@@ -11,6 +11,7 @@ on:
       - '.github/labels.yml'
 
 permissions:
+  contents: read
   issues: write
 
 jobs:
