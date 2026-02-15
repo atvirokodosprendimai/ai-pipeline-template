@@ -212,14 +212,51 @@ jobs:
         id: goose
         run: |
           echo "Starting Goose implementation..."
+          # max-turns limits LLM round-trips to control API costs.
+          # 50 is generous for most tasks; reduce if using paid-tier models.
+          set +e
           goose run \
             --no-session \
             --with-builtin "developer" \
             -i /tmp/goose-task.md \
             --max-turns 50 \
             2>&1 | tee /tmp/goose-output.log
+          GOOSE_EXIT=$?
+          set -e
 
-          echo "Goose finished with exit code: $?"
+          echo "Goose finished with exit code: $GOOSE_EXIT"
+
+          # Detect silent failures: Goose often exits 0 even on errors
+          ERRORS_FOUND=false
+
+          if grep -qiE "rate.?limit|quota.?exceeded|resource.?exhausted|429|too many requests" /tmp/goose-output.log; then
+            echo "::error::Goose hit API rate limits or quota exhaustion"
+            ERRORS_FOUND=true
+          fi
+
+          if grep -qiE "unauthorized|authentication|invalid.?api.?key|403|401" /tmp/goose-output.log; then
+            echo "::error::Goose encountered authentication/authorization errors"
+            ERRORS_FOUND=true
+          fi
+
+          if grep -qi "unexpected argument" /tmp/goose-output.log; then
+            echo "::error::Goose CLI argument error detected"
+            ERRORS_FOUND=true
+          fi
+
+          # Check if output is suspiciously short (Goose didn't actually run)
+          LINES=$(wc -l < /tmp/goose-output.log)
+          if [ "$LINES" -lt 5 ]; then
+            echo "::error::Goose output is suspiciously short ($LINES lines) — likely did not execute"
+            ERRORS_FOUND=true
+          fi
+
+          if [ "$GOOSE_EXIT" -ne 0 ] || [ "$ERRORS_FOUND" = "true" ]; then
+            echo "::error::Goose failed (exit=$GOOSE_EXIT, errors_detected=$ERRORS_FOUND)"
+            echo "--- Last 50 lines of Goose output ---"
+            tail -50 /tmp/goose-output.log
+            exit 1
+          fi
 
       # -- Commit and push -------------------------------------
       - name: Check for changes and commit
