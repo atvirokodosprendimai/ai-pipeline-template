@@ -319,7 +319,9 @@ jobs:
             echo "Goose finished with exit code: $GOOSE_EXIT"
 
             # ── Check for non-recoverable errors (fail immediately) ──
-            if grep -qiE "unauthorized|authentication|invalid.?api.?key" /tmp/goose-output.log; then
+            # Use narrow patterns to avoid false positives from code/docs
+            # that Goose reads or writes containing words like "authentication"
+            if grep -qiE "401 unauthorized|authentication failed|invalid.?api.?key|api key is invalid" /tmp/goose-output.log; then
               echo "::error::Goose encountered authentication errors (non-recoverable)"
               tail -30 /tmp/goose-output.log
               exit 1
@@ -332,8 +334,10 @@ jobs:
             fi
 
             # ── Check for rate limit errors (retryable) ──
+            # Use specific patterns to avoid false positives from source code
+            # line numbers (e.g. "429: fmt.Println()") or docs containing these words
             RATE_LIMITED=false
-            if grep -qiE "rate.?limit|quota.?exceeded|resource.?exhausted|429|too many requests" /tmp/goose-output.log; then
+            if grep -qiE "rate.?limit.?(exceeded|hit|reached)|quota.?exceeded|resource.?exhausted|HTTP.?429|status.?429|too many requests" /tmp/goose-output.log; then
               RATE_LIMITED=true
             fi
 
@@ -344,9 +348,11 @@ jobs:
               TOO_SHORT=true
             fi
 
-            # ── Success: no errors, meaningful output ──
-            if [ "$GOOSE_EXIT" -eq 0 ] && [ "$RATE_LIMITED" = "false" ] && [ "$TOO_SHORT" = "false" ]; then
-              echo "Goose completed successfully on attempt $ATTEMPT"
+            # ── Success: meaningful output, no fatal errors ──
+            # Goose CLI often exits 1 even on successful completion,
+            # so we check output quality rather than relying on exit code alone.
+            if [ "$RATE_LIMITED" = "false" ] && [ "$TOO_SHORT" = "false" ]; then
+              echo "Goose completed on attempt $ATTEMPT (exit=$GOOSE_EXIT)"
               SUCCEEDED=true
               break
             fi
