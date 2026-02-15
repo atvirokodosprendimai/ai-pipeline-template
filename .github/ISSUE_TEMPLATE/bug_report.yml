@@ -1,0 +1,77 @@
+name: Bug Report
+description: Report a bug in __PROJECT_NAME__
+title: "[Bug] "
+labels: ["type: bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. This issue will be automatically triaged by Copilot.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear description of what the bug is.
+      placeholder: What happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+      placeholder: What should have happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: Steps to reproduce the behavior.
+      placeholder: |
+        1. Run `...`
+        2. Observe behavior
+        3. See error
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which part of the project does this relate to?
+      options:
+        - Frontend
+        - Backend
+        - API
+        - CLI
+        - Database
+        - Infrastructure
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, language version, project version, relevant tool versions
+      placeholder: |
+        - OS: Ubuntu 22.04
+        - Language: __LANGUAGE__ __LANGUAGE_VERSION__
+        - Version: v0.1.0
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs
+      description: Any error output or logs (will be auto-formatted as code)
+      render: shell
+    validations:
+      required: false
