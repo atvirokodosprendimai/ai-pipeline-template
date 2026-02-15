@@ -17,56 +17,92 @@ jobs:
     if: github.event.label.name == 'needs-triage'
     runs-on: ubuntu-latest
     steps:
-      - name: Instruct Copilot to write specification
+      - name: Assign Copilot coding agent to write specification
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const issueNumber = context.issue.number;
             const issue = context.payload.issue;
+            const safeTitle = (issue.title || '')
+              .replace(/\r?\n/g, ' ')
+              .replace(/`/g, "'")
+              .replace(/[<>]/g, '')
+              .replace(/\s+/g, ' ')
+              .trim()
+              .slice(0, 180);
 
-            // Post a comment that @copilot will pick up as an instruction
+            // Build the spec-writing instructions for the agent_assignment payload.
+            const specInstructions = [
+              `Analyze this issue and create a **specification document only**. Do NOT write implementation code.`,
+              ``,
+              `Instructions:`,
+              `1. Read the issue title and description carefully`,
+              `2. Explore the codebase to understand the relevant components`,
+              `3. Create a file specs/issue-${issueNumber}-spec.md using this template:`,
+              ``,
+              `# Specification: Issue #${issueNumber}`,
+              ``,
+              `## Classification`,
+              `<!-- One of: fix, feature, refactor, wont-do, needs-info -->`,
+              ``,
+              `## Deliverables`,
+              `<!-- What needs to be delivered: code, documentation, or both -->`,
+              ``,
+              `## Problem Analysis`,
+              `<!-- Detailed analysis of what is wrong or what is being requested -->`,
+              ``,
+              `## Proposed Approach`,
+              `<!-- Step-by-step approach to solve this -->`,
+              `<!-- Be specific about which functions/files to modify -->`,
+              ``,
+              `## Affected Files`,
+              `<!-- List every file that would need changes -->`,
+              ``,
+              `## Test Strategy`,
+              `<!-- How to verify the fix/feature works -->`,
+              ``,
+              `## Estimated Complexity`,
+              `<!-- One of: low, medium, high -->`,
+              ``,
+              `4. Open a PR titled: spec: Issue #${issueNumber} - ${safeTitle}`,
+              `   Include "Issue #${issueNumber}" in the title for pipeline traceability.`,
+              `5. Target the main branch`,
+              `6. The PR should contain ONLY the spec file - no code changes`,
+            ].join('\n');
+
+            // Assign Copilot coding agent using the correct REST API.
+            // The assignee must be "copilot-swe-agent[bot]" (not "Copilot").
+            // See: https://docs.github.com/en/copilot/how-tos/use-copilot-agents/coding-agent/create-a-pr#using-the-rest-api
+            try {
+              await github.request('POST /repos/{owner}/{repo}/issues/{issue_number}/assignees', {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                assignees: ['copilot-swe-agent[bot]'],
+                agent_assignment: {
+                  custom_instructions: specInstructions,
+                },
+                headers: {
+                  'X-GitHub-Api-Version': '2022-11-28',
+                },
+              });
+              console.log(`Assigned copilot-swe-agent[bot] to issue #${issueNumber}`);
+            } catch (e) {
+              core.setFailed(`Failed to assign Copilot coding agent to issue #${issueNumber}: ${e.message}`);
+              return;
+            }
+
+            // Post a human-visible comment
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: issueNumber,
               body: [
-                `@copilot Please analyze this issue and create a **specification document only**. Do NOT write implementation code.`,
+                `Copilot coding agent has been assigned to write a specification for this issue.`,
                 ``,
-                `### Instructions`,
-                ``,
-                `1. Read the issue title and description carefully`,
-                `2. Explore the codebase to understand the relevant components`,
-                `3. Create a file \`specs/issue-${issueNumber}-spec.md\` using this template:`,
-                ``,
-                '```markdown',
-                `# Specification: Issue #${issueNumber}`,
-                ``,
-                `## Classification`,
-                `<!-- One of: fix, feature, refactor, wont-do, needs-info -->`,
-                ``,
-                `## Problem Analysis`,
-                `<!-- Detailed analysis of what is wrong or what is being requested -->`,
-                ``,
-                `## Proposed Approach`,
-                `<!-- Step-by-step approach to solve this -->`,
-                `<!-- Be specific about which functions/files to modify -->`,
-                ``,
-                `## Affected Files`,
-                `<!-- List every file that would need changes -->`,
-                ``,
-                `## Test Strategy`,
-                `<!-- How to verify the fix/feature works -->`,
-                `<!-- Include specific test cases if applicable -->`,
-                ``,
-                `## Estimated Complexity`,
-                `<!-- One of: low, medium, high -->`,
-                `<!-- Brief justification -->`,
-                '```',
-                ``,
-                `4. Open a PR titled: \`spec: Issue #${issueNumber} - ${issue.title.replace(/"/g, '\\"')}\``,
-                `5. Target the \`main\` branch`,
-                `6. The PR should contain ONLY the spec file - no code changes`,
+                `**Task:** Create \`specs/issue-${issueNumber}-spec.md\` and open a spec PR.`,
+                `No implementation code — spec only.`,
               ].join('\n')
             });
 
@@ -79,7 +115,6 @@ jobs:
                 name: 'needs-triage'
               });
             } catch (e) {
-              // Label may already have been removed
               console.log('Could not remove needs-triage label:', e.message);
             }
 
