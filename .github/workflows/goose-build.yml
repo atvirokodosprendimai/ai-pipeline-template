@@ -1,12 +1,22 @@
 name: Goose Implementation
 
-# Triggered when a spec PR is labeled 'approved-for-build'.
-# Reads the spec file, runs Goose to implement the code, and creates
-# a draft implementation PR for human review.
+# Triggered when:
+# 1. A spec PR is labeled 'approved-for-build' (normal flow)
+# 2. Manually via workflow_dispatch (re-trigger for merged PRs or retries)
 
 on:
   pull_request:
     types: [labeled]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: 'Issue number to implement (e.g. 24)'
+        required: true
+        type: string
+      spec_pr_number:
+        description: 'Spec PR number (for tracking, e.g. 28)'
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -16,20 +26,31 @@ permissions:
 env:
   GOOSE_PROVIDER: __GOOSE_PROVIDER__
   GOOSE_MODEL: __GOOSE_MODEL__
-  # Goose requires the provider-specific key
+  # Goose requires the provider-specific key.
+  # If using z.ai with Anthropic-compatible endpoint, set:
+  #   GOOSE_PROVIDER: anthropic
+  #   ANTHROPIC_API_KEY: ${{ secrets.__API_KEY_SECRET__ }}
+  #   ANTHROPIC_HOST: https://api.z.ai/api/anthropic
   __API_KEY_SECRET__: ${{ secrets.__API_KEY_SECRET__ }}
 
 jobs:
   implement:
-    if: github.event.label.name == 'approved-for-build'
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.label.name == 'approved-for-build'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     concurrency:
-      group: goose-implement-${{ github.event.pull_request.number }}
+      group: >-
+        goose-implement-${{
+          github.event_name == 'workflow_dispatch'
+          && github.event.inputs.issue_number
+          || github.event.pull_request.number
+        }}
       cancel-in-progress: false
 
     steps:
-      # -- Validate prerequisites --------------------------------
+      # ── Validate prerequisites ──────────────────────────
       - name: Validate API key is configured
         env:
           KEY: ${{ secrets.__API_KEY_SECRET__ }}
@@ -39,16 +60,21 @@ jobs:
             exit 1
           fi
 
-      - name: Verify label was applied by authorized user
+      - name: Verify authorization
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            // Log the PR branch for audit trail
+            if (context.eventName === 'workflow_dispatch') {
+              // workflow_dispatch already requires write access to trigger
+              console.log(`Manual dispatch by @${context.actor}`);
+              return;
+            }
+
+            // For PR label events, verify the sender has write access
             const pr = context.payload.pull_request;
             console.log(`Spec PR branch: ${pr.head.ref}`);
 
-            // Verify the label event was triggered by a user with write access
             const sender = context.payload.sender;
             if (sender) {
               try {
@@ -68,13 +94,17 @@ jobs:
               }
             }
 
-      # -- Setup ------------------------------------------------
+      # ── Setup ──────────────────────────────────────────
+      # PUSH_TOKEN is a PAT with 'repo' + 'workflow' scopes.
+      # Required because GITHUB_TOKEN cannot push workflow file changes.
+      # Falls back to GITHUB_TOKEN for non-workflow changes; set PUSH_TOKEN
+      # in Settings > Secrets > Actions if Goose may modify workflow files.
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           ref: main
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.PUSH_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Setup __LANGUAGE__
         uses: __SETUP_ACTION__
@@ -93,47 +123,97 @@ jobs:
           # Verify installation
           $HOME/.local/bin/goose --version
 
-      # -- Extract spec details --------------------------------
+      # ── Extract spec details ───────────────────────────
       - name: Extract issue number and spec metadata
         id: spec
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const pr = context.payload.pull_request;
+            let issueNumber, specBranch, specPRNumber;
 
-            // Parse issue number from PR title: "spec: Issue #123 - ..."
-            const match = pr.title.match(/Issue #(\d+)/);
-            if (!match) {
-              core.setFailed('Could not extract issue number from PR title: ' + pr.title);
-              return;
+            if (context.eventName === 'workflow_dispatch') {
+              // Manual trigger — inputs provided directly
+              issueNumber = context.payload.inputs.issue_number;
+              specPRNumber = context.payload.inputs.spec_pr_number;
+
+              // Look up the spec PR to find its branch (may be merged)
+              const { data: pr } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: parseInt(specPRNumber),
+              });
+              specBranch = pr.head.ref;
+              console.log(`Manual dispatch: issue #${issueNumber}, spec PR #${specPRNumber} (${pr.state})`);
+            } else {
+              // PR label trigger — extract from PR context
+              const pr = context.payload.pull_request;
+
+              // Prefer extracting issue number from the spec filename in PR changes.
+              const files = await github.paginate(github.rest.pulls.listFiles, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr.number,
+                per_page: 100,
+              });
+
+              issueNumber = null;
+              for (const file of files) {
+                const match = file.filename.match(/^specs\/issue-(\d+)-spec\.md$/);
+                if (match) {
+                  issueNumber = match[1];
+                  break;
+                }
+              }
+
+              // Backward-compatible fallback for older PRs.
+              if (!issueNumber) {
+                const titleMatch = pr.title.match(/Issue #(\d+)/);
+                if (titleMatch) {
+                  issueNumber = titleMatch[1];
+                }
+              }
+
+              if (!issueNumber) {
+                core.setFailed(
+                  'Could not extract issue number from spec filename or PR title. ' +
+                  'Expected changed file like specs/issue-N-spec.md or title containing "Issue #N". ' +
+                  'PR title: ' + pr.title
+                );
+                return;
+              }
+
+              specBranch = pr.head.ref;
+              specPRNumber = String(pr.number);
             }
-            const issueNumber = match[1];
 
             core.setOutput('issue_number', issueNumber);
-            core.setOutput('spec_branch', pr.head.ref);
-            core.setOutput('spec_pr_number', pr.number);
+            core.setOutput('spec_branch', specBranch);
+            core.setOutput('spec_pr_number', specPRNumber);
             core.setOutput('impl_branch', `goose/issue-${issueNumber}`);
 
             console.log(`Issue: #${issueNumber}`);
-            console.log(`Spec branch: ${pr.head.ref}`);
-            console.log(`Spec PR: #${pr.number}`);
+            console.log(`Spec branch: ${specBranch}`);
+            console.log(`Spec PR: #${specPRNumber}`);
 
-      - name: Fetch spec file from spec branch
+      - name: Fetch spec file
         run: |
-          # Fetch the spec branch to access the spec file
-          git fetch origin ${{ steps.spec.outputs.spec_branch }}
-          git checkout origin/${{ steps.spec.outputs.spec_branch }} -- \
-            "specs/issue-${{ steps.spec.outputs.issue_number }}-spec.md" 2>/dev/null || true
-
           SPEC_FILE="specs/issue-${{ steps.spec.outputs.issue_number }}-spec.md"
+
+          # Check if spec file already exists on main (merged PR case)
+          if [ -f "$SPEC_FILE" ]; then
+            echo "Spec file found on main (already merged)"
+          else
+            # Try fetching from the spec branch
+            echo "Fetching spec from branch: ${{ steps.spec.outputs.spec_branch }}"
+            git fetch origin ${{ steps.spec.outputs.spec_branch }} 2>/dev/null || true
+            git checkout origin/${{ steps.spec.outputs.spec_branch }} -- "$SPEC_FILE" 2>/dev/null || true
+          fi
 
           if [ ! -f "$SPEC_FILE" ]; then
             echo "::error::Spec file not found: $SPEC_FILE"
             echo "Listing specs/ directory:"
             ls -la specs/ 2>/dev/null || echo "specs/ directory does not exist"
-            echo "Listing all changed files on spec branch:"
-            git diff --name-only main...origin/${{ steps.spec.outputs.spec_branch }} || true
             exit 1
           fi
 
@@ -142,7 +222,7 @@ jobs:
           cat "$SPEC_FILE"
           echo "--- End Spec ---"
 
-      # -- Prepare implementation branch -----------------------
+      # ── Prepare implementation branch ──────────────────
       - name: Create implementation branch
         run: |
           git checkout main
@@ -157,7 +237,7 @@ jobs:
           git checkout -b "$BRANCH"
           echo "Created branch: $BRANCH"
 
-      # -- Run Goose -------------------------------------------
+      # ── Build Goose instructions ─────────────────────────
       - name: Build Goose instructions
         run: |
           ISSUE_NUM="${{ steps.spec.outputs.issue_number }}"
@@ -208,86 +288,153 @@ jobs:
           echo "Goose instructions written to /tmp/goose-task.md"
           wc -l /tmp/goose-task.md
 
+      # ── Run Goose ──────────────────────────────────────
       - name: Run Goose
         id: goose
         run: |
-          echo "Starting Goose implementation..."
-          # max-turns limits LLM round-trips to control API costs.
-          # 50 is generous for most tasks; reduce if using paid-tier models.
-          set +e
-          goose run \
-            --no-session \
-            --with-builtin "developer" \
-            -i /tmp/goose-task.md \
-            --max-turns 50 \
-            2>&1 | tee /tmp/goose-output.log
-          GOOSE_EXIT=$?
-          set -e
+          MAX_ATTEMPTS=3
+          BACKOFF=30  # initial delay in seconds
+          SUCCEEDED=false
 
-          echo "Goose finished with exit code: $GOOSE_EXIT"
+          for ATTEMPT in $(seq 1 $MAX_ATTEMPTS); do
+            echo "=== Goose attempt $ATTEMPT/$MAX_ATTEMPTS ==="
 
-          # Detect silent failures: Goose often exits 0 even on errors
-          ERRORS_FOUND=false
+            # Reset working tree to clean state for retries
+            if [ "$ATTEMPT" -gt 1 ]; then
+              echo "Restoring clean state for retry..."
+              git checkout -- . 2>/dev/null || true
+              git clean -fd 2>/dev/null || true
+            fi
 
-          if grep -qiE "rate.?limit|quota.?exceeded|resource.?exhausted|429|too many requests" /tmp/goose-output.log; then
-            echo "::error::Goose hit API rate limits or quota exhaustion"
-            ERRORS_FOUND=true
-          fi
+            set +e
+            goose run \
+              --no-session \
+              --with-builtin "developer" \
+              -i /tmp/goose-task.md \
+              --max-turns 50 \
+              2>&1 | tee /tmp/goose-output.log
+            GOOSE_EXIT=$?
+            set -e
 
-          if grep -qiE "unauthorized|authentication|invalid.?api.?key|403|401" /tmp/goose-output.log; then
-            echo "::error::Goose encountered authentication/authorization errors"
-            ERRORS_FOUND=true
-          fi
+            echo "Goose finished with exit code: $GOOSE_EXIT"
 
-          if grep -qi "unexpected argument" /tmp/goose-output.log; then
-            echo "::error::Goose CLI argument error detected"
-            ERRORS_FOUND=true
-          fi
+            # ── Check for non-recoverable errors (fail immediately) ──
+            if grep -qiE "unauthorized|authentication|invalid.?api.?key" /tmp/goose-output.log; then
+              echo "::error::Goose encountered authentication errors (non-recoverable)"
+              tail -30 /tmp/goose-output.log
+              exit 1
+            fi
 
-          # Check if output is suspiciously short (Goose didn't actually run)
-          LINES=$(wc -l < /tmp/goose-output.log)
-          if [ "$LINES" -lt 5 ]; then
-            echo "::error::Goose output is suspiciously short ($LINES lines) — likely did not execute"
-            ERRORS_FOUND=true
-          fi
+            if grep -qi "unexpected argument" /tmp/goose-output.log; then
+              echo "::error::Goose CLI argument error (non-recoverable)"
+              tail -30 /tmp/goose-output.log
+              exit 1
+            fi
 
-          if [ "$GOOSE_EXIT" -ne 0 ] || [ "$ERRORS_FOUND" = "true" ]; then
-            echo "::error::Goose failed (exit=$GOOSE_EXIT, errors_detected=$ERRORS_FOUND)"
+            # ── Check for rate limit errors (retryable) ──
+            RATE_LIMITED=false
+            if grep -qiE "rate.?limit|quota.?exceeded|resource.?exhausted|429|too many requests" /tmp/goose-output.log; then
+              RATE_LIMITED=true
+            fi
+
+            # ── Check if output is suspiciously short ──
+            LINES=$(wc -l < /tmp/goose-output.log)
+            TOO_SHORT=false
+            if [ "$LINES" -lt 5 ]; then
+              TOO_SHORT=true
+            fi
+
+            # ── Success: no errors, meaningful output ──
+            if [ "$GOOSE_EXIT" -eq 0 ] && [ "$RATE_LIMITED" = "false" ] && [ "$TOO_SHORT" = "false" ]; then
+              echo "Goose completed successfully on attempt $ATTEMPT"
+              SUCCEEDED=true
+              break
+            fi
+
+            # ── Parse retry delay from Goose output if available ──
+            SUGGESTED_DELAY=$(grep -oP 'retry in \K[0-9]+' /tmp/goose-output.log 2>/dev/null | tail -1)
+            if [ -n "$SUGGESTED_DELAY" ] && [ "$SUGGESTED_DELAY" -gt "$BACKOFF" ] 2>/dev/null; then
+              WAIT=$((SUGGESTED_DELAY + 5))  # add 5s buffer
+            else
+              WAIT=$BACKOFF
+            fi
+
+            # ── Log and sleep ──
+            if [ "$RATE_LIMITED" = "true" ]; then
+              echo "::warning::Rate limited on attempt $ATTEMPT. Waiting ${WAIT}s before retry..."
+            elif [ "$TOO_SHORT" = "true" ]; then
+              echo "::warning::Suspiciously short output ($LINES lines) on attempt $ATTEMPT. Waiting ${WAIT}s..."
+            else
+              echo "::warning::Goose failed (exit=$GOOSE_EXIT) on attempt $ATTEMPT. Waiting ${WAIT}s..."
+            fi
+            sleep "$WAIT"
+            BACKOFF=$((BACKOFF * 2))
+          done
+
+          if [ "$SUCCEEDED" != "true" ]; then
+            echo "::error::Goose failed after $MAX_ATTEMPTS attempts"
             echo "--- Last 50 lines of Goose output ---"
             tail -50 /tmp/goose-output.log
             exit 1
           fi
 
-      # -- Commit and push -------------------------------------
-      - name: Check for changes and commit
+      # ── Validate implementation ───────────────────────
+      - name: Validate implementation
+        id: validate
+        run: |
+          echo "=== Checking for changes ==="
+          if git diff --quiet && git diff --cached --quiet; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "::warning::Goose did not produce any code changes"
+            exit 0
+          fi
+          echo "has_changes=true" >> $GITHUB_OUTPUT
+
+          echo "=== Running build ==="
+          if ! __BUILD_CMD__; then
+            echo "::error::Build failed on Goose's changes"
+            exit 1
+          fi
+
+          echo "=== Running tests ==="
+          if ! __TEST_CMD__; then
+            echo "::error::Tests failed on Goose's changes"
+            exit 1
+          fi
+
+          echo "=== Running lint ==="
+          if ! __LINT_CMD__; then
+            echo "::error::Lint failed on Goose's changes"
+            exit 1
+          fi
+
+          echo "All validation checks passed"
+
+      # ── Commit and push ────────────────────────────────
+      - name: Commit and push
         id: commit
+        if: steps.validate.outputs.has_changes == 'true'
         run: |
           # Stage all changes except the spec file (it belongs to the spec PR)
           git add -A
           # Unstage the spec file if it was added
           git reset HEAD -- "specs/issue-${{ steps.spec.outputs.issue_number }}-spec.md" 2>/dev/null || true
 
-          if git diff --cached --quiet; then
-            echo "has_changes=false" >> $GITHUB_OUTPUT
-            echo "::warning::Goose did not produce any code changes"
-          else
-            echo "has_changes=true" >> $GITHUB_OUTPUT
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "impl: Issue #${{ steps.spec.outputs.issue_number }} - Goose implementation
 
-            git commit -m "impl: Issue #${{ steps.spec.outputs.issue_number }} - Goose implementation
+          Automated implementation based on specification from PR #${{ steps.spec.outputs.spec_pr_number }}.
+          Generated by Goose (block/goose) with ${{ env.GOOSE_MODEL }}.
+          Validated: build, test, and lint all passed."
 
-            Automated implementation based on specification from PR #${{ steps.spec.outputs.spec_pr_number }}.
-            Generated by Goose (block/goose) with ${{ env.GOOSE_MODEL }}."
+          git push origin ${{ steps.spec.outputs.impl_branch }}
+          echo "Pushed implementation to ${{ steps.spec.outputs.impl_branch }}"
 
-            git push origin ${{ steps.spec.outputs.impl_branch }}
-            echo "Pushed implementation to ${{ steps.spec.outputs.impl_branch }}"
-          fi
-
-      # -- Create implementation PR ----------------------------
+      # ── Create implementation PR ───────────────────────
       - name: Create implementation PR
-        if: steps.commit.outputs.has_changes == 'true'
+        if: steps.validate.outputs.has_changes == 'true'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -296,14 +443,14 @@ jobs:
             const specPR = '${{ steps.spec.outputs.spec_pr_number }}';
             const implBranch = '${{ steps.spec.outputs.impl_branch }}';
 
-            // Create draft PR
+            // Create PR (ready for review, not draft)
             const { data: pr } = await github.rest.pulls.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
               title: `impl: Issue #${issueNum} - Goose implementation`,
               head: implBranch,
               base: 'main',
-              draft: true,
+              draft: false,
               body: [
                 `## Goose Implementation`,
                 ``,
@@ -320,19 +467,35 @@ jobs:
                 `| Goose implementation | This PR |`,
                 `| Human code review | **Pending** |`,
                 ``,
-                `### Review Checklist`,
+                `### CI Validation (pre-PR)`,
                 ``,
-                `- [ ] Code changes match the specification`,
-                `- [ ] Tests pass and cover the changes`,
-                `- [ ] No unintended side effects`,
-                `- [ ] Code style follows project conventions`,
-                `- [ ] Security considerations addressed`,
+                `- [x] Build passed`,
+                `- [x] Tests passed`,
+                `- [x] Lint passed`,
+                ``,
+                `### Downloads`,
+                ``,
+                `Build artifacts will be available once CI completes: **[Download artifacts](${process.env.GITHUB_SERVER_URL}/${context.repo.owner}/${context.repo.repo}/actions?query=branch%3A${implBranch})**`,
                 ``,
                 `---`,
-                `*This PR was automatically generated by [Goose](https://github.com/block/goose).*`,
-                `*Please review carefully before merging.*`,
+                `*Generated by [Goose](https://github.com/block/goose) with ${process.env.GOOSE_MODEL}. Auto-merges after approval.*`,
               ].join('\n')
             });
+
+            // Enable auto-merge (merges automatically once reviews and checks pass)
+            // Requires "Allow auto-merge" to be enabled in repo settings.
+            try {
+              await github.graphql(`
+                mutation($prId: ID!) {
+                  enablePullRequestAutoMerge(input: {pullRequestId: $prId, mergeMethod: SQUASH}) {
+                    clientMutationId
+                  }
+                }
+              `, { prId: pr.node_id });
+              console.log(`Auto-merge enabled for PR #${pr.number}`);
+            } catch (e) {
+              console.log(`Could not enable auto-merge (may need repo setting): ${e.message}`);
+            }
 
             // Label the implementation PR
             await github.rest.issues.addLabels({
@@ -369,9 +532,9 @@ jobs:
 
             console.log(`Created implementation PR #${pr.number}`);
 
-      # -- Handle no-changes case ------------------------------
+      # ── Handle no-changes case ─────────────────────────
       - name: Report no changes
-        if: steps.commit.outputs.has_changes == 'false'
+        if: steps.validate.outputs.has_changes == 'false'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
