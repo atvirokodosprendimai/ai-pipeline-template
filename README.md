@@ -44,6 +44,7 @@ git add -A && git commit -m "Initialize AI pipeline" && git push
 1. **Add your LLM API key** as a repository secret (Settings > Secrets > Actions)
 2. **Enable Copilot coding agent** (Settings > Copilot > Coding agent)
 3. **Run the "Sync Labels" workflow** from the Actions tab to create pipeline labels
+4. **(Optional) Set up a project board** — see [CONTRIBUTING.md](CONTRIBUTING.md#board-setup) for instructions
 
 ## Supported Languages
 
@@ -83,7 +84,9 @@ Only users with **write access** to the repository can use these commands.
     approve-build.yml         # Handles /approve, /wont-do, /needs-info
     goose-build.yml           # Installs toolchain + Goose, runs implementation
     sync-labels.yml           # Creates/syncs pipeline labels
+    board-sync.yml            # Auto-moves project board items by label
 .goosehints                   # Goose project context (edit for your project)
+CONTRIBUTING.md               # Pipeline guide for contributors
 specs/                        # Spec documents go here (auto-created by Copilot)
 docs/
   pipeline-flow.d2            # Pipeline diagram source (D2 language)

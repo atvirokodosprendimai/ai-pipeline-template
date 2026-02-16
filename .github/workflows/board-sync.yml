@@ -1,0 +1,158 @@
+name: Sync Board Status
+
+# Keeps the project board in sync with reality.
+# Labels are facts applied by other workflows — this one just
+# moves items to the matching column so the board is always accurate.
+#
+# SETUP REQUIRED: Replace the placeholder IDs below with your
+# project's actual IDs. See CONTRIBUTING.md for instructions.
+
+on:
+  issues:
+    types: [labeled, closed, reopened]
+  pull_request:
+    types: [labeled, closed, reopened]
+
+env:
+  # ┌─────────────────────────────────────────────────────────┐
+  # │ Replace these with your GitHub Project field IDs.       │
+  # │ See CONTRIBUTING.md § "Board Setup" for how to find them│
+  # └─────────────────────────────────────────────────────────┘
+  PROJECT_ID: "__PROJECT_ID__"
+  STATUS_FIELD_ID: "__STATUS_FIELD_ID__"
+  # Status option IDs (from project field config)
+  COL_TRIAGE: "__COL_TRIAGE__"
+  COL_SPEC_IN_PROGRESS: "__COL_SPEC_IN_PROGRESS__"
+  COL_REVIEW_SPEC: "__COL_REVIEW_SPEC__"
+  COL_BUILDING: "__COL_BUILDING__"
+  COL_REVIEW_CODE: "__COL_REVIEW_CODE__"
+  COL_DONE: "__COL_DONE__"
+
+permissions:
+  issues: read
+  pull-requests: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    # Skip if placeholder IDs haven't been replaced
+    if: ${{ !contains(env.PROJECT_ID, '__') }}
+    steps:
+      - name: Move item to correct column
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.PUSH_TOKEN }}
+          script: |
+            const projectId = process.env.PROJECT_ID;
+            const fieldId = process.env.STATUS_FIELD_ID;
+
+            // Label → column mapping (first match wins, order = priority)
+            const labelToColumn = [
+              { labels: ['needs-review'],                       col: process.env.COL_REVIEW_CODE },
+              { labels: ['approved-for-build', 'goose-implementation'], col: process.env.COL_BUILDING },
+              { labels: ['spec-ready'],                         col: process.env.COL_REVIEW_SPEC },
+              { labels: ['copilot-triaging', 'copilot-revising'], col: process.env.COL_SPEC_IN_PROGRESS },
+              { labels: ['needs-triage'],                       col: process.env.COL_TRIAGE },
+            ];
+
+            // Get the content node ID (issue or PR)
+            const item = context.payload.issue || context.payload.pull_request;
+            const nodeId = item.node_id;
+            const itemLabels = item.labels.map(l => l.name);
+            const isClosed = item.state === 'closed';
+
+            // Determine target column
+            let targetCol = null;
+
+            if (isClosed) {
+              targetCol = process.env.COL_DONE;
+            } else {
+              for (const rule of labelToColumn) {
+                if (rule.labels.some(l => itemLabels.includes(l))) {
+                  targetCol = rule.col;
+                  break;
+                }
+              }
+            }
+
+            // Reopened items with no matching label go back to Triage
+            if (!targetCol && context.payload.action === 'reopened') {
+              targetCol = process.env.COL_TRIAGE;
+            }
+
+            if (!targetCol) {
+              console.log(`No column mapping for labels: [${itemLabels.join(', ')}]`);
+              return;
+            }
+
+            // Find or add the item on the project board
+            const { node } = await github.graphql(`
+              query($nodeId: ID!) {
+                node(id: $nodeId) {
+                  ... on Issue {
+                    projectItems(first: 10) {
+                      nodes {
+                        id
+                        project { id }
+                      }
+                    }
+                  }
+                  ... on PullRequest {
+                    projectItems(first: 10) {
+                      nodes {
+                        id
+                        project { id }
+                      }
+                    }
+                  }
+                }
+              }
+            `, { nodeId });
+
+            let projectItemId = null;
+            const items = node?.projectItems?.nodes || [];
+            const match = items.find(i => i.project.id === projectId);
+
+            if (match) {
+              projectItemId = match.id;
+            } else {
+              // Item not on the board yet — add it
+              const addResult = await github.graphql(`
+                mutation($projectId: ID!, $contentId: ID!) {
+                  addProjectV2ItemById(input: {projectId: $projectId, contentId: $contentId}) {
+                    item { id }
+                  }
+                }
+              `, { projectId, contentId: nodeId });
+              projectItemId = addResult.addProjectV2ItemById.item.id;
+              console.log(`Added to board: ${item.title}`);
+            }
+
+            // Update the status field
+            await github.graphql(`
+              mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+                updateProjectV2ItemFieldValue(input: {
+                  projectId: $projectId
+                  itemId: $itemId
+                  fieldId: $fieldId
+                  value: {singleSelectOptionId: $optionId}
+                }) {
+                  projectV2Item { id }
+                }
+              }
+            `, {
+              projectId,
+              itemId: projectItemId,
+              fieldId,
+              optionId: targetCol,
+            });
+
+            const colNames = {
+              [process.env.COL_TRIAGE]: 'Triage',
+              [process.env.COL_SPEC_IN_PROGRESS]: 'Spec in Progress',
+              [process.env.COL_REVIEW_SPEC]: 'Review Spec',
+              [process.env.COL_BUILDING]: 'Building',
+              [process.env.COL_REVIEW_CODE]: 'Review Code',
+              [process.env.COL_DONE]: 'Done',
+            };
+            console.log(`Moved "${item.title}" → ${colNames[targetCol]}`);

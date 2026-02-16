@@ -10,6 +10,10 @@
   color: "C2E0C6"
   description: "Copilot is analyzing the issue and writing a spec"
 
+- name: copilot-revising
+  color: "C2E0C6"
+  description: "Copilot is revising the spec based on review feedback"
+
 - name: spec-ready
   color: "0E8A16"
   description: "Spec PR created, awaiting human review"
