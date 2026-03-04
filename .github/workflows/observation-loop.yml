@@ -1,4 +1,4 @@
-name: Company Control Loop
+name: Observation Loop
 
 on:
   schedule:
@@ -14,7 +14,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: company-loop
+  group: observation-loop
   cancel-in-progress: false
 
 jobs:
@@ -70,10 +70,10 @@ jobs:
 
       - name: Call LLM (or generate stub)
         env:
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OBSERVER_API_KEY: ${{ secrets.__OBSERVER_API_KEY_SECRET__ }}
         run: |
-          if [ -z "$OPENROUTER_API_KEY" ]; then
-            echo "::warning::OPENROUTER_API_KEY not set — generating stub assessment."
+          if [ -z "$OBSERVER_API_KEY" ]; then
+            echo "::warning::Observer API key not set — generating stub assessment."
             today=$(date -u '+%Y-%m-%d')
             cat > /tmp/assessment.json <<STUBEOF
           {
@@ -81,14 +81,14 @@ jobs:
             "funnel_stage": 0,
             "stage_name": "Foundation",
             "runway": {"monthly_burn_eur": null, "months_remaining": null, "survival_mode": false},
-            "assessment": "First run — OPENROUTER_API_KEY not configured. The loop infrastructure is deployed but cannot call the LLM yet. This is a needs-human blocker.",
-            "blockers": ["OPENROUTER_API_KEY not set in GitHub secrets"],
-            "top_actions": [{"rank": 1, "action": "Set OPENROUTER_API_KEY in repo secrets", "function": "fn:ops", "leverage": "Unblocks the entire control loop", "cost": "cheap"}],
+            "assessment": "First run — observer API key not configured. The loop infrastructure is deployed but cannot call the LLM yet. This is a needs-human blocker.",
+            "blockers": ["Observer API key not set in GitHub secrets"],
+            "top_actions": [{"rank": 1, "action": "Set observer API key in repo secrets", "function": "fn:ops", "leverage": "Unblocks the entire control loop", "cost": "cheap"}],
             "issues_to_create": [],
             "issues_to_close": [],
             "contributions": [],
             "reciprocation_proposals": [],
-            "needs_human": [{"request": "Add OPENROUTER_API_KEY to repository secrets", "reason": "Loop cannot function without LLM access", "urgency": "blocking"}]
+            "needs_human": [{"request": "Add observer API key to repository secrets", "reason": "Loop cannot function without LLM access", "urgency": "blocking"}]
           }
           STUBEOF
           else
@@ -105,21 +105,21 @@ jobs:
           Please provide your assessment as a JSON object per the output format in your system prompt.
           MSGEOF
 
-            # Call OpenRouter API (Anthropic-compatible)
+            # Call LLM via OpenAI-compatible API
             jq -n \
               --rawfile system company/system-prompt.md \
               --rawfile user /tmp/user_message.txt \
               '{
-                model: "anthropic/claude-sonnet-4",
+                model: "__OBSERVER_MODEL__",
                 max_tokens: 4096,
                 messages: [{role: "system", content: $system}, {role: "user", content: $user}]
               }' > /tmp/request.json
 
             http_code=$(curl -s -w '%{http_code}' -o /tmp/llm_response.json \
-              -H "Authorization: Bearer $OPENROUTER_API_KEY" \
+              -H "Authorization: Bearer $OBSERVER_API_KEY" \
               -H "content-type: application/json" \
               -d @/tmp/request.json \
-              https://openrouter.ai/api/v1/chat/completions)
+              __OBSERVER_API_URL__)
 
             if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
               content=$(jq -r '.choices[0].message.content' /tmp/llm_response.json)
@@ -129,16 +129,16 @@ jobs:
               fi
             else
               api_error=$(jq -r '.error.message // "unknown error"' /tmp/llm_response.json 2>/dev/null || echo "HTTP $http_code")
-              echo "::warning::OpenRouter API returned HTTP $http_code: $api_error — falling back to stub."
+              echo "::warning::Observer LLM returned HTTP $http_code: $api_error — falling back to stub."
               today=$(date -u '+%Y-%m-%d')
               jq -n --arg ts "${today}T08:00:00Z" --arg err "$api_error" '{
                 timestamp: $ts, funnel_stage: 0, stage_name: "Foundation",
                 runway: {monthly_burn_eur: null, months_remaining: null, survival_mode: false},
                 assessment: ("LLM call failed: " + $err + ". Falling back to stub assessment."),
-                blockers: [("Anthropic API error: " + $err)],
-                top_actions: [{rank: 1, action: "Fix Anthropic API access", function: "fn:ops", leverage: "Unblocks LLM assessments", cost: "cheap"}],
+                blockers: [("Observer API error: " + $err)],
+                top_actions: [{rank: 1, action: "Fix observer API access", function: "fn:ops", leverage: "Unblocks LLM assessments", cost: "cheap"}],
                 issues_to_create: [], issues_to_close: [], contributions: [], reciprocation_proposals: [],
-                needs_human: [{request: "Fix Anthropic API access", reason: $err, urgency: "blocking"}]
+                needs_human: [{request: "Fix observer API access", reason: $err, urgency: "blocking"}]
               }' > /tmp/assessment.json
             fi
           fi
@@ -206,8 +206,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.PUSH_TOKEN }}
         run: |
-          git config user.name "company-loop[bot]"
-          git config user.email "company-loop[bot]@users.noreply.github.com"
+          git config user.name "observation-loop[bot]"
+          git config user.email "observation-loop[bot]@users.noreply.github.com"
           git add company/loop-state.json company/loop-history/
           git diff --cached --quiet && echo "No changes to commit" && exit 0
 
@@ -219,7 +219,7 @@ jobs:
 
           pr_url=$(gh pr create \
             --title "loop: daily assessment $today" \
-            --body "Automated assessment from company control loop." \
+            --body "Automated assessment from observation loop." \
             --base main \
             --head "$branch")
           gh pr merge "$pr_url" --squash --admin --delete-branch
@@ -271,7 +271,7 @@ jobs:
           jq -c '.issues_to_close // [] | .[]' /tmp/assessment.json | while read -r item; do
             number=$(echo "$item" | jq -r '.number')
             reason=$(echo "$item" | jq -r '.reason')
-            gh issue close "$number" --comment "Closed by company loop: $reason" || true
+            gh issue close "$number" --comment "Closed by observation loop: $reason" || true
           done
 
       - name: Create needs-human issue if requested
@@ -307,7 +307,7 @@ jobs:
             done < /tmp/open_issues.txt
 
             if [ "$match_count" = "0" ]; then
-              body=$(printf '**Urgency**: %s\n\n**Reason**: %s\n\n_Created by company control loop._' "$urgency" "$reason")
+              body=$(printf '**Urgency**: %s\n\n**Reason**: %s\n\n_Created by observation loop._' "$urgency" "$reason")
               gh issue create \
                 --title "$full_title" \
                 --body "$body" \

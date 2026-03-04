@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 # Collect infrastructure health signals for the company control loop.
-# Checks known service endpoints. Expand as services come online.
+# Reads endpoints from company/health.json.
 # Output: JSON to stdout.
 set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+HEALTH_FILE="$REPO_ROOT/company/health.json"
 
 check_health() {
   local name="$1" url="$2"
@@ -26,16 +29,24 @@ check_health() {
     '{name: $name, url: $url, status: $status, latency_ms: $latency}'
 }
 
-chimney=$(check_health "chimney" "https://chimney.beerpub.dev")
-cloudroof=$(check_health "cloudroof" "https://cloudroof.eu")
+# Read endpoints from health.json
+results="[]"
+if [ -f "$HEALTH_FILE" ]; then
+  endpoints=$(jq -c '.endpoints // [] | .[]' "$HEALTH_FILE" 2>/dev/null || echo "")
+  while IFS= read -r ep; do
+    [ -z "$ep" ] && continue
+    name=$(echo "$ep" | jq -r '.name')
+    url=$(echo "$ep" | jq -r '.url')
+    result=$(check_health "$name" "$url")
+    results=$(echo "$results" | jq --argjson r "$result" '. + [$r]')
+  done <<< "$endpoints"
+fi
 
-# Build JSON safely with jq
 jq -n \
   --arg collected_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
-  --argjson chimney "$chimney" \
-  --argjson cloudroof "$cloudroof" \
+  --argjson services "$results" \
   '{
     source: "infrastructure",
     collected_at: $collected_at,
-    services: [$chimney, $cloudroof]
+    services: $services
   }'

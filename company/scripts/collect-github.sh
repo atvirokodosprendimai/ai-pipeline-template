@@ -4,7 +4,7 @@
 # Output: JSON to stdout.
 set -euo pipefail
 
-REPO="${GITHUB_REPOSITORY:-atvirokodosprendimai/wgmesh}"
+REPO="${GITHUB_REPOSITORY:?GITHUB_REPOSITORY must be set}"
 API="https://api.github.com"
 AUTH=""
 if [ -n "${GITHUB_TOKEN:-}" ]; then
