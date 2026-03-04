@@ -1,18 +1,28 @@
 # AI Pipeline Template
 
-Drop-in AI pipeline: **GitHub Copilot** writes specs, **humans** approve, **Goose** builds code. Works with any language.
+Autonomous product pipeline for AI-native startups. An **observation loop** watches your project state, an LLM decides what to do, and **AI agents** write specs and code — with humans approving at two gates.
 
 ![Pipeline Flow](docs/pipeline-flow.svg)
 
-## How It Works
+## The Full Loop
+
+```
+observe → assess → create issues → [spec agent] → HUMAN approves → [build agent] → HUMAN merges
+    ↑                                                                                      |
+    └──────────────────────────────────────────────────────────────────────────────────────┘
+```
 
 | Phase | Actor | What Happens |
 |-------|-------|-------------|
-| 1. Issue | User | Files a bug report or feature request via issue template |
-| 2. Triage | Copilot | Analyzes the issue, writes a specification document, opens a spec PR |
-| 3. Approval | Human | Reviews the spec PR. Comments `/approve`, `/wont-do`, or `/needs-info` |
-| 4. Build | Goose | Reads the approved spec, implements the code, opens a draft PR |
-| 5. Review | Human | Reviews the implementation PR, merges to main |
+| 0. Observe | Loop | Collects GitHub signals, infra health, costs, contributions daily |
+| 1. Assess | LLM | Reads state, determines funnel stage, decides highest-leverage actions |
+| 2. Act | Loop | Creates/closes issues with function labels, commits assessment |
+| 3. Triage | Spec agent | Analyzes `needs-triage` issues, writes spec, opens spec PR |
+| 4. Approval | **Human** | Reviews spec PR — approve, request changes, or close |
+| 5. Build | Build agent | Reads approved spec, implements code, opens draft PR |
+| 6. Review | **Human** | Reviews implementation PR, merges to main |
+
+Humans approve at exactly two points: **spec review** and **PR merge**. Everything else runs autonomously.
 
 ## Quick Start
 
@@ -31,7 +41,11 @@ cd my-project
 ./init.sh
 ```
 
-The script will ask for your project name, language, build commands, and LLM provider. It loads sensible defaults for Go, Node.js, Python, and Rust - or you can choose "other" for any language.
+The script will ask for:
+- **Project** — name, description
+- **Language** — presets for Go, Node.js, Python, Rust, or custom
+- **Build agent LLM** — provider and model for code implementation
+- **Observation loop** — observer LLM, health endpoints, available capital
 
 ### 3. Commit and push
 
@@ -41,9 +55,36 @@ git add -A && git commit -m "Initialize AI pipeline" && git push
 
 ### 4. Configure GitHub
 
-1. **Add your LLM API key** as a repository secret (Settings > Secrets > Actions)
+1. **Add secrets** to Settings > Secrets > Actions:
+   - Build agent API key (e.g. `GOOGLE_API_KEY`)
+   - Observer API key (e.g. `OPENROUTER_API_KEY`)
+   - `PUSH_TOKEN` — a PAT with `contents:write` scope (for loop commits)
 2. **Enable Copilot coding agent** (Settings > Copilot > Coding agent)
-3. **Run the "Sync Labels" workflow** from the Actions tab to create pipeline labels
+3. **Run the "Sync Labels" workflow** from the Actions tab
+
+## Observation Loop
+
+The observation loop runs daily (08:00 UTC) via GitHub Actions. Each run:
+
+1. **Collects state** — GitHub API signals, infrastructure health, git contributors, costs
+2. **Sends to LLM** — state + system prompt + recent history → structured JSON assessment
+3. **Acts** — creates/closes issues, commits assessment to `company/loop-history/`
+
+### Opinionated Defaults
+
+The loop ships with a company-oriented system prompt that includes:
+
+- **Funnel stages** (Foundation → Dogfood → Presence → Reachable → Pipeline → Revenue)
+- **Frugality constraint** — runway tracking, survival mode at < 3 months
+- **Reciprocity tracking** — humans, AI agents, OSS dependencies tracked and flagged
+- **Function labels** — `fn:dev`, `fn:ops`, `fn:gtm`, `fn:billing`, `fn:support`, `fn:legal`
+- **Public/private boundary** — rules for what can be committed publicly
+
+Edit `company/system-prompt.md` to match your company.
+
+### Disabling
+
+If you don't want the observation loop, answer `n` during `init.sh` setup. The `company/` directory and workflow will be removed.
 
 ## Supported Languages
 
@@ -57,48 +98,54 @@ git add -A && git commit -m "Initialize AI pipeline" && git push
 
 All defaults can be overridden during `init.sh` setup.
 
-## Slash Commands
+## Agent Roles
 
-Comment these on **spec PRs** to control the pipeline:
+The pipeline defines roles, not specific tools. Swap any agent:
 
-| Command | Effect |
-|---------|--------|
-| `/approve` | Approves the spec and triggers Goose to implement |
-| `/wont-do` | Rejects the spec and closes the PR |
-| `/needs-info` | Pauses and asks the issue reporter for more details |
-
-Only users with **write access** to the repository can use these commands.
+| Role | Default | Alternatives |
+|------|---------|-------------|
+| **Spec writer** | GitHub Copilot coding agent | Claude Code, Cursor, manual |
+| **Build agent** | Goose | Claude Code, Aider, any PR-opening agent |
+| **Observer** | OpenRouter (any model) | OpenAI, Anthropic, any chat-completion API |
 
 ## File Manifest
 
 ```
 .github/
-  copilot-instructions.md     # Copilot behavior config (edit for your project)
-  labels.yml                  # Pipeline label definitions
+  copilot-instructions.md     # Spec agent behavior config
+  labels.yml                  # Pipeline + function label definitions
   ISSUE_TEMPLATE/
     bug_report.yml            # Bug report form
     feature_request.yml       # Feature request form
   workflows/
-    copilot-triage.yml        # Triggers Copilot on needs-triage label
-    approve-build.yml         # Handles /approve, /wont-do, /needs-info
-    goose-build.yml           # Installs toolchain + Goose, runs implementation
+    copilot-triage.yml        # Triggers spec agent on needs-triage label
+    approve-build.yml         # Handles spec PR approval flow
+    goose-build.yml           # Installs toolchain + runs build agent
+    observation-loop.yml      # Daily observe → assess → act cycle
     sync-labels.yml           # Creates/syncs pipeline labels
-.goosehints                   # Goose project context (edit for your project)
-specs/                        # Spec documents go here (auto-created by Copilot)
+company/
+  system-prompt.md            # LLM operational instructions (edit this)
+  loop-state.json             # Funnel stage, run count, timestamps
+  costs.json                  # Available capital, monthly burn
+  metrics.json                # Product + community + revenue signals
+  contributors.json           # Contribution ledger
+  health.json                 # Infrastructure health endpoints
+  loop-history/               # Daily assessment archive
+  scripts/
+    collect-github.sh         # GitHub API signal collector
+    collect-infra.sh          # Infrastructure health checker
+    collect-contributions.sh  # Git author + dependency tracker
+    sanitise.sh               # Secret/PII scanner
+.goosehints                   # Build agent project context
+specs/                        # Spec documents (auto-created by spec agent)
 docs/
   pipeline-flow.d2            # Pipeline diagram source (D2 language)
   pipeline-flow.svg           # Rendered pipeline diagram
 ```
 
-## Prerequisites
-
-- **GitHub Copilot** with coding agent enabled ([docs](https://docs.github.com/en/copilot/using-github-copilot/using-copilot-coding-agent-to-work-on-tasks))
-- **LLM API key** for Goose (Google Gemini free tier works, or OpenAI/Anthropic)
-- A GitHub repository (public or private)
-
 ## LLM Providers
 
-Goose supports multiple LLM providers. The setup script includes presets for:
+### Build Agent (Goose)
 
 | Provider | Default Model | Secret Name |
 |----------|--------------|-------------|
@@ -106,27 +153,40 @@ Goose supports multiple LLM providers. The setup script includes presets for:
 | OpenAI | `gpt-4o` | `OPENAI_API_KEY` |
 | Anthropic | `claude-sonnet-4-20250514` | `ANTHROPIC_API_KEY` |
 
+### Observer (Observation Loop)
+
+| Provider | Default Model | Secret Name |
+|----------|--------------|-------------|
+| OpenRouter | `anthropic/claude-sonnet-4` | `OPENROUTER_API_KEY` |
+| OpenAI | `gpt-4o` | `OPENAI_API_KEY` |
+| Anthropic | `claude-sonnet-4-20250514` | `ANTHROPIC_API_KEY` |
+
 ## Customization
 
-After running `init.sh`, you should edit these files for your project:
+After running `init.sh`, edit these files for your project:
 
-- **`.github/copilot-instructions.md`** - Add your project structure, code style, security guidelines
-- **`.goosehints`** - Add your architecture, key dependencies, important files
-- **`.github/ISSUE_TEMPLATE/*.yml`** - Customize the component dropdown for your project
+- **`company/system-prompt.md`** — Funnel stages, constraints, and company context
+- **`company/health.json`** — Your infrastructure endpoints to monitor
+- **`.github/copilot-instructions.md`** — Project structure, code style, security guidelines
+- **`.goosehints`** — Architecture, key dependencies, important files
+- **`.github/ISSUE_TEMPLATE/*.yml`** — Customize the component dropdown
 
 ## FAQ
 
 **Q: Can I use this with a monorepo?**
-A: Yes. Edit `.goosehints` and `copilot-instructions.md` to describe your monorepo structure. You may want to adjust the build/test commands in `goose-build.yml` to target specific packages.
+A: Yes. Edit `.goosehints` and `copilot-instructions.md` to describe your monorepo structure.
 
 **Q: What if Goose produces bad code?**
-A: The implementation PR is always created as a **draft**. Review it like any other PR. You can request changes, close it, or manually fix and merge.
+A: Implementation PRs are always **drafts**. Review like any other PR.
 
 **Q: Can I change the LLM provider later?**
-A: Yes. Edit the `env:` section at the top of `.github/workflows/goose-build.yml` and update your repository secrets.
+A: Yes. Edit the `env:` section in the relevant workflow and update your repository secrets.
 
 **Q: What if I don't use GitHub Copilot?**
-A: The triage phase requires Copilot coding agent. Without it, you can still manually write specs in `specs/` and use `/approve` to trigger Goose.
+A: You can manually write specs in `specs/` and approve them to trigger the build agent.
+
+**Q: What if the observer LLM is unavailable?**
+A: The loop falls back to a stub assessment — no crash, just a `needs-human` issue to fix the API key.
 
 **Q: How do I update the pipeline diagram?**
 A: Edit `docs/pipeline-flow.d2` and render with: `d2 --theme 200 --layout elk docs/pipeline-flow.d2 docs/pipeline-flow.svg`
