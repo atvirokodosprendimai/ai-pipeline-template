@@ -5,8 +5,11 @@ name: Goose Implementation
 # 2. Manually via workflow_dispatch (re-trigger for merged PRs or retries)
 
 on:
-  pull_request:
-    types: [labeled]
+  # pull_request trigger disabled until placeholders are replaced via init.sh.
+  # Uncomment after configuring GOOSE_PROVIDER, GOOSE_MODEL, API key, etc.
+  #
+  # pull_request:
+  #   types: [labeled]
   workflow_dispatch:
     inputs:
       issue_number:
