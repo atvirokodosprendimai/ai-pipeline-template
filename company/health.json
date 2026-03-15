@@ -1,3 +1,6 @@
 {
-  "endpoints": []
+  "endpoints": [
+    {"name": "chimney", "url": "https://chimney.beerpub.dev"},
+    {"name": "cloudroof", "url": "https://cloudroof.eu"}
+  ]
 }

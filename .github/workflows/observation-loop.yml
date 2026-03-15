@@ -31,7 +31,8 @@ jobs:
 
       - name: Collect GitHub signals
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PUSH_TOKEN }}
+          GITHUB_REPOSITORY: atvirokodosprendimai/wgmesh
         run: bash company/scripts/collect-github.sh > /tmp/github.json
 
       - name: Collect infrastructure signals
@@ -272,10 +273,11 @@ jobs:
 
       - name: Create issues from assessment
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PUSH_TOKEN }}
+          TARGET_REPO: atvirokodosprendimai/wgmesh
         run: |
-          # Fetch all open issue titles once for local dedup
-          gh issue list --state open --limit 100 --json title --jq '.[].title' > /tmp/open_issues.txt 2>/dev/null || touch /tmp/open_issues.txt
+          # Fetch all open issue titles from target repo for dedup
+          gh issue list --repo "$TARGET_REPO" --state open --limit 100 --json title --jq '.[].title' > /tmp/open_issues.txt 2>/dev/null || touch /tmp/open_issues.txt
 
           jq -c '.issues_to_create // [] | .[]' /tmp/assessment.json | while read -r issue; do
             title=$(echo "$issue" | jq -r '.title')
@@ -305,7 +307,7 @@ jobs:
                 echo "SKIPPING issue (failed sanitisation): $title"
                 continue
               fi
-              gh issue create --title "$title" --body "$body" --label "$labels" || true
+              gh issue create --repo "$TARGET_REPO" --title "$title" --body "$body" --label "$labels" || true
               echo "$title" >> /tmp/open_issues.txt
             else
               echo "Skipping duplicate: $title"
@@ -314,21 +316,23 @@ jobs:
 
       - name: Close issues from assessment
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PUSH_TOKEN }}
+          TARGET_REPO: atvirokodosprendimai/wgmesh
         run: |
           jq -c '.issues_to_close // [] | .[]' /tmp/assessment.json | while read -r item; do
             number=$(echo "$item" | jq -r '.number')
             reason=$(echo "$item" | jq -r '.reason')
-            gh issue close "$number" --comment "Closed by observation loop: $reason" || true
+            gh issue close "$number" --repo "$TARGET_REPO" --comment "Closed by observation loop: $reason" || true
           done
 
       - name: Create needs-human issue if requested
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PUSH_TOKEN }}
+          TARGET_REPO: atvirokodosprendimai/wgmesh
         run: |
           # Reuse open issues list (or fetch if not available)
           if [ ! -f /tmp/open_issues.txt ]; then
-            gh issue list --state open --limit 100 --json title --jq '.[].title' > /tmp/open_issues.txt 2>/dev/null || touch /tmp/open_issues.txt
+            gh issue list --repo "$TARGET_REPO" --state open --limit 100 --json title --jq '.[].title' > /tmp/open_issues.txt 2>/dev/null || touch /tmp/open_issues.txt
           fi
 
           jq -c '.needs_human // [] | .[]' /tmp/assessment.json | while read -r req; do
@@ -362,6 +366,7 @@ jobs:
                 continue
               fi
               gh issue create \
+                --repo "$TARGET_REPO" \
                 --title "$full_title" \
                 --body "$body" \
                 --label "needs-human" || true
