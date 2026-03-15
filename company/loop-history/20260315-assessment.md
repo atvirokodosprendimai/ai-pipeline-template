@@ -1,8 +1,8 @@
 # Assessment: 2026-03-15
 
-**Stage**: Foundation | **Run**: 1
+**Stage**: Foundation | **Run**: 2
 
-First run — observer API key not configured. The loop infrastructure is deployed but cannot call the LLM yet. This is a needs-human blocker.
+Observer API key not configured. The loop infrastructure is deployed but cannot call the LLM yet. This is a needs-human blocker.
 
 ## Blockers
 - Observer API key not set in GitHub secrets
