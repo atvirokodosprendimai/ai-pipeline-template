@@ -33,8 +33,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.PUSH_TOKEN }}
         run: |
-          repos=(
-            atvirokodosprendimai/wgmesh
+          # Full collection (with fn:label counts) only for primary product repo.
+          # Secondary repos get lightweight stats only (no search API calls).
+          primary="atvirokodosprendimai/wgmesh"
+          secondary=(
             atvirokodosprendimai/ai-pipeline-template
             atvirokodosprendimai/lighthouse
             atvirokodosprendimai/lighthouse-go
@@ -45,12 +47,37 @@ jobs:
             atvirokodosprendimai/tvcentras
             atvirokodosprendimai/homebrew-tap
           )
-          echo '[]' > /tmp/github.json
-          for repo in "${repos[@]}"; do
-            GITHUB_REPOSITORY="$repo" bash company/scripts/collect-github.sh > "/tmp/gh-${repo##*/}.json" 2>/dev/null || echo '{}' > "/tmp/gh-${repo##*/}.json"
-            jq --arg repo "$repo" '. + {repo: $repo}' "/tmp/gh-${repo##*/}.json" > "/tmp/gh-${repo##*/}-tagged.json"
+
+          # Primary repo: full collection
+          GITHUB_REPOSITORY="$primary" bash company/scripts/collect-github.sh > "/tmp/gh-primary.json" 2>&1 || {
+            echo "::warning::Failed to collect signals from $primary"
+            echo '{"error": "collection failed"}' > "/tmp/gh-primary.json"
+          }
+          jq --arg repo "$primary" '. + {repo: $repo}' "/tmp/gh-primary.json" > "/tmp/gh-primary-tagged.json"
+
+          # Secondary repos: lightweight (repo info + recent PRs only, no search API)
+          API="https://api.github.com"
+          AUTH=(-H "Authorization: token $GITHUB_TOKEN")
+          for repo in "${secondary[@]}"; do
+            name="${repo##*/}"
+            {
+              info=$(curl -sf "${AUTH[@]}" -H "Accept: application/vnd.github+json" "$API/repos/$repo" 2>/dev/null || echo '{}')
+              open_prs=$(curl -sf "${AUTH[@]}" -H "Accept: application/vnd.github+json" "$API/repos/$repo/pulls?state=open&per_page=5" 2>/dev/null | jq 'if type == "array" then length else 0 end' || echo "0")
+              jq -n \
+                --arg repo "$repo" \
+                --arg collected_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+                --argjson stars "$(echo "$info" | jq '.stargazers_count // 0')" \
+                --argjson forks "$(echo "$info" | jq '.forks_count // 0')" \
+                --argjson open_issues "$(echo "$info" | jq '.open_issues_count // 0')" \
+                --argjson open_prs "${open_prs:-0}" \
+                '{repo: $repo, source: "github-lite", collected_at: $collected_at, stars: $stars, forks: $forks, open_issues_total: $open_issues, open_prs: $open_prs}'
+            } > "/tmp/gh-${name}-tagged.json" 2>&1 || {
+              echo "::warning::Failed to collect signals from $repo"
+              jq -n --arg repo "$repo" '{repo: $repo, error: "collection failed"}' > "/tmp/gh-${name}-tagged.json"
+            }
           done
-          jq -s '{source: "github", repos: .}' /tmp/gh-*-tagged.json > /tmp/github.json
+
+          jq -s --arg ts "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" '{source: "github", collected_at: $ts, repos: .}' /tmp/gh-*-tagged.json > /tmp/github.json
 
       - name: Collect infrastructure signals
         run: bash company/scripts/collect-infra.sh > /tmp/infra.json
