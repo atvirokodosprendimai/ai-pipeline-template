@@ -29,11 +29,28 @@ jobs:
 
       # ── Collect state ──────────────────────────────────────────
 
-      - name: Collect GitHub signals
+      - name: Collect GitHub signals (all repos)
         env:
           GITHUB_TOKEN: ${{ secrets.PUSH_TOKEN }}
-          GITHUB_REPOSITORY: atvirokodosprendimai/wgmesh
-        run: bash company/scripts/collect-github.sh > /tmp/github.json
+        run: |
+          repos=(
+            atvirokodosprendimai/wgmesh
+            atvirokodosprendimai/ai-pipeline-template
+            atvirokodosprendimai/lighthouse
+            atvirokodosprendimai/lighthouse-go
+            atvirokodosprendimai/chimney
+            atvirokodosprendimai/coroot-cicd
+            atvirokodosprendimai/creu
+            atvirokodosprendimai/dns-server
+            atvirokodosprendimai/tvcentras
+            atvirokodosprendimai/homebrew-tap
+          )
+          echo '[]' > /tmp/github.json
+          for repo in "${repos[@]}"; do
+            GITHUB_REPOSITORY="$repo" bash company/scripts/collect-github.sh > "/tmp/gh-${repo##*/}.json" 2>/dev/null || echo '{}' > "/tmp/gh-${repo##*/}.json"
+            jq --arg repo "$repo" '. + {repo: $repo}' "/tmp/gh-${repo##*/}.json" > "/tmp/gh-${repo##*/}-tagged.json"
+          done
+          jq -s '{source: "github", repos: .}' /tmp/gh-*-tagged.json > /tmp/github.json
 
       - name: Collect infrastructure signals
         run: bash company/scripts/collect-infra.sh > /tmp/infra.json
