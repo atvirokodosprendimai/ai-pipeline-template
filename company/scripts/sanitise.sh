@@ -37,13 +37,10 @@ for pattern in "${patterns[@]}"; do
 done
 
 # Email pattern (basic — catches most customer PII leaks)
-if echo "$input" | grep -qEi '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' | grep -qvEi '(noreply@|bot@|ghost\.lt)'; then
-  # Allow known safe emails, flag unknown ones
-  unknown_emails=$(echo "$input" | grep -oEi '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' | grep -viE '(noreply@|bot@|ghost\.lt|github\.com)' || true)
-  if [ -n "$unknown_emails" ]; then
-    echo "SANITISE WARNING: Found potential PII email(s): $unknown_emails" >&2
-    # Warning only — don't fail for emails, they might be in public commit history
-  fi
+unknown_emails=$(echo "$input" | grep -oEi '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' | grep -viE '(noreply@|bot@|ghost\.lt|github\.com)' || true)
+if [ -n "$unknown_emails" ]; then
+  echo "SANITISE WARNING: Found potential PII email(s): $unknown_emails" >&2
+  # Warning only — don't fail for emails, they might be in public commit history
 fi
 
 if [ "$found" -eq 1 ]; then

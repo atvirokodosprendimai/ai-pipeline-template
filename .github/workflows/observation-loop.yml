@@ -115,6 +115,8 @@ jobs:
                 messages: [{role: "system", content: $system}, {role: "user", content: $user}]
               }' > /tmp/request.json
 
+            # NOTE: Expects OpenAI-compatible chat/completions endpoint.
+            # Use OpenRouter or similar proxy for non-OpenAI providers.
             http_code=$(curl -s -w '%{http_code}' -o /tmp/llm_response.json \
               -H "Authorization: Bearer $OBSERVER_API_KEY" \
               -H "content-type: application/json" \
@@ -222,7 +224,7 @@ jobs:
             --body "Automated assessment from observation loop." \
             --base main \
             --head "$branch")
-          gh pr merge "$pr_url" --squash --admin --delete-branch
+          gh pr merge "$pr_url" --squash --delete-branch
 
           git checkout main
           git pull origin main
@@ -257,6 +259,11 @@ jobs:
             done < /tmp/open_issues.txt
 
             if [ "$match_count" = "0" ]; then
+              # Sanitise issue content before publishing
+              if ! echo "$title $body" | bash company/scripts/sanitise.sh > /dev/null 2>&1; then
+                echo "SKIPPING issue (failed sanitisation): $title"
+                continue
+              fi
               gh issue create --title "$title" --body "$body" --label "$labels" || true
               echo "$title" >> /tmp/open_issues.txt
             else
@@ -308,6 +315,11 @@ jobs:
 
             if [ "$match_count" = "0" ]; then
               body=$(printf '**Urgency**: %s\n\n**Reason**: %s\n\n_Created by observation loop._' "$urgency" "$reason")
+              # Sanitise issue content before publishing
+              if ! echo "$full_title $body" | bash company/scripts/sanitise.sh > /dev/null 2>&1; then
+                echo "SKIPPING needs-human issue (failed sanitisation): $full_title"
+                continue
+              fi
               gh issue create \
                 --title "$full_title" \
                 --body "$body" \

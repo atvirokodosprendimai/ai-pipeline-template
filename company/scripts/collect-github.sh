@@ -6,20 +6,20 @@ set -euo pipefail
 
 REPO="${GITHUB_REPOSITORY:?GITHUB_REPOSITORY must be set}"
 API="https://api.github.com"
-AUTH=""
+AUTH=()
 if [ -n "${GITHUB_TOKEN:-}" ]; then
-  AUTH="-H Authorization: token $GITHUB_TOKEN"
+  AUTH=(-H "Authorization: token $GITHUB_TOKEN")
 fi
 
 gh_get() {
-  curl -sf $AUTH -H "Accept: application/vnd.github+json" "$API/$1" 2>/dev/null || echo "{}"
+  curl -sf "${AUTH[@]}" -H "Accept: application/vnd.github+json" "$API/$1" 2>/dev/null || echo "{}"
 }
 
 # Issues by function label
 fn_labels=("fn:dev" "fn:ops" "fn:gtm" "fn:billing" "fn:support" "fn:legal" "needs-human")
 issues_by_label="{}"
 for label in "${fn_labels[@]}"; do
-  count=$(gh_get "repos/$REPO/issues?labels=$(echo "$label" | sed 's/:/%3A/g')&state=open&per_page=1" | jq 'if type == "array" then length else 0 end')
+  count=$(gh_get "search/issues?q=repo:$REPO+state:open+label:\"$label\"&per_page=1" | jq '.total_count // 0')
   issues_by_label=$(echo "$issues_by_label" | jq --arg l "$label" --argjson c "${count:-0}" '. + {($l): $c}')
 done
 
@@ -48,7 +48,7 @@ open_issues_total=$(echo "$repo_info" | jq '.open_issues_count // 0')
 
 # Recent contributors (last 30 days via commit activity)
 recent_contributors=$(gh_get "repos/$REPO/commits?per_page=100" | \
-  jq '[.[].author.login // .[].commit.author.name] | unique | length')
+  jq '[.[] | (.author.login // .commit.author.name)] | unique | length')
 
 # Build JSON safely with jq
 jq -n \

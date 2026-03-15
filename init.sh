@@ -73,9 +73,7 @@ get_observer_preset() {
     openai:model)      echo "gpt-4o" ;;
     openai:key)        echo "OPENAI_API_KEY" ;;
     openai:url)        echo "https://api.openai.com/v1/chat/completions" ;;
-    anthropic:model)   echo "claude-sonnet-4-20250514" ;;
-    anthropic:key)     echo "ANTHROPIC_API_KEY" ;;
-    anthropic:url)     echo "https://api.anthropic.com/v1/messages" ;;
+    # NOTE: Anthropic's native API is not OpenAI-compatible. Use OpenRouter to access Claude models.
     *)                 echo "" ;;
   esac
 }
@@ -218,11 +216,11 @@ if [ "$ENABLE_LOOP" = "y" ]; then
   echo ""
   OBSERVER_PROVIDER=""
   while [ -z "$OBSERVER_PROVIDER" ]; do
-    read -rp "  Observer LLM provider [openrouter/openai/anthropic/other]: " OBSERVER_PROVIDER
+    read -rp "  Observer LLM provider [openrouter/openai/other]: " OBSERVER_PROVIDER
     case "$OBSERVER_PROVIDER" in
-      openrouter|openai|anthropic|other) ;;
+      openrouter|openai|other) ;;
       *)
-        echo "    Choose: openrouter, openai, anthropic, or other"
+        echo "    Choose: openrouter, openai, or other"
         OBSERVER_PROVIDER=""
         ;;
     esac
@@ -328,8 +326,9 @@ if [ "${ENABLE_LOOP:-n}" = "y" ]; then
 
   # Seed costs.json with available capital
   if [ "$AVAILABLE_CAPITAL" != "null" ] && [ -n "$AVAILABLE_CAPITAL" ]; then
-    jq --argjson cap "$AVAILABLE_CAPITAL" '.runway.available_capital = $cap' company/costs.json > /tmp/costs.json
-    mv /tmp/costs.json company/costs.json
+    tmp_costs="$(mktemp "${TMPDIR:-/tmp}/costs.XXXXXX.json")"
+    jq --argjson cap "$AVAILABLE_CAPITAL" '.runway.available_capital = $cap' company/costs.json > "$tmp_costs"
+    mv "$tmp_costs" company/costs.json
     echo "    Set available capital: ${AVAILABLE_CAPITAL} EUR/year"
   fi
 
@@ -367,7 +366,7 @@ echo "  -----------------"
 echo "  1. Add ${API_KEY_SECRET} to repo Settings > Secrets > Actions"
 if [ "${ENABLE_LOOP:-n}" = "y" ]; then
   echo "  2. Add ${OBSERVER_KEY_SECRET} to repo Settings > Secrets > Actions"
-  echo "  3. Add PUSH_TOKEN (PAT with contents:write) to repo Settings > Secrets > Actions"
+  echo "  3. Add PUSH_TOKEN (fine-grained PAT: Contents, Pull requests, and Issues set to Read and write) to repo Settings > Secrets > Actions"
   echo "  4. Enable GitHub Copilot coding agent (Settings > Copilot > Coding agent)"
   echo "  5. git add -A && git commit -m 'Initialize AI pipeline' && git push"
   echo "  6. Run the 'Sync Labels' workflow from the Actions tab"

@@ -58,7 +58,7 @@ git add -A && git commit -m "Initialize AI pipeline" && git push
 1. **Add secrets** to Settings > Secrets > Actions:
    - Build agent API key (e.g. `GOOGLE_API_KEY`)
    - Observer API key (e.g. `OPENROUTER_API_KEY`)
-   - `PUSH_TOKEN` — a PAT with `contents:write` scope (for loop commits)
+   - `PUSH_TOKEN` — a fine-grained PAT with **Contents: write**, **Pull requests: write**, and **Issues: write** scopes (for loop commits and PRs)
 2. **Enable Copilot coding agent** (Settings > Copilot > Coding agent)
 3. **Run the "Sync Labels" workflow** from the Actions tab
 
@@ -106,7 +106,7 @@ The pipeline defines roles, not specific tools. Swap any agent:
 |------|---------|-------------|
 | **Spec writer** | GitHub Copilot coding agent | Claude Code, Cursor, manual |
 | **Build agent** | Goose | Claude Code, Aider, any PR-opening agent |
-| **Observer** | OpenRouter (any model) | OpenAI, Anthropic, any chat-completion API |
+| **Observer** | OpenRouter (any model) | OpenAI, any OpenAI-compatible API |
 
 ## File Manifest
 
@@ -159,7 +159,6 @@ docs/
 |----------|--------------|-------------|
 | OpenRouter | `anthropic/claude-sonnet-4` | `OPENROUTER_API_KEY` |
 | OpenAI | `gpt-4o` | `OPENAI_API_KEY` |
-| Anthropic | `claude-sonnet-4-20250514` | `ANTHROPIC_API_KEY` |
 
 ## Customization
 
