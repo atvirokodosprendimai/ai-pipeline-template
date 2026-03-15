@@ -1,8 +1,8 @@
 {
-  "last_updated": null,
+  "last_updated": "2026-03-15",
   "currency": "EUR",
   "runway": {
-    "available_capital": null,
+    "available_capital": 2400,
     "monthly_burn": null,
     "months_remaining": null,
     "survival_mode": false,
