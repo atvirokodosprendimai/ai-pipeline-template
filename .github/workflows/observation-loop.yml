@@ -230,8 +230,7 @@ jobs:
           echo "Waiting for review on PR #${pr_number}..."
           review_received=false
           for i in $(seq 1 18); do
-            review_count=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${pr_number}/reviews" --jq 'length')
-            if [ $? -ne 0 ]; then
+            if ! review_count=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${pr_number}/reviews" --jq 'length'); then
               echo "::warning::API call failed checking reviews. Leaving PR open."
               exit 0
             fi
@@ -248,17 +247,15 @@ jobs:
             exit 0
           fi
 
-          # Check for blocking reviews (CHANGES_REQUESTED or non-empty review body)
-          has_blocking=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${pr_number}/reviews" \
-            --jq '[.[] | select(.state == "CHANGES_REQUESTED")] | length')
-          if [ $? -ne 0 ]; then
+          # Check for blocking reviews — latest review per reviewer wins
+          if ! has_blocking=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${pr_number}/reviews" \
+            --jq '[group_by(.user.login)[] | sort_by(.submitted_at) | last | select(.state == "CHANGES_REQUESTED")] | length'); then
             echo "::warning::API call failed checking review state. Leaving PR open."
             exit 0
           fi
 
           # Check for inline review comments
-          comment_count=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${pr_number}/comments" --jq 'length')
-          if [ $? -ne 0 ]; then
+          if ! comment_count=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${pr_number}/comments" --jq 'length'); then
             echo "::warning::API call failed checking comments. Leaving PR open."
             exit 0
           fi
