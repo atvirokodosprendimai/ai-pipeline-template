@@ -81,7 +81,7 @@ jobs:
             "funnel_stage": 0,
             "stage_name": "Foundation",
             "runway": {"monthly_burn_eur": null, "months_remaining": null, "survival_mode": false},
-            "assessment": "First run — observer API key not configured. The loop infrastructure is deployed but cannot call the LLM yet. This is a needs-human blocker.",
+            "assessment": "Observer API key not configured. The loop infrastructure is deployed but cannot call the LLM yet. This is a needs-human blocker.",
             "blockers": ["Observer API key not set in GitHub secrets"],
             "top_actions": [{"rank": 1, "action": "Set observer API key in repo secrets", "function": "fn:ops", "leverage": "Unblocks the entire control loop", "cost": "cheap"}],
             "issues_to_create": [],
