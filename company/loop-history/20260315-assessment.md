@@ -1,6 +1,6 @@
 # Assessment: 2026-03-15
 
-**Stage**: Foundation | **Run**: 0
+**Stage**: Foundation | **Run**: 1
 
 First run — observer API key not configured. The loop infrastructure is deployed but cannot call the LLM yet. This is a needs-human blocker.
 
