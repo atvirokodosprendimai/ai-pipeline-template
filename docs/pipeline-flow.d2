@@ -1,4 +1,4 @@
-# AI-Powered Issue-to-Code Pipeline
+# Autonomous Product Pipeline
 # Render: d2 --theme 200 --layout elk docs/pipeline-flow.d2 docs/pipeline-flow.svg
 
 direction: down
@@ -41,12 +41,67 @@ classes: {
 # --- Title -------------------------------------------------
 
 title: |md
-  # AI-Powered Issue-to-Code Pipeline
-  Copilot writes specs, humans approve, Goose builds code
+  # Autonomous Product Pipeline
+  Observe → Assess → Act → Spec → Build — humans approve at two gates
 | {
   near: top-center
   shape: text
   style.font-size: 14
+}
+
+# --- Phase 0: Observation Loop ----------------------------
+
+phase0: Phase 0 - Observation Loop {
+  style.fill: "#F3E5F5"
+  style.stroke: "#6A1B9A"
+  style.border-radius: 12
+  style.font-size: 16
+  style.bold: true
+
+  workflow: observation-loop.yml {
+    class: workflow
+  }
+
+  collect: Collect State {
+    style.fill: "#EDE7F6"
+    style.stroke: "#4527A0"
+    style.border-radius: 8
+
+    github: "GitHub signals\n(issues, PRs, CI)"
+    infra: "Infra health\n(endpoints)"
+    contrib: "Contributions\n(git, deps)"
+  }
+
+  llm: "Observer LLM\nassesses state" {
+    shape: hexagon
+    style.fill: "#E8F5E9"
+    style.stroke: "#2E7D32"
+    style.shadow: true
+    style.font-size: 14
+    style.bold: true
+    style.3d: true
+  }
+
+  assessment: "Assessment\ncommitted" {
+    class: artifact
+  }
+
+  issues: "Issues created\nwith fn: labels" {
+    shape: rectangle
+    style.fill: "#FFFFFF"
+    style.stroke: "#6A1B9A"
+    style.shadow: true
+    style.border-radius: 8
+  }
+
+  workflow -> collect.github
+  workflow -> collect.infra
+  workflow -> collect.contrib
+  collect.github -> llm
+  collect.infra -> llm
+  collect.contrib -> llm
+  llm -> assessment: commits
+  llm -> issues: creates
 }
 
 # --- Phase 1: Issue Creation -------------------------------
@@ -389,6 +444,12 @@ phase5: Phase 5 - Code Review & Merge {
 
 # --- Phase Connections (the backbone) ----------------------
 
+phase0.issues -> phase1.label_triage: "loop-created issues\nauto-labeled" {
+  style.stroke: "#6A1B9A"
+  style.stroke-width: 3
+  style.animated: true
+}
+
 phase1.label_triage -> phase2.workflow: "triggers on label" {
   style.stroke: "#1565C0"
   style.stroke-width: 3
@@ -423,4 +484,11 @@ phase5.review_code -> phase4.runner.run_goose: "request changes via\nPR comment"
   style.stroke: "#4527A0"
   style.stroke-dash: 5
   style.opacity: 0.7
+}
+
+phase5.merge -> phase0.workflow: "next daily run\nobserves changes" {
+  style.stroke: "#6A1B9A"
+  style.stroke-dash: 5
+  style.opacity: 0.7
+  style.animated: true
 }
