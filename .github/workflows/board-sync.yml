@@ -8,10 +8,15 @@ name: Sync Board Status
 # project's actual IDs. See CONTRIBUTING.md for instructions.
 
 on:
-  issues:
-    types: [labeled, unlabeled, closed, reopened]
-  pull_request:
-    types: [labeled, unlabeled, closed, reopened]
+  # Disabled until project board IDs are configured.
+  # Uncomment the triggers below and replace __PLACEHOLDER__ env vars
+  # with your project's actual IDs (see CONTRIBUTING.md § "Board Setup").
+  #
+  # issues:
+  #   types: [labeled, unlabeled, closed, reopened]
+  # pull_request:
+  #   types: [labeled, unlabeled, closed, reopened]
+  workflow_dispatch: # manual-only until configured
 
 env:
   # ┌─────────────────────────────────────────────────────────┐
