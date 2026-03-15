@@ -228,26 +228,50 @@ jobs:
           # Wait for Copilot review (up to 90s)
           pr_number=$(echo "$pr_url" | grep -o '[0-9]*$')
           echo "Waiting for review on PR #${pr_number}..."
+          review_received=false
           for i in $(seq 1 18); do
-            review_count=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${pr_number}/reviews" --jq 'length' 2>/dev/null || echo "0")
+            review_count=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${pr_number}/reviews" --jq 'length')
+            if [ $? -ne 0 ]; then
+              echo "::warning::API call failed checking reviews. Leaving PR open."
+              exit 0
+            fi
             if [ "$review_count" -gt 0 ]; then
               echo "Review received."
+              review_received=true
               break
             fi
             sleep 5
           done
 
-          # Check for unresolved review comments
-          comment_count=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${pr_number}/comments" --jq 'length' 2>/dev/null || echo "0")
-          if [ "$comment_count" -gt 0 ]; then
-            echo "::warning::PR #${pr_number} has ${comment_count} review comment(s). Leaving open for human review."
-            echo "LOOP_PR_OPEN=true" >> "$GITHUB_ENV"
-          else
-            echo "No review comments. Merging."
-            gh pr merge "$pr_url" --squash --delete-branch --admin
-            git checkout main
-            git pull origin main
+          if [ "$review_received" = "false" ]; then
+            echo "::warning::No review received within 90s. Leaving PR #${pr_number} open."
+            exit 0
           fi
+
+          # Check for blocking reviews (CHANGES_REQUESTED or non-empty review body)
+          has_blocking=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${pr_number}/reviews" \
+            --jq '[.[] | select(.state == "CHANGES_REQUESTED")] | length')
+          if [ $? -ne 0 ]; then
+            echo "::warning::API call failed checking review state. Leaving PR open."
+            exit 0
+          fi
+
+          # Check for inline review comments
+          comment_count=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${pr_number}/comments" --jq 'length')
+          if [ $? -ne 0 ]; then
+            echo "::warning::API call failed checking comments. Leaving PR open."
+            exit 0
+          fi
+
+          if [ "$has_blocking" -gt 0 ] || [ "$comment_count" -gt 0 ]; then
+            echo "::warning::PR #${pr_number} has ${comment_count} comment(s) and ${has_blocking} blocking review(s). Leaving open for human review."
+            exit 0
+          fi
+
+          echo "Review clean — no comments, no blockers. Merging."
+          gh pr merge "$pr_url" --squash --delete-branch --admin
+          git checkout main
+          git pull origin main
 
       - name: Create issues from assessment
         env:
