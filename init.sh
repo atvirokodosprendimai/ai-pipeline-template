@@ -64,6 +64,20 @@ get_provider_preset() {
   esac
 }
 
+get_observer_preset() {
+  local provider="$1" field="$2"
+  case "${provider}:${field}" in
+    openrouter:model)  echo "anthropic/claude-sonnet-4" ;;
+    openrouter:key)    echo "OPENROUTER_API_KEY" ;;
+    openrouter:url)    echo "https://openrouter.ai/api/v1/chat/completions" ;;
+    openai:model)      echo "gpt-4o" ;;
+    openai:key)        echo "OPENAI_API_KEY" ;;
+    openai:url)        echo "https://api.openai.com/v1/chat/completions" ;;
+    # NOTE: Anthropic's native API is not OpenAI-compatible. Use OpenRouter to access Claude models.
+    *)                 echo "" ;;
+  esac
+}
+
 # ── Helper: prompt with default ──────────────────────────────
 
 prompt() {
@@ -179,6 +193,59 @@ prompt GOOSE_MODEL    "Model name"           "$DEFAULT_MODEL"
 prompt API_KEY_SECRET "API key secret name"  "$DEFAULT_KEY"
 echo ""
 
+echo "  Observation Loop"
+echo "  ----------------"
+echo "  The observation loop runs daily, collects project state,"
+echo "  sends it to an LLM for assessment, and creates issues."
+echo ""
+
+ENABLE_LOOP=""
+while [ -z "$ENABLE_LOOP" ]; do
+  read -rp "  Enable observation loop? [y/n] (y): " ENABLE_LOOP
+  ENABLE_LOOP="${ENABLE_LOOP:-y}"
+  case "$ENABLE_LOOP" in
+    y|n) ;;
+    *)
+      echo "    Choose: y or n"
+      ENABLE_LOOP=""
+      ;;
+  esac
+done
+
+if [ "$ENABLE_LOOP" = "y" ]; then
+  echo ""
+  OBSERVER_PROVIDER=""
+  while [ -z "$OBSERVER_PROVIDER" ]; do
+    read -rp "  Observer LLM provider [openrouter/openai/other]: " OBSERVER_PROVIDER
+    case "$OBSERVER_PROVIDER" in
+      openrouter|openai|other) ;;
+      *)
+        echo "    Choose: openrouter, openai, or other"
+        OBSERVER_PROVIDER=""
+        ;;
+    esac
+  done
+
+  if [ "$OBSERVER_PROVIDER" != "other" ]; then
+    OBS_DEFAULT_MODEL="$(get_observer_preset "$OBSERVER_PROVIDER" model)"
+    OBS_DEFAULT_KEY="$(get_observer_preset "$OBSERVER_PROVIDER" key)"
+    OBS_DEFAULT_URL="$(get_observer_preset "$OBSERVER_PROVIDER" url)"
+  else
+    OBS_DEFAULT_MODEL=""
+    OBS_DEFAULT_KEY=""
+    OBS_DEFAULT_URL=""
+  fi
+
+  prompt OBSERVER_MODEL      "Observer model name"        "$OBS_DEFAULT_MODEL"
+  prompt OBSERVER_KEY_SECRET "Observer API key secret"    "$OBS_DEFAULT_KEY"
+  prompt OBSERVER_API_URL    "Observer API URL"           "$OBS_DEFAULT_URL"
+  echo ""
+
+  prompt HEALTH_ENDPOINTS "Health check URLs (comma-separated, or 'none')" "none"
+  prompt AVAILABLE_CAPITAL "Available capital (EUR/year, or 'null')" "null"
+  echo ""
+fi
+
 # ══════════════════════════════════════════════════════════════
 # Replace placeholders
 # ══════════════════════════════════════════════════════════════
@@ -188,7 +255,7 @@ echo "  Applying configuration..."
 # Escape special characters for sed (forward slashes, ampersands, backslashes)
 esc() { printf '%s' "$1" | sed 's/[&/\]/\\&/g'; }
 
-FILES=$(find . -type f \( -name '*.yml' -o -name '*.yaml' -o -name '*.md' -o -name '*.d2' -o -name '.goosehints' \) -not -path './.git/*' -not -name 'init.sh' -not -name 'LICENSE')
+FILES=$(find . -type f \( -name '*.yml' -o -name '*.yaml' -o -name '*.md' -o -name '*.json' -o -name '*.d2' -o -name '.goosehints' \) -not -path './.git/*' -not -name 'init.sh' -not -name 'LICENSE')
 
 # Build replacement pairs (placeholder|value)
 PAIRS=""
@@ -219,6 +286,15 @@ PAIRS="${PAIRS}__SETUP_ACTION__|$(esc "$SETUP_ACTION")
 PAIRS="${PAIRS}__SETUP_WITH__|$(esc "$SETUP_WITH")
 "
 
+if [ "${ENABLE_LOOP:-n}" = "y" ]; then
+  PAIRS="${PAIRS}__OBSERVER_MODEL__|$(esc "$OBSERVER_MODEL")
+"
+  PAIRS="${PAIRS}__OBSERVER_API_KEY_SECRET__|$(esc "$OBSERVER_KEY_SECRET")
+"
+  PAIRS="${PAIRS}__OBSERVER_API_URL__|$(esc "$OBSERVER_API_URL")
+"
+fi
+
 count=0
 for f in $FILES; do
   echo "$PAIRS" | while IFS='|' read -r placeholder value; do
@@ -231,6 +307,38 @@ for f in $FILES; do
 done
 
 echo "    Processed ${count} files"
+
+# ── Observation loop setup ────────────────────────────────────
+
+if [ "${ENABLE_LOOP:-n}" = "y" ]; then
+  # Seed health.json with endpoints
+  if [ "$HEALTH_ENDPOINTS" != "none" ] && [ -n "$HEALTH_ENDPOINTS" ]; then
+    endpoints_json="[]"
+    IFS=',' read -ra URLS <<< "$HEALTH_ENDPOINTS"
+    for url in "${URLS[@]}"; do
+      url=$(echo "$url" | xargs)  # trim whitespace
+      name=$(echo "$url" | sed 's|https\?://||' | sed 's|/.*||' | sed 's|\.[^.]*$||')
+      endpoints_json=$(echo "$endpoints_json" | jq --arg n "$name" --arg u "$url" '. + [{name: $n, url: $u}]')
+    done
+    echo "$endpoints_json" | jq '{endpoints: .}' > company/health.json
+    echo "    Configured $(echo "$endpoints_json" | jq length) health endpoints"
+  fi
+
+  # Seed costs.json with available capital
+  if [ "$AVAILABLE_CAPITAL" != "null" ] && [ -n "$AVAILABLE_CAPITAL" ]; then
+    tmp_costs="$(mktemp "${TMPDIR:-/tmp}/costs.XXXXXX.json")"
+    jq --argjson cap "$AVAILABLE_CAPITAL" '.runway.available_capital = $cap' company/costs.json > "$tmp_costs"
+    mv "$tmp_costs" company/costs.json
+    echo "    Set available capital: ${AVAILABLE_CAPITAL} EUR/year"
+  fi
+
+  echo "    Observation loop enabled"
+else
+  # Remove observation loop files
+  rm -rf company/
+  rm -f .github/workflows/observation-loop.yml
+  echo "    Observation loop disabled — removed company/ and workflow"
+fi
 
 # ── Optional: re-render D2 diagram ───────────────────────────
 
@@ -256,7 +364,15 @@ echo ""
 echo "  Done! Next steps:"
 echo "  -----------------"
 echo "  1. Add ${API_KEY_SECRET} to repo Settings > Secrets > Actions"
-echo "  2. Enable GitHub Copilot coding agent (Settings > Copilot > Coding agent)"
-echo "  3. git add -A && git commit -m 'Initialize AI pipeline' && git push"
-echo "  4. Run the 'Sync Labels' workflow from the Actions tab"
+if [ "${ENABLE_LOOP:-n}" = "y" ]; then
+  echo "  2. Add ${OBSERVER_KEY_SECRET} to repo Settings > Secrets > Actions"
+  echo "  3. Add PUSH_TOKEN (fine-grained PAT: Contents, Pull requests, and Issues set to Read and write) to repo Settings > Secrets > Actions"
+  echo "  4. Enable GitHub Copilot coding agent (Settings > Copilot > Coding agent)"
+  echo "  5. git add -A && git commit -m 'Initialize AI pipeline' && git push"
+  echo "  6. Run the 'Sync Labels' workflow from the Actions tab"
+else
+  echo "  2. Enable GitHub Copilot coding agent (Settings > Copilot > Coding agent)"
+  echo "  3. git add -A && git commit -m 'Initialize AI pipeline' && git push"
+  echo "  4. Run the 'Sync Labels' workflow from the Actions tab"
+fi
 echo ""

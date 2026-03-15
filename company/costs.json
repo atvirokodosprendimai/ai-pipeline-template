@@ -1,0 +1,13 @@
+{
+  "last_updated": null,
+  "currency": "EUR",
+  "runway": {
+    "available_capital": null,
+    "monthly_burn": null,
+    "months_remaining": null,
+    "survival_mode": false,
+    "note": "Human must set available_capital. Loop calculates the rest."
+  },
+  "categories": {},
+  "principle": "Can this be zero? > Can this be cheap? > Is this necessary?"
+}
