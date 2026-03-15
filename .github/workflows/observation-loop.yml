@@ -70,7 +70,7 @@ jobs:
 
       - name: Call LLM (or generate stub)
         env:
-          OBSERVER_API_KEY: ${{ secrets.__OBSERVER_API_KEY_SECRET__ }}
+          OBSERVER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: |
           if [ -z "$OBSERVER_API_KEY" ]; then
             echo "::warning::Observer API key not set — generating stub assessment."
@@ -110,7 +110,7 @@ jobs:
               --rawfile system company/system-prompt.md \
               --rawfile user /tmp/user_message.txt \
               '{
-                model: "__OBSERVER_MODEL__",
+                model: "anthropic/claude-sonnet-4",
                 max_tokens: 4096,
                 messages: [{role: "system", content: $system}, {role: "user", content: $user}]
               }' > /tmp/request.json
@@ -121,7 +121,7 @@ jobs:
               -H "Authorization: Bearer $OBSERVER_API_KEY" \
               -H "content-type: application/json" \
               -d @/tmp/request.json \
-              __OBSERVER_API_URL__)
+              https://openrouter.ai/api/v1/chat/completions)
 
             if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
               content=$(jq -r '.choices[0].message.content' /tmp/llm_response.json)
