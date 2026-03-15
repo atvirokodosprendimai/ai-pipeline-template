@@ -224,7 +224,19 @@ jobs:
             --body "Automated assessment from observation loop." \
             --base main \
             --head "$branch")
-          gh pr merge "$pr_url" --squash --delete-branch
+
+          # Enable auto-merge — waits for required reviews (Copilot)
+          # before merging. If no branch protection, merges immediately.
+          gh pr merge "$pr_url" --squash --delete-branch --auto
+
+          # Wait for merge (up to 2 minutes for Copilot review)
+          for i in $(seq 1 24); do
+            state=$(gh pr view "$pr_url" --json state --jq '.state')
+            if [ "$state" = "MERGED" ]; then
+              break
+            fi
+            sleep 5
+          done
 
           git checkout main
           git pull origin main
