@@ -36,8 +36,9 @@ env:
 jobs:
   implement:
     if: >-
-      github.event_name == 'workflow_dispatch' ||
-      github.event.label.name == 'approved-for-build'
+      !contains(github.repository, 'ai-pipeline-template') &&
+      (github.event_name == 'workflow_dispatch' ||
+      github.event.label.name == 'approved-for-build')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     concurrency:

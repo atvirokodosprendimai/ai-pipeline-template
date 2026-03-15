@@ -60,7 +60,8 @@ git add -A && git commit -m "Initialize AI pipeline" && git push
    - Observer API key (e.g. `OPENROUTER_API_KEY`)
    - `PUSH_TOKEN` — a fine-grained PAT with **Contents: write**, **Pull requests: write**, and **Issues: write** scopes (for loop commits and PRs)
 2. **Enable Copilot coding agent** (Settings > Copilot > Coding agent)
-3. **Run the "Sync Labels" workflow** from the Actions tab
+3. **Run the "Sync Labels" workflow** from the Actions tab to create pipeline labels
+4. **(Optional) Set up a project board** — see [CONTRIBUTING.md](CONTRIBUTING.md#board-setup) for instructions
 
 ## Observation Loop
 
@@ -123,6 +124,7 @@ The pipeline defines roles, not specific tools. Swap any agent:
     goose-build.yml           # Installs toolchain + runs build agent
     observation-loop.yml      # Daily observe → assess → act cycle
     sync-labels.yml           # Creates/syncs pipeline labels
+    board-sync.yml            # Auto-moves project board items by label
 company/
   system-prompt.md            # LLM operational instructions (edit this)
   loop-state.json             # Funnel stage, run count, timestamps
@@ -137,6 +139,7 @@ company/
     collect-contributions.sh  # Git author + dependency tracker
     sanitise.sh               # Secret/PII scanner
 .goosehints                   # Build agent project context
+CONTRIBUTING.md               # Pipeline guide for contributors
 specs/                        # Spec documents (auto-created by spec agent)
 docs/
   pipeline-flow.d2            # Pipeline diagram source (D2 language)
