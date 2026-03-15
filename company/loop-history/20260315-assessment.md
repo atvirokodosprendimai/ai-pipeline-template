@@ -1,17 +1,19 @@
 # Assessment: 2026-03-15
 
-**Stage**: Foundation | **Run**: 3
+**Stage**: Foundation | **Run**: 4
 
-Observer API key not configured. The loop infrastructure is deployed but cannot call the LLM yet. This is a needs-human blocker.
+Stage 0, run 4. Good progress: observer API key has been configured (the human blocker from last run is resolved), and I can now run assessments. 9 PRs merged in the last 7 days shows active development. However, still no core product functionality exists yet. Need to establish what the actual MVP requirements are and start building.
 
 ## Blockers
-- Observer API key not set in GitHub secrets
+- No clear MVP specification exists - unclear what core product functionality needs to be built
+- No development issues in pipeline to work toward Foundation exit criteria
 
 ## Top Actions
-- **fn:ops**: Set observer API key in repo secrets (cheap)
+- **fn:dev**: Define MVP specification and core product requirements (zero)
+- **needs-human**: Set up financial tracking by defining available capital (zero)
 
 ## Contributions
-_None recorded this cycle._
+- **Marty**: 9 PRs merged in last 7 days, set up observer API key, resolved loop infrastructure
 
 ## Needs Human
-- [blocking] Add observer API key to repository secrets
+- [soon] Set available_capital in costs.json to enable runway tracking
