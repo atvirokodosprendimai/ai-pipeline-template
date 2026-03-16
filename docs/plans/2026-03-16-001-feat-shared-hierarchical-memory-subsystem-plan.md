@@ -175,12 +175,12 @@ One-paragraph description of what happened.
 **Goal**: The observation loop reads memory before assessing and writes episodic memory after.
 
 **Tasks**:
-1. Add `collect-memory.sh` call to observation-loop.yml (after existing collect steps)
-2. Inject memory output into LLM user message (new "## Shared Memory" section)
-3. After LLM assessment, generate episodic memory file from the assessment JSON
-4. Include episodic file in the branch+PR commit (alongside loop-state.json and assessment)
-5. Add sanitisation step for memory files
-6. Set context budget: 4KB semantic + 2KB episodic (latest 3 entries)
+1. [x] Add `collect-memory.sh` call to observation-loop.yml (after existing collect steps)
+2. [x] Inject memory output into LLM user message (new "## Shared Memory" section)
+3. [x] After LLM assessment, generate episodic memory file from the assessment JSON
+4. [x] Include episodic file in the branch+PR commit (alongside loop-state.json and assessment)
+5. [x] Add sanitisation step for memory files
+6. [x] Set context budget: 4KB semantic + 2KB episodic (latest 5 entries)
 
 **Design decision — observation loop episodic write**:
 The loop already commits via branch → PR → review → merge. Add memory files to the same commit. Copilot review covers them alongside the assessment. No separate PR flow needed.

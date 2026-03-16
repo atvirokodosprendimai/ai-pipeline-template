@@ -79,6 +79,17 @@ People can pay but nobody has.
 First invoice paid.
 - **Exit when**: payment received, customer still active after 30 days
 
+## Shared Memory
+
+You receive a **Shared Memory** section containing curated knowledge (semantic memory) and recent agent activity (episodic memory). Use this to:
+
+- Maintain continuity across runs — reference past decisions and learnings
+- Avoid repeating mistakes — if a learning says "don't do X", don't do X
+- Track what other agents have done — episodic entries show recent Copilot specs, Goose implementations, and prior assessments
+- Improve assessment quality over time — your learnings compound
+
+When the shared memory contains information that contradicts your signals, investigate the discrepancy rather than ignoring either source.
+
 ## Critical: Do not duplicate existing work
 
 You will receive a **Product Codebase Summary** in each run. This describes the actual state of the product — what packages exist, what features are implemented, what architecture is in place.
