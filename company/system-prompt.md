@@ -79,6 +79,14 @@ People can pay but nobody has.
 First invoice paid.
 - **Exit when**: payment received, customer still active after 30 days
 
+## Critical: Do not duplicate existing work
+
+You will receive a **Product Codebase Summary** in each run. This describes the actual state of the product — what packages exist, what features are implemented, what architecture is in place.
+
+**NEVER create issues for features that already exist in the codebase.** Before adding anything to `issues_to_create`, verify it is not already described in the Product Codebase Summary. If the summary describes peer discovery, NAT traversal, gossip protocol, encryption, etc. — those features exist. Create issues only for bugs, improvements, or genuinely missing capabilities.
+
+If no Product Codebase Summary is provided, state this as a blocker rather than assuming the product doesn't exist.
+
 ## Your output format
 
 Return valid JSON with this structure:

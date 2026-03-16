@@ -85,6 +85,25 @@ jobs:
       - name: Collect contribution signals
         run: bash company/scripts/collect-contributions.sh > /tmp/contributions.json
 
+      - name: Collect product codebase summary
+        env:
+          GITHUB_TOKEN: ${{ secrets.PUSH_TOKEN }}
+        run: |
+          # Fetch CLAUDE.md from primary product repo — gives the LLM awareness of
+          # what actually exists in the codebase (architecture, packages, features).
+          # Without this, the LLM can only see GitHub metadata (issue counts, PR velocity)
+          # and may hallucinate that features don't exist.
+          # See RCA: https://github.com/atvirokodosprendimai/wgmesh/issues/458
+          primary="atvirokodosprendimai/wgmesh"
+          claude_md=$(gh api "repos/$primary/contents/CLAUDE.md" --jq '.content' 2>/dev/null | base64 -d 2>/dev/null || echo "")
+
+          if [ -n "$claude_md" ]; then
+            # Extract Build/Test + Architecture sections (skip conventions, CI, etc.)
+            echo "$claude_md" | sed -n '1,/^## Code Conventions/p' | head -n -1 > /tmp/product_summary.txt
+          else
+            echo "No CLAUDE.md found in $primary." > /tmp/product_summary.txt
+          fi
+
       - name: Read recent assessments
         run: |
           {
@@ -143,6 +162,11 @@ jobs:
 
           ## State Snapshot
           $(cat /tmp/snapshot.json)
+
+          ## Product Codebase Summary
+          This is the actual state of the primary product repo (from CLAUDE.md). Use this to
+          understand what features ALREADY EXIST. Do NOT create issues for features listed here.
+          $(cat /tmp/product_summary.txt)
 
           ## Recent Assessment History
           $(cat /tmp/history.txt)
@@ -320,8 +344,12 @@ jobs:
           GH_TOKEN: ${{ secrets.PUSH_TOKEN }}
           TARGET_REPO: atvirokodosprendimai/wgmesh
         run: |
-          # Fetch all open issue titles from target repo for dedup
-          gh issue list --repo "$TARGET_REPO" --state open --limit 100 --json title --jq '.[].title' > /tmp/open_issues.txt 2>/dev/null || touch /tmp/open_issues.txt
+          # Fetch open AND recently closed issue titles for dedup.
+          # Checking only open issues misses features that were already implemented
+          # and closed — causing the LLM to re-create them as greenfield tasks.
+          # See RCA: https://github.com/atvirokodosprendimai/wgmesh/issues/458
+          gh issue list --repo "$TARGET_REPO" --state open --limit 200 --json title --jq '.[].title' > /tmp/open_issues.txt 2>/dev/null || touch /tmp/open_issues.txt
+          gh issue list --repo "$TARGET_REPO" --state closed --limit 200 --json title --jq '.[].title' >> /tmp/open_issues.txt 2>/dev/null || true
 
           jq -c '.issues_to_create // [] | .[]' /tmp/assessment.json | while read -r issue; do
             title=$(echo "$issue" | jq -r '.title')
