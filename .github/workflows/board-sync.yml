@@ -48,10 +48,14 @@ jobs:
   sync:
     needs: guard
     runs-on: ubuntu-latest
-    # Skip if placeholder IDs haven't been replaced, or if PUSH_TOKEN is unavailable (e.g. fork PRs)
-    if: ${{ secrets.PUSH_TOKEN != '' && !contains(env.PROJECT_ID, '__') && !contains(env.STATUS_FIELD_ID, '__') && !contains(env.COL_TRIAGE, '__') }}
+    # Skip if placeholder IDs haven't been replaced
+    if: >-
+      !contains(env.PROJECT_ID, '__') &&
+      !contains(env.STATUS_FIELD_ID, '__') &&
+      !contains(env.COL_TRIAGE, '__')
     steps:
       - name: Move item to correct column
+        if: ${{ secrets.PUSH_TOKEN != '' }}
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.PUSH_TOKEN }}
