@@ -5,12 +5,8 @@ name: Goose Implementation
 # 2. Manually via workflow_dispatch (re-trigger for merged PRs or retries)
 
 on:
-  # pull_request trigger is uncommented by init.sh after placeholders are replaced.
-  # GitHub validates `uses:` values statically — __SETUP_ACTION__ fails validation
-  # if this trigger is active. Safe to uncomment after running init.sh.
-  #
-  # pull_request:
-  #   types: [labeled]
+  pull_request:
+    types: [labeled]
   workflow_dispatch:
     inputs:
       issue_number:
@@ -38,16 +34,7 @@ env:
   __API_KEY_SECRET__: ${{ secrets.__API_KEY_SECRET__ }}
 
 jobs:
-  # Guard job: always succeeds so skipped runs don't show as failures.
-  # Without this, GitHub marks the run as "failure" when all jobs skip.
-  guard:
-    runs-on: ubuntu-latest
-    if: always()
-    steps:
-      - run: echo "Workflow evaluated"
-
   implement:
-    needs: guard
     if: >-
       !contains(github.repository, 'ai-pipeline-template') &&
       (github.event_name == 'workflow_dispatch' ||
@@ -120,13 +107,10 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.PUSH_TOKEN || secrets.GITHUB_TOKEN }}
 
-      # Uncommented by init.sh after placeholders are replaced.
-      # GitHub validates uses: values statically — __SETUP_ACTION__ is invalid.
-      #
-      # - name: Setup __LANGUAGE__
-      #   uses: __SETUP_ACTION__
-      #   with:
-      #     __SETUP_WITH__: "__LANGUAGE_VERSION__"
+      - name: Setup __LANGUAGE__
+        uses: __SETUP_ACTION__
+        with:
+          __SETUP_WITH__: "__LANGUAGE_VERSION__"
 
       - name: Install Goose CLI
         run: |

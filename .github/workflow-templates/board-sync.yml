@@ -38,15 +38,7 @@ permissions:
   pull-requests: read
 
 jobs:
-  # Guard job: always succeeds so skipped runs don't show as failures.
-  guard:
-    runs-on: ubuntu-latest
-    if: always()
-    steps:
-      - run: echo "Workflow evaluated"
-
   sync:
-    needs: guard
     runs-on: ubuntu-latest
     # Skip if placeholder IDs haven't been replaced
     if: >-
