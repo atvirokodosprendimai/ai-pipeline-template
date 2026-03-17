@@ -319,9 +319,19 @@ echo "    Processed ${count} files"
 # __SETUP_ACTION__ is still a placeholder.
 GOOSE_WF=".github/workflows/goose-build.yml"
 if [ -f "$GOOSE_WF" ]; then
+  # Uncomment the pull_request trigger
   sedi 's|^  # pull_request:|  pull_request:|' "$GOOSE_WF"
   sedi 's|^  #   types: \[labeled\]|    types: [labeled]|' "$GOOSE_WF"
-  echo "    Enabled pull_request trigger in goose-build.yml"
+  # Uncomment the language setup step.
+  # Placeholders are already replaced at this point, so match the comment prefix only.
+  sedi 's|^      # - name: Setup |      - name: Setup |' "$GOOSE_WF"
+  sedi 's|^      #   uses: |        uses: |' "$GOOSE_WF"
+  sedi 's|^      #   with:|        with:|' "$GOOSE_WF"
+  sedi 's|^      #     |          |' "$GOOSE_WF"
+  # Remove the explanation comment block above the setup step
+  sedi '/Uncommented by init.sh after placeholders/d' "$GOOSE_WF"
+  sedi '/GitHub validates uses: values statically/d' "$GOOSE_WF"
+  echo "    Enabled pull_request trigger and setup step in goose-build.yml"
 fi
 
 # ── Observation loop setup ────────────────────────────────────

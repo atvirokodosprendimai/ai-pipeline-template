@@ -120,10 +120,13 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.PUSH_TOKEN || secrets.GITHUB_TOKEN }}
 
-      - name: Setup __LANGUAGE__
-        uses: __SETUP_ACTION__
-        with:
-          __SETUP_WITH__: "__LANGUAGE_VERSION__"
+      # Uncommented by init.sh after placeholders are replaced.
+      # GitHub validates uses: values statically — __SETUP_ACTION__ is invalid.
+      #
+      # - name: Setup __LANGUAGE__
+      #   uses: __SETUP_ACTION__
+      #   with:
+      #     __SETUP_WITH__: "__LANGUAGE_VERSION__"
 
       - name: Install Goose CLI
         run: |
