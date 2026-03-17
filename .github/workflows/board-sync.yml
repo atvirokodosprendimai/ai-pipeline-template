@@ -38,7 +38,15 @@ permissions:
   pull-requests: read
 
 jobs:
+  # Guard job: always succeeds so skipped runs don't show as failures.
+  guard:
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - run: echo "Workflow evaluated"
+
   sync:
+    needs: guard
     runs-on: ubuntu-latest
     # Skip if placeholder IDs haven't been replaced, or if PUSH_TOKEN is unavailable (e.g. fork PRs)
     if: ${{ secrets.PUSH_TOKEN != '' && !contains(env.PROJECT_ID, '__') && !contains(env.STATUS_FIELD_ID, '__') && !contains(env.COL_TRIAGE, '__') }}
