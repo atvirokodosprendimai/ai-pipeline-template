@@ -19,8 +19,12 @@
   description: "Spec PR created, awaiting human review"
 
 - name: approved-for-build
-  color: "1D76DB"
-  description: "Human approved spec, Goose will implement"
+  color: "0E8A16"
+  description: "Spec passed validation, ready for Goose implementation"
+
+- name: spec-needs-fix
+  color: "E11D48"
+  description: "Spec validation found structural issues"
 
 - name: goose-implementation
   color: "D93F0B"

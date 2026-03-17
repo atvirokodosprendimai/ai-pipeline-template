@@ -5,11 +5,8 @@ name: Goose Implementation
 # 2. Manually via workflow_dispatch (re-trigger for merged PRs or retries)
 
 on:
-  # pull_request trigger disabled until placeholders are replaced via init.sh.
-  # Uncomment after configuring GOOSE_PROVIDER, GOOSE_MODEL, API key, etc.
-  #
-  # pull_request:
-  #   types: [labeled]
+  pull_request:
+    types: [labeled]
   workflow_dispatch:
     inputs:
       issue_number:
@@ -266,6 +263,15 @@ jobs:
 
           TASK_HEADER
 
+          # Inject live project context if CLAUDE.md exists
+          if [ -f "CLAUDE.md" ]; then
+            echo "" >> /tmp/goose-task.md
+            echo "## Project Context (from CLAUDE.md)" >> /tmp/goose-task.md
+            echo "" >> /tmp/goose-task.md
+            cat CLAUDE.md >> /tmp/goose-task.md
+            echo "" >> /tmp/goose-task.md
+          fi
+
           # Append the actual spec content
           cat "$SPEC_FILE" >> /tmp/goose-task.md
 
@@ -277,7 +283,7 @@ jobs:
 
           1. Read the specification above thoroughly
           2. Explore the relevant source files mentioned in "Affected Files"
-          3. Implement the changes described in "Proposed Approach"
+          3. Implement the changes described in "Implementation Tasks"
           4. Write or update tests for your changes
           5. Run `__BUILD_CMD__` and fix any compilation errors
           6. Run `__TEST_CMD__` and fix any test failures

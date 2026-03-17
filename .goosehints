@@ -1,33 +1,22 @@
-This is __PROJECT_NAME__ - __PROJECT_DESCRIPTION__.
+This is __PROJECT_NAME__ — __PROJECT_DESCRIPTION__.
 
-## Architecture
+## Structure
 
-<!-- TODO: Describe your project's architecture -->
-<!-- Example: main components, how they interact, key design decisions -->
+__PROJECT_STRUCTURE__
 
-## Build Commands
+## Commands
 
 - Build: __BUILD_CMD__
 - Test: __TEST_CMD__
 - Lint: __LINT_CMD__
 - Format: __FORMAT_CMD__
 
-## Code Style
+## Architecture
 
-- Language: __LANGUAGE__ __LANGUAGE_VERSION__
+__ARCHITECTURE_NOTES__
 
-<!-- TODO: Add your code style conventions -->
-<!-- Examples: formatting rules, error handling patterns, testing conventions -->
+## Rules
 
-## Key Dependencies
-
-<!-- TODO: List important external dependencies -->
-
-## Important Files
-
-<!-- TODO: List key files and their purposes -->
-<!-- Example:
-- src/index.ts: Application entry point
-- src/config.ts: Configuration loading
-- src/routes/: API route handlers
--->
+- Do NOT modify files outside the scope of the specification
+- Run build, test, and lint before considering work complete
+- Keep changes minimal and focused

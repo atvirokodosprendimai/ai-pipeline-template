@@ -116,6 +116,8 @@ echo "  Project"
 echo "  -------"
 prompt PROJECT_NAME "Project name"
 prompt PROJECT_DESC "Brief description"
+prompt PROJECT_STRUCTURE "Brief project structure (e.g. 'monorepo with pkg/ for libraries and cmd/ for CLI')"
+prompt ARCHITECTURE_NOTES "Key architectural patterns (e.g. 'event-driven, repository pattern, CQRS')" ""
 echo ""
 
 echo "  Language"
@@ -284,6 +286,10 @@ PAIRS="${PAIRS}__API_KEY_SECRET__|$(esc "$API_KEY_SECRET")
 PAIRS="${PAIRS}__SETUP_ACTION__|$(esc "$SETUP_ACTION")
 "
 PAIRS="${PAIRS}__SETUP_WITH__|$(esc "$SETUP_WITH")
+"
+PAIRS="${PAIRS}__PROJECT_STRUCTURE__|$(esc "$PROJECT_STRUCTURE")
+"
+PAIRS="${PAIRS}__ARCHITECTURE_NOTES__|$(esc "$ARCHITECTURE_NOTES")
 "
 
 if [ "${ENABLE_LOOP:-n}" = "y" ]; then

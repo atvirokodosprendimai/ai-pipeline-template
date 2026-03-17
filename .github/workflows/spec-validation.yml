@@ -1,0 +1,125 @@
+name: Spec Validation
+
+# Runs structural checks on spec PRs and auto-approves clean ones.
+# Human is notified but does not gate the pipeline.
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - 'specs/issue-*-spec.md'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  validate:
+    # Skip in the template repo itself
+    if: "!contains(github.repository, 'ai-pipeline-template')"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Find spec file
+        id: find
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+              per_page: 100,
+            });
+            const spec = files.find(f => /^specs\/issue-\d+-spec\.md$/.test(f.filename));
+            if (!spec) {
+              core.setFailed('No spec file found in PR');
+              return;
+            }
+            core.setOutput('spec_file', spec.filename);
+
+      - name: Run structural checks
+        id: checks
+        continue-on-error: true
+        env:
+          # spec_file is regex-validated (specs/issue-N-spec.md) — safe for shell use
+          SPEC_FILE: ${{ steps.find.outputs.spec_file }}
+        run: |
+          bash .github/scripts/validate-spec.sh "$SPEC_FILE" | tee /tmp/validation-results.txt
+
+      - name: Auto-approve or flag
+        if: always() && steps.find.outcome == 'success'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            let raw = '';
+            try {
+              raw = fs.readFileSync('/tmp/validation-results.txt', 'utf8').trim();
+            } catch (e) {
+              raw = 'SCRIPT_ERROR|FAIL|validate-spec.sh produced no output';
+            }
+            const results = raw.split('\n').filter(l => l.includes('|'));
+
+            const failures = results.filter(r => r.includes('|FAIL|'));
+            const warnings = results.filter(r => r.includes('|WARN|'));
+            const passed = failures.length === 0;
+
+            const prNumber = context.issue.number;
+
+            // Helper: safe label removal (ignore 404)
+            async function removeLabel(name) {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner, repo: context.repo.repo,
+                  issue_number: prNumber, name
+                });
+              } catch (e) { /* label not present — OK */ }
+            }
+
+            if (passed) {
+              await removeLabel('spec-needs-fix');
+
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: prNumber, labels: ['approved-for-build']
+              });
+
+              let body = '**Spec validation passed.** Auto-approved for build.';
+              if (warnings.length > 0) {
+                body += '\n\n**Warnings (non-blocking):**\n' +
+                  warnings.map(w => '- ' + w.split('|').slice(2).join('|')).join('\n');
+              }
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: prNumber, body
+              });
+            } else {
+              await removeLabel('approved-for-build');
+
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: prNumber, labels: ['spec-needs-fix']
+              });
+
+              const body = '**Spec validation failed.**\n\n' +
+                failures.map(f => {
+                  const parts = f.split('|');
+                  return `- **${parts[0]}**: ${parts.slice(2).join('|')}`;
+                }).join('\n') +
+                (warnings.length > 0
+                  ? '\n\n**Warnings:**\n' + warnings.map(w => '- ' + w.split('|').slice(2).join('|')).join('\n')
+                  : '');
+
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: prNumber, body
+              });
+
+              core.setFailed('Spec validation failed — see PR comment for details');
+            }
