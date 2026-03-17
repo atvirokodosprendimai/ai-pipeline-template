@@ -5,8 +5,12 @@ name: Goose Implementation
 # 2. Manually via workflow_dispatch (re-trigger for merged PRs or retries)
 
 on:
-  pull_request:
-    types: [labeled]
+  # pull_request trigger is uncommented by init.sh after placeholders are replaced.
+  # GitHub validates `uses:` values statically — __SETUP_ACTION__ fails validation
+  # if this trigger is active. Safe to uncomment after running init.sh.
+  #
+  # pull_request:
+  #   types: [labeled]
   workflow_dispatch:
     inputs:
       issue_number:

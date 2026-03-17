@@ -314,6 +314,16 @@ done
 
 echo "    Processed ${count} files"
 
+# Uncomment the pull_request trigger in goose-build.yml now that placeholders are replaced.
+# GitHub validates `uses:` values statically, so the trigger must stay commented while
+# __SETUP_ACTION__ is still a placeholder.
+GOOSE_WF=".github/workflows/goose-build.yml"
+if [ -f "$GOOSE_WF" ]; then
+  sedi 's|^  # pull_request:|  pull_request:|' "$GOOSE_WF"
+  sedi 's|^  #   types: \[labeled\]|    types: [labeled]|' "$GOOSE_WF"
+  echo "    Enabled pull_request trigger in goose-build.yml"
+fi
+
 # ── Observation loop setup ────────────────────────────────────
 
 if [ "${ENABLE_LOOP:-n}" = "y" ]; then
