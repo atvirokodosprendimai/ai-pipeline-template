@@ -42,8 +42,24 @@ Changes:
 2. **Double-assignment guard**: Skips if issue already has `copilot-triaging` label. Prevents re-triggering when multiple labels are added to the same issue.
 3. **Selective label cleanup**: Only removes `needs-triage` (the pipeline-specific label); preserves `bug` and `fn:dev` which carry semantic meaning.
 
+## Investigation Steps
+
+1. Traced pipeline flow: issue → `needs-triage` label → `copilot-triage.yml` → Copilot spec → validation → approval → Goose build
+2. Checked issue #457 state: labels `[bug]`, assignees `[]`, comments `[]` — completely untouched by pipeline
+3. Checked triage workflow runs: fired on 2026-03-16 for #457 but conclusion was `skipped` — `if` condition didn't match
+4. Compared label on issue (`bug`) vs trigger condition (`needs-triage`) — mismatch confirmed
+5. Checked observation loop output schema — has `issues_to_create` and `issues_to_close` but no relabel capability
+6. Verified loop assessments referenced #457 as top blocker for 3 consecutive runs without acting on it
+
 ## Prevention
 
 - Any new label that should enter the pipeline must be added to the `fromJSON` array in `copilot-triage.yml:17`.
 - The `copilot-triaging` guard ensures idempotency regardless of how many triggering labels an issue has.
 - Consider adding `issues_to_relabel` to the observation loop output schema so it can push existing issues into the pipeline.
+- When filing issues manually, always add `needs-triage` to ensure pipeline pickup.
+
+## Related
+
+- [Observation loop creates bogus issues for existing features](./observation-loop-creates-bogus-issues-for-existing-features.md) — same pipeline, different gap (loop created wrong issues; here it couldn't push existing issues into triage)
+- PR [#38](https://github.com/atvirokodosprendimai/ai-pipeline-template/pull/38) — the fix
+- `memory/episodic/20260316-0937-claude-nat-relay-issue-filed.md` — session that filed #457 manually
