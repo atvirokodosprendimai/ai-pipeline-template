@@ -113,6 +113,25 @@ jobs:
             echo "No shared memory available." > /tmp/shared_memory.txt
           }
 
+      - name: Collect open issues and PRs
+        env:
+          GH_TOKEN: ${{ secrets.PUSH_TOKEN }}
+        run: |
+          target="atvirokodosprendimai/wgmesh"
+          {
+            echo "## Open Issues (wgmesh)"
+            echo ""
+            gh issue list --repo "$target" --state open --limit 50 \
+              --json number,title,labels \
+              --jq '.[] | "- #\(.number) \(.title) [\([.labels[].name] | join(", "))]"' 2>/dev/null || echo "- (failed to fetch)"
+            echo ""
+            echo "## Open PRs (wgmesh)"
+            echo ""
+            gh pr list --repo "$target" --state open --limit 20 \
+              --json number,title,author \
+              --jq '.[] | "- PR #\(.number) \(.title) (by \(.author.login))"' 2>/dev/null || echo "- (failed to fetch)"
+          } > /tmp/open_board.txt
+
       - name: Read recent assessments
         run: |
           {
@@ -181,6 +200,11 @@ jobs:
           Curated knowledge and recent agent activity from the shared memory subsystem.
           Use this to maintain continuity across runs and avoid repeating past mistakes.
           $(cat /tmp/shared_memory.txt)
+
+          ## Open Issues & PRs
+          Review this list every run. Close issues and PRs that are stale, superseded, or
+          describe features that already exist (check the Product Codebase Summary).
+          $(cat /tmp/open_board.txt)
 
           ## Recent Assessment History
           $(cat /tmp/history.txt)
@@ -457,4 +481,18 @@ jobs:
             else
               echo "Skipping duplicate needs-human: $request"
             fi
+          done
+
+      - name: Close PRs from assessment
+        env:
+          GH_TOKEN: ${{ secrets.PUSH_TOKEN }}
+        run: |
+          jq -c '.prs_to_close // [] | .[]' /tmp/assessment.json | while read -r item; do
+            repo=$(echo "$item" | jq -r '.repo')
+            number=$(echo "$item" | jq -r '.number')
+            reason=$(echo "$item" | jq -r '.reason')
+            full_repo="atvirokodosprendimai/${repo}"
+            gh pr close "$number" --repo "$full_repo" \
+              --comment "Closed by observation loop: $reason" || true
+            echo "Closed PR #${number} in ${full_repo}: ${reason}"
           done

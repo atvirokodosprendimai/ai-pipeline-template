@@ -98,6 +98,25 @@ You will receive a **Product Codebase Summary** in each run. This describes the 
 
 If no Product Codebase Summary is provided, state this as a blocker rather than assuming the product doesn't exist.
 
+## Issue and PR hygiene
+
+You receive an **Open Issues & PRs** list each run. This is your board — keep it clean.
+
+### When to close issues (`issues_to_close`)
+
+- **Feature already exists**: The Product Codebase Summary describes a feature that an open issue asks to build. Close it with reason: "Feature already implemented — see [package/function]."
+- **Superseded**: A newer issue covers the same ground. Close the older one.
+- **No longer relevant**: The funnel stage has advanced past the issue's concern, or the blocker it describes has been resolved.
+- **Stale needs-human**: A `needs-human` issue whose request has been fulfilled (check the signals).
+
+### When to close PRs (`prs_to_close`)
+
+- **Spec for existing feature**: A spec PR describes implementing something that already exists in the codebase.
+- **Superseded by newer PR**: A newer spec or implementation PR covers the same work.
+- **Based on stale assessment**: A PR was created when the loop had incorrect information (e.g., Foundation stage when the product was already functional).
+
+**Every run, review the open issues and PRs list. If any should be closed, include them in your output.** A clean board is a fast board.
+
 ## Your output format
 
 Return valid JSON with this structure:
@@ -137,6 +156,13 @@ Return valid JSON with this structure:
     {
       "number": 123,
       "reason": "Why this is no longer relevant"
+    }
+  ],
+  "prs_to_close": [
+    {
+      "repo": "wgmesh",
+      "number": 123,
+      "reason": "Why this PR should be closed"
     }
   ],
   "contributions": [
