@@ -1,0 +1,83 @@
+name: Health Check
+
+# Lightweight endpoint health monitor — runs every 15 minutes.
+# Creates a GitHub issue on the first failure, closes it on recovery.
+# No LLM calls, no heavy processing — just curl + issue management.
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            company/health.json
+            company/scripts/collect-infra.sh
+
+      - name: Run health checks
+        id: health
+        run: |
+          result=$(bash company/scripts/collect-infra.sh)
+          echo "$result" | jq .
+
+          # Extract failures
+          down=$(echo "$result" | jq -c '[.services[] | select(.status != "up")]')
+          down_count=$(echo "$down" | jq 'length')
+          down_names=$(echo "$down" | jq -r '[.[].name] | join(", ")')
+
+          echo "down_count=$down_count" >> "$GITHUB_OUTPUT"
+          echo "down_names=$down_names" >> "$GITHUB_OUTPUT"
+
+          # Write details for issue body
+          echo "$down" | jq -r '.[] | "- **\(.name)** (\(.url)): \(.status)"' > /tmp/down-details.txt
+
+      - name: Create or update issue on failure
+        if: steps.health.outputs.down_count != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DOWN_NAMES: ${{ steps.health.outputs.down_names }}
+        run: |
+          # Check for existing open health-check issue
+          existing=$(gh issue list --label "health-check" --state open --json number --jq '.[0].number // empty')
+
+          body="**Services down:** $DOWN_NAMES
+
+          $(cat /tmp/down-details.txt)
+
+          *Detected at $(date -u '+%Y-%m-%d %H:%M UTC') — auto-created by health-check workflow.*
+          *Will auto-close when all endpoints recover.*"
+
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+            echo "Updated existing issue #${existing}"
+          else
+            gh issue create \
+              --title "Health check: ${DOWN_NAMES} down" \
+              --body "$body" \
+              --label "health-check,needs-human"
+            echo "Created new health-check issue"
+          fi
+
+      - name: Auto-close on recovery
+        if: steps.health.outputs.down_count == '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          existing=$(gh issue list --label "health-check" --state open --json number --jq '.[0].number // empty')
+
+          if [ -n "$existing" ]; then
+            gh issue close "$existing" \
+              --comment "All endpoints recovered at $(date -u '+%Y-%m-%d %H:%M UTC'). Auto-closing."
+            echo "Closed issue #${existing} — all endpoints up"
+          else
+            echo "All endpoints up, no open health-check issues."
+          fi

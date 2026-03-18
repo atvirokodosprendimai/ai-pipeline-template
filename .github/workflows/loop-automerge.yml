@@ -1,0 +1,46 @@
+name: Auto-merge Loop PRs
+
+# Event-driven auto-merge for observation loop assessment PRs.
+# Triggers when a review lands on a loop/* PR — no polling, no timing races.
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  automerge:
+    # Only loop PRs, only non-blocking reviews
+    if: >-
+      startsWith(github.event.pull_request.head.ref, 'loop/') &&
+      github.event.review.state != 'changes_requested'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check reviews and merge
+        env:
+          GH_TOKEN: ${{ secrets.PUSH_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          # Check for blocking reviews — latest review per reviewer wins
+          has_blocking=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews" \
+            --jq '[group_by(.user.login)[] | sort_by(.submitted_at) | last | select(.state == "CHANGES_REQUESTED")] | length')
+
+          if [ "$has_blocking" -gt 0 ]; then
+            echo "::warning::PR #${PR_NUMBER} has ${has_blocking} blocking review(s). Leaving open for human review."
+            exit 0
+          fi
+
+          # Check for inline review comments
+          comment_count=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}/comments" --jq 'length')
+
+          if [ "$comment_count" -gt 0 ]; then
+            echo "::warning::PR #${PR_NUMBER} has ${comment_count} inline comment(s). Leaving open for human review."
+            exit 0
+          fi
+
+          echo "Review clean — no blocking reviews, no inline comments. Merging."
+          gh pr merge "$PR_NUMBER" --repo "$REPO" --squash --delete-branch --admin
