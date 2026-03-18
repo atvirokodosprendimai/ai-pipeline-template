@@ -1,8 +1,11 @@
 name: Copilot Issue Triage
 
-# Triggered when an issue is labeled with 'needs-triage'.
+# Triggered when an issue is labeled with a pipeline-entry label.
 # Assigns the issue to GitHub Copilot coding agent with instructions
 # to analyze the issue and produce a specification document (no code).
+#
+# Entry labels: needs-triage (observation loop), fn:dev (dev work), bug (manual reports).
+# Guard: skips issues already labeled 'copilot-triaging' to prevent double-assignment.
 
 on:
   issues:
@@ -14,7 +17,9 @@ permissions:
 
 jobs:
   triage:
-    if: github.event.label.name == 'needs-triage'
+    if: >-
+      contains(fromJSON('["needs-triage","fn:dev","bug"]'), github.event.label.name) &&
+      !contains(join(github.event.issue.labels.*.name, ','), 'copilot-triaging')
     runs-on: ubuntu-latest
     steps:
       - name: Assign Copilot coding agent to write specification
@@ -89,16 +94,19 @@ jobs:
               ].join('\n')
             });
 
-            // Swap labels: remove needs-triage, add copilot-triaging
-            try {
-              await github.rest.issues.removeLabel({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: issueNumber,
-                name: 'needs-triage'
-              });
-            } catch (e) {
-              console.log('Could not remove needs-triage label:', e.message);
+            // Swap labels: remove the triggering label, add copilot-triaging
+            const triggerLabel = context.payload.label.name;
+            if (triggerLabel === 'needs-triage') {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issueNumber,
+                  name: 'needs-triage'
+                });
+              } catch (e) {
+                console.log('Could not remove needs-triage label:', e.message);
+              }
             }
 
             await github.rest.issues.addLabels({
