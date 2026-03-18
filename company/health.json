@@ -2,7 +2,7 @@
   "endpoints": [
     {"name": "chimney", "url": "https://chimney.beerpub.dev"},
     {"name": "cloudroof", "url": "https://cloudroof.eu"},
-    {"name": "coroot", "url": "https://coroot.beerpub.dev"},
+    {"name": "coroot", "url": "https://table.beerpub.dev"},
     {"name": "tvcentras", "url": "https://tvcentras.lt"},
     {"name": "creu", "url": "https://creu.lt"}
   ]
