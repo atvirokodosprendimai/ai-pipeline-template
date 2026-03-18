@@ -1,8 +1,8 @@
 {
-  "funnel_stage": 0,
-  "stage_name": "Foundation",
+  "funnel_stage": 1,
+  "stage_name": "Dogfood",
   "stage_entered": null,
-  "last_run": "2026-03-17T08:56:42Z",
-  "run_count": 8,
+  "last_run": "2026-03-18T08:53:41Z",
+  "run_count": 9,
   "history": []
 }
