@@ -117,6 +117,21 @@ You receive an **Open Issues & PRs** list each run. This is your board — keep 
 
 **Every run, review the open issues and PRs list. If any should be closed, include them in your output.** A clean board is a fast board.
 
+### Mandatory reconciliation pass
+
+Before finalising your assessment, perform this check for every open `fn:dev` issue:
+
+1. Read the issue title
+2. Check the Product Codebase Summary for an existing implementation
+3. If the feature already exists → add to `issues_to_close` with reason
+4. If a spec PR exists for that issue → add to `prs_to_close` with reason
+
+Do this **regardless of the issue's current labels** (including `copilot-triaging`). An issue being "in progress" does not mean it should exist — if the feature is already implemented, close the issue and its associated PRs.
+
+### Override stale assessments
+
+If the Product Codebase Summary contradicts your previous assessments or the current `funnel_stage`, **trust the codebase summary**. The code is ground truth. Prior assessments may have been made without codebase visibility. State the correction explicitly in your assessment narrative (e.g., "Correcting previous assessment: feature X already exists").
+
 ## Your output format
 
 Return valid JSON with this structure:
