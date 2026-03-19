@@ -515,3 +515,30 @@ jobs:
               --comment "Closed by observation loop: $reason" || true
             echo "Closed PR #${number} in ${full_repo}: ${reason}"
           done
+
+      - name: Sweep stale needs-triage issues
+        env:
+          GH_TOKEN: ${{ secrets.PUSH_TOKEN }}
+          TARGET_REPO: atvirokodosprendimai/wgmesh
+        run: |
+          # Find issues labeled 'needs-triage' that are older than 24h.
+          # This catches issues where the copilot-triage workflow fired but
+          # failed silently, or where the label was added before the workflow
+          # existed. Re-applying the label re-triggers the triage workflow.
+          cutoff=$(date -u -d '24 hours ago' '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || \
+                   date -u -v-24H '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || echo "")
+
+          if [ -z "$cutoff" ]; then
+            echo "::warning::Could not compute 24h cutoff — skipping stale triage sweep"
+            exit 0
+          fi
+
+          gh issue list --repo "$TARGET_REPO" --state open --label "needs-triage" --limit 50 \
+            --json number,title,createdAt \
+            --jq --arg cutoff "$cutoff" '.[] | select(.createdAt < $cutoff) | "\(.number)\t\(.title)"' \
+          | while IFS=$'\t' read -r number title; do
+            echo "Stale needs-triage: #${number} ${title} — re-triggering"
+            gh issue edit "$number" --repo "$TARGET_REPO" --remove-label "needs-triage" 2>/dev/null || true
+            sleep 2
+            gh issue edit "$number" --repo "$TARGET_REPO" --add-label "needs-triage" 2>/dev/null || true
+          done
