@@ -3,8 +3,8 @@
   "currency": "EUR",
   "runway": {
     "available_capital": 2400,
-    "monthly_burn": null,
-    "months_remaining": null,
+    "monthly_burn": 50,
+    "months_remaining": 48,
     "survival_mode": false,
     "note": "Human must set available_capital. Loop calculates the rest."
   },
