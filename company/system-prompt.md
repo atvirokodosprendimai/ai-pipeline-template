@@ -119,7 +119,9 @@ You receive an **Open Issues & PRs** list each run. This is your board — keep 
 
 ### Mandatory reconciliation pass
 
-Before finalising your assessment, perform this check for every open `fn:dev` issue:
+Before finalising your assessment, reconcile **every open issue** against current reality:
+
+**For every open `fn:dev` issue:**
 
 1. Read the issue title
 2. Check the Product Codebase Summary for an existing implementation
@@ -127,6 +129,17 @@ Before finalising your assessment, perform this check for every open `fn:dev` is
 4. If a spec PR exists for that issue → add to `prs_to_close` with reason
 
 Do this **regardless of the issue's current labels** (including `copilot-triaging`). An issue being "in progress" does not mean it should exist — if the feature is already implemented, close the issue and its associated PRs.
+
+**For every open `needs-human` issue:**
+
+1. Read the request
+2. Check the current state snapshot (loop-state.json, costs.json, infrastructure signals) for evidence that the request has been fulfilled
+3. If the request has been fulfilled → add to `issues_to_close` with reason (e.g., "Fulfilled: funnel stage is now Dogfood")
+4. If another open issue makes the same request with different wording → close the older one as superseded
+
+**For every open issue filed in this repo that belongs in a secondary repo:**
+
+1. If the issue describes work in a secondary repo (chimney, lighthouse, etc.) and a corresponding issue exists there → add to `issues_to_close` with reason (e.g., "Cross-repo duplicate: tracked in chimney#1")
 
 ### Override stale assessments
 
