@@ -2,7 +2,7 @@ name: Observation Loop
 
 on:
   schedule:
-    - cron: '0 8 * * *'  # daily 08:00 UTC
+    - cron: '0 0,8,16 * * *'  # every 8 hours: 00:00, 08:00, 16:00 UTC
   workflow_dispatch:       # manual trigger
   repository_dispatch:     # webhook events (payment, alert, etc.)
     types: [company-signal]
