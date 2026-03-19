@@ -118,6 +118,9 @@ jobs:
           GH_TOKEN: ${{ secrets.PUSH_TOKEN }}
         run: |
           target="atvirokodosprendimai/wgmesh"
+          # Secondary repos with potential open issues — lightweight scan for cross-repo dedup.
+          secondary_repos="atvirokodosprendimai/chimney atvirokodosprendimai/lighthouse atvirokodosprendimai/tvcentras"
+
           {
             echo "## Open Issues (wgmesh)"
             echo ""
@@ -130,6 +133,20 @@ jobs:
             gh pr list --repo "$target" --state open --limit 20 \
               --json number,title,author \
               --jq '.[] | "- PR #\(.number) \(.title) (by \(.author.login))"' 2>/dev/null || echo "- (failed to fetch)"
+
+            # Include secondary repo issues so the LLM can detect cross-repo duplicates
+            for repo in $secondary_repos; do
+              name="${repo##*/}"
+              issues=$(gh issue list --repo "$repo" --state open --limit 10 \
+                --json number,title \
+                --jq '.[] | "- #\(.number) \(.title)"' 2>/dev/null || true)
+              if [ -n "$issues" ]; then
+                echo ""
+                echo "## Open Issues ($name)"
+                echo ""
+                echo "$issues"
+              fi
+            done
           } > /tmp/open_board.txt
 
       - name: Read recent assessments
@@ -391,8 +408,10 @@ jobs:
             body=$(echo "$issue" | jq -r '.body')
             labels=$(echo "$issue" | jq -r '.labels | join(",")')
 
-            # Extract key words for fuzzy matching (skip common filler words)
-            keywords=$(echo "$title" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '\n' | grep -v -E '^(the|a|an|in|on|for|to|of|and|or|is|set|add|configure|verify|check|update)$' | head -3)
+            # Extract key words for fuzzy matching (skip common filler words).
+            # Use 5 keywords (not 3) and require 2+ matches to reduce false negatives
+            # when the same ask is rephrased across runs (e.g. "configure burn" vs "review burn").
+            keywords=$(echo "$title" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '\n' | grep -v -E '^(the|a|an|in|on|for|to|of|and|or|is|set|add|configure|verify|check|update|review|approve|implement|basic|define|fix|enable)$' | head -5)
             match_count=0
             while IFS= read -r existing_title; do
               existing_lower=$(echo "$existing_title" | tr '[:upper:]' '[:lower:]')
@@ -448,8 +467,8 @@ jobs:
             urgency=$(echo "$req" | jq -r '.urgency')
             full_title="[needs-human] $request"
 
-            # Fuzzy dedup against existing open issues
-            keywords=$(echo "$request" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '\n' | grep -v -E '^(the|a|an|in|on|for|to|of|and|or|is|set|add|configure|verify|check|update)$' | head -3)
+            # Fuzzy dedup against existing open issues (5 keywords, expanded stop words)
+            keywords=$(echo "$request" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '\n' | grep -v -E '^(the|a|an|in|on|for|to|of|and|or|is|set|add|configure|verify|check|update|review|approve|implement|basic|define|fix|enable)$' | head -5)
             match_count=0
             while IFS= read -r existing_title; do
               existing_lower=$(echo "$existing_title" | tr '[:upper:]' '[:lower:]')
