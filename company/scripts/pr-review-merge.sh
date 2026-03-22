@@ -485,13 +485,42 @@ main() {
     exit 0  # guardrail escalated internally
   fi
 
-  # Check for spec-needs-fix label (blocks merge even if review is clean)
-  local labels
-  if labels=$(gh pr view "$PR_NUMBER" --repo "$TARGET_REPO" --json labels --jq '.labels[].name' 2>/dev/null); then
+  # Spec PR gate: require positive validation signal before merge.
+  # spec-validation.yml runs fast (~30s) and adds approved-for-build on pass
+  # or spec-needs-fix on fail. We check for both to avoid a race where we
+  # merge before validation finishes.
+  local pr_title
+  pr_title=$(gh pr view "$PR_NUMBER" --repo "$TARGET_REPO" --json title --jq '.title' 2>/dev/null || echo "")
+  if echo "$pr_title" | grep -qi "^spec:"; then
+    local labels
+    labels=$(gh pr view "$PR_NUMBER" --repo "$TARGET_REPO" --json labels --jq '.labels[].name' 2>/dev/null || echo "")
     if echo "$labels" | grep -qxF "spec-needs-fix"; then
       escalate "$PR_NUMBER" "Spec validation failed (spec-needs-fix label present)"
       exit 0
     fi
+    if ! echo "$labels" | grep -qxF "approved-for-build"; then
+      # Validation hasn't finished yet — wait and retry
+      echo "Spec PR waiting for spec-validation to complete..."
+      local spec_wait
+      for spec_wait in $(seq 1 6); do
+        sleep 30
+        labels=$(gh pr view "$PR_NUMBER" --repo "$TARGET_REPO" --json labels --jq '.labels[].name' 2>/dev/null || echo "")
+        if echo "$labels" | grep -qxF "spec-needs-fix"; then
+          escalate "$PR_NUMBER" "Spec validation failed (spec-needs-fix label present)"
+          exit 0
+        fi
+        if echo "$labels" | grep -qxF "approved-for-build"; then
+          echo "Spec PR approved for build — proceeding to merge"
+          break
+        fi
+        echo "  Waiting for spec-validation (attempt ${spec_wait}/6)..."
+      done
+      if ! echo "$labels" | grep -qxF "approved-for-build"; then
+        escalate "$PR_NUMBER" "Spec validation did not complete within timeout"
+        exit 0
+      fi
+    fi
+    log_audit "spec_validated" "Spec PR passed validation (approved-for-build)"
   fi
 
   # T1.4: merge the PR

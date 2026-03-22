@@ -1,6 +1,6 @@
 ---
 title: "Close the OODA Loop"
-status: draft
+status: complete
 version: "1.0"
 ---
 
