@@ -1,6 +1,6 @@
 # Project Constitution
 
-> **Version:** 1.2.0 | **Last Updated:** 2026-03-22
+> **Version:** 2.0.0 | **Last Updated:** 2026-03-22
 > **Project Type:** GitHub Actions automation pipeline
 
 This constitution defines the enforceable rules for the ai-pipeline-template project.
@@ -173,17 +173,17 @@ message: "Specs must follow the .start/specs/NNN-<name>/ convention with README,
 
 Spec 001 establishes the canonical structure. Consistent spec layout enables automated discovery and status tracking across the planning pipeline.
 
-### ARCH-4: Automated PRs must self-merge (scoped to data paths)
+### ARCH-4: Automated PRs must self-merge (with review and guardrails)
 
 ```yaml
 level: L1
-check: "Workflows creating automated PRs include a self-merge step using gh pr merge. Self-merged PRs must only modify files under company/ and .start/ — workflow or script changes require human review."
+check: "Workflows creating automated PRs include a self-merge step via company/scripts/pr-review-merge.sh. The script enforces: Copilot review (poll + timeout), author allowlist, size limit, security keyword scan, and CI status check. No path-based restrictions — the guardrail system protects the goal, not specific file paths."
 scope: ".github/workflows/*.yml"
-pattern: "gh pr merge"
-message: "Automated PRs must self-merge (GitHub Apps don't trigger review events). Self-merge is restricted to data paths (company/, .start/). Changes to .github/ or company/scripts/ require human review."
+pattern: "pr-review-merge\\.sh"
+message: "Automated PRs must self-merge through pr-review-merge.sh which enforces review + guardrails. The old data-path scoping is replaced by comprehensive guardrails (author, review, size, keywords, CI)."
 ```
 
-Evidence at `pipeline-health.yml:742` and `observation-loop.yml:394`. Self-merge is a necessary workaround for the GitHub App limitation, but unrestricted auto-merge of arbitrary code is a security gap. The compensating control: `git add` in these workflows only stages `company/` state files and `memory/` data, never workflow YAML or scripts.
+Evidence at `pipeline-health.yml` and `observation-loop.yml`. Self-merge is a necessary workaround for the GitHub App limitation (reviews don't trigger workflow events). Protection comes from the guardrail system: Copilot review required (never merge without review), author must be an approved bot, security keywords scanned, CI must pass, size limits enforced, circuit breaker on errors. Path-based scoping was the compensating control before guardrails existed; the guardrails now protect the goal directly.
 
 ### ARCH-5: Cross-repo via TARGET_REPO env var
 
@@ -432,3 +432,4 @@ Evidence at both test scripts around lines 20-21. Hardcoded poll intervals and u
 | 1.0.0 | 2026-03-22 | Initial constitution with 27 rules from codebase discovery |
 | 1.1.0 | 2026-03-22 | Address issue #65: fix QUAL-5 tension, scope ARCH-4, add QUAL-8/ARCH-9, add amendment process |
 | 1.2.0 | 2026-03-22 | Add Andon principle as foundational rule. Upgrade QUAL-5 to L1: no silent errors, every failure must signal. Remove loop-automerge.yml (PR #67) |
+| 2.0.0 | 2026-03-22 | ARCH-4: replace path-based scoping with guardrail-based protection (pr-review-merge.sh). The goal is protected, not the file paths. L1 rule changed → major version bump. |
