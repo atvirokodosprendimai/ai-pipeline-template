@@ -15,7 +15,7 @@ jobs:
   automerge:
     # Only loop PRs, only non-blocking reviews
     if: >-
-      startsWith(github.event.pull_request.head.ref, 'loop/') &&
+      (startsWith(github.event.pull_request.head.ref, 'loop/') || startsWith(github.event.pull_request.head.ref, 'pipeline-health/')) &&
       github.event.review.state != 'changes_requested'
     runs-on: ubuntu-latest
     steps:
