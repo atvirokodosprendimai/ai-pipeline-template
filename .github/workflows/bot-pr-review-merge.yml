@@ -2,7 +2,7 @@ name: Bot PR Review and Merge
 
 on:
   pull_request:
-    types: [opened]
+    types: [opened, reopened]
 
 permissions:
   contents: write
