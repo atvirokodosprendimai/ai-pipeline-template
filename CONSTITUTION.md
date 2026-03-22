@@ -1,7 +1,7 @@
 # Project Constitution
 
 > **Version:** 1.0.0 | **Last Updated:** 2026-03-22
-> **Project Type:** GitHub Actions automation pipeline with Go web dashboard
+> **Project Type:** GitHub Actions automation pipeline
 
 This constitution defines the enforceable rules for the ai-pipeline-template project.
 Every rule includes a severity level, a machine-checkable pattern or check command,
@@ -38,7 +38,7 @@ pattern: "sanitise\\.sh"
 message: "All user-facing content (issues, PRs, commit messages) must pass through sanitise.sh before publishing. Steps must skip on sanitisation failure."
 ```
 
-`pipeline-health.yml` invokes sanitisation at 7 locations and `observation-loop.yml` at 3 locations, covering every publish path. Sanitisation failure must cause the publish step to be skipped, never bypassed.
+`pipeline-health.yml` and `observation-loop.yml` both invoke sanitisation on every user-facing publish path, with multiple call sites per workflow. Sanitisation failure must cause the publish step to be skipped, never bypassed.
 
 ### SEC-3: Event context through env only
 
@@ -69,25 +69,25 @@ All 9 workflow files declare explicit `permissions:` blocks. Omitting permission
 ```yaml
 level: L2
 pattern: "innerHTML"
-scope: "company/dashboard/**"
+scope: "**/*.html"
 exclude: "Static HTML structure only (no external data)"
 check: "No innerHTML assignment with data sourced from API responses or state files"
 message: "Dashboard must use textContent for untrusted data. innerHTML with external content enables XSS."
 ```
 
-`pipeline.html` uses `textContent` exclusively for dynamic data rendering. Any introduction of `innerHTML` with API-sourced or state-file data must be rejected.
+The dashboard (in the chimney companion repo) uses `textContent` exclusively for dynamic data rendering. Any introduction of `innerHTML` with API-sourced or state-file data must be rejected. This rule applies to any HTML dashboard files in this repo or its companions.
 
 ### SEC-6: Secure external links
 
 ```yaml
 level: L2
 pattern: 'target="_blank"'
-scope: "company/dashboard/**"
+scope: "**/*.html"
 check: 'All target="_blank" links include rel="noopener noreferrer"'
 message: 'Links with target="_blank" must include rel="noopener noreferrer" to prevent reverse tabnapping.'
 ```
 
-Evidence at `pipeline.html:368,448`. Omitting `rel="noopener noreferrer"` on blank-target links allows the opened page to access `window.opener` and redirect the parent.
+Evidence at chimney `docs/pipeline.html:368,448`. Omitting `rel="noopener noreferrer"` on blank-target links allows the opened page to access `window.opener` and redirect the parent.
 
 ### SEC-7: Circuit breaker on healing loops
 
@@ -109,9 +109,9 @@ Evidence at `pipeline-health.yml:189-209`. Without a circuit breaker, a misconfi
 
 ```yaml
 level: L1
-check: "All JSON/YAML state files reside under company/. No state files in root or .github/"
-scope: "**/*.json"
-exclude: "package.json, package-lock.json, tsconfig.json, go.mod, go.sum"
+check: "All persistent state files (JSON, JSONL, YAML) reside under company/. No state files in root or .github/"
+scope: "**/*.{json,jsonl,yaml,yml}"
+exclude: "package.json, package-lock.json, tsconfig.json, .github/**/*.yml, .start/**"
 message: "State files must live in company/. Root and .github/ are reserved for configuration and workflow definitions."
 ```
 
@@ -221,10 +221,8 @@ All 8 scripts follow this pattern. Without strict mode, scripts silently continu
 
 ```yaml
 level: L1
-pattern: "> /tmp/.*&& mv"
-scope: ".github/workflows/*.yml"
-exclude: "Read-only jq queries"
-check: "jq state mutations use > /tmp/file && mv /tmp/file target atomic-write pattern"
+check: "All jq write operations that modify state files must use the temp-file-then-mv pattern: jq ... > /tmp/tmpfile && mv /tmp/tmpfile \"$TARGET\". The && guard ensures mv only runs if jq succeeds."
+scope: ".github/workflows/*.yml, company/scripts/*.sh"
 message: "jq mutations must write to a temp file then mv atomically. Direct > redirect to the source file risks truncation on failure."
 ```
 
