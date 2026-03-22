@@ -739,47 +739,7 @@ jobs:
           pr_number=$(echo "$pr_url" | grep -o '[0-9]*$')
           echo "Created PR #${pr_number}"
 
-          # Wait for Copilot review, then merge only if zero inline comments.
-          # Copilot typically reviews within 30-90s of PR creation.
-          # NOTE: For comprehensive review-merge with guardrails, fix loop, and
-          # escalation, see company/scripts/pr-review-merge.sh and
-          # docs/patterns/pr-review-merge.md
-          echo "Waiting for Copilot review on PR #${pr_number}..."
-          review_clean=false
-          for attempt in 1 2 3 4 5 6; do
-            sleep 30
-            # Check if any review has been submitted
-            review_count=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${pr_number}/reviews" --jq 'length' 2>/dev/null || echo "0")
-            if [ "$review_count" -gt 0 ]; then
-              # Check for inline comments (from any reviewer)
-              comment_count=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${pr_number}/comments" --jq 'length' 2>/dev/null || echo "0")
-              if [ "$comment_count" -eq 0 ]; then
-                echo "Copilot review clean — zero inline comments."
-                review_clean=true
-                break
-              else
-                echo "::warning::PR #${pr_number} has ${comment_count} inline review comment(s). Leaving open for resolution."
-                gh pr edit "$pr_number" --add-label "review-comments-pending" 2>/dev/null || true
-                break
-              fi
-            fi
-            echo "  No review yet (attempt ${attempt}/6)..."
-          done
-
-          if [ "$review_clean" = "true" ]; then
-            echo "Merging PR #${pr_number}..."
-            if ! gh pr merge "$pr_number" --squash --admin --delete-branch; then
-              echo "::error::Auto-merge failed for PR #${pr_number}."
-              ERRORS=$((ERRORS + 1))
-            fi
-          else
-            if [ "$review_count" -eq 0 ]; then
-              echo "::warning::No review appeared after 3 minutes. Merging anyway to avoid stale state."
-              gh pr merge "$pr_number" --squash --admin --delete-branch || {
-                echo "::error::Fallback merge failed for PR #${pr_number}."
-                ERRORS=$((ERRORS + 1))
-              }
-            else
-              echo "PR #${pr_number} left open — resolve review comments, then merge manually or wait for next cycle."
-            fi
-          fi
+          # Autonomous review-merge: poll for Copilot review, enforce guardrails,
+          # merge or escalate. See docs/patterns/pr-review-merge.md
+          PR_NUMBER="$pr_number" TARGET_REPO="$GITHUB_REPOSITORY" \
+            company/scripts/pr-review-merge.sh

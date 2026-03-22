@@ -13,7 +13,7 @@ APPROVED_AUTHORS="${APPROVED_AUTHORS:-copilot-swe-agent[bot],goose[bot]}"
 POLL_INTERVAL="${POLL_INTERVAL:-30}"
 POLL_MAX_ATTEMPTS="${POLL_MAX_ATTEMPTS:-6}"
 REVIEW_WINDOWS="${REVIEW_WINDOWS:-2}"
-PROTECTED_PATHS="${PROTECTED_PATHS:-.github/,company/scripts/}"
+PROTECTED_PATHS="${PROTECTED_PATHS:-}"
 SECURITY_KEYWORDS="${SECURITY_KEYWORDS:-secret,token,key,password,api_key,private_key}"
 
 # ---------------------------------------------------------------------------
