@@ -150,14 +150,37 @@ poll_for_review() {
 }
 
 # ---------------------------------------------------------------------------
-# check_inline_comments — count inline review comments on PR
-# Outputs the comment count to stdout. Returns non-zero on API failure.
+# check_unresolved_threads — count UNRESOLVED review threads on PR
+# Uses GraphQL because the REST API has no resolved/unresolved filter.
+# Outputs the unresolved count to stdout. Returns non-zero on API failure.
 # ---------------------------------------------------------------------------
-check_inline_comments() {
+check_unresolved_threads() {
   local pr="$1"
+  local owner repo
+  owner="${TARGET_REPO%%/*}"
+  repo="${TARGET_REPO##*/}"
   local count
-  if ! count=$(gh api "repos/${TARGET_REPO}/pulls/${pr}/comments" --jq 'length'); then
-    echo "::error::Failed to fetch inline comments for PR #${pr}"
+  if ! count=$(gh api graphql \
+    -F owner="$owner" \
+    -F repo="$repo" \
+    -F pr="$pr" \
+    -f query='
+      query($owner: String!, $repo: String!, $pr: Int!) {
+        repository(owner: $owner, name: $repo) {
+          pullRequest(number: $pr) {
+            reviewThreads(first: 100) {
+              pageInfo { hasNextPage }
+              nodes { isResolved }
+            }
+          }
+        }
+      }' \
+    --jq '
+      if .data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage
+      then 999
+      else [.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false)] | length
+      end' 2>/dev/null); then
+    echo "::error::Failed to fetch review threads for PR #${pr}"
     ERRORS=$((ERRORS + 1))
     check_circuit_breaker
     echo "0"
@@ -448,13 +471,13 @@ main() {
 
   # T1.2: Check for inline review comments + retry loop
   local comment_count
-  comment_count=$(check_inline_comments "$PR_NUMBER")
-  log_audit "review_detected" "Review found, ${comment_count} inline comments"
+  comment_count=$(check_unresolved_threads "$PR_NUMBER")
+  log_audit "review_detected" "Review found, ${comment_count} unresolved threads"
   local retry_count=0
 
   while [[ "$comment_count" -gt 0 ]] && [[ "$retry_count" -lt "$MAX_RETRY_COUNT" ]]; do
     retry_count=$((retry_count + 1))
-    log_audit "retry" "Retry ${retry_count}/${MAX_RETRY_COUNT} — ${comment_count} inline comments"
+    log_audit "retry" "Retry ${retry_count}/${MAX_RETRY_COUNT} — ${comment_count} unresolved threads"
 
     reassign_agent "$PR_NUMBER" "$retry_count"
 
@@ -477,11 +500,11 @@ main() {
       retry_count=0
     fi
 
-    comment_count=$(check_inline_comments "$PR_NUMBER")
+    comment_count=$(check_unresolved_threads "$PR_NUMBER")
   done
 
   if [[ "$comment_count" -gt 0 ]]; then
-    escalate "$PR_NUMBER" "Retries exhausted (${MAX_RETRY_COUNT}), ${comment_count} inline comments remain"
+    escalate "$PR_NUMBER" "Retries exhausted (${MAX_RETRY_COUNT}), ${comment_count} unresolved threads remain"
     exit 0
   fi
 
