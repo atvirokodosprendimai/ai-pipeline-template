@@ -1,6 +1,6 @@
 # Project Constitution
 
-> **Version:** 1.0.0 | **Last Updated:** 2026-03-22
+> **Version:** 1.1.0 | **Last Updated:** 2026-03-22
 > **Project Type:** GitHub Actions automation pipeline
 
 This constitution defines the enforceable rules for the ai-pipeline-template project.
@@ -141,17 +141,17 @@ message: "Specs must follow the .start/specs/NNN-<name>/ convention with README,
 
 Spec 001 establishes the canonical structure. Consistent spec layout enables automated discovery and status tracking across the planning pipeline.
 
-### ARCH-4: Automated PRs must self-merge
+### ARCH-4: Automated PRs must self-merge (scoped to data paths)
 
 ```yaml
 level: L1
-check: "Workflows creating automated PRs include a self-merge step using gh pr merge"
+check: "Workflows creating automated PRs include a self-merge step using gh pr merge. Self-merged PRs must only modify files under company/ and .start/ — workflow or script changes require human review."
 scope: ".github/workflows/*.yml"
 pattern: "gh pr merge"
-message: "Automated PRs must self-merge. Never rely on external review triggers -- GitHub Apps do not fire pull_request_review events for their own approvals."
+message: "Automated PRs must self-merge (GitHub Apps don't trigger review events). Self-merge is restricted to data paths (company/, .start/). Changes to .github/ or company/scripts/ require human review."
 ```
 
-Evidence at `pipeline-health.yml:742` and `observation-loop.yml:394`. Depending on external review triggers for bot-created PRs causes them to stall indefinitely.
+Evidence at `pipeline-health.yml:742` and `observation-loop.yml:394`. Self-merge is a necessary workaround for the GitHub App limitation, but unrestricted auto-merge of arbitrary code is a security gap. The compensating control: `git add` in these workflows only stages `company/` state files and `memory/` data, never workflow YAML or scripts.
 
 ### ARCH-5: Cross-repo via TARGET_REPO env var
 
@@ -200,6 +200,17 @@ message: "Workflows writing to the repo must use PUSH_TOKEN (a PAT) instead of G
 ```
 
 All commit-creating workflows use `PUSH_TOKEN`. Commits made with `GITHUB_TOKEN` are intentionally excluded from triggering subsequent workflow runs, breaking pipeline chains.
+
+### ARCH-9: State file recovery and idempotency
+
+```yaml
+level: L2
+check: "State files are git-tracked so corruption is recoverable via git checkout. Healing workflows must be idempotent (safe to re-run on the same input without side effects)."
+scope: ".github/workflows/*.yml, company/*.json, company/*.jsonl"
+message: "State files must be git-tracked for recovery. Healing workflows must be idempotent — re-running on the same state must not create duplicate issues or corrupt counters."
+```
+
+State files are committed via PR after each cycle, providing git-based rollback. Idempotency is enforced through retry trackers (skip issues already in cooldown), duplicate detection (fuzzy title matching before issue creation), and the circuit breaker (cap actions per run). A corrupted `pipeline-health-state.json` can be recovered with `git checkout main -- company/pipeline-health-state.json`.
 
 ---
 
@@ -252,17 +263,18 @@ message: "Commits must follow conventional format: <type>: <description>. Valid 
 
 Git history confirms consistent use. Conventional commits enable automated changelog generation and semantic version bumping.
 
-### QUAL-5: Soft-fail gh CLI in loops
+### QUAL-5: Logged soft-fail in loops
 
 ```yaml
 level: L2
-pattern: "gh .*(\\|\\| true|2>/dev/null)"
+check: "gh CLI calls inside loops catch failures with explicit error handling that logs a warning and increments an error counter. Silent || true suppression is prohibited."
 scope: ".github/workflows/*.yml"
-check: "gh CLI calls inside loops use || true or 2>/dev/null to prevent one failure from aborting the entire loop"
-message: "gh CLI calls in loops must soft-fail with || true or 2>/dev/null. A single API error should not abort processing of remaining items."
+message: "Loop failures must be caught, logged (::warning:: or echo), and counted. Silent || true swallows auth failures and permission errors. Use: if ! gh ...; then echo '::warning::Failed'; ((errors++)); fi"
 ```
 
-Evidence at `pipeline-health.yml:97,161`. Under `set -e`, a transient GitHub API error in a loop iteration kills the entire workflow run.
+Evidence at `pipeline-health.yml:97,161`. Under `set -e`, a transient API error kills the workflow — but silent suppression via `|| true` hides real failures like expired tokens. The fix is explicit error handling that continues the loop while preserving observability.
+
+> **Note:** This rule intentionally tensions with QUAL-1 (`set -euo pipefail`). QUAL-1 catches unexpected failures; QUAL-5 handles *expected* API failures in loops. The resolution: use `if ! cmd; then warn; fi` instead of `cmd || true`.
 
 ### QUAL-6: JSON construction via jq
 
@@ -275,6 +287,17 @@ message: "JSON must be constructed with jq -n --arg/--argjson. String interpolat
 ```
 
 Evidence in `collect-*.sh` scripts. Shell variable interpolation into JSON strings breaks on quotes, newlines, and backslashes.
+
+### QUAL-8: State file schema validation
+
+```yaml
+level: L2
+check: "State files are validated for required keys and correct types after mutation. A jq query asserting expected structure must follow every state file write."
+scope: ".github/workflows/*.yml, company/scripts/*.sh"
+message: "Mutated state files must be validated for required keys and types. Structurally valid JSON with missing keys or wrong types corrupts downstream consumers."
+```
+
+Atomic writes (QUAL-2) prevent truncation, but don't catch semantic corruption. A state file missing `last_check` or with `checks_run` as a string instead of number passes jq syntax checks but breaks the dashboard and observation loop. Validate after write.
 
 ### QUAL-7: Manual-only label check
 
@@ -351,3 +374,20 @@ message: "Polling loops must have configurable interval and max attempts. Unboun
 ```
 
 Evidence at both test scripts around lines 20-21. Hardcoded poll intervals and unbounded retries cause unpredictable CI run times and potential runner exhaustion.
+
+---
+
+## Amendment Process
+
+- **Adding rules:** New rules require a PR with codebase evidence. No aspirational rules — document what's practiced.
+- **Changing severity:** L1↔L2 changes require documented justification in the PR body.
+- **Removing rules:** Removal requires migration notes explaining what replaces the rule or why it's no longer needed.
+- **Versioning:** Major version bump (2.0.0) when L1 rules change. Minor bump (1.x.0) for L2/L3 additions or modifications.
+- **Exceptions:** Temporary exceptions to L2/L3 rules can be documented inline with `<!-- EXCEPTION: reason, expires YYYY-MM-DD -->`.
+
+### Version History
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0.0 | 2026-03-22 | Initial constitution with 27 rules from codebase discovery |
+| 1.1.0 | 2026-03-22 | Address issue #65: fix QUAL-5 tension, scope ARCH-4, add QUAL-8/ARCH-9, add amendment process |
