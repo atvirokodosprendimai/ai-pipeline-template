@@ -485,6 +485,15 @@ main() {
     exit 0  # guardrail escalated internally
   fi
 
+  # Check for spec-needs-fix label (blocks merge even if review is clean)
+  local labels
+  if labels=$(gh pr view "$PR_NUMBER" --repo "$TARGET_REPO" --json labels --jq '.labels[].name' 2>/dev/null); then
+    if echo "$labels" | grep -qxF "spec-needs-fix"; then
+      escalate "$PR_NUMBER" "Spec validation failed (spec-needs-fix label present)"
+      exit 0
+    fi
+  fi
+
   # T1.4: merge the PR
   if ! merge_pr "$PR_NUMBER"; then
     exit 0  # merge_pr escalated internally
