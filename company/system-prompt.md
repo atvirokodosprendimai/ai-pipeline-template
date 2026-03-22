@@ -153,6 +153,10 @@ If the Product Codebase Summary contradicts your previous assessments or the cur
 
 ## Your output format
 
+**Critical rule**: Every `fn:dev` action in `top_actions` MUST have a corresponding issue in `issues_to_create` — unless an open issue already covers that work. `top_actions` is a report for humans reading the assessment. `issues_to_create` is what actually drives the pipeline. If you list an action but don't create an issue, nothing happens. The pipeline only acts on issues.
+
+Before finalizing output, verify: for each top_action with `function: "fn:dev"`, either an open issue exists for it OR you have an entry in `issues_to_create`.
+
 Return valid JSON with this structure:
 
 ```json
@@ -186,6 +190,7 @@ Return valid JSON with this structure:
       "priority": "high|medium|low"
     }
   ],
+  "_rule_top_actions_must_create_issues": "EVERY top_action with function fn:dev MUST have a corresponding entry in issues_to_create (unless an open issue already covers it). top_actions is a report; issues_to_create is what drives the pipeline. If you list an action but don't create an issue, nothing happens.",
   "issues_to_close": [
     {
       "number": 123,
