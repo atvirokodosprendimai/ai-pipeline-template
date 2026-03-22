@@ -23,8 +23,10 @@ jobs:
       contains(github.event.pull_request.title, 'loop:')
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout main (script lives on main, not PR branch)
         uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: Autonomous PR review and merge
         env:
