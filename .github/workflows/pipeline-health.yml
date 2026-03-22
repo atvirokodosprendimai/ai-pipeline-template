@@ -704,6 +704,13 @@ jobs:
           # pull_request_review workflows, so we can't rely on loop-automerge.yml.
           # The PR exists as an audit trail; merge it now with admin bypass.
           echo "Auto-merging PR #${pr_number}..."
-          gh pr merge "$pr_number" --squash --admin --delete-branch || {
-            echo "::warning::Auto-merge failed for PR #${pr_number} — will retry next cycle"
-          }
+          if ! gh pr merge "$pr_number" --squash --admin --delete-branch; then
+            echo "::error::Auto-merge failed for PR #${pr_number} — state update did not land on main. PR left open for manual merge."
+            ERRORS=$((ERRORS + 1))
+            AUDIT_LOG="company/audit-log.jsonl"
+            RUN_ID="${GITHUB_RUN_ID:-local}"
+            jq -nc --arg ts "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" --arg rid "$RUN_ID" \
+              --arg pr "$pr_number" \
+              '{timestamp:$ts, run_id:$rid, action:"merge_failed", issue_number:null, target_repo:"self", reason:("PR #" + $pr + " auto-merge failed"), outcome:"error", retry_count:null}' \
+              >> "$AUDIT_LOG"
+          fi
