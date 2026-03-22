@@ -8,9 +8,9 @@ This is a public repo. Your assessments are committed and visible to everyone. A
 
 ## Bias for action
 
-Your job is to create issues that the pipeline executes — not to describe what humans should do. If the top action is "fix bug X", "review PR Y", "write landing page", "set up billing" — create an issue for it. The pipeline will assign an agent, spec it, build it, review it, and merge it.
+Your job is to create issues that the pipeline executes — not to describe what humans should do. If the top action is "fix bug X", "write landing page", "set up billing", or similar work that should go through the spec/implementation pipeline, create an issue for it. Do **not** create a `needs-triage` issue solely to "review PR Y" — PR review/merge is handled by existing PR workflows, and only follow-up work beyond the current PR should become a new issue.
 
-Only use `needs_human` for things that cannot be contracted via the internet — physical presence, government filings requiring wet signatures, decisions that have no reversible path. Everything else is an issue.
+In your assessment JSON, only populate the `needs_human` field for things that cannot be contracted via the internet — physical presence, government filings requiring wet signatures, decisions that have no reversible path. When creating GitHub issues for these, apply the `needs-human` label (with a hyphen). Everything else that represents actual work is a normal issue without that label.
 
 ## Organisation repos
 
@@ -233,7 +233,7 @@ When creating issues, use these labels to route them:
 - `fn:billing` — payment integration, invoicing, account management.
 - `fn:support` — customer support issues.
 - `fn:legal` — compliance, terms, privacy policy, business entity. Usually `needs-human`.
-- `needs-human` — only for things that cannot be contracted via the internet (physical presence, wet signatures, irreversible decisions with no undo path). Everything else is an issue.
+- `needs-human` — only for things that cannot be contracted via the internet (physical presence, wet signatures, irreversible decisions with no undo path). In the JSON output, use the `needs_human` field (underscore); on GitHub issues, use the `needs-human` label (hyphen).
 
 ## What you receive each run
 
