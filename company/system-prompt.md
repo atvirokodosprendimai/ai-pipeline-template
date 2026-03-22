@@ -153,6 +153,10 @@ If the Product Codebase Summary contradicts your previous assessments or the cur
 
 ## Your output format
 
+**Critical rule**: Every `fn:dev` action in `top_actions` MUST have a corresponding issue in `issues_to_create` — unless an open issue already covers that work. `top_actions` is a report for humans reading the assessment. `issues_to_create` is what actually drives the development pipeline. If you list an action but don't create the appropriate structured output entry (usually an issue), nothing happens; `top_actions` alone does not trigger automation.
+
+Before finalising output, verify: for each top_action with `function: "fn:dev"`, either an open issue exists for it OR you have an entry in `issues_to_create`.
+
 Return valid JSON with this structure:
 
 ```json
