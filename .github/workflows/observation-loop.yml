@@ -279,10 +279,15 @@ jobs:
           contribs=$(jq -r '(.contributions // []) | map("- **" + .entity + "**: " + .detail) | join("\n")' /tmp/assessment.json)
           human=$(jq -r '(.needs_human // []) | map("- [" + .urgency + "] " + .request) | join("\n")' /tmp/assessment.json)
 
+          # Compute new run count once — used by all subsequent steps
+          prev_count=$(jq -r '.run_count // 0' company/loop-state.json)
+          new_count=$((prev_count + 1))
+          echo "$new_count" > /tmp/run-count.txt
+
           cat > /tmp/assessment.md <<MDEOF
           # Assessment: $today
 
-          **Stage**: $stage | **Run**: $(jq -r '.run_count // 0' company/loop-state.json)
+          **Stage**: $stage | **Run**: $new_count
 
           $narrative
 
@@ -311,8 +316,7 @@ jobs:
           today=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
           stage=$(jq -r '.funnel_stage // 0' /tmp/assessment.json)
           stage_name=$(jq -r '.stage_name // "Foundation"' /tmp/assessment.json)
-          prev_count=$(jq -r '.run_count // 0' company/loop-state.json)
-          new_count=$((prev_count + 1))
+          new_count=$(cat /tmp/run-count.txt)
 
           jq --arg ts "$today" \
              --argjson stage "$stage" \
@@ -333,7 +337,7 @@ jobs:
           actions=$(jq -r '(.top_actions // []) | map(.action) | join("; ")' /tmp/assessment.json)
           issues_created=$(jq -r '(.issues_to_create // []) | map(.title) | join("; ")' /tmp/assessment.json)
           issues_closed=$(jq -r '(.issues_to_close // []) | map(.number | tostring) | join(", ")' /tmp/assessment.json)
-          run_count=$(jq -r '.run_count // 0' company/loop-state.json)
+          run_count=$(cat /tmp/run-count.txt)
 
           cat > "memory/episodic/${ts}-loop-daily-assessment.md" <<MEMEOF
           ---
@@ -346,7 +350,7 @@ jobs:
           ---
 
           ## Summary
-          Run #$((run_count + 1)), stage: ${stage}. ${narrative}
+          Run #${run_count}, stage: ${stage}. ${narrative}
 
           ## Key Decisions
           - Top actions: ${actions:-none}
