@@ -64,7 +64,7 @@ escalate() {
   fi
 
   # Add needs-human label (Andon: each gh command wrapped in error handling)
-  if ! gh pr edit "$pr" --repo "$TARGET_REPO" --add-label "needs-human"; then
+  if ! gh pr edit "$pr" --repo "$TARGET_REPO" --add-label "needs-human" >/dev/null 2>&1; then
     echo "::error::Failed to add needs-human label to PR #${pr}"
     ERRORS=$((ERRORS + 1))
   fi
@@ -76,7 +76,7 @@ escalate() {
   # body is JSON-encoded string; strip outer quotes for --body
   body="${body:1:${#body}-2}"
 
-  if ! gh pr comment "$pr" --repo "$TARGET_REPO" --body "$body"; then
+  if ! gh pr comment "$pr" --repo "$TARGET_REPO" --body "$body" >/dev/null 2>&1; then
     echo "::error::Failed to comment on PR #${pr}"
     ERRORS=$((ERRORS + 1))
   fi
@@ -128,7 +128,7 @@ poll_for_review() {
 
   for attempt in $(seq 1 "$max_attempts"); do
     local review_count
-    if ! review_count=$(gh api "repos/${TARGET_REPO}/pulls/${pr}/reviews" --jq 'length'); then
+    if ! review_count=$(gh api "repos/${TARGET_REPO}/pulls/${pr}/reviews" --jq 'length' 2>/dev/null); then
       echo "::warning::Failed to fetch reviews for PR #${pr} (window ${window}, attempt ${attempt})"
       ERRORS=$((ERRORS + 1))
       check_circuit_breaker
@@ -239,7 +239,7 @@ run_guardrails() {
 
   IFS=',' read -ra keyword_list <<< "$SECURITY_KEYWORDS"
   for kw in "${keyword_list[@]}"; do
-    if echo "$diff_added" | grep -qi "$kw"; then
+    if echo "$diff_added" | grep -qiF -- "$kw"; then
       escalate "$PR_NUMBER" "Security keyword detected in diff: ${kw}"
       check_circuit_breaker
       return 1
@@ -310,7 +310,7 @@ reassign_agent() {
   if ! gh api "repos/${TARGET_REPO}/issues/${pr}/assignees" \
     -H "X-GitHub-Api-Version:2022-11-28" \
     --method POST \
-    --input - <<< "$payload"; then
+    --input - <<< "$payload" >/dev/null 2>&1; then
     echo "::error::Failed to re-assign agent for PR #${pr} (attempt ${attempt})"
     ERRORS=$((ERRORS + 1))
     check_circuit_breaker
@@ -349,7 +349,7 @@ merge_pr() {
   # Attempt merge (up to 2 tries: initial + 1 retry for conflict recovery)
   local max_merge_attempts=2
   for attempt in $(seq 1 "$max_merge_attempts"); do
-    if gh pr merge "$pr" --repo "$TARGET_REPO" --squash --admin --delete-branch; then
+    if gh pr merge "$pr" --repo "$TARGET_REPO" --squash --admin --delete-branch >/dev/null 2>&1; then
       local elapsed=$(( $(date +%s) - START_TIME ))
       echo "PR #${pr} merged successfully (attempt ${attempt}, ${elapsed}s elapsed)"
       log_audit "merged" "Squash merged on attempt ${attempt}, ${elapsed}s elapsed"
@@ -389,11 +389,16 @@ merge_pr() {
 check_manual_push() {
   local pr="$1"
   local latest_author
-  if ! latest_author=$(gh api "repos/${TARGET_REPO}/pulls/${pr}/commits" --jq '.[-1].author.login'); then
+  if ! latest_author=$(gh api "repos/${TARGET_REPO}/pulls/${pr}/commits" --jq '.[-1].author.login // empty' 2>/dev/null); then
     echo "::warning::Failed to check latest commit author for PR #${pr}"
     ERRORS=$((ERRORS + 1))
     check_circuit_breaker
     return 1  # can't determine, continue normally
+  fi
+
+  # If author is empty/null, can't determine — skip reset
+  if [[ -z "$latest_author" ]]; then
+    return 1
   fi
 
   # Check if author is NOT a known bot
