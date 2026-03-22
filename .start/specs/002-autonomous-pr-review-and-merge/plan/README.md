@@ -73,9 +73,9 @@ company/scripts/sanitise.sh            # Content sanitisation (SEC-2)
 
 Each phase is defined in a separate file. Tasks follow red-green-refactor: **Prime** (understand context), **Test** (red), **Implement** (green), **Validate** (refactor + verify).
 
-- [ ] [Phase 1: Core Script Foundation](phase-1.md)
-- [ ] [Phase 2: Fix Loop and Retry Orchestration](phase-2.md)
-- [ ] [Phase 3: Workflow Integration, Testing, and Documentation](phase-3.md)
+- [x] [Phase 1: Core Script Foundation](phase-1.md)
+- [x] [Phase 2: Fix Loop and Retry Orchestration](phase-2.md)
+- [x] [Phase 3: Workflow Integration, Testing, and Documentation](phase-3.md)
 
 ---
 

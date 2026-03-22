@@ -1,0 +1,45 @@
+# Autonomous PR Review and Merge — Integration Template
+#
+# Add this step to any workflow that creates bot-authored PRs.
+# Place it immediately after the step that creates the PR.
+#
+# Prerequisites:
+#   - PUSH_TOKEN secret configured (PAT with contents:write, pull-requests:write, issues:write)
+#   - company/scripts/pr-review-merge.sh available in the repo
+#   - Copilot code review enabled on the repository
+#
+# See: docs/patterns/pr-review-merge.md for full documentation
+#
+# Usage:
+#   1. Copy the permissions, concurrency, and step blocks below into your workflow.
+#   2. Replace __PLACEHOLDER__ values with your step IDs / outputs.
+#   3. Adjust optional env vars to taste (defaults are in the script).
+
+# --- Add to workflow-level permissions ---
+# permissions:
+#   contents: write
+#   pull-requests: write
+#   issues: write
+#   actions: read
+
+# --- Add to workflow-level concurrency ---
+# concurrency:
+#   group: pr-review-${{ github.run_id }}
+#   cancel-in-progress: false
+
+# --- Add this step after PR creation ---
+- name: Autonomous PR review and merge
+  if: steps.__CREATE_PR_STEP_ID__.outputs.pr_number != ''
+  env:
+    GH_TOKEN: ${{ secrets.PUSH_TOKEN }}
+    TARGET_REPO: ${{ github.repository }}
+    PR_NUMBER: ${{ steps.__CREATE_PR_STEP_ID__.outputs.pr_number }}
+    # Optional: Override defaults
+    # PR_MAX_LINES: "500"
+    # MAX_RETRY_COUNT: "3"
+    # APPROVED_AUTHORS: "copilot-swe-agent[bot],goose[bot]"
+    # POLL_INTERVAL: "30"
+    # POLL_MAX_ATTEMPTS: "6"
+    # REVIEW_WINDOWS: "2"
+  run: |
+    company/scripts/pr-review-merge.sh

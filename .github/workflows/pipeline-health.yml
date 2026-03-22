@@ -741,6 +741,9 @@ jobs:
 
           # Wait for Copilot review, then merge only if zero inline comments.
           # Copilot typically reviews within 30-90s of PR creation.
+          # NOTE: For comprehensive review-merge with guardrails, fix loop, and
+          # escalation, see company/scripts/pr-review-merge.sh and
+          # docs/patterns/pr-review-merge.md
           echo "Waiting for Copilot review on PR #${pr_number}..."
           review_clean=false
           for attempt in 1 2 3 4 5 6; do
