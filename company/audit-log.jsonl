@@ -1,0 +1,1 @@
+{"timestamp":"2026-03-22T09:14:43Z","run_id":"23399921041","action":"check_funnel_signals","issue_number":null,"target_repo":"wgmesh","reason":"periodic signal check","outcome":"success","retry_count":null,"signals":{"dogfood":true,"presence":true}}
