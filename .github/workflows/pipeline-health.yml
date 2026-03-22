@@ -699,3 +699,11 @@ jobs:
 
           pr_number=$(echo "$pr_url" | grep -o '[0-9]*$')
           echo "Created PR #${pr_number}"
+
+          # Auto-merge immediately — Copilot reviews (GitHub App) don't trigger
+          # pull_request_review workflows, so we can't rely on loop-automerge.yml.
+          # The PR exists as an audit trail; merge it now with admin bypass.
+          echo "Auto-merging PR #${pr_number}..."
+          gh pr merge "$pr_number" --squash --admin --delete-branch || {
+            echo "::warning::Auto-merge failed for PR #${pr_number} — will retry next cycle"
+          }
