@@ -1,0 +1,15 @@
+{
+  "last_check": null,
+  "check_interval_hours": 2,
+  "checks_run": 0,
+  "issues_healed_total": 0,
+  "retry_tracker": {},
+  "last_run_summary": {
+    "stale_triage_found": 0,
+    "stale_copilot_found": 0,
+    "stale_approved_found": 0,
+    "needs_human_closed": 0,
+    "actions_taken": 0,
+    "errors": 0
+  }
+}

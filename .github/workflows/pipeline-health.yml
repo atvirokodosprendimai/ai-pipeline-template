@@ -1,0 +1,701 @@
+name: Pipeline Health (Self-Healing)
+
+on:
+  schedule:
+    - cron: '0 */2 * * *'   # every 2 hours
+  workflow_dispatch:          # manual trigger
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  actions: read
+
+concurrency:
+  group: pipeline-health
+  cancel-in-progress: false
+
+env:
+  TARGET_REPO: atvirokodosprendimai/wgmesh
+
+jobs:
+  heal:
+    name: Diagnose → Heal → Report
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.PUSH_TOKEN }}
+          fetch-depth: 0
+
+      # ── Read current state ────────────────────────────────────
+      - name: Read pipeline health state
+        id: state
+        run: |
+          state_file="company/pipeline-health-state.json"
+          if [ -f "$state_file" ]; then
+            echo "checks_run=$(jq -r '.checks_run // 0' "$state_file")" >> "$GITHUB_ENV"
+            echo "issues_healed_total=$(jq -r '.issues_healed_total // 0' "$state_file")" >> "$GITHUB_ENV"
+          else
+            echo "checks_run=0" >> "$GITHUB_ENV"
+            echo "issues_healed_total=0" >> "$GITHUB_ENV"
+          fi
+
+      # ── Initialize run counters ───────────────────────────────
+      - name: Initialize run counters
+        run: |
+          echo "ACTIONS_TAKEN=0" >> "$GITHUB_ENV"
+          echo "ERRORS=0" >> "$GITHUB_ENV"
+          echo "ISSUES_CREATED=0" >> "$GITHUB_ENV"
+          echo "STALE_TRIAGE_FOUND=0" >> "$GITHUB_ENV"
+          echo "STALE_COPILOT_FOUND=0" >> "$GITHUB_ENV"
+          echo "STALE_APPROVED_FOUND=0" >> "$GITHUB_ENV"
+          echo "NEEDS_HUMAN_CLOSED=0" >> "$GITHUB_ENV"
+          echo "CIRCUIT_BREAKER_TRIPPED=false" >> "$GITHUB_ENV"
+
+      # ── Phase 2 healing checks ───────────────────────────────
+      - name: "Check stale needs-triage issues"
+        env:
+          GH_TOKEN: ${{ secrets.PUSH_TOKEN }}
+        run: |
+          STATE_FILE="company/pipeline-health-state.json"
+          AUDIT_LOG="company/audit-log.jsonl"
+          RUN_ID="${GITHUB_RUN_ID:-local}"
+          local_actions=0
+          local_errors=0
+          local_issues_created=0
+          local_stale=0
+
+          # Dual-platform date math
+          cutoff=$(date -u -d '24 hours ago' '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || \
+                   date -u -v-24H '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || echo "")
+
+          if [ -z "$cutoff" ]; then
+            echo "::warning::Could not compute 24h cutoff — skipping stale triage sweep"
+            exit 0
+          fi
+
+          echo "Cutoff: $cutoff"
+
+          gh issue list --repo "$TARGET_REPO" --state open \
+            --label "needs-triage" --limit 50 \
+            --json number,title,createdAt,labels \
+            --jq --arg cutoff "$cutoff" \
+            '.[] | select(.createdAt < $cutoff) | @json' \
+            > /tmp/stale_triage.json || true
+
+          while read -r issue; do
+            number=$(echo "$issue" | jq -r '.number')
+            title=$(echo "$issue" | jq -r '.title')
+            labels=$(echo "$issue" | jq -r '[.labels[].name] | join(",")')
+
+            # Skip manual-only
+            if echo "$labels" | grep -q "manual-only"; then
+              echo "Skipping #${number} — manual-only"
+              continue
+            fi
+
+            # Skip issues also labeled wont-do, needs-info
+            if echo "$labels" | grep -qE "(wont-do|needs-info)"; then
+              echo "Skipping #${number} — has exclusion label"
+              continue
+            fi
+
+            local_stale=$((local_stale + 1))
+
+            # Read retry tracker
+            retries=$(jq -r --arg n "$number" '.retry_tracker[$n].retries // 0' "$STATE_FILE")
+            cooldown=$(jq -r --arg n "$number" '.retry_tracker[$n].cooldown_until // ""' "$STATE_FILE")
+
+            # Check cooldown
+            if [ -n "$cooldown" ] && [ "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \< "$cooldown" ]; then
+              echo "Skipping #${number} — in cooldown until $cooldown"
+              continue
+            fi
+
+            # Escalate after 2 failures
+            if [ "$retries" -ge 2 ]; then
+              echo "Escalating #${number} — $retries consecutive failures"
+              body="Self-healing failed to resolve stale triage for #${number} after $retries attempts."
+              esc_title="[needs-human] Stuck at triage: #${number} ${title}"
+              if echo "$body" | bash company/scripts/sanitise.sh > /dev/null 2>&1; then
+                gh issue create --repo "$TARGET_REPO" \
+                  --title "$esc_title" \
+                  --body "$body" \
+                  --label "needs-human" || { local_errors=$((local_errors + 1)); true; }
+                local_issues_created=$((local_issues_created + 1))
+                local_actions=$((local_actions + 1))
+              else
+                echo "SKIPPING (failed sanitisation): $esc_title"
+                local_errors=$((local_errors + 1))
+              fi
+              # Set 24h cooldown
+              cooldown_until=$(date -u -d '+24 hours' '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || \
+                               date -u -v+24H '+%Y-%m-%dT%H:%M:%SZ')
+              jq --arg n "$number" --arg until "$cooldown_until" \
+                '.retry_tracker[$n].cooldown_until = $until' "$STATE_FILE" > /tmp/state.json
+              mv /tmp/state.json "$STATE_FILE"
+              # Audit
+              jq -nc --arg ts "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" --arg rid "$RUN_ID" \
+                --arg num "$number" --argjson retries "$retries" \
+                '{timestamp:$ts, run_id:$rid, action:"escalate", issue_number:($num|tonumber), target_repo:"wgmesh", reason:"2 consecutive triage failures", outcome:"success", retry_count:$retries}' \
+                >> "$AUDIT_LOG"
+              continue
+            fi
+
+            # Recovery: toggle label to re-trigger copilot-triage.yml
+            echo "Healing #${number}: removing needs-triage label"
+            gh issue edit "$number" --repo "$TARGET_REPO" \
+              --remove-label "needs-triage" 2>/dev/null || { local_errors=$((local_errors + 1)); true; }
+            sleep 2
+            echo "Healing #${number}: re-applying needs-triage label"
+            gh issue edit "$number" --repo "$TARGET_REPO" \
+              --add-label "needs-triage" 2>/dev/null || { local_errors=$((local_errors + 1)); true; }
+            local_actions=$((local_actions + 1))
+
+            # Update retry tracker
+            new_retries=$((retries + 1))
+            jq --arg n "$number" --argjson r "$new_retries" \
+              --arg ts "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+              '.retry_tracker[$n] = {retries: $r, last_retry: $ts, action: "retrigger_triage"}' \
+              "$STATE_FILE" > /tmp/state.json
+            mv /tmp/state.json "$STATE_FILE"
+
+            # Audit
+            jq -nc --arg ts "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" --arg rid "$RUN_ID" \
+              --arg num "$number" --argjson retries "$new_retries" \
+              '{timestamp:$ts, run_id:$rid, action:"retrigger_triage", issue_number:($num|tonumber), target_repo:"wgmesh", reason:"stale >24h at needs-triage", outcome:"success", retry_count:$retries}' \
+              >> "$AUDIT_LOG"
+          done < /tmp/stale_triage.json
+
+          # Write counters to GITHUB_ENV
+          echo "ACTIONS_TAKEN=$((ACTIONS_TAKEN + local_actions))" >> "$GITHUB_ENV"
+          echo "ERRORS=$((ERRORS + local_errors))" >> "$GITHUB_ENV"
+          echo "ISSUES_CREATED=$((ISSUES_CREATED + local_issues_created))" >> "$GITHUB_ENV"
+          echo "STALE_TRIAGE_FOUND=$((STALE_TRIAGE_FOUND + local_stale))" >> "$GITHUB_ENV"
+
+      - name: "Circuit breaker check (after triage)"
+        if: env.CIRCUIT_BREAKER_TRIPPED != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.PUSH_TOKEN }}
+        run: |
+          MAX_CREATES=10
+          MAX_ERRORS=5
+          if [ "$ISSUES_CREATED" -ge "$MAX_CREATES" ] || [ "$ERRORS" -ge "$MAX_ERRORS" ]; then
+            echo "::error::Circuit breaker triggered: $ISSUES_CREATED creates, $ERRORS errors"
+            echo "CIRCUIT_BREAKER_TRIPPED=true" >> "$GITHUB_ENV"
+            body="Self-healing hit per-run limits: $ISSUES_CREATED issues created, $ERRORS errors. Manual review required."
+            if echo "$body" | bash company/scripts/sanitise.sh > /dev/null 2>&1; then
+              gh issue create --repo "$TARGET_REPO" \
+                --title "[needs-human] Pipeline self-healing circuit breaker triggered" \
+                --body "$body" \
+                --label "needs-human" || true
+            fi
+            jq -nc --arg ts "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" --arg rid "${GITHUB_RUN_ID:-local}" \
+              '{timestamp:$ts, run_id:$rid, action:"circuit_breaker", issue_number:null, target_repo:"wgmesh", reason:"per-run limit exceeded", outcome:"success", retry_count:null}' \
+              >> company/audit-log.jsonl
+          fi
+
+      - name: "Check stale copilot-triaging issues"
+        if: env.CIRCUIT_BREAKER_TRIPPED != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.PUSH_TOKEN }}
+        run: |
+          STATE_FILE="company/pipeline-health-state.json"
+          AUDIT_LOG="company/audit-log.jsonl"
+          RUN_ID="${GITHUB_RUN_ID:-local}"
+          local_actions=0
+          local_errors=0
+          local_issues_created=0
+          local_stale=0
+
+          # Dual-platform date math (48h for copilot-triaging)
+          cutoff=$(date -u -d '48 hours ago' '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || \
+                   date -u -v-48H '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || echo "")
+
+          if [ -z "$cutoff" ]; then
+            echo "::warning::Could not compute 48h cutoff — skipping stale copilot sweep"
+            exit 0
+          fi
+
+          echo "Cutoff: $cutoff"
+
+          gh issue list --repo "$TARGET_REPO" --state open \
+            --label "copilot-triaging" --limit 50 \
+            --json number,title,createdAt,labels \
+            --jq --arg cutoff "$cutoff" \
+            '.[] | select(.createdAt < $cutoff) | @json' \
+            > /tmp/stale_copilot.json || true
+
+          while read -r issue; do
+            number=$(echo "$issue" | jq -r '.number')
+            title=$(echo "$issue" | jq -r '.title')
+            labels=$(echo "$issue" | jq -r '[.labels[].name] | join(",")')
+
+            # Skip manual-only
+            if echo "$labels" | grep -q "manual-only"; then
+              echo "Skipping #${number} — manual-only"
+              continue
+            fi
+
+            local_stale=$((local_stale + 1))
+
+            # Check if a spec PR already exists for this issue
+            spec_pr=$(gh pr list --repo "$TARGET_REPO" --state open \
+              --search "spec: Issue #${number}" --json number --jq '.[0].number // empty' 2>/dev/null || echo "")
+
+            if [ -n "$spec_pr" ]; then
+              echo "Skipping #${number} — spec PR #${spec_pr} in progress"
+              continue
+            fi
+
+            # Read retry tracker
+            retries=$(jq -r --arg n "$number" '.retry_tracker[$n].retries // 0' "$STATE_FILE")
+            cooldown=$(jq -r --arg n "$number" '.retry_tracker[$n].cooldown_until // ""' "$STATE_FILE")
+
+            if [ -n "$cooldown" ] && [ "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \< "$cooldown" ]; then
+              echo "Skipping #${number} — in cooldown until $cooldown"
+              continue
+            fi
+
+            # Escalate after 2 failures
+            if [ "$retries" -ge 2 ]; then
+              echo "Escalating #${number} — $retries consecutive failures"
+              body="Self-healing failed to resolve stale copilot-triaging for #${number} after $retries attempts."
+              esc_title="[needs-human] Stuck at copilot-triaging: #${number} ${title}"
+              if echo "$body" | bash company/scripts/sanitise.sh > /dev/null 2>&1; then
+                gh issue create --repo "$TARGET_REPO" \
+                  --title "$esc_title" \
+                  --body "$body" \
+                  --label "needs-human" || { local_errors=$((local_errors + 1)); true; }
+                local_issues_created=$((local_issues_created + 1))
+                local_actions=$((local_actions + 1))
+              else
+                echo "SKIPPING (failed sanitisation): $esc_title"
+                local_errors=$((local_errors + 1))
+              fi
+              cooldown_until=$(date -u -d '+24 hours' '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || \
+                               date -u -v+24H '+%Y-%m-%dT%H:%M:%SZ')
+              jq --arg n "$number" --arg until "$cooldown_until" \
+                '.retry_tracker[$n].cooldown_until = $until' "$STATE_FILE" > /tmp/state.json
+              mv /tmp/state.json "$STATE_FILE"
+              jq -nc --arg ts "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" --arg rid "$RUN_ID" \
+                --arg num "$number" --argjson retries "$retries" \
+                '{timestamp:$ts, run_id:$rid, action:"escalate", issue_number:($num|tonumber), target_repo:"wgmesh", reason:"2 consecutive copilot-triaging failures", outcome:"success", retry_count:$retries}' \
+                >> "$AUDIT_LOG"
+              continue
+            fi
+
+            # Recovery: remove copilot-triaging, re-add needs-triage (fresh triage)
+            echo "Healing #${number}: removing copilot-triaging label"
+            gh issue edit "$number" --repo "$TARGET_REPO" \
+              --remove-label "copilot-triaging" 2>/dev/null || { local_errors=$((local_errors + 1)); true; }
+            sleep 2
+            echo "Healing #${number}: adding needs-triage label (fresh triage)"
+            gh issue edit "$number" --repo "$TARGET_REPO" \
+              --add-label "needs-triage" 2>/dev/null || { local_errors=$((local_errors + 1)); true; }
+            local_actions=$((local_actions + 1))
+
+            # Update retry tracker
+            new_retries=$((retries + 1))
+            jq --arg n "$number" --argjson r "$new_retries" \
+              --arg ts "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+              '.retry_tracker[$n] = {retries: $r, last_retry: $ts, action: "retrigger_copilot"}' \
+              "$STATE_FILE" > /tmp/state.json
+            mv /tmp/state.json "$STATE_FILE"
+
+            jq -nc --arg ts "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" --arg rid "$RUN_ID" \
+              --arg num "$number" --argjson retries "$new_retries" \
+              '{timestamp:$ts, run_id:$rid, action:"retrigger_copilot", issue_number:($num|tonumber), target_repo:"wgmesh", reason:"stale >48h at copilot-triaging", outcome:"success", retry_count:$retries}' \
+              >> "$AUDIT_LOG"
+          done < /tmp/stale_copilot.json
+
+          # Write counters to GITHUB_ENV
+          echo "ACTIONS_TAKEN=$((ACTIONS_TAKEN + local_actions))" >> "$GITHUB_ENV"
+          echo "ERRORS=$((ERRORS + local_errors))" >> "$GITHUB_ENV"
+          echo "ISSUES_CREATED=$((ISSUES_CREATED + local_issues_created))" >> "$GITHUB_ENV"
+          echo "STALE_COPILOT_FOUND=$((STALE_COPILOT_FOUND + local_stale))" >> "$GITHUB_ENV"
+
+      - name: "Check stale approved-for-build PRs"
+        if: env.CIRCUIT_BREAKER_TRIPPED != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.PUSH_TOKEN }}
+        run: |
+          STATE_FILE="company/pipeline-health-state.json"
+          AUDIT_LOG="company/audit-log.jsonl"
+          RUN_ID="${GITHUB_RUN_ID:-local}"
+          local_actions=0
+          local_errors=0
+          local_issues_created=0
+          local_stale=0
+
+          # Dual-platform date math (24h for approved-for-build)
+          cutoff=$(date -u -d '24 hours ago' '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || \
+                   date -u -v-24H '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || echo "")
+
+          if [ -z "$cutoff" ]; then
+            echo "::warning::Could not compute 24h cutoff — skipping stale build sweep"
+            exit 0
+          fi
+
+          echo "Cutoff: $cutoff"
+
+          gh pr list --repo "$TARGET_REPO" --state open \
+            --label "approved-for-build" --limit 50 \
+            --json number,title,updatedAt,labels \
+            --jq --arg cutoff "$cutoff" \
+            '.[] | select(.updatedAt < $cutoff) | @json' \
+            > /tmp/stale_approved.json || true
+
+          while read -r pr; do
+            number=$(echo "$pr" | jq -r '.number')
+            title=$(echo "$pr" | jq -r '.title')
+            labels=$(echo "$pr" | jq -r '[.labels[].name] | join(",")')
+
+            # Skip manual-only
+            if echo "$labels" | grep -q "manual-only"; then
+              echo "Skipping PR #${number} — manual-only"
+              continue
+            fi
+
+            local_stale=$((local_stale + 1))
+
+            # Extract issue number from spec PR title: "spec: Issue #123 - ..."
+            issue_num=$(echo "$title" | grep -oP 'Issue #\K\d+' || echo "")
+
+            # Check if an impl PR already exists
+            if [ -n "$issue_num" ]; then
+              impl_pr=$(gh pr list --repo "$TARGET_REPO" --state open \
+                --search "impl: Issue #${issue_num}" --json number --jq '.[0].number // empty' 2>/dev/null || echo "")
+              if [ -n "$impl_pr" ]; then
+                echo "Skipping PR #${number} — impl PR #${impl_pr} in progress"
+                continue
+              fi
+            fi
+
+            # Read retry tracker (use PR number as key)
+            retries=$(jq -r --arg n "pr-$number" '.retry_tracker[$n].retries // 0' "$STATE_FILE")
+            cooldown=$(jq -r --arg n "pr-$number" '.retry_tracker[$n].cooldown_until // ""' "$STATE_FILE")
+
+            if [ -n "$cooldown" ] && [ "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \< "$cooldown" ]; then
+              echo "Skipping PR #${number} — in cooldown until $cooldown"
+              continue
+            fi
+
+            # Escalate after 2 failures
+            if [ "$retries" -ge 2 ]; then
+              echo "Escalating PR #${number} — $retries consecutive failures"
+              body="Self-healing failed to resolve stale approved-for-build PR #${number} after $retries attempts."
+              esc_title="[needs-human] Stuck at build: PR #${number} ${title}"
+              if echo "$body" | bash company/scripts/sanitise.sh > /dev/null 2>&1; then
+                gh issue create --repo "$TARGET_REPO" \
+                  --title "$esc_title" \
+                  --body "$body" \
+                  --label "needs-human" || { local_errors=$((local_errors + 1)); true; }
+                local_issues_created=$((local_issues_created + 1))
+                local_actions=$((local_actions + 1))
+              else
+                echo "SKIPPING (failed sanitisation): $esc_title"
+                local_errors=$((local_errors + 1))
+              fi
+              cooldown_until=$(date -u -d '+24 hours' '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || \
+                               date -u -v+24H '+%Y-%m-%dT%H:%M:%SZ')
+              jq --arg n "pr-$number" --arg until "$cooldown_until" \
+                '.retry_tracker[$n].cooldown_until = $until' "$STATE_FILE" > /tmp/state.json
+              mv /tmp/state.json "$STATE_FILE"
+              jq -nc --arg ts "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" --arg rid "$RUN_ID" \
+                --arg num "$number" --argjson retries "$retries" \
+                '{timestamp:$ts, run_id:$rid, action:"escalate", issue_number:($num|tonumber), target_repo:"wgmesh", reason:"2 consecutive build trigger failures", outcome:"success", retry_count:$retries}' \
+                >> "$AUDIT_LOG"
+              continue
+            fi
+
+            # Recovery: toggle approved-for-build label to re-trigger goose-build
+            echo "Healing PR #${number}: removing approved-for-build label"
+            gh pr edit "$number" --repo "$TARGET_REPO" \
+              --remove-label "approved-for-build" 2>/dev/null || { local_errors=$((local_errors + 1)); true; }
+            sleep 2
+            echo "Healing PR #${number}: re-applying approved-for-build label"
+            gh pr edit "$number" --repo "$TARGET_REPO" \
+              --add-label "approved-for-build" 2>/dev/null || { local_errors=$((local_errors + 1)); true; }
+            local_actions=$((local_actions + 1))
+
+            # Update retry tracker
+            new_retries=$((retries + 1))
+            jq --arg n "pr-$number" --argjson r "$new_retries" \
+              --arg ts "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+              '.retry_tracker[$n] = {retries: $r, last_retry: $ts, action: "retrigger_goose"}' \
+              "$STATE_FILE" > /tmp/state.json
+            mv /tmp/state.json "$STATE_FILE"
+
+            jq -nc --arg ts "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" --arg rid "$RUN_ID" \
+              --arg num "$number" --argjson retries "$new_retries" \
+              '{timestamp:$ts, run_id:$rid, action:"retrigger_goose", issue_number:($num|tonumber), target_repo:"wgmesh", reason:"stale >24h at approved-for-build", outcome:"success", retry_count:$retries}' \
+              >> "$AUDIT_LOG"
+          done < /tmp/stale_approved.json
+
+          # Write counters to GITHUB_ENV
+          echo "ACTIONS_TAKEN=$((ACTIONS_TAKEN + local_actions))" >> "$GITHUB_ENV"
+          echo "ERRORS=$((ERRORS + local_errors))" >> "$GITHUB_ENV"
+          echo "ISSUES_CREATED=$((ISSUES_CREATED + local_issues_created))" >> "$GITHUB_ENV"
+          echo "STALE_APPROVED_FOUND=$((STALE_APPROVED_FOUND + local_stale))" >> "$GITHUB_ENV"
+
+      - name: "Check fulfilled needs-human issues"
+        if: env.CIRCUIT_BREAKER_TRIPPED != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.PUSH_TOKEN }}
+        run: |
+          AUDIT_LOG="company/audit-log.jsonl"
+          RUN_ID="${GITHUB_RUN_ID:-local}"
+          local_actions=0
+          local_errors=0
+          local_closed=0
+
+          gh issue list --repo "$TARGET_REPO" --state open \
+            --label "needs-human" --limit 50 \
+            --json number,title,labels \
+            --jq '.[] | @json' \
+            > /tmp/needs_human.json || true
+
+          while read -r issue; do
+            number=$(echo "$issue" | jq -r '.number')
+            title=$(echo "$issue" | jq -r '.title')
+            labels=$(echo "$issue" | jq -r '[.labels[].name] | join(",")')
+
+            # Skip manual-only
+            if echo "$labels" | grep -q "manual-only"; then
+              echo "Skipping #${number} — manual-only"
+              continue
+            fi
+
+            resolved=""
+            reason=""
+
+            # Signal 1: Check for linked merged PRs
+            merged_prs=$(gh api "repos/$TARGET_REPO/issues/${number}/timeline" \
+              --jq '[.[] | select(.event == "cross-referenced" and .source.issue.pull_request.merged_at != null)] | length' \
+              2>/dev/null || echo "0")
+            if [ "$merged_prs" -gt 0 ] 2>/dev/null; then
+              resolved="true"
+              reason="Linked PR merged ($merged_prs merged PR(s) found)"
+            fi
+
+            # Signal 2: Title pattern matching
+            if [ -z "$resolved" ]; then
+              title_lower=$(echo "$title" | tr '[:upper:]' '[:lower:]')
+
+              if echo "$title_lower" | grep -qE "(api key|secret)"; then
+                # Check if observation-loop last run succeeded
+                loop_status=$(jq -r '.last_run // ""' company/loop-state.json 2>/dev/null || echo "")
+                run_count=$(jq -r '.run_count // 0' company/loop-state.json 2>/dev/null || echo "0")
+                if [ -n "$loop_status" ] && [ "$run_count" -gt 0 ]; then
+                  resolved="true"
+                  reason="Observation loop running successfully (run_count=$run_count)"
+                fi
+              elif echo "$title_lower" | grep -qE "(health|endpoint)"; then
+                # Curl each endpoint in health.json
+                all_healthy="true"
+                endpoints=$(jq -r '.endpoints[].url' company/health.json 2>/dev/null || echo "")
+                if [ -z "$endpoints" ]; then
+                  all_healthy=""
+                fi
+                for url in $endpoints; do
+                  status=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$url" 2>/dev/null || echo "000")
+                  if [ "$status" -lt 200 ] || [ "$status" -ge 400 ]; then
+                    all_healthy=""
+                    break
+                  fi
+                done
+                if [ -n "$all_healthy" ]; then
+                  resolved="true"
+                  reason="All health endpoints responding OK"
+                fi
+              elif echo "$title_lower" | grep -qE "(burn|capital|budget)"; then
+                # Check costs.json has non-default values
+                capital=$(jq -r '.runway.available_capital // 0' company/costs.json 2>/dev/null || echo "0")
+                if [ "$capital" -gt 0 ] 2>/dev/null; then
+                  resolved="true"
+                  reason="Costs data populated (available_capital=$capital)"
+                fi
+              fi
+            fi
+
+            # If resolved, close the issue
+            if [ -n "$resolved" ]; then
+              echo "Closing #${number} — resolved: $reason"
+              comment="Resolved by self-healing: $reason"
+              if echo "$comment" | bash company/scripts/sanitise.sh > /dev/null 2>&1; then
+                gh issue close "$number" --repo "$TARGET_REPO" \
+                  --comment "$comment" 2>/dev/null || { local_errors=$((local_errors + 1)); true; }
+                local_closed=$((local_closed + 1))
+                local_actions=$((local_actions + 1))
+              else
+                echo "SKIPPING (failed sanitisation): close #${number}"
+                local_errors=$((local_errors + 1))
+              fi
+              # Audit
+              jq -nc --arg ts "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" --arg rid "$RUN_ID" \
+                --arg num "$number" --arg reason "$reason" \
+                '{timestamp:$ts, run_id:$rid, action:"close_needs_human", issue_number:($num|tonumber), target_repo:"wgmesh", reason:$reason, outcome:"success", retry_count:null}' \
+                >> "$AUDIT_LOG"
+            else
+              echo "No resolution signal for #${number} — $title"
+            fi
+          done < /tmp/needs_human.json
+
+          # Write counters to GITHUB_ENV
+          echo "ACTIONS_TAKEN=$((ACTIONS_TAKEN + local_actions))" >> "$GITHUB_ENV"
+          echo "ERRORS=$((ERRORS + local_errors))" >> "$GITHUB_ENV"
+          echo "NEEDS_HUMAN_CLOSED=$((NEEDS_HUMAN_CLOSED + local_closed))" >> "$GITHUB_ENV"
+
+      - name: "Check funnel signals"
+        if: env.CIRCUIT_BREAKER_TRIPPED != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.PUSH_TOKEN }}
+        run: |
+          STATE_FILE="company/pipeline-health-state.json"
+          AUDIT_LOG="company/audit-log.jsonl"
+          RUN_ID="${GITHUB_RUN_ID:-local}"
+
+          dogfood_signal="false"
+          presence_signal="false"
+
+          # Fetch CLAUDE.md from wgmesh to check dogfood signal
+          wgmesh_claude=$(gh api repos/atvirokodosprendimai/wgmesh/contents/CLAUDE.md \
+            --jq '.content' 2>/dev/null | base64 -d 2>/dev/null || echo "")
+
+          if [ -n "$wgmesh_claude" ]; then
+            has_architecture=$(echo "$wgmesh_claude" | grep -ci "Architecture" || echo "0")
+            has_build=$(echo "$wgmesh_claude" | grep -ci "Build" || echo "0")
+            if [ "$has_architecture" -gt 0 ] && [ "$has_build" -gt 0 ]; then
+              dogfood_signal="true"
+              echo "Dogfood signal: CLAUDE.md has Architecture and Build sections"
+            else
+              echo "Dogfood signal: CLAUDE.md missing Architecture ($has_architecture) or Build ($has_build) sections"
+            fi
+          else
+            echo "Dogfood signal: could not fetch CLAUDE.md from wgmesh"
+          fi
+
+          # Check health endpoints for presence signal
+          all_present="true"
+          endpoint_results=""
+          endpoints=$(jq -r '.endpoints[] | "\(.name)|\(.url)"' company/health.json 2>/dev/null || echo "")
+
+          if [ -z "$endpoints" ]; then
+            all_present="false"
+            echo "Presence signal: no endpoints configured"
+          else
+            while IFS='|' read -r name url; do
+              status=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$url" 2>/dev/null || echo "000")
+              if [ "$status" -ge 200 ] && [ "$status" -lt 400 ]; then
+                echo "Presence signal: $name ($url) — OK ($status)"
+                endpoint_results="${endpoint_results}${name}:ok,"
+              else
+                echo "Presence signal: $name ($url) — FAIL ($status)"
+                endpoint_results="${endpoint_results}${name}:fail,"
+                all_present="false"
+              fi
+            done <<< "$endpoints"
+          fi
+
+          if [ "$all_present" = "true" ]; then
+            presence_signal="true"
+          fi
+
+          # Write signals to state file under funnel_signals key
+          # Do NOT modify company/loop-state.json
+          now=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+          jq --arg ds "$dogfood_signal" --arg ps "$presence_signal" \
+            --arg ep "${endpoint_results%,}" --arg ts "$now" \
+            '.funnel_signals = {
+              dogfood: ($ds == "true"),
+              presence: ($ps == "true"),
+              endpoint_details: $ep,
+              checked_at: $ts
+            }' "$STATE_FILE" > /tmp/state.json
+          mv /tmp/state.json "$STATE_FILE"
+
+          # Audit
+          jq -nc --arg ts "$now" --arg rid "$RUN_ID" \
+            --arg ds "$dogfood_signal" --arg ps "$presence_signal" \
+            '{timestamp:$ts, run_id:$rid, action:"check_funnel_signals", issue_number:null, target_repo:"wgmesh", reason:"periodic signal check", outcome:"success", retry_count:null, signals:{dogfood:($ds == "true"), presence:($ps == "true")}}' \
+            >> "$AUDIT_LOG"
+
+          echo "Funnel signals — dogfood: $dogfood_signal, presence: $presence_signal"
+
+      # ── Update state ──────────────────────────────────────────
+      - name: Update state summary
+        run: |
+          STATE_FILE="company/pipeline-health-state.json"
+          now=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+          new_checks_run=$(( checks_run + 1 ))
+          new_healed=$(( issues_healed_total + ACTIONS_TAKEN ))
+
+          # Preserve existing retry_tracker and funnel_signals from check steps
+          existing_retry_tracker=$(jq '.retry_tracker // {}' "$STATE_FILE")
+          existing_funnel_signals=$(jq '.funnel_signals // {}' "$STATE_FILE")
+
+          jq -n \
+            --arg last_check "$now" \
+            --argjson check_interval_hours 2 \
+            --argjson checks_run "$new_checks_run" \
+            --argjson issues_healed_total "$new_healed" \
+            --argjson retry_tracker "$existing_retry_tracker" \
+            --argjson funnel_signals "$existing_funnel_signals" \
+            --argjson stale_triage "$STALE_TRIAGE_FOUND" \
+            --argjson stale_copilot "$STALE_COPILOT_FOUND" \
+            --argjson stale_approved "$STALE_APPROVED_FOUND" \
+            --argjson needs_human "$NEEDS_HUMAN_CLOSED" \
+            --argjson actions "$ACTIONS_TAKEN" \
+            --argjson errors "$ERRORS" \
+            '{
+              last_check: $last_check,
+              check_interval_hours: $check_interval_hours,
+              checks_run: $checks_run,
+              issues_healed_total: $issues_healed_total,
+              retry_tracker: $retry_tracker,
+              funnel_signals: $funnel_signals,
+              last_run_summary: {
+                stale_triage_found: $stale_triage,
+                stale_copilot_found: $stale_copilot,
+                stale_approved_found: $stale_approved,
+                needs_human_closed: $needs_human,
+                actions_taken: $actions,
+                errors: $errors
+              }
+            }' > "$STATE_FILE"
+
+      # ── Sanitise before commit ────────────────────────────────
+      - name: Sanitise before commit
+        run: |
+          cat company/pipeline-health-state.json | bash company/scripts/sanitise.sh > /dev/null
+          if [ -s company/audit-log.jsonl ]; then
+            cat company/audit-log.jsonl | bash company/scripts/sanitise.sh > /dev/null
+          fi
+
+      # ── Commit state via PR ───────────────────────────────────
+      - name: Commit state via PR
+        env:
+          GH_TOKEN: ${{ secrets.PUSH_TOKEN }}
+        run: |
+          git config user.name "pipeline-health[bot]"
+          git config user.email "pipeline-health[bot]@users.noreply.github.com"
+          git add company/pipeline-health-state.json company/audit-log.jsonl
+          git diff --cached --quiet && echo "No changes to commit" && exit 0
+
+          today=$(date -u '+%Y-%m-%d')
+          branch="pipeline-health/${today}-${GITHUB_RUN_ID}"
+          git checkout -b "$branch" origin/main
+          git commit -m "heal: pipeline health check $today"
+          git push -u origin "$branch"
+
+          pr_url=$(gh pr create \
+            --title "heal: pipeline health check $today" \
+            --body "Automated state update from pipeline-health workflow." \
+            --base main \
+            --head "$branch")
+
+          pr_number=$(echo "$pr_url" | grep -o '[0-9]*$')
+          echo "Created PR #${pr_number}"
