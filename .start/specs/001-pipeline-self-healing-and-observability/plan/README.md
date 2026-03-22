@@ -75,7 +75,7 @@ Each phase is defined in a separate file. Tasks follow red-green-refactor: **Pri
 
 - [x] [Phase 1: Foundation — State Files and Workflow Skeleton](phase-1.md)
 - [x] [Phase 2: Self-Healing Checks and Circuit Breaker](phase-2.md)
-- [ ] [Phase 3: Pipeline Dashboard](phase-3.md)
+- [x] [Phase 3: Pipeline Dashboard](phase-3.md)
 - [ ] [Phase 4: Integration and Validation](phase-4.md)
 
 ---
