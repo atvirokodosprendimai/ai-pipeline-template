@@ -15,8 +15,6 @@ permissions:
 
 jobs:
   validate:
-    # Skip in the template repo itself
-    if: "!contains(github.repository, 'ai-pipeline-template')"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

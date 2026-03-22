@@ -391,10 +391,7 @@ jobs:
           pr_number=$(echo "$pr_url" | grep -o '[0-9]*$')
           echo "Created PR #${pr_number}"
 
-          # Autonomous review-merge: poll for Copilot review, enforce guardrails,
-          # merge or escalate. See docs/patterns/pr-review-merge.md
-          PR_NUMBER="$pr_number" TARGET_REPO="$GITHUB_REPOSITORY" \
-            bash company/scripts/pr-review-merge.sh
+          # Review-merge handled by bot-pr-review-merge.yml workflow
 
       - name: Create issues from assessment
         env:

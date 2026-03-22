@@ -7,9 +7,9 @@ Autonomous product pipeline for AI-native startups. An **observation loop** watc
 ## The Full Loop
 
 ```
-observe → assess → create issues → [spec agent] → HUMAN approves → [build agent] → HUMAN merges
-    ↑                                                                                      |
-    └──────────────────────────────────────────────────────────────────────────────────────┘
+observe → assess → create issues → [spec agent] → auto-validate → [build agent] → auto-merge → close issue
+    ↑                                                                                                    |
+    └────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 | Phase | Actor | What Happens |
@@ -18,11 +18,12 @@ observe → assess → create issues → [spec agent] → HUMAN approves → [bu
 | 1. Assess | LLM | Reads state, determines funnel stage, decides highest-leverage actions |
 | 2. Act | Loop | Creates/closes issues with function labels, commits assessment |
 | 3. Triage | Spec agent | Analyzes `needs-triage` issues, writes spec, opens spec PR |
-| 4. Approval | **Human** | Reviews spec PR — approve, request changes, or close |
-| 5. Build | Build agent | Reads approved spec, implements code, opens draft PR |
-| 6. Review | **Human** | Reviews implementation PR, merges to main |
+| 4. Validate | Workflow | Structural checks on spec — auto-approves or flags for fix |
+| 5. Build | Build agent | Reads approved spec, implements code, opens impl PR |
+| 6. Review | Workflow | Copilot reviews, guardrails enforced, auto-merges or escalates |
+| 7. Close | Workflow | Closes originating issue on successful merge |
 
-Humans approve at exactly two points: **spec review** and **PR merge**. Everything else runs autonomously.
+The full loop runs autonomously. Humans set the goal — the system drives toward it.
 
 ## Quick Start
 
