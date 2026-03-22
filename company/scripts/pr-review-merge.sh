@@ -150,14 +150,27 @@ poll_for_review() {
 }
 
 # ---------------------------------------------------------------------------
-# check_inline_comments — count inline review comments on PR
-# Outputs the comment count to stdout. Returns non-zero on API failure.
+# check_inline_comments — count UNRESOLVED review threads on PR
+# Uses GraphQL because the REST API has no resolved/unresolved filter.
+# Outputs the unresolved count to stdout. Returns non-zero on API failure.
 # ---------------------------------------------------------------------------
 check_inline_comments() {
   local pr="$1"
+  local owner repo
+  owner="${TARGET_REPO%%/*}"
+  repo="${TARGET_REPO##*/}"
   local count
-  if ! count=$(gh api "repos/${TARGET_REPO}/pulls/${pr}/comments" --jq 'length'); then
-    echo "::error::Failed to fetch inline comments for PR #${pr}"
+  if ! count=$(gh api graphql -f query="
+    query {
+      repository(owner:\"${owner}\", name:\"${repo}\") {
+        pullRequest(number:${pr}) {
+          reviewThreads(first:100) {
+            nodes { isResolved }
+          }
+        }
+      }
+    }" --jq '[.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false)] | length' 2>/dev/null); then
+    echo "::error::Failed to fetch review threads for PR #${pr}"
     ERRORS=$((ERRORS + 1))
     check_circuit_breaker
     echo "0"
