@@ -389,7 +389,14 @@ jobs:
             --head "$branch")
 
           pr_number=$(echo "$pr_url" | grep -o '[0-9]*$')
-          echo "Created PR #${pr_number}. Auto-merge handled by loop-automerge.yml when review arrives."
+          echo "Created PR #${pr_number}"
+
+          # Self-merge immediately — GitHub Apps (Copilot reviewer) don't trigger
+          # pull_request_review workflows, so loop-automerge.yml never fires.
+          echo "Auto-merging PR #${pr_number}..."
+          gh pr merge "$pr_number" --squash --admin --delete-branch || {
+            echo "::warning::Auto-merge failed for PR #${pr_number} — will retry next cycle"
+          }
 
       - name: Create issues from assessment
         env:
