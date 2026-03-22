@@ -3,7 +3,12 @@ name: Pipeline Health (Self-Healing)
 on:
   schedule:
     - cron: '0 */2 * * *'   # every 2 hours
-  workflow_dispatch:          # manual trigger
+  workflow_dispatch:
+    inputs:
+      cutoff_override_minutes:
+        description: 'Override stale cutoff (minutes). For E2E testing.'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -118,7 +123,7 @@ jobs:
             if [ "$retries" -ge 2 ]; then
               echo "Escalating #${number} — $retries consecutive failures"
               body="Self-healing failed to resolve stale triage for #${number} after $retries attempts."
-              esc_title="[needs-human] Stuck at triage: #${number} ${title}"
+              esc_title="[needs-human] Stuck at triage: #${number}"
               if echo "$body" | bash company/scripts/sanitise.sh > /dev/null 2>&1; then
                 gh issue create --repo "$TARGET_REPO" \
                   --title "$esc_title" \
@@ -134,7 +139,7 @@ jobs:
               cooldown_until=$(date -u -d '+24 hours' '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || \
                                date -u -v+24H '+%Y-%m-%dT%H:%M:%SZ')
               jq --arg n "$number" --arg until "$cooldown_until" \
-                '.retry_tracker[$n].cooldown_until = $until' "$STATE_FILE" > /tmp/state.json
+                '.retry_tracker[$n].cooldown_until = $until' "$STATE_FILE" > /tmp/state.json && \
               mv /tmp/state.json "$STATE_FILE"
               # Audit
               jq -nc --arg ts "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" --arg rid "$RUN_ID" \
@@ -159,7 +164,7 @@ jobs:
             jq --arg n "$number" --argjson r "$new_retries" \
               --arg ts "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
               '.retry_tracker[$n] = {retries: $r, last_retry: $ts, action: "retrigger_triage"}' \
-              "$STATE_FILE" > /tmp/state.json
+              "$STATE_FILE" > /tmp/state.json && \
             mv /tmp/state.json "$STATE_FILE"
 
             # Audit
@@ -263,7 +268,7 @@ jobs:
             if [ "$retries" -ge 2 ]; then
               echo "Escalating #${number} — $retries consecutive failures"
               body="Self-healing failed to resolve stale copilot-triaging for #${number} after $retries attempts."
-              esc_title="[needs-human] Stuck at copilot-triaging: #${number} ${title}"
+              esc_title="[needs-human] Stuck at copilot-triaging: #${number}"
               if echo "$body" | bash company/scripts/sanitise.sh > /dev/null 2>&1; then
                 gh issue create --repo "$TARGET_REPO" \
                   --title "$esc_title" \
@@ -278,7 +283,7 @@ jobs:
               cooldown_until=$(date -u -d '+24 hours' '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || \
                                date -u -v+24H '+%Y-%m-%dT%H:%M:%SZ')
               jq --arg n "$number" --arg until "$cooldown_until" \
-                '.retry_tracker[$n].cooldown_until = $until' "$STATE_FILE" > /tmp/state.json
+                '.retry_tracker[$n].cooldown_until = $until' "$STATE_FILE" > /tmp/state.json && \
               mv /tmp/state.json "$STATE_FILE"
               jq -nc --arg ts "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" --arg rid "$RUN_ID" \
                 --arg num "$number" --argjson retries "$retries" \
@@ -302,7 +307,7 @@ jobs:
             jq --arg n "$number" --argjson r "$new_retries" \
               --arg ts "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
               '.retry_tracker[$n] = {retries: $r, last_retry: $ts, action: "retrigger_copilot"}' \
-              "$STATE_FILE" > /tmp/state.json
+              "$STATE_FILE" > /tmp/state.json && \
             mv /tmp/state.json "$STATE_FILE"
 
             jq -nc --arg ts "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" --arg rid "$RUN_ID" \
@@ -316,6 +321,14 @@ jobs:
           echo "ERRORS=$((ERRORS + local_errors))" >> "$GITHUB_ENV"
           echo "ISSUES_CREATED=$((ISSUES_CREATED + local_issues_created))" >> "$GITHUB_ENV"
           echo "STALE_COPILOT_FOUND=$((STALE_COPILOT_FOUND + local_stale))" >> "$GITHUB_ENV"
+
+      - name: Check circuit breaker (post-copilot)
+        if: env.CIRCUIT_BREAKER_TRIPPED == 'false'
+        run: |
+          if [ "$ISSUES_CREATED" -ge 10 ] || [ "$ERRORS" -ge 5 ]; then
+            echo "CIRCUIT_BREAKER_TRIPPED=true" >> "$GITHUB_ENV"
+            echo "::error::Circuit breaker tripped: ${ISSUES_CREATED} issues created, ${ERRORS} errors"
+          fi
 
       - name: "Check stale approved-for-build PRs"
         if: env.CIRCUIT_BREAKER_TRIPPED != 'true'
@@ -387,7 +400,7 @@ jobs:
             if [ "$retries" -ge 2 ]; then
               echo "Escalating PR #${number} — $retries consecutive failures"
               body="Self-healing failed to resolve stale approved-for-build PR #${number} after $retries attempts."
-              esc_title="[needs-human] Stuck at build: PR #${number} ${title}"
+              esc_title="[needs-human] Stuck at build: PR #${number}"
               if echo "$body" | bash company/scripts/sanitise.sh > /dev/null 2>&1; then
                 gh issue create --repo "$TARGET_REPO" \
                   --title "$esc_title" \
@@ -402,7 +415,7 @@ jobs:
               cooldown_until=$(date -u -d '+24 hours' '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || \
                                date -u -v+24H '+%Y-%m-%dT%H:%M:%SZ')
               jq --arg n "pr-$number" --arg until "$cooldown_until" \
-                '.retry_tracker[$n].cooldown_until = $until' "$STATE_FILE" > /tmp/state.json
+                '.retry_tracker[$n].cooldown_until = $until' "$STATE_FILE" > /tmp/state.json && \
               mv /tmp/state.json "$STATE_FILE"
               jq -nc --arg ts "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" --arg rid "$RUN_ID" \
                 --arg num "$number" --argjson retries "$retries" \
@@ -426,7 +439,7 @@ jobs:
             jq --arg n "pr-$number" --argjson r "$new_retries" \
               --arg ts "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
               '.retry_tracker[$n] = {retries: $r, last_retry: $ts, action: "retrigger_goose"}' \
-              "$STATE_FILE" > /tmp/state.json
+              "$STATE_FILE" > /tmp/state.json && \
             mv /tmp/state.json "$STATE_FILE"
 
             jq -nc --arg ts "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" --arg rid "$RUN_ID" \
@@ -440,6 +453,14 @@ jobs:
           echo "ERRORS=$((ERRORS + local_errors))" >> "$GITHUB_ENV"
           echo "ISSUES_CREATED=$((ISSUES_CREATED + local_issues_created))" >> "$GITHUB_ENV"
           echo "STALE_APPROVED_FOUND=$((STALE_APPROVED_FOUND + local_stale))" >> "$GITHUB_ENV"
+
+      - name: Check circuit breaker (post-approved)
+        if: env.CIRCUIT_BREAKER_TRIPPED == 'false'
+        run: |
+          if [ "$ISSUES_CREATED" -ge 10 ] || [ "$ERRORS" -ge 5 ]; then
+            echo "CIRCUIT_BREAKER_TRIPPED=true" >> "$GITHUB_ENV"
+            echo "::error::Circuit breaker tripped: ${ISSUES_CREATED} issues created, ${ERRORS} errors"
+          fi
 
       - name: "Check fulfilled needs-human issues"
         if: env.CIRCUIT_BREAKER_TRIPPED != 'true'
@@ -614,7 +635,7 @@ jobs:
               presence: ($ps == "true"),
               endpoint_details: $ep,
               checked_at: $ts
-            }' "$STATE_FILE" > /tmp/state.json
+            }' "$STATE_FILE" > /tmp/state.json && \
           mv /tmp/state.json "$STATE_FILE"
 
           # Audit
@@ -707,10 +728,4 @@ jobs:
           if ! gh pr merge "$pr_number" --squash --admin --delete-branch; then
             echo "::error::Auto-merge failed for PR #${pr_number} — state update did not land on main. PR left open for manual merge."
             ERRORS=$((ERRORS + 1))
-            AUDIT_LOG="company/audit-log.jsonl"
-            RUN_ID="${GITHUB_RUN_ID:-local}"
-            jq -nc --arg ts "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" --arg rid "$RUN_ID" \
-              --arg pr "$pr_number" \
-              '{timestamp:$ts, run_id:$rid, action:"merge_failed", issue_number:null, target_repo:"self", reason:("PR #" + $pr + " auto-merge failed"), outcome:"error", retry_count:null}' \
-              >> "$AUDIT_LOG"
           fi
