@@ -42,4 +42,4 @@
     # POLL_MAX_ATTEMPTS: "6"
     # REVIEW_WINDOWS: "2"
   run: |
-    company/scripts/pr-review-merge.sh
+    bash company/scripts/pr-review-merge.sh
