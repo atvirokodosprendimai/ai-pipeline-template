@@ -81,19 +81,12 @@ export GH_TOKEN
 log "Starting circuit breaker E2E test against $TARGET_REPO"
 echo "============================================================"
 
-# ── Seed state: set retry_tracker so issues trigger escalation ───────
+# ── Strategy ─────────────────────────────────────────────────────────
 # The circuit breaker fires when ISSUES_CREATED >= 10 or ERRORS >= 5.
-# To trigger it, we need many stale issues that each cause an escalation
-# (issue create). We pre-seed the retry_tracker so each test issue has
-# retries >= 2, which causes the workflow to create escalation issues.
-#
-# Strategy:
-#   1. Create 12 stale needs-triage issues
-#   2. Pre-seed retry_tracker with retries=2 for each, so each triggers
-#      an escalation (gh issue create) instead of a label toggle
-#   3. Trigger workflow
-#   4. After 10 escalation creates, the circuit breaker should fire
-#   5. Remaining issues should NOT be processed
+# We create 12 stale needs-triage issues and trigger the workflow with
+# cutoff_override_minutes=1 so that freshly created issues are treated
+# as stale. Each issue triggers a label toggle (action), and after 10
+# actions the breaker should fire, leaving remaining issues unprocessed.
 
 # ── Test 1: Create stale issues for breaker threshold ────────────────
 log "Test 1: Creating ${BREAKER_CREATE_THRESHOLD} + 2 stale issues..."
@@ -113,95 +106,45 @@ done
 
 pass "Created $((BREAKER_CREATE_THRESHOLD + 2)) test issues"
 
-# ── Pre-seed retry tracker via PR ────────────────────────────────────
-# We need to update pipeline-health-state.json on the main branch so the
-# workflow reads retries >= 2 for each test issue. This forces escalation
-# (issue creation) instead of label toggle for every issue.
-
-log "Pre-seeding retry tracker to force escalations..."
-
-# Fetch current state file from main
-state_content=$(gh api "repos/$SELF_REPO/contents/company/pipeline-health-state.json" \
-  --jq '.content' 2>/dev/null | base64 -d 2>/dev/null || echo "{}")
-state_sha=$(gh api "repos/$SELF_REPO/contents/company/pipeline-health-state.json" \
-  --jq '.sha' 2>/dev/null || echo "")
-
-if [ -z "$state_content" ] || [ "$state_content" = "{}" ]; then
-  fail "Could not fetch current pipeline-health-state.json"
-  echo "============================================================"
-  echo "Results: ${PASS_COUNT} passed, ${FAIL_COUNT} failed"
-  exit 1
-fi
-
-# Build retry_tracker entries: each issue gets retries=2 so escalation fires
-retry_tracker_json=$(printf '%s\n' "${issue_numbers[@]}" | jq -R -s '
-  split("\n") | map(select(. != "")) |
-  reduce .[] as $num ({}; .[$num] = {
-    retries: 2,
-    last_retry: "2026-01-01T00:00:00Z",
-    action: "retrigger_triage"
-  })
-')
-
-# Merge retry tracker into state, preserving other fields immutably
-new_state=$(echo "$state_content" | jq --argjson rt "$retry_tracker_json" '
-  . + { retry_tracker: (.retry_tracker + $rt) }
-')
-
-# Push updated state directly to main (needed before workflow runs)
-encoded_state=$(echo "$new_state" | base64 | tr -d '\n')
-
-update_result=$(gh api "repos/$SELF_REPO/contents/company/pipeline-health-state.json" \
-  --method PUT \
-  --field "message=test: pre-seed retry tracker for circuit breaker e2e" \
-  --field "content=${encoded_state}" \
-  --field "sha=${state_sha}" \
-  --jq '.commit.sha' 2>/dev/null || echo "")
-
-if [ -n "$update_result" ]; then
-  pass "Pre-seeded retry tracker for ${#issue_numbers[@]} issues (commit: ${update_result:0:8})"
-  SEED_COMMIT_SHA="$update_result"
-else
-  fail "Could not pre-seed retry tracker"
-  echo "============================================================"
-  echo "Results: ${PASS_COUNT} passed, ${FAIL_COUNT} failed"
-  exit 1
-fi
-
 # ── Trigger the workflow ─────────────────────────────────────────────
-log "Triggering pipeline-health.yml via workflow_dispatch..."
+log "Triggering pipeline-health.yml via workflow_dispatch (cutoff_override_minutes=1)..."
 
-gh workflow run pipeline-health.yml --repo "$SELF_REPO" 2>/dev/null || \
-  gh workflow run "Pipeline Health (Self-Healing)" --repo "$SELF_REPO" 2>/dev/null || {
+gh workflow run pipeline-health.yml --repo "$SELF_REPO" -f cutoff_override_minutes=1 2>/dev/null || \
+  gh workflow run "Pipeline Health (Self-Healing)" --repo "$SELF_REPO" -f cutoff_override_minutes=1 2>/dev/null || {
     fail "Could not trigger pipeline-health workflow"
     echo "============================================================"
     echo "Results: ${PASS_COUNT} passed, ${FAIL_COUNT} failed"
     exit 1
   }
 
+# Wait a moment for the run to appear, then get the specific run ID
 sleep 5
+run_id=$(gh run list --repo "$SELF_REPO" \
+  --workflow "pipeline-health.yml" \
+  --event workflow_dispatch \
+  --limit 1 \
+  --json databaseId --jq '.[0].databaseId' 2>/dev/null || echo "")
+
+if [ -z "$run_id" ]; then
+  fail "Could not find workflow_dispatch run"
+  echo "============================================================"
+  echo "Results: ${PASS_COUNT} passed, ${FAIL_COUNT} failed"
+  exit 1
+fi
+
+log "  Found run $run_id"
 
 # ── Poll for workflow completion ─────────────────────────────────────
-log "Waiting for workflow run to complete..."
+log "Waiting for workflow run $run_id to complete..."
 
-run_id=""
 for attempt in $(seq 1 "$MAX_POLL_ATTEMPTS"); do
-  latest_run=$(gh run list --repo "$SELF_REPO" \
-    --workflow "pipeline-health.yml" \
-    --limit 1 \
-    --json databaseId,status,conclusion \
-    --jq '.[0]' 2>/dev/null || echo "{}")
+  run_data=$(gh run view "$run_id" --repo "$SELF_REPO" \
+    --json status,conclusion 2>/dev/null || echo "{}")
 
-  current_id=$(echo "$latest_run" | jq -r '.databaseId // ""')
-  current_status=$(echo "$latest_run" | jq -r '.status // ""')
-  current_conclusion=$(echo "$latest_run" | jq -r '.conclusion // ""')
+  current_status=$(echo "$run_data" | jq -r '.status // ""')
+  current_conclusion=$(echo "$run_data" | jq -r '.conclusion // ""')
 
-  if [ -z "$run_id" ] && [ -n "$current_id" ]; then
-    run_id="$current_id"
-    log "  Found run $run_id (status: $current_status)"
-  fi
-
-  if [ -n "$run_id" ] && [ "$current_status" = "completed" ]; then
+  if [ "$current_status" = "completed" ]; then
     log "  Run $run_id completed with conclusion: $current_conclusion"
     break
   fi
@@ -361,36 +304,6 @@ if [ -n "$state_json" ] && [ "$state_json" != "{}" ]; then
     pass "State file shows ${run_actions} actions taken"
   else
     fail "State file shows 0 actions taken"
-  fi
-fi
-
-# ── Revert the seeded state file ─────────────────────────────────────
-log "Reverting pre-seeded retry tracker..."
-
-current_sha=$(gh api "repos/$SELF_REPO/contents/company/pipeline-health-state.json" \
-  --jq '.sha' 2>/dev/null || echo "")
-current_content=$(gh api "repos/$SELF_REPO/contents/company/pipeline-health-state.json" \
-  --jq '.content' 2>/dev/null | base64 -d 2>/dev/null || echo "{}")
-
-if [ -n "$current_content" ] && [ -n "$current_sha" ]; then
-  # Remove test issue entries from retry_tracker
-  cleaned_state=$(echo "$current_content" | jq '
-    .retry_tracker = (
-      .retry_tracker // {} |
-      to_entries |
-      map(select(.key | test("^[0-9]+$") | not) // select(true)) |
-      from_entries
-    )
-  ')
-
-  # Only revert if we seeded something
-  if [ -n "${SEED_COMMIT_SHA:-}" ]; then
-    encoded_clean=$(echo "$cleaned_state" | base64 | tr -d '\n')
-    gh api "repos/$SELF_REPO/contents/company/pipeline-health-state.json" \
-      --method PUT \
-      --field "message=test: revert circuit breaker e2e retry tracker seeding" \
-      --field "content=${encoded_clean}" \
-      --field "sha=${current_sha}" > /dev/null 2>&1 || log "  WARN: Could not revert state file"
   fi
 fi
 

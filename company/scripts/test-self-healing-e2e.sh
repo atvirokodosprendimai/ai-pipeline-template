@@ -164,41 +164,58 @@ else
   build_pr_num=""
 fi
 
-# ── Trigger the workflow ─────────────────────────────────────────────
-log "Triggering pipeline-health.yml via workflow_dispatch..."
+# ── Test 5: Create manual-only exclusion issue (before trigger) ──────
+log "Test 5: manual-only exclusion"
 
-gh workflow run pipeline-health.yml --repo "$SELF_REPO" 2>/dev/null || \
-  gh workflow run "Pipeline Health (Self-Healing)" --repo "$SELF_REPO" 2>/dev/null || {
+manual_issue_url=$(gh issue create --repo "$TARGET_REPO" \
+  --title "${TEST_PREFIX} Manual-only exclusion test" \
+  --body "This issue should be skipped by self-healing. Safe to close." \
+  --label "needs-triage" \
+  --label "manual-only" \
+  --label "$LABEL_TEST_TAG")
+manual_issue_num=$(echo "$manual_issue_url" | grep -o '[0-9]*$')
+CREATED_ISSUES+=("$manual_issue_num")
+log "  Created manual-only issue #${manual_issue_num}"
+
+# ── Trigger the workflow ─────────────────────────────────────────────
+log "Triggering pipeline-health.yml via workflow_dispatch (cutoff_override_minutes=1)..."
+
+gh workflow run pipeline-health.yml --repo "$SELF_REPO" -f cutoff_override_minutes=1 2>/dev/null || \
+  gh workflow run "Pipeline Health (Self-Healing)" --repo "$SELF_REPO" -f cutoff_override_minutes=1 2>/dev/null || {
     fail "Could not trigger pipeline-health workflow"
     echo "============================================================"
     echo "Results: ${PASS_COUNT} passed, ${FAIL_COUNT} failed"
     exit 1
   }
 
-# Wait a moment for the run to appear
+# Wait a moment for the run to appear, then get the specific run ID
 sleep 5
+run_id=$(gh run list --repo "$SELF_REPO" \
+  --workflow "pipeline-health.yml" \
+  --event workflow_dispatch \
+  --limit 1 \
+  --json databaseId --jq '.[0].databaseId' 2>/dev/null || echo "")
+
+if [ -z "$run_id" ]; then
+  fail "Could not find workflow_dispatch run"
+  echo "============================================================"
+  echo "Results: ${PASS_COUNT} passed, ${FAIL_COUNT} failed"
+  exit 1
+fi
+
+log "  Found run $run_id"
 
 # ── Poll for workflow completion ─────────────────────────────────────
-log "Waiting for workflow run to complete..."
+log "Waiting for workflow run $run_id to complete..."
 
-run_id=""
 for attempt in $(seq 1 "$MAX_POLL_ATTEMPTS"); do
-  latest_run=$(gh run list --repo "$SELF_REPO" \
-    --workflow "pipeline-health.yml" \
-    --limit 1 \
-    --json databaseId,status,conclusion \
-    --jq '.[0]' 2>/dev/null || echo "{}")
+  run_data=$(gh run view "$run_id" --repo "$SELF_REPO" \
+    --json status,conclusion 2>/dev/null || echo "{}")
 
-  current_id=$(echo "$latest_run" | jq -r '.databaseId // ""')
-  current_status=$(echo "$latest_run" | jq -r '.status // ""')
-  current_conclusion=$(echo "$latest_run" | jq -r '.conclusion // ""')
+  current_status=$(echo "$run_data" | jq -r '.status // ""')
+  current_conclusion=$(echo "$run_data" | jq -r '.conclusion // ""')
 
-  if [ -z "$run_id" ] && [ -n "$current_id" ]; then
-    run_id="$current_id"
-    log "  Found run $run_id (status: $current_status)"
-  fi
-
-  if [ -n "$run_id" ] && [ "$current_status" = "completed" ]; then
+  if [ "$current_status" = "completed" ]; then
     log "  Run $run_id completed with conclusion: $current_conclusion"
     break
   fi
@@ -344,18 +361,17 @@ if [ -n "${build_pr_num:-}" ]; then
 fi
 
 # ── Check 4: Verify manual-only exclusion ────────────────────────────
-log "Test 5: manual-only exclusion"
+log "Verifying manual-only issue #${manual_issue_num} was not modified..."
 
-manual_issue_url=$(gh issue create --repo "$TARGET_REPO" \
-  --title "${TEST_PREFIX} Manual-only exclusion test" \
-  --body "This issue should be skipped by self-healing. Safe to close." \
-  --label "needs-triage" \
-  --label "manual-only" \
-  --label "$LABEL_TEST_TAG")
-manual_issue_num=$(echo "$manual_issue_url" | grep -o '[0-9]*$')
-CREATED_ISSUES+=("$manual_issue_num")
-log "  Created manual-only issue #${manual_issue_num}"
-pass "manual-only issue created (verified via workflow logs — should be skipped)"
+manual_labels=$(gh issue view "$manual_issue_num" --repo "$TARGET_REPO" \
+  --json labels --jq '[.labels[].name] | join(",")' 2>/dev/null || echo "")
+log "  Manual-only issue #${manual_issue_num} labels: ${manual_labels:-<none>}"
+
+if echo "$manual_labels" | grep -q "needs-triage" && echo "$manual_labels" | grep -q "manual-only"; then
+  pass "manual-only issue #${manual_issue_num} still has original labels (not modified by workflow)"
+else
+  fail "manual-only issue #${manual_issue_num} labels changed unexpectedly: ${manual_labels}"
+fi
 
 # ── Summary ──────────────────────────────────────────────────────────
 echo ""
