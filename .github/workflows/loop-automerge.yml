@@ -34,11 +34,12 @@ jobs:
             exit 0
           fi
 
-          # Check for inline review comments
-          comment_count=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}/comments" --jq 'length')
+          # Check for inline review comments from humans (exclude bot accounts)
+          human_comment_count=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}/comments" \
+            --jq '[.[] | select(.user.type != "Bot")] | length')
 
-          if [ "$comment_count" -gt 0 ]; then
-            echo "::warning::PR #${PR_NUMBER} has ${comment_count} inline comment(s). Leaving open for human review."
+          if [ "$human_comment_count" -gt 0 ]; then
+            echo "::warning::PR #${PR_NUMBER} has ${human_comment_count} human inline comment(s). Leaving open for human review."
             exit 0
           fi
 
