@@ -1,6 +1,6 @@
 # Project Constitution
 
-> **Version:** 1.1.0 | **Last Updated:** 2026-03-22
+> **Version:** 1.2.0 | **Last Updated:** 2026-03-22
 > **Project Type:** GitHub Actions automation pipeline
 
 This constitution defines the enforceable rules for the ai-pipeline-template project.
@@ -11,6 +11,38 @@ and evidence from the current codebase. Rules are grouped by domain.
 - **L1 (Critical):** Must never be violated. Blocks merge.
 - **L2 (Important):** Should not be violated without documented justification.
 - **L3 (Advisory):** Best practice. Violations flagged as warnings.
+
+---
+
+## Foundational Principle: Andon
+
+> **If a step is important enough to exist, it is important enough to stop on failure.
+> If a step is not important enough to stop on failure, it must not exist.**
+
+There is no middle ground. No silent errors. No swallowed warnings. No `|| true` without a loud signal.
+
+Every step in every workflow and script falls into exactly one of two categories:
+
+| Category | On failure | Implementation |
+|----------|-----------|----------------|
+| **Essential** | Stop. Escalate. Make it visible. | `set -e` catches it, or explicit `if ! cmd; then echo "::error::..."; exit 1; fi` |
+| **Not essential** | Remove the step entirely. | If you wouldn't stop the pipeline for it, don't run it. |
+
+This eliminates the gray area where steps "sort of matter" and failures are logged but ignored. That gray area is where silent corruption lives.
+
+**Applying Andon to loops:** Healing loops process multiple items. A single item failure should not stop processing of other items — but it MUST be counted, logged, and escalated when thresholds are breached (see SEC-7: Circuit Breaker). The loop continues; the failure is never silent.
+
+```yaml
+# Andon in a loop:
+if ! gh issue edit "$num" ...; then
+  echo "::warning::Failed to heal issue #${num}"
+  ERRORS=$((ERRORS + 1))          # counted
+  jq -nc '...' >> "$AUDIT_LOG"    # logged
+fi
+# Circuit breaker checks ERRORS threshold after each step
+```
+
+**This principle supersedes QUAL-5.** The old "soft-fail" rule permitted `|| true`. Under Andon, every suppressed failure must produce a visible signal (warning annotation + error counter + audit entry). Silent suppression is prohibited.
 
 ---
 
@@ -263,18 +295,26 @@ message: "Commits must follow conventional format: <type>: <description>. Valid 
 
 Git history confirms consistent use. Conventional commits enable automated changelog generation and semantic version bumping.
 
-### QUAL-5: Logged soft-fail in loops
+### QUAL-5: Andon on failure (no silent errors)
 
 ```yaml
-level: L2
-check: "gh CLI calls inside loops catch failures with explicit error handling that logs a warning and increments an error counter. Silent || true suppression is prohibited."
-scope: ".github/workflows/*.yml"
-message: "Loop failures must be caught, logged (::warning:: or echo), and counted. Silent || true swallows auth failures and permission errors. Use: if ! gh ...; then echo '::warning::Failed'; ((errors++)); fi"
+level: L1
+check: "Every failure in a workflow or script produces a visible signal: ::error:: or ::warning:: annotation, error counter increment, and audit log entry. Bare || true is prohibited. Bare 2>/dev/null without a following error handler is prohibited."
+scope: ".github/workflows/*.yml, company/scripts/*.sh"
+pattern: "\\|\\| true"
+message: "Andon: no silent failures. Every caught error must produce a visible signal (annotation + counter + audit). If a step isn't worth signaling on failure, remove it."
 ```
 
-Evidence at `pipeline-health.yml:97,161`. Under `set -e`, a transient API error kills the workflow — but silent suppression via `|| true` hides real failures like expired tokens. The fix is explicit error handling that continues the loop while preserving observability.
+**Implements the Andon principle.** This is an L1 rule — silent error suppression is as dangerous as no error handling at all. The pattern `|| true` and bare `2>/dev/null` hide expired tokens, permission denials, and state corruption behind a green CI check.
 
-> **Note:** This rule intentionally tensions with QUAL-1 (`set -euo pipefail`). QUAL-1 catches unexpected failures; QUAL-5 handles *expected* API failures in loops. The resolution: use `if ! cmd; then warn; fi` instead of `cmd || true`.
+The only acceptable error suppression pattern:
+```bash
+if ! gh issue edit "$num" 2>/dev/null; then
+  echo "::warning::Failed to edit issue #${num}"
+  ERRORS=$((ERRORS + 1))
+  # audit log entry
+fi
+```
 
 ### QUAL-6: JSON construction via jq
 
@@ -391,3 +431,4 @@ Evidence at both test scripts around lines 20-21. Hardcoded poll intervals and u
 |---------|------|---------|
 | 1.0.0 | 2026-03-22 | Initial constitution with 27 rules from codebase discovery |
 | 1.1.0 | 2026-03-22 | Address issue #65: fix QUAL-5 tension, scope ARCH-4, add QUAL-8/ARCH-9, add amendment process |
+| 1.2.0 | 2026-03-22 | Add Andon principle as foundational rule. Upgrade QUAL-5 to L1: no silent errors, every failure must signal. Remove loop-automerge.yml (PR #67) |
