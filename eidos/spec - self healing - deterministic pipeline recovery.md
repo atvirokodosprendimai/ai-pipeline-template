@@ -58,6 +58,8 @@ Ensure every issue progresses through the autonomous pipeline without human inte
 
 ## Interactions
 
+- Reads `company/loop-state.json` for resolution signals — depends on [[spec - observation loop - autonomous OODA cycle for company operations]] for state ownership.
+- Reads `company/health.json` for presence signals and health-related auto-close — depends on [[spec - infrastructure monitoring - endpoint health and alerting]] for endpoint definitions.
 - Depends on [[spec - pipeline state machine - label driven issue lifecycle]] for the canonical label definitions, stale thresholds, and exclusion label semantics.
 - Label toggle recovery directly re-triggers the Copilot triage workflow (`copilot-triage.yml`) and the Goose build workflow. Guard conditions in those workflows prevent double-triggering on duplicate label events.
 - State commits (branch + PR) flow through [[spec - pr review merge - autonomous bot pr guardrails]] — the `bot-pr-review-merge.yml` workflow auto-merges heal PRs.
