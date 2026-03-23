@@ -1,6 +1,6 @@
 ---
 tldr: Overview pull of the entire ai-pipeline-template system — maps territory for subsection pulls
-status: active
+status: complete
 ---
 
 # Pull: AI Pipeline Template — Full System Overview
