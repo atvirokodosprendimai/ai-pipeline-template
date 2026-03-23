@@ -53,7 +53,7 @@ jobs:
 
             await github.rest.issues.addLabels({
               owner: context.repo.owner, repo: context.repo.repo,
-              issue_number: issueNumber, labels: ['building']
+              issue_number: issueNumber, labels: ['goose-implementation']
             });
 
             await github.rest.issues.createComment({

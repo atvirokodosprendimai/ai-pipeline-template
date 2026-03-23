@@ -122,8 +122,13 @@ None found (script confirmed).
 ## Suggested Actions
 
 1. **Decision needed:** Resolve `spec-ready` vs `approved-for-build` flow. Is `spec-ready` vestigial or intended for a future human-review gate between validation and build trigger? If vestigial, remove from `labels.yml` and update domain doc.
+   **Resolved:** `spec-ready` is vestigial — auto-validation skips it. Spec updated to note it exists but is unused by automated flow. Label kept in `labels.yml` for potential manual use.
+
 2. **Decision needed:** Resolve `goose-implementation` vs `building` label. Are these the same stage? Should one be removed? The dashboard expects `goose-implementation`; the code applies `building`.
+   **Resolved:** Code bug — `spec-merged-build.yml` was applying `building` instead of `goose-implementation`. Fixed to use `goose-implementation` to match `labels.yml` and dashboard.
+
 3. **Pull/update:** The pipeline state machine spec should clarify the workflow-templates vs active workflows distinction. `goose-build.yml` is a template for forks, not an active workflow in this repo.
+   **Resolved:** Pipeline SM spec updated with "Active workflows vs templates" design note.
 
 ## Summary
 
