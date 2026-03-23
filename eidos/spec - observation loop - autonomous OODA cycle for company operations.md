@@ -84,6 +84,7 @@ Related specs:
 - [[spec - pipeline state machine - label driven issue lifecycle]]
 - [[spec - self healing - deterministic pipeline recovery]]
 - [[spec - infrastructure monitoring - endpoint health and alerting]]
+- [[spec - pr review merge - autonomous bot pr guardrails]] — loop PRs flow through bot-pr-review-merge for autonomous merge
 - [[spec - security quality - constitution and enforcement]]
 
 ## Mapping

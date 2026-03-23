@@ -38,7 +38,7 @@ Detect service outages within 15 minutes and surface them as actionable GitHub i
 ## Interactions
 
 - [[spec - observation loop - autonomous OODA cycle for company operations]] — the structured JSON payload from `collect-infra.sh` is ingested by the observation loop as raw infrastructure signal.
-- [[spec - self healing - deterministic pipeline recovery]] — `needs-human` label on health-check issues signals that self-healing cannot resolve the outage; the healing pipeline sees the open issue but does not attempt to auto-close it.
+- [[spec - self healing - deterministic pipeline recovery]] — `needs-human` label on health-check issues signals that self-healing cannot resolve the outage autonomously. However, self-healing DOES auto-close health-related `needs-human` issues when all endpoints in `health.json` recover (resolution signal 3). The health-check workflow handles the `health-check`-labelled issue lifecycle; self-healing handles the `needs-human` escalation lifecycle.
 
 ## Mapping
 

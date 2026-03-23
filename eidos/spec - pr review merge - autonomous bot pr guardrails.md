@@ -20,7 +20,7 @@ The subsystem absorbs all coordination overhead — waiting for Copilot review, 
 - A human commit on the PR branch resets the fix-loop retry counter, so a human intervention is never penalised by the bot's prior failures. {>> `check_manual_push` compares latest commit author against `APPROVED_AUTHORS`}
 - Adding a `manual-only` label to any PR causes the script to exit immediately without taking any automated action.
 - Five layered guardrails run in cheapest-first order before merge; the first failure short-circuits the remainder and escalates: author allowlist, protected paths, PR size, security keyword scan of the diff, CI status. {>> order is deliberate — author and path checks require only PR metadata; diff scan and CI check are more expensive}
-- PRs touching protected path prefixes are blocked regardless of author or size. {>> `PROTECTED_PATHS` env var; by default covers `.github/` and `company/scripts/`}
+- PRs touching protected path prefixes are blocked regardless of author or size. {>> `PROTECTED_PATHS` env var; empty by default — configure to protect sensitive paths like `.github/` or `company/scripts/` as needed}
 - PRs exceeding `PR_MAX_LINES` changed lines (additions + deletions) are blocked; large PRs need human judgement. {>> default 500 lines}
 - Any added diff line containing a configured security keyword causes immediate escalation; the scan covers only additions (`grep '^+'`), not context or deletions. {>> `SECURITY_KEYWORDS` default: `secret,token,password,api_key,private_key,credentials,authorization`}
 - For `spec:` titled PRs, the script waits for a `spec-validation` signal before merging: it escalates on `spec-needs-fix`, proceeds only on `approved-for-build`, and escalates on timeout if neither label appears. {>> polls up to 6 × 30 s = 3 min for the validation label}
@@ -30,7 +30,7 @@ The subsystem absorbs all coordination overhead — waiting for Copilot review, 
 - A circuit breaker halts the script with exit 1 after five cumulative errors; every error increments a shared counter that is checked after each fallible operation. {>> `ERRORS` counter + `check_circuit_breaker` called after every `ERRORS` increment}
 - Every significant decision (start, review detected, retry, guardrails passed, escalated, merged) is appended to a JSONL audit log with timestamp, run ID, PR number, and repository. {>> `company/audit-log.jsonl`; JSON constructed exclusively with `jq -nc --arg` to avoid injection}
 - Required environment variables (`PR_NUMBER`, `TARGET_REPO`, `GH_TOKEN`) are validated at script start with `bash` parameter expansion fail-fast; the script never proceeds with missing config.
-- The script exits 0 on both successful merge and successful escalation; exit 1 is reserved for fatal infrastructure failure (circuit breaker triggered or script bug).
+- The script exits 0 on both successful merge and successful escalation (escalation IS a successful outcome — the system detected a problem and surfaced it). Exit 1 is reserved for unrecoverable infrastructure failure: circuit breaker tripped (5+ cumulative errors) or an unexpected script error.
 
 ## Design
 

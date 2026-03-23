@@ -89,14 +89,16 @@ This framework exists to make a fully autonomous pipeline safe to run without hu
 
 ## Interactions
 
-- [[spec - observation loop]] — must comply with SEC-1, SEC-2, SEC-3, SEC-4, ARCH-5, ARCH-7, ARCH-8, QUAL-1 through QUAL-5; its publish steps are the primary consumers of `sanitise.sh`
-- [[spec - pipeline health]] — healing loop implementation of Andon (per-item error counting + circuit breaker SEC-7); ARCH-4 (self-merge via `pr-review-merge.sh`); ARCH-6 (concurrency); TEST-4 (cutoff override)
-- [[spec - pr review merge]] — the guardrail script that implements ARCH-4; enforces author allowlist, Copilot review, size limit, security keyword scan, and CI status check
-- [[spec - state management]] — every state file write must comply with QUAL-2 (atomic), QUAL-3 (date compat), QUAL-8 (schema validation after write), and ARCH-1 (location under `company/`)
-- [[spec - audit log]] — the required destination for every Andon-compliant error signal (QUAL-5); without audit entries, error counters are the only evidence of suppressed failures
-- [[spec - dashboard]] — SEC-5 (textContent, no innerHTML); SEC-6 (noopener links); consumes state files written under QUAL-2 and QUAL-8 guarantees
-- [[spec - testing]] — TEST-1 through TEST-5 govern all test scripts; TEST-4 depends on a specific `pipeline-health` workflow input that ARCH-2 (scripts-not-inline) makes testable locally
-- [[spec - conventional commits]] — QUAL-4 governs the commit format; the amendment process itself uses conventional commit types for Constitution version PRs
+- [[spec - observation loop - autonomous OODA cycle for company operations]] — must comply with SEC-1, SEC-2, SEC-3, SEC-4, ARCH-5, ARCH-7, ARCH-8, QUAL-1 through QUAL-5; its publish steps are the primary consumers of `sanitise.sh`
+- [[spec - self healing - deterministic pipeline recovery]] — healing loop implementation of Andon (per-item error counting + circuit breaker SEC-7); ARCH-4 (self-merge via `pr-review-merge.sh`); ARCH-6 (concurrency); TEST-4 (cutoff override)
+- [[spec - pr review merge - autonomous bot pr guardrails]] — the guardrail script that implements ARCH-4; enforces author allowlist, Copilot review, size limit, security keyword scan, and CI status check
+- [[spec - pipeline state machine - label driven issue lifecycle]] — label vocabulary and state transitions governed by ARCH-3 (spec structure), QUAL-4 (commit format), SEC-2 (sanitised agent instructions)
+- [[spec - infrastructure monitoring - endpoint health and alerting]] — health probes governed by SEC-4 (explicit permissions), QUAL-1 (strict mode in collect-infra.sh)
+- [[spec - testing - e2e and integration test framework]] — TEST-1 through TEST-5 govern all test scripts; TEST-4 depends on a specific `pipeline-health` workflow input that ARCH-2 (scripts-not-inline) makes testable locally
+- State management (QUAL-2 atomic writes, QUAL-3 date compat, QUAL-8 schema validation, ARCH-1 location under `company/`) applies to all subsystems that write state files
+- Audit log (`company/audit-log.jsonl`) is the required destination for every Andon-compliant error signal (QUAL-5); consumed by self-healing and PR review specs
+- Dashboard (chimney repo) must comply with SEC-5 (textContent, no innerHTML) and SEC-6 (noopener links)
+- QUAL-4 (conventional commits) governs the commit format across all subsystems
 
 ## Mapping
 
