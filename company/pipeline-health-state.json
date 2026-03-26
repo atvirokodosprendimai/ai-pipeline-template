@@ -1,14 +1,14 @@
 {
-  "last_check": "2026-03-26T17:11:55Z",
+  "last_check": "2026-03-26T19:17:59Z",
   "check_interval_hours": 2,
-  "checks_run": 49,
+  "checks_run": 50,
   "issues_healed_total": 0,
   "retry_tracker": {},
   "funnel_signals": {
     "dogfood": true,
     "presence": true,
     "endpoint_details": "chimney:ok,cloudroof:ok,coroot:ok,tvcentras:ok",
-    "checked_at": "2026-03-26T17:11:55Z"
+    "checked_at": "2026-03-26T19:17:58Z"
   },
   "last_run_summary": {
     "stale_triage_found": 0,
