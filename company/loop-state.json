@@ -2,7 +2,7 @@
   "funnel_stage": 1,
   "stage_name": "Dogfood",
   "stage_entered": "2026-03-18T08:53:41Z",
-  "last_run": "2026-04-01T01:44:56Z",
-  "run_count": 40,
+  "last_run": "2026-04-01T16:44:35Z",
+  "run_count": 41,
   "history": []
 }
