@@ -181,14 +181,20 @@ jobs:
         env:
           OBSERVER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: |
+          # Read prior stage from loop-state.json — stubs carry it forward
+          # instead of resetting to 0/Foundation on transient failures.
+          prev_stage=$(jq -r '.funnel_stage // 0' company/loop-state.json)
+          prev_stage_name=$(jq -r '.stage_name // "Foundation"' company/loop-state.json)
+
           if [ -z "$OBSERVER_API_KEY" ]; then
             echo "::warning::Observer API key not set — generating stub assessment."
             today=$(date -u '+%Y-%m-%d')
             cat > /tmp/assessment.json <<STUBEOF
           {
             "timestamp": "${today}T08:00:00Z",
-            "funnel_stage": 0,
-            "stage_name": "Foundation",
+            "funnel_stage": ${prev_stage},
+            "stage_name": "${prev_stage_name}",
+            "assessment_degraded": true,
             "runway": {"monthly_burn_eur": null, "months_remaining": null, "survival_mode": false},
             "assessment": "Observer API key not configured. The loop infrastructure is deployed but cannot call the LLM yet. This is a needs-human blocker.",
             "blockers": ["Observer API key not set in GitHub secrets"],
@@ -257,8 +263,10 @@ jobs:
               api_error=$(jq -r '.error.message // "unknown error"' /tmp/llm_response.json 2>/dev/null || echo "HTTP $http_code")
               echo "::warning::Observer LLM returned HTTP $http_code: $api_error — falling back to stub."
               today=$(date -u '+%Y-%m-%d')
-              jq -n --arg ts "${today}T08:00:00Z" --arg err "$api_error" '{
-                timestamp: $ts, funnel_stage: 0, stage_name: "Foundation",
+              jq -n --arg ts "${today}T08:00:00Z" --arg err "$api_error" \
+                --argjson prev_stage "$prev_stage" --arg prev_stage_name "$prev_stage_name" '{
+                timestamp: $ts, funnel_stage: $prev_stage, stage_name: $prev_stage_name,
+                assessment_degraded: true,
                 runway: {monthly_burn_eur: null, months_remaining: null, survival_mode: false},
                 assessment: ("LLM call failed: " + $err + ". Falling back to stub assessment."),
                 blockers: [("Observer API error: " + $err)],
@@ -338,6 +346,12 @@ jobs:
           issues_created=$(jq -r '(.issues_to_create // []) | map(.title) | join("; ")' /tmp/assessment.json)
           issues_closed=$(jq -r '(.issues_to_close // []) | map(.number | tostring) | join(", ")' /tmp/assessment.json)
           run_count=$(cat /tmp/run-count.txt)
+          degraded=$(jq -r '.assessment_degraded // false' /tmp/assessment.json)
+          if [ "$degraded" = "true" ]; then
+            outcome="partial"
+          else
+            outcome="success"
+          fi
 
           cat > "memory/episodic/${ts}-loop-daily-assessment.md" <<MEMEOF
           ---
@@ -346,7 +360,7 @@ jobs:
           type: assessment
           tags: [observation-loop, assessment, ${stage,,}]
           status: active
-          outcome: success
+          outcome: ${outcome}
           ---
 
           ## Summary
