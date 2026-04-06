@@ -1,14 +1,14 @@
 {
-  "last_check": "2026-04-06T03:25:54Z",
+  "last_check": "2026-04-06T06:02:46Z",
   "check_interval_hours": 2,
-  "checks_run": 161,
+  "checks_run": 162,
   "issues_healed_total": 0,
   "retry_tracker": {},
   "funnel_signals": {
     "dogfood": true,
-    "presence": true,
-    "endpoint_details": "chimney:ok,cloudroof:ok,coroot:ok,tvcentras:ok",
-    "checked_at": "2026-04-06T03:25:54Z"
+    "presence": false,
+    "endpoint_details": "chimney:ok,cloudroof:ok,coroot:fail,tvcentras:ok",
+    "checked_at": "2026-04-06T06:02:46Z"
   },
   "last_run_summary": {
     "stale_triage_found": 0,
