@@ -4,7 +4,7 @@ agent: claude
 type: rca
 issue: 458
 tags: [observation-loop, hallucination, dedup, codebase-awareness]
-status: active
+status: resolved
 outcome: success
 ---
 

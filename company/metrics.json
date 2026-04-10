@@ -1,7 +1,19 @@
 {
-  "last_updated": null,
-  "product": {},
-  "community": {},
+  "last_updated": "2026-04-10",
+  "product": {
+    "stage": "Dogfood",
+    "stage_day": 23,
+    "loop_runs": 61,
+    "health_checks": 208,
+    "monitored_endpoints": 4,
+    "critical_bugs_open": 0,
+    "stability_clock_started": "2026-04-10",
+    "note": "NAT flapping fix merged. Stability clock running toward 2026-04-17 Dogfood exit"
+  },
+  "community": {
+    "contributors_total": 4,
+    "note": "2 human + 2 AI agents"
+  },
   "revenue": {
     "mrr_status": "pre-revenue",
     "active_customers": 0

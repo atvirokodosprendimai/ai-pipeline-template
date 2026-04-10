@@ -1,6 +1,31 @@
 {
   "schema_version": 1,
-  "last_updated": null,
-  "entities": [],
+  "last_updated": "2026-04-10",
+  "entities": [
+    {
+      "id": "marty",
+      "type": "human",
+      "contributions": ["engineering", "operations", "architecture"],
+      "note": "Founder, primary contributor across all repos"
+    },
+    {
+      "id": "saint",
+      "type": "human",
+      "contributions": ["engineering"],
+      "note": "Contributor to wgmesh core"
+    },
+    {
+      "id": "app/copilot-swe-agent",
+      "type": "ai-agent",
+      "contributions": ["engineering", "spec-writing"],
+      "note": "Writes specs and implementation PRs. Authored PR #464 (relay hysteresis)"
+    },
+    {
+      "id": "goose-bot",
+      "type": "ai-agent",
+      "contributions": ["engineering"],
+      "note": "Implements approved specs"
+    }
+  ],
   "unreciprocated": []
 }

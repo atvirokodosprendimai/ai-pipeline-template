@@ -4,7 +4,7 @@ agent: claude
 type: session
 issue: 457
 tags: [nat, relay, routing, issue-triage, beta-testing]
-status: active
+status: resolved
 outcome: success
 ---
 
