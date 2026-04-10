@@ -4,7 +4,7 @@ agent: claude
 type: session
 issue: 457
 tags: [nat, relay, routing, implementation]
-status: active
+status: resolved
 outcome: partial
 ---
 
