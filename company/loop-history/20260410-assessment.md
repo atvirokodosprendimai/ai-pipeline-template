@@ -1,22 +1,23 @@
 # Assessment: 2026-04-10
 
-**Stage**: Dogfood | **Run**: 61
+**Stage**: Dogfood | **Run**: 62
 
-Stage 1, day 23. Product remains fully functional with complete mesh networking architecture — centralized/decentralized modes, 4 discovery layers, NAT traversal, AES-256-GCM encryption, JSON-RPC 2.0. PR #464 fixing NAT relay flapping continues under review for 18+ days, becoming the critical blocker for advancement to Presence stage. Issue #475 shows building progress on dogfooding documentation.
+Stage 1, day 23. Product remains fully functional with complete mesh networking architecture — centralized/decentralized modes, 4 discovery layers, NAT traversal, AES-256-GCM encryption, JSON-RPC 2.0. Major milestone: NAT relay flapping fixed, resetting Dogfood stability clock. PR #477 adds landing section to cloudroof.eu (first presence work). Clean development pipeline with 3 correctly scoped issues in progress.
 
 ## Blockers
-- PR #464 NAT relay stability fix under review for 18+ days — blocks Dogfood exit criteria (stable for 1 week)
-- No landing page exists — blocks Presence stage advancement
-- Team dogfooding documentation incomplete — needed to validate Dogfood completion
+- NAT relay flapping fix needs verification in production testlab
+- Team dogfooding documentation incomplete (issue #475)
+- No observability metrics for mesh health monitoring (issue #470)
 
 ## Top Actions
-- **fn:dev**: Complete PR #464 review and merge to fix NAT relay flapping (zero)
-- **fn:dev**: Complete dogfooding documentation (#475) with stability metrics (zero)
-- **fn:gtm**: Progress landing page creation (#474) for Presence readiness (zero)
+- **fn:gtm**: Merge PR #477 to add wgmesh landing section to cloudroof.eu (zero)
+- **fn:dev**: Complete dogfooding documentation to establish team usage baseline (zero)
+- **fn:dev**: Test NAT relay flapping fix in production mesh (zero)
 
 ## Contributions
-- **Marty**: Recent git commits maintaining product functionality
-- **app/copilot-swe-agent**: Created PR #464 for NAT relay flapping fix (under review)
+- **nycterent**: Created PR #477 adding wgmesh landing section to cloudroof.eu
+- **Marty**: Ongoing development activity - 3 recent contributors in 30 days
+- **~.~**: Recent git activity - 2 authors in past 7 days
 
 ## Needs Human
 _Nothing this cycle._
