@@ -453,7 +453,7 @@ jobs:
         if: steps.validate.outputs.has_changes == 'true'
         uses: actions/github-script@v8
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.PUSH_TOKEN }}
           script: |
             const issueNum = '${{ steps.spec.outputs.issue_number }}';
             const specPR = '${{ steps.spec.outputs.spec_pr_number }}';
@@ -553,7 +553,7 @@ jobs:
         if: steps.validate.outputs.has_changes == 'false'
         uses: actions/github-script@v8
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.PUSH_TOKEN }}
           script: |
             const specPR = '${{ steps.spec.outputs.spec_pr_number }}';
             const issueNum = '${{ steps.spec.outputs.issue_number }}';
