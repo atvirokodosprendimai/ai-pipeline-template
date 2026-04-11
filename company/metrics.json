@@ -1,21 +1,27 @@
 {
-  "last_updated": "2026-04-10",
+  "last_updated": "2026-04-11",
   "product": {
     "stage": "Dogfood",
-    "stage_day": 23,
-    "loop_runs": 61,
-    "health_checks": 208,
+    "stage_day": 25,
+    "loop_runs": 64,
+    "health_checks": 223,
     "monitored_endpoints": 4,
     "critical_bugs_open": 0,
     "stability_clock_started": "2026-04-10",
-    "note": "NAT flapping fix merged. Stability clock running toward 2026-04-17 Dogfood exit"
+    "note": "NAT flapping fix holding. Day 1 of 7-day stability window. Heartbeat fast lane fixed and operational."
   },
   "community": {
-    "contributors_total": 4,
-    "note": "2 human + 2 AI agents"
+    "contributors_total": 5,
+    "note": "2 human (nycterent, blinkinglight) + 3 AI agents (Copilot, github-actions[bot], goose-bot)"
   },
   "revenue": {
     "mrr_status": "pre-revenue",
     "active_customers": 0
+  },
+  "traffic": {
+    "stars": 9,
+    "views_7d": 32,
+    "clones_7d_unique": 153,
+    "note": "Traffic spike on 2026-04-10 — 26 views, 153 unique clones. Discovery happening."
   }
 }
