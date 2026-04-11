@@ -155,14 +155,14 @@ jobs:
             fi
           done
 
-      - name: Merge heartbeat PR
+      - name: Enable auto-merge for heartbeat PR
         env:
           GH_TOKEN: ${{ secrets.PUSH_TOKEN }}
           TARGET_REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
-          gh pr merge "$PR_NUMBER" --repo "$TARGET_REPO" --squash --delete-branch
+          gh pr merge "$PR_NUMBER" --repo "$TARGET_REPO" --squash --delete-branch --auto
 
       - name: Comment on validation failure
         if: failure()
