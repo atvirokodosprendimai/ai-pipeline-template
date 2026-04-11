@@ -155,6 +155,15 @@ jobs:
             fi
           done
 
+      - name: Auto-approve heartbeat PR
+        env:
+          GH_TOKEN: ${{ secrets.PUSH_TOKEN }}
+          TARGET_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          gh pr review "$PR_NUMBER" --repo "$TARGET_REPO" --approve --body "Heartbeat fast-lane: all validation gates passed (scope, JSON, sanitisation). Auto-approved for merge."
+
       - name: Enable auto-merge for heartbeat PR
         env:
           GH_TOKEN: ${{ secrets.PUSH_TOKEN }}
