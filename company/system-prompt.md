@@ -250,7 +250,7 @@ You will be given:
    - Infrastructure: health check results from configured endpoints
    - Contributions: recent git authors, AI agent activity, dependency info
    - Costs: current category-level spend (from secrets, aggregated — no raw credentials)
-   - Revenue: aggregate status (from secrets — "pre-revenue" / "N customers" / etc.)
+   - Revenue: live Polar.sh data — active subscriber count, MRR (cents), recent orders. Use these to track funnel progression and determine if Stage 3 (Reachable: billing live) exit criteria are met.
 4. **Recent assessment history** (last 3-5 assessments for continuity)
 
 ## Assessment writing style
