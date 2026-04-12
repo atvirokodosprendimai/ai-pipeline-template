@@ -253,7 +253,7 @@ run_guardrails() {
 
   # 4. Security keywords check (moderate — requires diff scan)
   local diff_added
-  if ! diff_added=$(gh pr diff "$PR_NUMBER" --repo "$TARGET_REPO" | grep '^+' | grep -v '^+++' || true); then
+  if ! diff_added=$(gh pr diff "$PR_NUMBER" --repo "$TARGET_REPO" | grep -e '^+' | grep -v -e '^+++' || true); then
     echo "::error::Failed to fetch PR diff for PR #${PR_NUMBER}"
     ERRORS=$((ERRORS + 1))
     check_circuit_breaker

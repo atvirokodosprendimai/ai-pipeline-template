@@ -30,7 +30,7 @@ patterns=(
 )
 
 for pattern in "${patterns[@]}"; do
-  if echo "$input" | grep -qEi "$pattern"; then
+  if echo "$input" | grep -qEi -- "$pattern"; then
     echo "SANITISE ERROR: Found potential secret matching pattern: $pattern" >&2
     found=1
   fi
