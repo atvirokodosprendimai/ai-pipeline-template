@@ -664,6 +664,78 @@ jobs:
 
           echo "Funnel signals — dogfood: $dogfood_signal, presence: $presence_signal"
 
+      - name: Check idle pipeline signal
+        env:
+          GH_TOKEN: ${{ secrets.PUSH_TOKEN }}
+        run: |
+          STATE_FILE="company/pipeline-health-state.json"
+          now=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+          existing_last_dispatch=$(jq -r '.idle_signal.last_dispatch_at // ""' "$STATE_FILE")
+
+          open_prs=$(gh pr list --repo "$TARGET_REPO" --state open --limit 50 --json number | jq 'length')
+          active_pipeline_issues=$(gh issue list --repo "$TARGET_REPO" --state open --limit 100 --json labels \
+            | jq '[.[] | select(any(.labels[].name; . == "needs-triage" or . == "copilot-triaging" or . == "copilot-revising" or . == "approved-for-build" or . == "goose-implementation"))] | length')
+
+          idle="false"
+          if [ "$open_prs" -eq 0 ] && [ "$active_pipeline_issues" -eq 0 ] && [ "$ACTIONS_TAKEN" -eq 0 ] && [ "$ERRORS" -eq 0 ]; then
+            idle="true"
+          fi
+
+          jq \
+            --argjson idle "$( [ "$idle" = "true" ] && echo true || echo false )" \
+            --argjson open_prs "$open_prs" \
+            --argjson active_pipeline_issues "$active_pipeline_issues" \
+            --arg ts "$now" \
+            --arg last_dispatch "$existing_last_dispatch" \
+            '.idle_signal = ({
+              idle: $idle,
+              open_prs: $open_prs,
+              active_pipeline_issues: $active_pipeline_issues,
+              checked_at: $ts
+            } + if $last_dispatch != "" then {last_dispatch_at: $last_dispatch} else {} end)' \
+            "$STATE_FILE" > /tmp/state.json && mv /tmp/state.json "$STATE_FILE"
+
+          echo "Idle signal — idle: $idle, open PRs: $open_prs, active pipeline issues: $active_pipeline_issues"
+
+      - name: Dispatch observation loop on idle
+        if: env.CIRCUIT_BREAKER_TRIPPED != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.PUSH_TOKEN }}
+        run: |
+          STATE_FILE="company/pipeline-health-state.json"
+          now=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+          idle=$(jq -r '.idle_signal.idle // false' "$STATE_FILE")
+          last_dispatch=$(jq -r '.idle_signal.last_dispatch_at // ""' "$STATE_FILE")
+
+          if [ "$idle" != "true" ]; then
+            echo "Pipeline is not idle — skipping observation-loop dispatch"
+            exit 0
+          fi
+
+          cooldown_seconds=$((6 * 60 * 60))
+          now_epoch=$(date -u +%s)
+          last_epoch=0
+          if [ -n "$last_dispatch" ]; then
+            last_epoch=$(date -u -d "$last_dispatch" +%s 2>/dev/null || date -u -j -f '%Y-%m-%dT%H:%M:%SZ' "$last_dispatch" +%s 2>/dev/null || echo 0)
+          fi
+
+          if [ "$last_epoch" -gt 0 ] && [ $((now_epoch - last_epoch)) -lt "$cooldown_seconds" ]; then
+            echo "Idle dispatch cooldown active — last dispatch at $last_dispatch"
+            exit 0
+          fi
+
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${GITHUB_REPOSITORY}/dispatches" \
+            -f event_type='company-signal' \
+            -f client_payload[signal]='idle-pipeline' \
+            -f client_payload[source]='pipeline-health' \
+            -f client_payload[idle_checked_at]="$now"
+
+          jq --arg ts "$now" '.idle_signal.last_dispatch_at = $ts' "$STATE_FILE" > /tmp/state.json && mv /tmp/state.json "$STATE_FILE"
+          echo "Dispatched observation loop due to idle pipeline"
+
       # ── Update state ──────────────────────────────────────────
       - name: Update state summary
         run: |
@@ -672,9 +744,10 @@ jobs:
           new_checks_run=$(( checks_run + 1 ))
           new_healed=$(( issues_healed_total + ACTIONS_TAKEN ))
 
-          # Preserve existing retry_tracker and funnel_signals from check steps
+          # Preserve existing retry_tracker and signals from check steps
           existing_retry_tracker=$(jq '.retry_tracker // {}' "$STATE_FILE")
           existing_funnel_signals=$(jq '.funnel_signals // {}' "$STATE_FILE")
+          existing_idle_signal=$(jq '.idle_signal // {}' "$STATE_FILE")
 
           jq -n \
             --arg last_check "$now" \
@@ -683,6 +756,7 @@ jobs:
             --argjson issues_healed_total "$new_healed" \
             --argjson retry_tracker "$existing_retry_tracker" \
             --argjson funnel_signals "$existing_funnel_signals" \
+            --argjson idle_signal "$existing_idle_signal" \
             --argjson stale_triage "$STALE_TRIAGE_FOUND" \
             --argjson stale_copilot "$STALE_COPILOT_FOUND" \
             --argjson stale_approved "$STALE_APPROVED_FOUND" \
@@ -696,6 +770,7 @@ jobs:
               issues_healed_total: $issues_healed_total,
               retry_tracker: $retry_tracker,
               funnel_signals: $funnel_signals,
+              idle_signal: $idle_signal,
               last_run_summary: {
                 stale_triage_found: $stale_triage,
                 stale_copilot_found: $stale_copilot,

@@ -169,6 +169,7 @@ docs/
 After running `init.sh`, edit these files for your project:
 
 - **`company/system-prompt.md`** — Funnel stages, constraints, and company context
+- **`company/idle-policy.md`** — What the observer should recommend when the pipeline is idle; use this to steer 2–4 hour commercial work toward first-customer progress
 - **`company/health.json`** — Your infrastructure endpoints to monitor
 - **`.github/copilot-instructions.md`** — Project structure, code style, security guidelines
 - **`.goosehints`** — Architecture, key dependencies, important files

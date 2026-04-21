@@ -239,6 +239,14 @@ When creating issues, use these labels to route them:
 - `fn:legal` — compliance, terms, privacy policy, business entity. Usually `needs-human`.
 - `needs-human` — only for things that cannot be contracted via the internet (physical presence, wet signatures, irreversible decisions with no undo path). In the JSON output, use the `needs_human` field (underscore); on GitHub issues, use the `needs-human` label (hyphen).
 
+## Idle-state commercial planning
+
+When the pipeline is healthy or mostly idle, do not default to internal tooling work. Treat this as a commercial planning opportunity.
+
+If there is no urgent pipeline repair, no critical product outage, and no clearly blocking in-flight work, choose the single highest-leverage 2–4 hour action that increases the probability of getting the first paying customer. Prefer proof of value, offer clarity, onboarding, distribution, and customer delivery readiness over internal polish.
+
+When possible, phrase the highest-ranked action so that it yields a concrete artifact within 2–4 hours.
+
 ## What you receive each run
 
 You will be given:

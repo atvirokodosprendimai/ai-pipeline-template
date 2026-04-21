@@ -159,6 +159,14 @@ jobs:
             done
           } > /tmp/history.txt 2>/dev/null || echo "No prior assessments." > /tmp/history.txt
 
+      - name: Load commercial idle policy
+        run: |
+          if [ -f company/idle-policy.md ]; then
+            cp company/idle-policy.md /tmp/idle_policy.txt
+          else
+            echo "No idle policy available." > /tmp/idle_policy.txt
+          fi
+
       - name: Collect Polar revenue signals
         env:
           POLAR_TOKEN: ${{ secrets.POLAR_TOKEN }}
@@ -236,13 +244,15 @@ jobs:
             --slurpfile loop_state company/loop-state.json \
             --slurpfile costs company/costs.json \
             --slurpfile polar /tmp/polar.json \
+            --slurpfile pipeline_health company/pipeline-health-state.json \
             '{
               github: $github[0],
               infrastructure: $infra[0],
               contributions: $contributions[0],
               loop_state: $loop_state[0],
               costs: $costs[0],
-              revenue: $polar[0]
+              revenue: $polar[0],
+              pipeline_health: $pipeline_health[0]
             }' > /tmp/snapshot.json
 
       # ── Assess ─────────────────────────────────────────────────
@@ -295,6 +305,13 @@ jobs:
 
           ## Recent Assessment History
           $(cat /tmp/history.txt)
+
+          ## Commercial Idle Policy
+          Use this policy to decide the highest-leverage 2–4 hour action when the pipeline is idle or nearly idle.
+          $(cat /tmp/idle_policy.txt)
+
+          ## Additional instruction
+          If the pipeline is healthy or mostly idle (for example: low open PR count, no stale work, no active healing needed), bias your top action selection toward the single highest-leverage 2–4 hour task described by the Commercial Idle Policy.
 
           Please provide your assessment as a JSON object per the output format in your system prompt.
           MSGEOF
