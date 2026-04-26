@@ -1,4 +1,23 @@
+terraform {
+  required_version = ">= 1.0.0"
+
+  required_providers {
+    hcloud = {
+      source  = "hetznercloud/hcloud"
+      version = "~> 1.45"
+    }
+    cloudflare = {
+      source  = "cloudflare/cloudflare"
+      version = "~> 4.0"
+    }
+  }
+}
+
 provider "hcloud" {}
+
+provider "cloudflare" {
+  # Configured via CLOUDFLARE_API_TOKEN env var
+}
 
 resource "hcloud_ssh_key" "deploy" {
   name       = "mentisdb-deploy"

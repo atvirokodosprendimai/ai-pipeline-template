@@ -1,1 +1,9 @@
 .sugar/
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.backup
+crash.log
+*.tfvars
+!*.tfvars.example
