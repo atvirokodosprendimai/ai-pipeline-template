@@ -12,11 +12,19 @@ This Terraform module provisions the MentisDB production VPS on Hetzner and crea
 ## Required Environment
 
 ```bash
+export AWS_ACCESS_KEY_ID="your_hetzner_s3_access_key"
+export AWS_SECRET_ACCESS_KEY="your_hetzner_s3_secret_key"
 export HCLOUD_TOKEN="your_hetzner_cloud_token"
 export CLOUDFLARE_API_TOKEN="your_cloudflare_api_token"
 export TF_VAR_deploy_ssh_public_key="ssh-ed25519 AAAA..."
 export TF_VAR_beerpub_cloudflare_zone_id="your_beerpub_zone_id_here"
 ```
+
+## State Backend
+
+Remote state is stored in the Hetzner Object Storage bucket `atvirokodosprendimai-tfstate`.
+This module uses the key `mentisdb/terraform.tfstate`.
+Configure the bucket, S3 credentials, and GitHub secrets with [../BOOTSTRAP.md](../BOOTSTRAP.md).
 
 ## Commands
 

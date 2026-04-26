@@ -11,6 +11,4 @@ Each module is run independently from its own directory and has its own Terrafor
 
 ## State Backend
 
-No remote backend is configured yet. Each module currently uses local state, which is fine for a one-shot operator apply but problematic for CI auto-apply.
-
-TODO: add an S3-compatible backend, such as Hetzner Object Storage, before relying on CI auto-apply.
+Configured: both modules use Hetzner Object Storage at `fsn1` as an S3-compatible remote state backend. See [BOOTSTRAP.md](BOOTSTRAP.md) for one-time bucket, credential, GitHub secret, and local operator setup.

@@ -14,11 +14,19 @@ This Terraform module manages the existing wgmesh GitHub repository and the pipe
 ## Required Environment
 
 ```bash
+export AWS_ACCESS_KEY_ID="your_hetzner_s3_access_key"
+export AWS_SECRET_ACCESS_KEY="your_hetzner_s3_secret_key"
 export CLOUDFLARE_API_TOKEN="your_cloudflare_api_token"
 export TF_VAR_github_push_token="ghp_your_token_here"
 export TF_VAR_openrouter_api_key="opr_your_key_here"
 export TF_VAR_cloudflare_zone_id="your_chimney_zone_id_here"
 ```
+
+## State Backend
+
+Remote state is stored in the Hetzner Object Storage bucket `atvirokodosprendimai-tfstate`.
+This module uses the key `pipeline/terraform.tfstate`.
+Configure the bucket, S3 credentials, and GitHub secrets with [../BOOTSTRAP.md](../BOOTSTRAP.md).
 
 ## Commands
 
