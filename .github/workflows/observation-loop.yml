@@ -413,50 +413,73 @@ jobs:
              company/loop-state.json > /tmp/new-state.json
           mv /tmp/new-state.json company/loop-state.json
 
-      - name: Write episodic memory
+      - name: Append assessment to MentisDB
+        env:
+          MENTISDB_URL: ${{ secrets.MENTISDB_URL }}
+          MENTISDB_USER: ${{ secrets.MENTISDB_USER }}
+          MENTISDB_PASSWORD: ${{ secrets.MENTISDB_PASSWORD }}
         run: |
-          # Generate an episodic memory record from this assessment run.
-          # This feeds future runs with structured knowledge of what was decided.
-          ts=$(date -u '+%Y%m%d-%H%M')
+          set -euo pipefail
+
           stage=$(jq -r '.stage_name // "Unknown"' /tmp/assessment.json)
-          narrative=$(jq -r '.assessment // "No assessment."' /tmp/assessment.json)
+          summary=$(jq -r '.assessment // "No assessment."' /tmp/assessment.json)
           blockers=$(jq -r '(.blockers // []) | join("; ")' /tmp/assessment.json)
           actions=$(jq -r '(.top_actions // []) | map(.action) | join("; ")' /tmp/assessment.json)
           issues_created=$(jq -r '(.issues_to_create // []) | map(.title) | join("; ")' /tmp/assessment.json)
           issues_closed=$(jq -r '(.issues_to_close // []) | map(.number | tostring) | join(", ")' /tmp/assessment.json)
           run_count=$(cat /tmp/run-count.txt)
+          lower_stage=$(printf '%s' "$stage" | tr '[:upper:]' '[:lower:]')
 
-          cat > "memory/episodic/${ts}-loop-daily-assessment.md" <<MEMEOF
-          ---
-          date: $(date -u '+%Y-%m-%dT%H:%M:%SZ')
-          agent: loop
-          type: assessment
-          tags: [observation-loop, assessment, ${stage,,}]
-          status: active
-          outcome: success
-          ---
-
-          ## Summary
-          Run #${run_count}, stage: ${stage}. ${narrative}
-
-          ## Key Decisions
+          decisions=$(cat <<EOF
           - Top actions: ${actions:-none}
           - Issues created: ${issues_created:-none}
           - Issues closed: ${issues_closed:-none}
+          EOF
+          )
+
+          learnings=$(cat <<EOF
+          - Blockers: ${blockers:-none identified}
+          EOF
+          )
+
+          BODY=$(cat <<EOF
+          ## Summary
+          Run #${run_count}, stage: ${stage}.
+          ${summary}
+
+          ## Key Decisions
+          ${decisions}
 
           ## Learnings
-          - Blockers: ${blockers:-none identified}
-          MEMEOF
+          ${learnings}
+          EOF
+          )
+
+          PAYLOAD=$(jq -n \
+            --arg content "$BODY" \
+            --arg stage "$lower_stage" \
+            --arg run "$run_count" \
+            '{
+              chain_key: "ai-pipeline-template",
+              agent_id: "observation-loop",
+              agent_name: "observation-loop",
+              thought_type: "Insight",
+              content: $content,
+              tags: ["observation-loop", "assessment", $stage, ("run-" + $run)],
+              importance: 0.4
+            }')
+
+          curl --fail-with-body --silent --show-error --max-time 15 \
+            -u "$MENTISDB_USER:$MENTISDB_PASSWORD" \
+            -X POST -H 'Content-Type: application/json' \
+            -d "$PAYLOAD" "$MENTISDB_URL/v1/thoughts"
 
       - name: Sanitise before commit
         run: |
-          today=$(date -u '+%Y%m%d')
-          cat "company/loop-history/${today}-assessment.md" | bash company/scripts/sanitise.sh > /dev/null
-          cat company/loop-state.json | bash company/scripts/sanitise.sh > /dev/null
-          # Sanitise episodic memory files
-          for f in memory/episodic/*.md; do
+          for f in company/loop-history/*.md; do
             [ -f "$f" ] && cat "$f" | bash company/scripts/sanitise.sh > /dev/null || true
           done
+          cat company/loop-state.json | bash company/scripts/sanitise.sh > /dev/null
 
       - name: Commit state
         env:
@@ -464,7 +487,7 @@ jobs:
         run: |
           git config user.name "observation-loop[bot]"
           git config user.email "observation-loop[bot]@users.noreply.github.com"
-          git add company/loop-state.json company/loop-history/ memory/episodic/
+          git add company/loop-state.json company/loop-history/
           git diff --cached --quiet && echo "No changes to commit" && exit 0
 
           today=$(date -u '+%Y-%m-%d')

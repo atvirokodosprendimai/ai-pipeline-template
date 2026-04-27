@@ -91,7 +91,7 @@ jobs:
             case "$path" in
               company/loop-state.json|company/pipeline-health-state.json|company/audit-log.jsonl)
                 ;;
-              company/loop-history/*.md|memory/episodic/*.md)
+              company/loop-history/*.md)
                 ;;
               *)
                 echo "::error::Heartbeat PR touches out-of-scope file: $path"
