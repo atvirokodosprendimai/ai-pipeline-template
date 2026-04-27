@@ -34,9 +34,35 @@ apt-get install -y \
   curl nginx certbot python3-certbot-nginx ufw \
   ca-certificates apache2-utils docker.io
 
-# --- 2. Data dir ---
+# --- 2. Persistent volume mount ---
+# Hetzner Volume ${volume_id} attached at server creation. Mount it at
+# $DATA_DIR before any data is written so mentisdb chain data survives
+# server replacement (tofu apply -replace=hcloud_server.mentisdb).
+VOLUME_DEVICE="/dev/disk/by-id/scsi-0HC_Volume_${volume_id}"
+echo "Waiting for volume device $VOLUME_DEVICE to appear..."
+for _ in $(seq 1 60); do
+  [ -e "$VOLUME_DEVICE" ] && break
+  sleep 1
+done
+if [ ! -e "$VOLUME_DEVICE" ]; then
+  echo "ERROR: volume device $VOLUME_DEVICE never appeared after 60s" >&2
+  exit 1
+fi
+mkdir -p "$DATA_DIR"
+# Mount idempotently: skip if already mounted (cloud-init re-runs are rare
+# but keep the script safe to re-execute manually for diagnostics).
+if ! mountpoint -q "$DATA_DIR"; then
+  mount "$VOLUME_DEVICE" "$DATA_DIR"
+fi
+# Persist mount via /etc/fstab (nofail so a missing volume doesn't
+# block boot; we'd rather have a degraded server we can SSH into than
+# an emergency-shell boot we can't reach).
+if ! grep -q "$VOLUME_DEVICE" /etc/fstab; then
+  echo "$VOLUME_DEVICE  $DATA_DIR  ext4  discard,nofail,defaults  0  0" >> /etc/fstab
+fi
 # Container internally runs as uid 991; ensure host dir is writable by it.
-install -d -o 991 -g 991 -m 0750 "$DATA_DIR"
+chown -R 991:991 "$DATA_DIR"
+chmod 0750 "$DATA_DIR"
 
 # --- 3. Pull mentisdbd image + systemd unit wrapping `docker run` ---
 systemctl enable --now docker

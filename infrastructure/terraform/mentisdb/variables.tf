@@ -33,6 +33,17 @@ variable "mentisdb_image" {
   default     = "ghcr.io/nycterent/mentisdb:0.9.5-test4"
 }
 
+variable "mentisdb_volume_size_gb" {
+  description = "Size (GB) of the Hetzner Volume that holds /var/lib/mentisdb. Volume survives server delete/recreate. Min 10."
+  type        = number
+  default     = 10
+
+  validation {
+    condition     = var.mentisdb_volume_size_gb >= 10
+    error_message = "Hetzner Volumes have a 10GB minimum."
+  }
+}
+
 variable "mentisdb_password" {
   description = "HTTP Basic Auth password for the mentisdb user (sourced from MENTISDB_PASSWORD org secret via TF_VAR_mentisdb_password). Single source of truth: the org secret. Rotate by updating the secret + re-applying."
   type        = string
