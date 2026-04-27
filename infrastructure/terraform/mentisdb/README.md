@@ -14,11 +14,10 @@ This OpenTofu module provisions the MentisDB production VPS on Hetzner, configur
 ```bash
 export TF_VAR_hcloud_token="your_hetzner_cloud_token"
 export TF_VAR_cloudflare_api_token="your_cloudflare_api_token"
-export TF_VAR_deploy_ssh_public_key="ssh-ed25519 AAAA..."
 export TF_VAR_beerpub_cloudflare_zone_id="your_beerpub_zone_id_here"
 ```
 
-The SSH public key is only for optional debugging access to the deployed VPS. MentisDB installation and service configuration run from cloud-init during first boot.
+No SSH key is provisioned. MentisDB installation and service configuration run autonomously from cloud-init during first boot. For emergency access, use the Hetzner Cloud Console (web-based VNC) — no SSH credentials required.
 
 ## State Backend
 

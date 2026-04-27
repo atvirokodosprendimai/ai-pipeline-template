@@ -29,7 +29,6 @@ Set these as org-level secrets on `ai-pipeline-template`, except the inherited o
 | State | `TOFU_STATE_ENDPOINT=https://hel1.your-objectstorage.com` |
 | State | `TOFU_STATE_ACCESS_KEY` |
 | State | `TOFU_STATE_SECRET_KEY` |
-| Hetzner | `HETZNER_SSH_PUBLIC_KEY` (public key only, for SSH access to deployed VPS) |
 | Cloudflare | `BEERPUB_CLOUDFLARE_API_TOKEN` (zone-scoped to beerpub.dev) |
 | Cloudflare | `BEERPUB_CLOUDFLARE_ZONE_ID` |
 | Cloudflare | `CLOUDFLARE_ZONE_ID` |
@@ -116,7 +115,6 @@ tofu apply
 cd infrastructure/terraform/mentisdb
 export TF_VAR_hcloud_token="<hetzner-cloud-api-token>"
 export TF_VAR_cloudflare_api_token="<cloudflare-api-token>"
-export TF_VAR_deploy_ssh_public_key="ssh-ed25519 AAAA..."
 export TF_VAR_beerpub_cloudflare_zone_id="<beerpub-zone-id>"
 
 tofu plan

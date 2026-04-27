@@ -23,20 +23,12 @@ provider "cloudflare" {
   api_token = var.cloudflare_api_token
 }
 
-resource "hcloud_ssh_key" "deploy" {
-  name       = "mentisdb-deploy"
-  public_key = var.deploy_ssh_public_key
-}
-
 resource "hcloud_firewall" "mentisdb" {
   name = "mentisdb-public"
 
-  rule {
-    direction  = "in"
-    protocol   = "tcp"
-    port       = "22"
-    source_ips = ["0.0.0.0/0", "::/0"]
-  }
+  # No SSH ingress — cloud-init is autonomous; emergency access via
+  # Hetzner web Console only. To re-add SSH, restore the hcloud_ssh_key
+  # resource and a port 22 rule.
 
   rule {
     direction  = "in"
@@ -58,7 +50,6 @@ resource "hcloud_server" "mentisdb" {
   image        = "ubuntu-24.04"
   server_type  = "cx22"
   location     = "fra1"
-  ssh_keys     = [hcloud_ssh_key.deploy.id]
   firewall_ids = [hcloud_firewall.mentisdb.id]
   user_data = templatefile("${path.module}/cloud-init.sh.tpl", {
     domain_name       = var.domain_name
