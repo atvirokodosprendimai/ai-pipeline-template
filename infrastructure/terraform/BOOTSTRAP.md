@@ -1,106 +1,135 @@
-# Terraform State Backend Bootstrap
+# OpenTofu State Backend Bootstrap
 
-This guide covers the one-time setup for the shared Terraform state backend used by the `pipeline` and `mentisdb` modules.
+This repository follows the org OpenTofu convention used by mailservice:
+https://github.com/atvirokodosprendimai/mailservice/blob/main/docs/hetzner-cicd.md
 
-## Prerequisites
+The `pipeline` and `mentisdb` stacks use empty `backend "s3" {}` blocks.
+Operators and CI generate `backend.hcl` at runtime, then run
+`tofu init -backend-config=backend.hcl`.
 
-- Hetzner Cloud project access with permission to create Object Storage buckets and S3 credentials.
-- GitHub permissions to create repository or organization secrets for `ai-pipeline-template`.
-- Terraform 1.9.x locally if you plan to initialize or migrate state from your workstation.
-
-## Backend
-
-- Provider: Hetzner Object Storage, S3-compatible API.
-- Region: `fsn1` (Falkenstein).
-- Endpoint: `https://fsn1.your-objectstorage.com`.
-- Bucket: `atvirokodosprendimai-tfstate`.
-- Auth: S3 access key and secret key from Hetzner Cloud Project -> Security -> S3 Credentials.
-
-## One-time bootstrap
-
-1. Create the bucket in Hetzner Cloud Console:
-
-   Project -> Object Storage -> Create Bucket -> Region `fsn1` -> Name `atvirokodosprendimai-tfstate` -> Privacy Public OFF (Private) -> Create.
-
-   Or create it with the AWS CLI after S3 credentials exist:
-
-   ```bash
-   aws --endpoint-url https://fsn1.your-objectstorage.com s3 mb s3://atvirokodosprendimai-tfstate
-   ```
-
-2. Create S3 credentials:
-
-   Hetzner Cloud Console -> Project -> Security -> S3 Credentials -> Create.
-
-   Save the access key and secret key immediately. The secret key cannot be retrieved later.
-
-3. Set GitHub secrets:
-
-   Organization-level secrets are recommended for `ai-pipeline-template`.
-
-   ```bash
-   gh secret set HETZNER_S3_ACCESS_KEY --org atvirokodosprendimai --visibility selected --repos ai-pipeline-template
-   gh secret set HETZNER_S3_SECRET_KEY --org atvirokodosprendimai --visibility selected --repos ai-pipeline-template
-   ```
-
-4. Set local operator credentials:
-
-   ```bash
-   export AWS_ACCESS_KEY_ID=<hetzner-s3-access-key>
-   export AWS_SECRET_ACCESS_KEY=<hetzner-s3-secret-key>
-   ```
-
-5. Initialize each module:
-
-   ```bash
-   cd infrastructure/terraform/pipeline
-   terraform init
-
-   cd ../mentisdb
-   terraform init
-   ```
-
-   The first init for each module creates its state file in the bucket under that module's configured state key.
-
-## State file layout
-
+## Tooling
+Install OpenTofu locally:
+```bash
+brew install opentofu
+```
+Or download it from:
 ```text
-atvirokodosprendimai-tfstate/
+https://opentofu.org/docs/intro/install/
+```
+CI uses `opentofu/setup-opentofu@v1` with `tofu_version: 1.8.5`.
+
+## Required GitHub Secrets
+Set these as org or repo secrets.
+
+| Area | Secrets |
+| --- | --- |
+| State | `TOFU_STATE_BUCKET` |
+| State | `TOFU_STATE_REGION=eu-central-1` |
+| State | `TOFU_STATE_ENDPOINT=https://fsn1.your-objectstorage.com` |
+| State | `TOFU_STATE_ACCESS_KEY` |
+| State | `TOFU_STATE_SECRET_KEY` |
+| Hetzner | `HCLOUD_API` |
+| Hetzner | `HETZNER_SSH_PUBLIC_KEY` |
+| Cloudflare | `CLOUDFLARE_API_TOKEN` |
+| Cloudflare | `CLOUDFLARE_ZONE_ID` |
+| Cloudflare | `BEERPUB_CLOUDFLARE_ZONE_ID` |
+| Pipeline | `PUSH_TOKEN` |
+| Pipeline | `OPENROUTER_API_KEY` |
+
+## One-Time Bucket Setup
+Create a private Hetzner Object Storage bucket in the Hetzner Console:
+```text
+Project -> Object Storage -> Create Bucket
+Region: fsn1
+Privacy: Private
+```
+Set the bucket name in `TOFU_STATE_BUCKET`.
+
+Alternatively, create it with the AWS CLI after S3 credentials exist:
+```bash
+export AWS_ACCESS_KEY_ID="<hetzner-object-storage-access-key>"
+export AWS_SECRET_ACCESS_KEY="<hetzner-object-storage-secret-key>"
+
+aws --endpoint-url https://fsn1.your-objectstorage.com \
+  s3 mb "s3://${TOFU_STATE_BUCKET}"
+```
+Create Object Storage credentials in:
+```text
+Hetzner Cloud Console -> Project -> Security -> S3 Credentials
+```
+Save the secret key immediately. Hetzner does not show it again.
+
+## State Layout
+```text
+<TOFU_STATE_BUCKET>/
 |-- pipeline/terraform.tfstate
 `-- mentisdb/terraform.tfstate
 ```
 
-## Migrating from local state
+## Local Backend Config
+Generate `backend.hcl` in the stack directory. The file is gitignored.
 
-If a module already has a local `terraform.tfstate`, run migration after adding the backend block:
-
+For `pipeline`:
 ```bash
 cd infrastructure/terraform/pipeline
-terraform init -migrate-state
+STATE_KEY="pipeline/terraform.tfstate"
+```
+For `mentisdb`:
+```bash
+cd infrastructure/terraform/mentisdb
+STATE_KEY="mentisdb/terraform.tfstate"
+```
+Then generate backend config and initialize:
+```bash
+cat > backend.hcl <<EOF
+bucket = "${TOFU_STATE_BUCKET}"
+region = "${TOFU_STATE_REGION:-eu-central-1}"
+endpoints = { s3 = "${TOFU_STATE_ENDPOINT:-https://fsn1.your-objectstorage.com}" }
+key = "${STATE_KEY}"
+access_key = "${TOFU_STATE_ACCESS_KEY}"
+secret_key = "${TOFU_STATE_SECRET_KEY}"
+skip_credentials_validation = true
+skip_metadata_api_check     = true
+skip_region_validation      = true
+skip_requesting_account_id  = true
+skip_s3_checksum            = true
+use_path_style              = true
+EOF
 
-cd ../mentisdb
-terraform init -migrate-state
+tofu init -backend-config=backend.hcl
 ```
 
-Terraform will upload the existing local state to the configured object storage key:
+## Local Pipeline Workflow
+```bash
+cd infrastructure/terraform/pipeline
+export TF_VAR_github_push_token="<github-pat>"
+export TF_VAR_openrouter_api_key="<openrouter-api-key>"
+export TF_VAR_cloudflare_zone_id="<chimney-zone-id>"
+export TF_VAR_cloudflare_api_token="<cloudflare-api-token>"
 
-- `pipeline/terraform.tfstate`
-- `mentisdb/terraform.tfstate`
+tofu plan
+tofu apply
+```
 
-Skip migration for modules that do not have local state yet.
+## Local MentisDB Workflow
+```bash
+cd infrastructure/terraform/mentisdb
+export TF_VAR_hcloud_token="<hetzner-cloud-api-token>"
+export TF_VAR_cloudflare_api_token="<cloudflare-api-token>"
+export TF_VAR_deploy_ssh_public_key="ssh-ed25519 AAAA..."
+export TF_VAR_beerpub_cloudflare_zone_id="<beerpub-zone-id>"
 
-## Locking note
+tofu plan
+tofu apply
+```
 
-Hetzner Object Storage does not support DynamoDB-style Terraform state locking. Concurrent applies are unsafe.
+## CI Workflow
+GitHub Actions generates `backend.hcl` per stack, runs
+`tofu init -backend-config=backend.hcl`, then passes provider credentials
+through `TF_VAR_*`. The GitHub provider reads `var.github_push_token`, the
+Hetzner provider reads `var.hcloud_token`, and Cloudflare reads
+`var.cloudflare_api_token`.
 
-Current mitigations:
-
-- Keep CI on the default single workflow runner pattern for this repository's low apply volume.
-- Operators avoid running `terraform apply` locally while CI is running.
-- Use `terraform plan` locally before any operator apply.
-
-Future options if multi-operator applies become routine:
-
-- Move state and applies to Terraform Cloud.
-- Run a self-hosted Atlantis or similar apply coordinator.
-- Add an external lock service around CI and local operator workflows.
+## Locking Note
+Hetzner Object Storage does not provide DynamoDB-style state locking. Avoid
+concurrent applies, and do not run local `tofu apply` while CI is applying.

@@ -1,27 +1,12 @@
 terraform {
-  required_version = ">= 1.9.0"
+  required_version = ">= 1.8.0"
 
-  backend "s3" {
-    bucket = "atvirokodosprendimai-tfstate"
-    key    = "mentisdb/terraform.tfstate"
-    region = "us-east-1"
-
-    endpoints = {
-      s3 = "https://fsn1.your-objectstorage.com"
-    }
-
-    skip_credentials_validation = true
-    skip_metadata_api_check     = true
-    skip_region_validation      = true
-    skip_requesting_account_id  = true
-    skip_s3_checksum            = true
-    use_path_style              = true
-  }
+  backend "s3" {}
 
   required_providers {
     hcloud = {
       source  = "hetznercloud/hcloud"
-      version = "~> 1.45"
+      version = "~> 1.50"
     }
     cloudflare = {
       source  = "cloudflare/cloudflare"
@@ -30,10 +15,12 @@ terraform {
   }
 }
 
-provider "hcloud" {}
+provider "hcloud" {
+  token = var.hcloud_token
+}
 
 provider "cloudflare" {
-  # Configured via CLOUDFLARE_API_TOKEN env var
+  api_token = var.cloudflare_api_token
 }
 
 resource "hcloud_ssh_key" "deploy" {

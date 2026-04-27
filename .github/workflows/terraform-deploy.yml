@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   pipeline:
-    name: 'Terraform Apply (pipeline)'
+    name: 'OpenTofu Apply (pipeline)'
     runs-on: ubuntu-latest
     environment: production
     defaults:
@@ -23,44 +23,51 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+      - name: Setup OpenTofu
+        uses: opentofu/setup-opentofu@v1
         with:
-          terraform_version: 1.9.7
+          tofu_version: 1.8.5
 
-      - name: Terraform Init
-        run: terraform init
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.HETZNER_S3_ACCESS_KEY }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.HETZNER_S3_SECRET_KEY }}
-          GITHUB_TOKEN: ${{ secrets.PUSH_TOKEN }}
+      - name: Generate backend config
+        run: |
+          cat > backend.hcl <<EOF
+          bucket = "${{ secrets.TOFU_STATE_BUCKET }}"
+          region = "${{ secrets.TOFU_STATE_REGION }}"
+          endpoints = { s3 = "${{ secrets.TOFU_STATE_ENDPOINT }}" }
+          key = "pipeline/terraform.tfstate"
+          access_key = "${{ secrets.TOFU_STATE_ACCESS_KEY }}"
+          secret_key = "${{ secrets.TOFU_STATE_SECRET_KEY }}"
+          skip_credentials_validation = true
+          skip_metadata_api_check     = true
+          skip_region_validation      = true
+          skip_requesting_account_id  = true
+          skip_s3_checksum            = true
+          use_path_style              = true
+          EOF
 
-      - name: Terraform Plan
+      - name: Tofu Init
+        run: tofu init -backend-config=backend.hcl
+
+      - name: Tofu Plan
         id: plan
-        run: terraform plan -no-color
+        run: tofu plan -no-color
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.HETZNER_S3_ACCESS_KEY }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.HETZNER_S3_SECRET_KEY }}
-          GITHUB_TOKEN: ${{ secrets.PUSH_TOKEN }}
           TF_VAR_github_push_token: ${{ secrets.PUSH_TOKEN }}
           TF_VAR_openrouter_api_key: ${{ secrets.OPENROUTER_API_KEY }}
           TF_VAR_cloudflare_zone_id: ${{ secrets.CLOUDFLARE_ZONE_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
-      - name: Terraform Apply
+      - name: Tofu Apply
         if: github.ref == 'refs/heads/main'
-        run: terraform apply -auto-approve
+        run: tofu apply -auto-approve
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.HETZNER_S3_ACCESS_KEY }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.HETZNER_S3_SECRET_KEY }}
-          GITHUB_TOKEN: ${{ secrets.PUSH_TOKEN }}
           TF_VAR_github_push_token: ${{ secrets.PUSH_TOKEN }}
           TF_VAR_openrouter_api_key: ${{ secrets.OPENROUTER_API_KEY }}
           TF_VAR_cloudflare_zone_id: ${{ secrets.CLOUDFLARE_ZONE_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
   mentisdb:
-    name: 'Terraform Apply (mentisdb)'
+    name: 'OpenTofu Apply (mentisdb)'
     runs-on: ubuntu-latest
     environment: production
     defaults:
@@ -70,35 +77,45 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+      - name: Setup OpenTofu
+        uses: opentofu/setup-opentofu@v1
         with:
-          terraform_version: 1.9.7
+          tofu_version: 1.8.5
 
-      - name: Terraform Init
-        run: terraform init
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.HETZNER_S3_ACCESS_KEY }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.HETZNER_S3_SECRET_KEY }}
+      - name: Generate backend config
+        run: |
+          cat > backend.hcl <<EOF
+          bucket = "${{ secrets.TOFU_STATE_BUCKET }}"
+          region = "${{ secrets.TOFU_STATE_REGION }}"
+          endpoints = { s3 = "${{ secrets.TOFU_STATE_ENDPOINT }}" }
+          key = "mentisdb/terraform.tfstate"
+          access_key = "${{ secrets.TOFU_STATE_ACCESS_KEY }}"
+          secret_key = "${{ secrets.TOFU_STATE_SECRET_KEY }}"
+          skip_credentials_validation = true
+          skip_metadata_api_check     = true
+          skip_region_validation      = true
+          skip_requesting_account_id  = true
+          skip_s3_checksum            = true
+          use_path_style              = true
+          EOF
 
-      - name: Terraform Plan
+      - name: Tofu Init
+        run: tofu init -backend-config=backend.hcl
+
+      - name: Tofu Plan
         id: plan
-        run: terraform plan -no-color
+        run: tofu plan -no-color
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.HETZNER_S3_ACCESS_KEY }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.HETZNER_S3_SECRET_KEY }}
-          TF_VAR_deploy_ssh_public_key: ${{ secrets.DEPLOY_SSH_PUBLIC_KEY }}
+          TF_VAR_hcloud_token: ${{ secrets.HCLOUD_API }}
+          TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          TF_VAR_deploy_ssh_public_key: ${{ secrets.HETZNER_SSH_PUBLIC_KEY }}
           TF_VAR_beerpub_cloudflare_zone_id: ${{ secrets.BEERPUB_CLOUDFLARE_ZONE_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
 
-      - name: Terraform Apply
+      - name: Tofu Apply
         if: github.ref == 'refs/heads/main'
-        run: terraform apply -auto-approve
+        run: tofu apply -auto-approve
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.HETZNER_S3_ACCESS_KEY }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.HETZNER_S3_SECRET_KEY }}
-          TF_VAR_deploy_ssh_public_key: ${{ secrets.DEPLOY_SSH_PUBLIC_KEY }}
+          TF_VAR_hcloud_token: ${{ secrets.HCLOUD_API }}
+          TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          TF_VAR_deploy_ssh_public_key: ${{ secrets.HETZNER_SSH_PUBLIC_KEY }}
           TF_VAR_beerpub_cloudflare_zone_id: ${{ secrets.BEERPUB_CLOUDFLARE_ZONE_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}

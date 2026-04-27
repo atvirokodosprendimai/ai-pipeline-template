@@ -1,6 +1,6 @@
-# MentisDB Terraform Module
+# MentisDB OpenTofu Module
 
-This Terraform module provisions the MentisDB production VPS on Hetzner and creates the `mem.beerpub.dev` Cloudflare A record.
+This OpenTofu module provisions the MentisDB production VPS on Hetzner and creates the `mem.beerpub.dev` Cloudflare A record.
 
 ## Managed Resources
 
@@ -9,13 +9,11 @@ This Terraform module provisions the MentisDB production VPS on Hetzner and crea
 - Hetzner Cloud `mentisdb-prod` server
 - Cloudflare `mem.beerpub.dev` A record pointing at the server IPv4 address
 
-## Required Environment
+## Required TF Variables
 
 ```bash
-export AWS_ACCESS_KEY_ID="your_hetzner_s3_access_key"
-export AWS_SECRET_ACCESS_KEY="your_hetzner_s3_secret_key"
-export HCLOUD_TOKEN="your_hetzner_cloud_token"
-export CLOUDFLARE_API_TOKEN="your_cloudflare_api_token"
+export TF_VAR_hcloud_token="your_hetzner_cloud_token"
+export TF_VAR_cloudflare_api_token="your_cloudflare_api_token"
 export TF_VAR_deploy_ssh_public_key="ssh-ed25519 AAAA..."
 export TF_VAR_beerpub_cloudflare_zone_id="your_beerpub_zone_id_here"
 ```
@@ -23,20 +21,21 @@ export TF_VAR_beerpub_cloudflare_zone_id="your_beerpub_zone_id_here"
 ## State Backend
 
 Remote state is stored in the Hetzner Object Storage bucket `atvirokodosprendimai-tfstate`.
-This module uses the key `mentisdb/terraform.tfstate`.
+This module uses the key `mentisdb/terraform.tfstate`. The module has an empty backend block, so provide a generated `backend.hcl` when initializing.
+
 Configure the bucket, S3 credentials, and GitHub secrets with [../BOOTSTRAP.md](../BOOTSTRAP.md).
 
 ## Commands
 
 ```bash
-terraform init
-terraform plan
-terraform apply
+tofu init -backend-config=../backend.hcl
+tofu plan
+tofu apply
 ```
 
 ## Deployment Sequence
 
-1. Apply this Terraform module first.
+1. Apply this OpenTofu module first.
 2. Read the `mentisdb_ipv4` or `mentisdb_ssh` output.
 3. Run the Ansible playbook against the output IP:
 
@@ -55,15 +54,15 @@ ansible-playbook -i inventory.ini infrastructure/ansible/mentisdb-deploy.yml
 ```mermaid
 sequenceDiagram
     participant Operator
-    participant Terraform
+    participant OpenTofu
     participant Hetzner
     participant Cloudflare
     participant Ansible
 
-    Operator->>Terraform: terraform apply
-    Terraform->>Hetzner: Create SSH key, firewall, server
-    Terraform->>Cloudflare: Create mem.beerpub.dev A record
-    Terraform-->>Operator: Output server IP and SSH command
+    Operator->>OpenTofu: tofu apply
+    OpenTofu->>Hetzner: Create SSH key, firewall, server
+    OpenTofu->>Cloudflare: Create mem.beerpub.dev A record
+    OpenTofu-->>Operator: Output server IP and SSH command
     Operator->>Ansible: Run mentisdb-deploy.yml against output IP
     Ansible->>Hetzner: Install and configure mentisdbd
 ```

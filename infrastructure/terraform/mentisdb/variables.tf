@@ -1,3 +1,15 @@
+variable "hcloud_token" {
+  description = "Hetzner Cloud API token"
+  type        = string
+  sensitive   = true
+}
+
+variable "cloudflare_api_token" {
+  description = "Cloudflare API token (Zone DNS Edit on beerpub.dev)"
+  type        = string
+  sensitive   = true
+}
+
 variable "deploy_ssh_public_key" {
   description = "SSH public key (OpenSSH format) for Hetzner mentisdb-prod server"
   type        = string
