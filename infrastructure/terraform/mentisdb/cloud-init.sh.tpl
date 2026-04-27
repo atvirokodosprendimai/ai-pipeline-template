@@ -2,13 +2,17 @@
 # MentisDB cloud-init bootstrap
 # Generated from cloud-init.sh.tpl by terraform
 # Runs as root on first boot.
-set -euxo pipefail
+set -euo pipefail
 trap 'echo "MentisDB cloud-init bootstrap failed on line $LINENO (pid $$$$)" >&2' ERR
 
 DOMAIN="${domain_name}"
 EMAIL="${letsencrypt_email}"
 VERSION="${mentisdb_version}"
-BASIC_AUTH_PASSWORD="${basic_auth_password}"
+# Single-quoted heredoc neutralizes shell metachars in the rendered password.
+BASIC_AUTH_PASSWORD=$(cat <<'BASIC_AUTH_PASSWORD_END'
+${basic_auth_password}
+BASIC_AUTH_PASSWORD_END
+)
 DATA_DIR="/var/lib/mentisdb"
 USER="mentisdb"
 
@@ -133,7 +137,8 @@ server {
 EOF
 
 # --- 7b. Basic Auth credentials file ---
-htpasswd -bcB /etc/nginx/.htpasswd mentisdb "$BASIC_AUTH_PASSWORD"
+# Use -i (stdin) instead of -b (argv) to avoid leaking the password via /proc.
+printf '%s' "$BASIC_AUTH_PASSWORD" | htpasswd -ciB /etc/nginx/.htpasswd mentisdb
 chown root:www-data /etc/nginx/.htpasswd
 chmod 0640 /etc/nginx/.htpasswd
 
