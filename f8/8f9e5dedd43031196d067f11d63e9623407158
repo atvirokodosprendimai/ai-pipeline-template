@@ -1,0 +1,25 @@
+docs/solutions/integration-issues/github-app-reviews-dont-trigger-workflows.md
+  d934944e0176dc7a 34-36
+docs/solutions/integration-issues/loop-pr-automerge-timing-race.md
+  d934944e0176dc7a 40-48
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "f88f9e5dedd43031196d067f11d63e9623407158",
+  "prompts": {
+    "d934944e0176dc7a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bbf4f2ab-b801-4879-b6b7-defd627d2a7e",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "~.~",
+      "messages": [],
+      "total_additions": 107,
+      "total_deletions": 40,
+      "accepted_lines": 107,
+      "overriden_lines": 0
+    }
+  }
+}
