@@ -1,0 +1,23 @@
+infrastructure/terraform/mentisdb/cloud-init.sh.tpl
+  15cce70529af2a08 24,87-90,138
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "69dc027a4aa1455f1d97f8ab69ad40c70843e8a4",
+  "prompts": {
+    "15cce70529af2a08": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "72637909-623d-4d2f-9625-3af88da6986e",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "~.~",
+      "messages": [],
+      "total_additions": 6,
+      "total_deletions": 151,
+      "accepted_lines": 6,
+      "overriden_lines": 0
+    }
+  }
+}
