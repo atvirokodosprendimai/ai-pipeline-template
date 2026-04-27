@@ -30,7 +30,7 @@ Set these as org or repo secrets.
 | State | `TOFU_STATE_SECRET_KEY` |
 | Hetzner | `HCLOUD_API` |
 | Hetzner | `HETZNER_SSH_PUBLIC_KEY` |
-| Cloudflare | `CLOUDFLARE_API_TOKEN` |
+| Cloudflare | `BEERPUB_CLOUDFLARE_API_TOKEN` (zone-scoped to beerpub.dev) |
 | Cloudflare | `CLOUDFLARE_ZONE_ID` |
 | Cloudflare | `BEERPUB_CLOUDFLARE_ZONE_ID` |
 | Pipeline | `PUSH_TOKEN` |
