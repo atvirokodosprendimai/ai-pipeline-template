@@ -1,0 +1,210 @@
+---
+- name: Deploy MentisDB on Hetzner VPS
+  hosts: all
+  become: yes
+  vars:
+    mentisdb_version: "0.9.5.41"
+    domain_name: "mem.beerpub.dev"
+    letsencrypt_email: "admin@beerpub.dev"
+    mentisdb_user: "mentisdb"
+    mentisdb_data_dir: "/var/lib/mentisdb"
+
+  tasks:
+    - name: Update apt packages and upgrade system
+      apt:
+        update_cache: yes
+        upgrade: dist
+
+    - name: Install required packages
+      apt:
+        name:
+          - build-essential
+          - curl
+          - git
+          - nginx
+          - certbot
+          - python3-certbot-nginx
+          - ufw
+          - pkg-config
+          - libssl-dev
+          - ca-certificates
+        state: present
+
+    - name: Create MentisDB system user
+      user:
+        name: "{{ mentisdb_user }}"
+        system: yes
+        shell: /usr/sbin/nologin
+        home: "{{ mentisdb_data_dir }}"
+        create_home: yes
+
+    - name: Ensure MentisDB data directory exists
+      file:
+        path: "{{ mentisdb_data_dir }}"
+        state: directory
+        owner: "{{ mentisdb_user }}"
+        group: "{{ mentisdb_user }}"
+        mode: "0750"
+
+    - name: Ensure MentisDB config directory exists
+      file:
+        path: /etc/mentisdb
+        state: directory
+        mode: "0755"
+
+    - name: Download rustup-init (pinned, checksum-verified)
+      get_url:
+        url: https://static.rust-lang.org/rustup/archive/1.27.1/x86_64-unknown-linux-gnu/rustup-init
+        dest: /tmp/rustup-init
+        mode: "0755"
+        checksum: sha256:6aeece6993e902708983b209d04c0d1dbb14ebb405ddb87def578d41f920f56d
+      when: ansible_architecture == "x86_64"
+
+    - name: Download rustup-init for ARM64 (pinned, checksum-verified)
+      get_url:
+        url: https://static.rust-lang.org/rustup/archive/1.27.1/aarch64-unknown-linux-gnu/rustup-init
+        dest: /tmp/rustup-init
+        mode: "0755"
+        checksum: sha256:1cffbf51e63e634c746f741de50649bbbcbd9dbe1de363c9ecef64e278dba2b2
+      when: ansible_architecture == "aarch64"
+
+    - name: Install Rust toolchain via pinned rustup-init
+      command: /tmp/rustup-init -y --default-toolchain stable --profile minimal --no-modify-path
+      become_user: "{{ mentisdb_user }}"
+      args:
+        creates: "{{ mentisdb_data_dir }}/.cargo/bin/cargo"
+      environment:
+        HOME: "{{ mentisdb_data_dir }}"
+        CARGO_HOME: "{{ mentisdb_data_dir }}/.cargo"
+        RUSTUP_HOME: "{{ mentisdb_data_dir }}/.rustup"
+
+    - name: Cleanup rustup-init
+      file:
+        path: /tmp/rustup-init
+        state: absent
+
+    - name: Install MentisDB from crates.io
+      command: "{{ mentisdb_data_dir }}/.cargo/bin/cargo install mentisdb --version {{ mentisdb_version }} --locked"
+      become_user: "{{ mentisdb_user }}"
+      args:
+        creates: "{{ mentisdb_data_dir }}/.cargo/bin/mentisdbd"
+      environment:
+        HOME: "{{ mentisdb_data_dir }}"
+        CARGO_HOME: "{{ mentisdb_data_dir }}/.cargo"
+        RUSTUP_HOME: "{{ mentisdb_data_dir }}/.rustup"
+
+    - name: Symlink mentisdbd into PATH
+      file:
+        src: "{{ mentisdb_data_dir }}/.cargo/bin/mentisdbd"
+        dest: /usr/local/bin/mentisdbd
+        state: link
+        force: yes
+
+    - name: Configure MentisDB environment
+      template:
+        src: templates/mentisdbd.env.j2
+        dest: /etc/mentisdb/mentisdbd.env
+        owner: "{{ mentisdb_user }}"
+        group: "{{ mentisdb_user }}"
+        mode: "0640"
+      notify: restart mentisdbd
+
+    - name: Configure MentisDB systemd service
+      template:
+        src: templates/mentisdbd.service.j2
+        dest: /etc/systemd/system/mentisdbd.service
+      notify:
+        - reload systemd
+        - restart mentisdbd
+
+    - name: Enable and start MentisDB service
+      systemd:
+        name: mentisdbd
+        daemon_reload: yes
+        enabled: yes
+        state: started
+
+    - name: Configure nginx site
+      template:
+        src: nginx.conf.j2
+        dest: /etc/nginx/sites-available/mentisdb
+      notify: reload nginx
+
+    - name: Enable nginx site
+      file:
+        src: /etc/nginx/sites-available/mentisdb
+        dest: /etc/nginx/sites-enabled/mentisdb
+        state: link
+      notify: reload nginx
+
+    - name: Remove default nginx site
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      notify: reload nginx
+
+    - name: Obtain Let's Encrypt certificate
+      command: certbot --nginx -d {{ domain_name }} --non-interactive --agree-tos --email {{ letsencrypt_email }} --redirect
+      args:
+        creates: "/etc/letsencrypt/live/{{ domain_name }}/fullchain.pem"
+
+    - name: Set up Certbot renewal
+      cron:
+        name: "Certbot renewal"
+        minute: "17"
+        hour: "3"
+        job: "/usr/bin/certbot renew --quiet"
+
+    - name: Set UFW default incoming policy
+      ufw:
+        direction: incoming
+        policy: deny
+
+    - name: Set UFW default outgoing policy
+      ufw:
+        direction: outgoing
+        policy: allow
+
+    - name: Allow public firewall ports
+      ufw:
+        rule: allow
+        port: "{{ item }}"
+        proto: tcp
+      loop:
+        - "22"
+        - "80"
+        - "443"
+
+    - name: Enable UFW
+      ufw:
+        state: enabled
+
+  handlers:
+    - name: reload systemd
+      systemd:
+        daemon_reload: yes
+
+    - name: restart mentisdbd
+      systemd:
+        name: mentisdbd
+        state: restarted
+
+    - name: reload nginx
+      service:
+        name: nginx
+        state: reloaded
+
+  post_tasks:
+    - name: Verify MentisDB health endpoint
+      uri:
+        url: "https://{{ domain_name }}/health"
+        validate_certs: yes
+        status_code: 200
+      register: health_check
+      until: health_check.status == 200
+      retries: 6
+      delay: 10
+
+    - name: Display deployment info
+      debug:
+        msg: "MentisDB live at https://{{ domain_name }}"
