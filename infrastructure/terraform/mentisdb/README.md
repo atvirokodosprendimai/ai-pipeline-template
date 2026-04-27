@@ -44,6 +44,24 @@ tofu apply
 
 The `hcloud_server.mentisdb` resource renders `cloud-init.sh.tpl` into Hetzner `user_data`. On first boot, cloud-init installs packages, installs `mentisdbd`, writes the systemd unit and environment file, configures nginx, obtains the Let's Encrypt certificate, and enables the firewall.
 
+## Auth
+
+The public HTTP API is protected by single-user HTTP Basic Auth at nginx. The username is `mentisdb`.
+
+Retrieve the generated password with:
+
+```bash
+tofu output -raw mentisdb_basic_auth_password
+```
+
+Rotate the password with:
+
+```bash
+tofu apply -replace=random_password.basic_auth
+```
+
+The `/.well-known/acme-challenge/` path remains unauthenticated so certbot can renew Let's Encrypt certificates.
+
 ## Debugging cloud-init
 
 ```bash

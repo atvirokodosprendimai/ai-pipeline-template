@@ -8,6 +8,7 @@ trap 'echo "MentisDB cloud-init bootstrap failed on line $LINENO (pid $$$$)" >&2
 DOMAIN="${domain_name}"
 EMAIL="${letsencrypt_email}"
 VERSION="${mentisdb_version}"
+BASIC_AUTH_PASSWORD="${basic_auth_password}"
 DATA_DIR="/var/lib/mentisdb"
 USER="mentisdb"
 
@@ -17,7 +18,7 @@ apt-get update -y
 apt-get upgrade -y
 apt-get install -y \
   build-essential curl git nginx certbot python3-certbot-nginx ufw \
-  pkg-config libssl-dev libasound2-dev ca-certificates
+  pkg-config libssl-dev libasound2-dev ca-certificates apache2-utils
 
 # --- 2. System user + dirs ---
 id -u "$USER" >/dev/null 2>&1 || \
@@ -116,6 +117,8 @@ server {
     }
 
     location / {
+        auth_basic           "MentisDB";
+        auth_basic_user_file /etc/nginx/.htpasswd;
         proxy_pass http://127.0.0.1:9472;
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
@@ -128,6 +131,12 @@ server {
     }
 }
 EOF
+
+# --- 7b. Basic Auth credentials file ---
+htpasswd -bcB /etc/nginx/.htpasswd mentisdb "$BASIC_AUTH_PASSWORD"
+chown root:www-data /etc/nginx/.htpasswd
+chmod 0640 /etc/nginx/.htpasswd
+
 ln -sf /etc/nginx/sites-available/mentisdb /etc/nginx/sites-enabled/mentisdb
 rm -f /etc/nginx/sites-enabled/default
 nginx -t
