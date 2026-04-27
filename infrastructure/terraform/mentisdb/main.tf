@@ -12,10 +12,6 @@ terraform {
       source  = "cloudflare/cloudflare"
       version = "~> 4.0"
     }
-    random = {
-      source  = "hashicorp/random"
-      version = "~> 3.6"
-    }
     tls = {
       source  = "hashicorp/tls"
       version = "~> 4.0"
@@ -29,14 +25,6 @@ provider "hcloud" {
 
 provider "cloudflare" {
   api_token = var.cloudflare_api_token
-}
-
-resource "random_password" "basic_auth" {
-  length  = 48
-  special = false
-  upper   = true
-  lower   = true
-  numeric = true
 }
 
 resource "tls_private_key" "deploy" {
@@ -84,7 +72,7 @@ resource "hcloud_server" "mentisdb" {
     domain_name         = var.domain_name
     letsencrypt_email   = var.letsencrypt_email
     mentisdb_version    = var.mentisdb_version
-    basic_auth_password = random_password.basic_auth.result
+    basic_auth_password = var.mentisdb_password
   })
   labels = {
     role = "mentisdb"

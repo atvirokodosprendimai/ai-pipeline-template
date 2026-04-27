@@ -16,13 +16,7 @@ output "mentisdb_ssh_private_key" {
   sensitive   = true
 }
 
-output "mentisdb_basic_auth_password" {
-  description = "Random password for mentisdb HTTP Basic Auth (user: mentisdb). Pair with username 'mentisdb' for Authorization: Basic header. Rotate via `tofu apply -replace=random_password.basic_auth`."
-  value       = random_password.basic_auth.result
-  sensitive   = true
-}
-
 output "mentisdb_curl_example" {
-  description = "Working curl command for the protected API"
-  value       = "curl -u mentisdb:<password> -X POST -H 'Content-Type: application/json' -d '{}' https://${var.domain_name}/v1/agents"
+  description = "Working curl command for the protected API. Pull the password from MENTISDB_PASSWORD org secret or your password manager."
+  value       = "curl -u mentisdb:$MENTISDB_PASSWORD -X POST -H 'Content-Type: application/json' -d '{}' https://${var.domain_name}/v1/agents"
 }
