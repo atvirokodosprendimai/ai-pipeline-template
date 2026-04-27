@@ -12,6 +12,10 @@ terraform {
       source  = "cloudflare/cloudflare"
       version = "~> 4.0"
     }
+    tls = {
+      source  = "hashicorp/tls"
+      version = "~> 4.0"
+    }
   }
 }
 
@@ -23,12 +27,24 @@ provider "cloudflare" {
   api_token = var.cloudflare_api_token
 }
 
+resource "tls_private_key" "deploy" {
+  algorithm = "ED25519"
+}
+
+resource "hcloud_ssh_key" "deploy" {
+  name       = "mentisdb-deploy"
+  public_key = tls_private_key.deploy.public_key_openssh
+}
+
 resource "hcloud_firewall" "mentisdb" {
   name = "mentisdb-public"
 
-  # No SSH ingress — cloud-init is autonomous; emergency access via
-  # Hetzner web Console only. To re-add SSH, restore the hcloud_ssh_key
-  # resource and a port 22 rule.
+  rule {
+    direction  = "in"
+    protocol   = "tcp"
+    port       = "22"
+    source_ips = ["0.0.0.0/0", "::/0"]
+  }
 
   rule {
     direction  = "in"
@@ -50,6 +66,7 @@ resource "hcloud_server" "mentisdb" {
   image        = "ubuntu-24.04"
   server_type  = "cx23"
   location     = "hel1"
+  ssh_keys     = [hcloud_ssh_key.deploy.id]
   firewall_ids = [hcloud_firewall.mentisdb.id]
   user_data = templatefile("${path.module}/cloud-init.sh.tpl", {
     domain_name       = var.domain_name
