@@ -48,4 +48,6 @@ if [ "$found" -eq 1 ]; then
   exit 1
 fi
 
-echo "$input"
+# Use printf '%s\n' instead of echo: echo can interpret leading '-n'/'-e' as
+# flags depending on the shell, mangling content the caller depends on.
+printf '%s\n' "$input"

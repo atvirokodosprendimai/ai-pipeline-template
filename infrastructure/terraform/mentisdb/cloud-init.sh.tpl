@@ -3,7 +3,7 @@
 # Generated from cloud-init.sh.tpl by terraform
 # Runs as root on first boot.
 set -euo pipefail
-trap 'echo "MentisDB cloud-init bootstrap failed on line $LINENO (pid $$$$)" >&2' ERR
+trap 'echo "MentisDB cloud-init bootstrap failed on line $LINENO (pid $$)" >&2' ERR
 
 DOMAIN="${domain_name}"
 EMAIL="${letsencrypt_email}"
@@ -13,6 +13,11 @@ BASIC_AUTH_PASSWORD=$(cat <<'BASIC_AUTH_PASSWORD_END'
 ${basic_auth_password}
 BASIC_AUTH_PASSWORD_END
 )
+# Validate non-empty (an empty TF var would silently create empty Basic Auth).
+if [ -z "$BASIC_AUTH_PASSWORD" ] || [ "$(printf '%s' "$BASIC_AUTH_PASSWORD" | tr -d '[:space:]')" = "" ]; then
+  echo "ERROR: basic_auth_password is empty or whitespace-only" >&2
+  exit 1
+fi
 DATA_DIR="/var/lib/mentisdb"
 USER="mentisdb"
 
@@ -138,9 +143,19 @@ EOF
 
 # --- 7b. Basic Auth credentials file ---
 # Use -i (stdin) instead of -b (argv) to avoid leaking the password via /proc.
-printf '%s' "$BASIC_AUTH_PASSWORD" | htpasswd -ciB /etc/nginx/.htpasswd mentisdb
+# Newline-terminated stdin — some htpasswd implementations expect a line.
+printf '%s\n' "$BASIC_AUTH_PASSWORD" | htpasswd -ciB /etc/nginx/.htpasswd mentisdb
 chown root:www-data /etc/nginx/.htpasswd
 chmod 0640 /etc/nginx/.htpasswd
+# Drop the rendered password from the in-memory shell variable; the bcrypt
+# hash in /etc/nginx/.htpasswd is the only artifact we want to retain.
+unset BASIC_AUTH_PASSWORD
+# cloud-init persists the rendered user-data at /var/lib/cloud/instance/user-data.txt
+# with the plaintext password. Shred + remove so the only on-disk credential
+# representation is the bcrypt hash in nginx's .htpasswd.
+if [ -f /var/lib/cloud/instance/user-data.txt ]; then
+  shred -u /var/lib/cloud/instance/user-data.txt 2>/dev/null || rm -f /var/lib/cloud/instance/user-data.txt
+fi
 
 ln -sf /etc/nginx/sites-available/mentisdb /etc/nginx/sites-enabled/mentisdb
 rm -f /etc/nginx/sites-enabled/default

@@ -84,7 +84,7 @@ curl -u mentisdb:<pass> ... → auth:200, real JSON response
 - Pipeline module first-apply needs `terraform import` for 4 pre-existing resources (`github_repository.wgmesh`, `cloudflare_record.dashboard`, `cloudflare_page_rule.dashboard_redirect`, `github_repository_file.pipeline_health_alert`). Currently fails loud per push; mentisdb job continues independently.
 - mentisdb skill registry doesn't enforce Ed25519 signing by default (upstream concern).
 - Public dashboard (port 9475) only reachable via SSH tunnel — could expose via additional nginx vhost on a separate path/subdomain if needed.
-- Rotate the password leaked in Claude conversation history.
+- ~~Rotate the password leaked in Claude conversation history.~~ (DONE 2026-04-27)
 - Test downstream consumer pattern from a wgmesh workflow (write a thought, read it back).
 
 ## Memory artifacts created/updated this session

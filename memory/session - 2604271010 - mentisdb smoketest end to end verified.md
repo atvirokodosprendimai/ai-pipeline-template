@@ -53,5 +53,5 @@ Same as last session export, all still open:
 - Pipeline module first-apply needs `terraform import` for 4 pre-existing resources
 - mentisdb skill registry doesn't enforce Ed25519 signing by default
 - Public dashboard (port 9475) only via SSH tunnel
-- Rotate the password leaked in conversation history
+- ~~Rotate the password leaked in conversation history~~ (DONE 2026-04-27 via PR #601, then again via task/critical-batch-2 after a transient re-leak during user-data inspection)
 - Consume MentisDB from a wgmesh workflow (smoketest only validates from ai-pipeline-template — should also dispatch from wgmesh to confirm cross-repo org-secret access works)
