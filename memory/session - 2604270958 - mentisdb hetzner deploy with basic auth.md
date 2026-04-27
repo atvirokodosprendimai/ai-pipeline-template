@@ -11,7 +11,7 @@ duration: ~12 hours (with idle gaps)
 
 Live MentisDB deployment at `https://mem.beerpub.dev`:
 
-- Hetzner Cloud VPS `mentisdb-prod` (cx23 hel1 ubuntu-24.04, IPv4 `157.180.23.70`)
+- Hetzner Cloud VPS (cx23 hel1 ubuntu-24.04). Server name and IPv4 redacted; current values discoverable via `dig mem.beerpub.dev` and the Hetzner Cloud Console for operators with access.
 - mentisdbd 0.9.5 installed via cargo from crates.io, running under systemd (Restart=on-failure) wrapped in `script -qfc` for fake PTY
 - nginx + Let's Encrypt + auto-renewal cron (03:17 daily) terminating TLS at 443
 - nginx Basic Auth (single user `mentisdb`) gating REST + MCP API
@@ -45,7 +45,7 @@ Visibility selected → `ai-pipeline-template`, `wgmesh`:
 
 - `MENTISDB_URL` = `https://mem.beerpub.dev`
 - `MENTISDB_USER` = `mentisdb`
-- `MENTISDB_PASSWORD` = (47-char alnum)
+- `MENTISDB_PASSWORD` (value redacted; rotate via `gh secret set` + redeploy)
 - `HCLOUD_TOKEN` (org-level, scoped wgmesh+ai-pipeline)
 - `TOFU_STATE_BUCKET=aupipe`, `TOFU_STATE_REGION=eu-central-1`, `TOFU_STATE_ENDPOINT=https://hel1.your-objectstorage.com`, `TOFU_STATE_ACCESS_KEY`, `TOFU_STATE_SECRET_KEY`
 - Per-repo Cloudflare: `BEERPUB_CLOUDFLARE_API_TOKEN`, `BEERPUB_CLOUDFLARE_ZONE_ID`, `CLOUDFLARE_ZONE_ID`, `CLOUDFLARE_ACCOUNT_ID`

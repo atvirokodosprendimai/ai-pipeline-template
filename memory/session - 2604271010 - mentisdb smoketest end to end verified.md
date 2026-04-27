@@ -12,7 +12,7 @@ duration: ~12 minutes
 - **Org secrets shipped** (visibility selected → `ai-pipeline-template`, `wgmesh`):
   - `MENTISDB_URL` = `https://mem.beerpub.dev`
   - `MENTISDB_USER` = `mentisdb`
-  - `MENTISDB_PASSWORD` = (47-char alnum)
+  - `MENTISDB_PASSWORD` (value redacted; rotate via `gh secret set` + redeploy)
 - **Smoketest workflow** at `.github/workflows/mentisdb-smoketest.yml`
   - workflow_dispatch + daily 04:17 UTC cron (after certbot renewal at 03:17)
   - Round-trip: POST `/v1/thoughts` (Finding type, unique marker per run) → POST `/v1/search` (text=marker) → assert marker in response

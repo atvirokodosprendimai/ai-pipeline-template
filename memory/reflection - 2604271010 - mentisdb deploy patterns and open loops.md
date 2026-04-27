@@ -61,7 +61,7 @@ Captured in updated `reference_dippy_config.md`.
 
 ### High priority
 
-- [ ] **Rotate the password leaked in conversation history** — `openssl rand -base64 36 | tr -d '=+/' | head -c 48`, `gh secret set MENTISDB_PASSWORD`, push trigger to re-deploy. The current value (`SOzLRn68ij...`) appeared in chat AND in the commit `feat: nginx Basic Auth` description AND in the now-merged tfstate.
+- [x] **Rotate the password leaked in conversation history** (DONE 2026-04-27) — generated new value, set as `MENTISDB_PASSWORD` org secret, triggered terraform-deploy workflow_dispatch to rebuild the server with the new htpasswd. Old value invalidated server-side. The leaked fragment is redacted from this file but git history retains it; this is acceptable post-rotation since the value is no longer authoritative anywhere.
 
 ### Medium priority
 
