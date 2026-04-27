@@ -28,7 +28,7 @@ Set these as org or repo secrets.
 | State | `TOFU_STATE_ENDPOINT=https://fsn1.your-objectstorage.com` |
 | State | `TOFU_STATE_ACCESS_KEY` |
 | State | `TOFU_STATE_SECRET_KEY` |
-| Hetzner | `HCLOUD_API` |
+| Hetzner | `HCLOUD_TOKEN` (org-level, shared with wgmesh) |
 | Hetzner | `HETZNER_SSH_PUBLIC_KEY` |
 | Cloudflare | `BEERPUB_CLOUDFLARE_API_TOKEN` (zone-scoped to beerpub.dev) |
 | Cloudflare | `CLOUDFLARE_ZONE_ID` |

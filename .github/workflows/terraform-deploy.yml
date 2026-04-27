@@ -106,7 +106,7 @@ jobs:
         id: plan
         run: tofu plan -no-color
         env:
-          TF_VAR_hcloud_token: ${{ secrets.HCLOUD_API }}
+          TF_VAR_hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
           TF_VAR_cloudflare_api_token: ${{ secrets.BEERPUB_CLOUDFLARE_API_TOKEN }}
           TF_VAR_deploy_ssh_public_key: ${{ secrets.HETZNER_SSH_PUBLIC_KEY }}
           TF_VAR_beerpub_cloudflare_zone_id: ${{ secrets.BEERPUB_CLOUDFLARE_ZONE_ID }}
@@ -115,7 +115,7 @@ jobs:
         if: github.ref == 'refs/heads/main'
         run: tofu apply -auto-approve
         env:
-          TF_VAR_hcloud_token: ${{ secrets.HCLOUD_API }}
+          TF_VAR_hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
           TF_VAR_cloudflare_api_token: ${{ secrets.BEERPUB_CLOUDFLARE_API_TOKEN }}
           TF_VAR_deploy_ssh_public_key: ${{ secrets.HETZNER_SSH_PUBLIC_KEY }}
           TF_VAR_beerpub_cloudflare_zone_id: ${{ secrets.BEERPUB_CLOUDFLARE_ZONE_ID }}
