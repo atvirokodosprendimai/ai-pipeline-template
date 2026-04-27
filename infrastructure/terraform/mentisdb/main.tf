@@ -1,27 +1,12 @@
 terraform {
-  required_version = ">= 1.9.0"
+  required_version = ">= 1.8.0"
 
-  backend "s3" {
-    bucket = "atvirokodosprendimai-tfstate"
-    key    = "mentisdb/terraform.tfstate"
-    region = "us-east-1"
-
-    endpoints = {
-      s3 = "https://fsn1.your-objectstorage.com"
-    }
-
-    skip_credentials_validation = true
-    skip_metadata_api_check     = true
-    skip_region_validation      = true
-    skip_requesting_account_id  = true
-    skip_s3_checksum            = true
-    use_path_style              = true
-  }
+  backend "s3" {}
 
   required_providers {
     hcloud = {
       source  = "hetznercloud/hcloud"
-      version = "~> 1.45"
+      version = "~> 1.50"
     }
     cloudflare = {
       source  = "cloudflare/cloudflare"
@@ -30,26 +15,20 @@ terraform {
   }
 }
 
-provider "hcloud" {}
-
-provider "cloudflare" {
-  # Configured via CLOUDFLARE_API_TOKEN env var
+provider "hcloud" {
+  token = var.hcloud_token
 }
 
-resource "hcloud_ssh_key" "deploy" {
-  name       = "mentisdb-deploy"
-  public_key = var.deploy_ssh_public_key
+provider "cloudflare" {
+  api_token = var.cloudflare_api_token
 }
 
 resource "hcloud_firewall" "mentisdb" {
   name = "mentisdb-public"
 
-  rule {
-    direction  = "in"
-    protocol   = "tcp"
-    port       = "22"
-    source_ips = ["0.0.0.0/0", "::/0"]
-  }
+  # No SSH ingress — cloud-init is autonomous; emergency access via
+  # Hetzner web Console only. To re-add SSH, restore the hcloud_ssh_key
+  # resource and a port 22 rule.
 
   rule {
     direction  = "in"
@@ -71,8 +50,12 @@ resource "hcloud_server" "mentisdb" {
   image        = "ubuntu-24.04"
   server_type  = "cx22"
   location     = "fra1"
-  ssh_keys     = [hcloud_ssh_key.deploy.id]
   firewall_ids = [hcloud_firewall.mentisdb.id]
+  user_data = templatefile("${path.module}/cloud-init.sh.tpl", {
+    domain_name       = var.domain_name
+    letsencrypt_email = var.letsencrypt_email
+    mentisdb_version  = var.mentisdb_version
+  })
   labels = {
     role = "mentisdb"
     env  = "prod"

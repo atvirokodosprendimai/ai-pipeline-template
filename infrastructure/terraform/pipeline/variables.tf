@@ -1,4 +1,4 @@
-# Terraform Variables for AI Pipeline Infrastructure
+# OpenTofu Variables for AI Pipeline Infrastructure
 
 variable "github_push_token" {
   description = "GitHub Personal Access Token with repo scope"
@@ -15,6 +15,12 @@ variable "openrouter_api_key" {
 variable "cloudflare_zone_id" {
   description = "Cloudflare Zone ID for chimney.beerpub.dev domain"
   type        = string
+}
+
+variable "cloudflare_api_token" {
+  description = "Cloudflare API token (Zone DNS Edit on beerpub.dev)"
+  type        = string
+  sensitive   = true
 }
 
 variable "critical_issue_numbers" {
