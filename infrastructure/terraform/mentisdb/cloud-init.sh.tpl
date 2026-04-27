@@ -21,7 +21,7 @@ apt-get install -y \
 
 # --- 2. System user + dirs ---
 id -u "$USER" >/dev/null 2>&1 || \
-  useradd --system --shell /usr/sbin/nologin --home "$DATA_DIR" --create-home "$USER"
+  useradd --system --shell /bin/bash --home "$DATA_DIR" --create-home "$USER"
 install -d -o "$USER" -g "$USER" -m 0750 "$DATA_DIR"
 install -d -m 0755 /etc/mentisdb
 
@@ -84,7 +84,10 @@ Type=simple
 User=$USER
 Group=$USER
 EnvironmentFile=/etc/mentisdb/mentisdbd.env
-ExecStart=/usr/local/bin/mentisdbd
+# mentisdbd unconditionally opens /dev/tty for TUI init even when not interactive.
+# Wrap in `script` to allocate a fake PTY so the daemon can start under systemd.
+# (mentisdb 0.9.5 — track upstream for headless flag)
+ExecStart=/usr/bin/script -qfc /usr/local/bin/mentisdbd /dev/null
 Restart=on-failure
 RestartSec=5
 StateDirectory=mentisdb
@@ -132,7 +135,7 @@ systemctl reload nginx
 
 # --- 8. Let's Encrypt + auto-renewal ---
 certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos --email "$EMAIL" --redirect
-( crontab -l 2>/dev/null; echo "17 3 * * * /usr/bin/certbot renew --quiet" ) | crontab -
+( crontab -l 2>/dev/null || true; echo "17 3 * * * /usr/bin/certbot renew --quiet" ) | crontab -
 
 # --- 9. ufw firewall ---
 ufw default deny incoming
