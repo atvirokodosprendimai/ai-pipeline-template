@@ -84,9 +84,9 @@ resource "hcloud_server" "mentisdb" {
   location     = "hel1"
   ssh_keys     = [hcloud_ssh_key.deploy.id]
   firewall_ids = [hcloud_firewall.mentisdb.id]
-  volumes      = [hcloud_volume.mentisdb_data.id]
-  # The volume is attached in the server create request so it is
-  # available before cloud-init runs the docker mount logic.
+  # Volume attached via hcloud_volume_attachment below.
+  # `volumes` argument on hcloud_server is not supported by the
+  # hetznercloud/hcloud provider 1.x — see PR #610 + heal commit.
   user_data = templatefile("${path.module}/cloud-init.sh.tpl", {
     domain_name         = var.domain_name
     letsencrypt_email   = var.letsencrypt_email
@@ -98,6 +98,12 @@ resource "hcloud_server" "mentisdb" {
     role = "mentisdb"
     env  = "prod"
   }
+}
+
+resource "hcloud_volume_attachment" "mentisdb_data" {
+  volume_id = hcloud_volume.mentisdb_data.id
+  server_id = hcloud_server.mentisdb.id
+  automount = false
 }
 
 resource "cloudflare_record" "mem_beerpub" {
