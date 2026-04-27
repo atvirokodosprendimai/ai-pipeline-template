@@ -455,8 +455,18 @@ jobs:
           EOF
           )
 
+          # Sanitise content before persisting — same gate the markdown writes used.
+          if ! SANITISED_BODY=$(printf '%s' "$BODY" | bash company/scripts/sanitise.sh); then
+            echo "::error::sanitise.sh rejected the assessment body — refusing to POST to MentisDB"
+            exit 1
+          fi
+          if [ -z "$SANITISED_BODY" ]; then
+            echo "::error::sanitise.sh rejected the assessment body — refusing to POST to MentisDB"
+            exit 1
+          fi
+
           PAYLOAD=$(jq -n \
-            --arg content "$BODY" \
+            --arg content "$SANITISED_BODY" \
             --arg stage "$lower_stage" \
             --arg run "$run_count" \
             '{
