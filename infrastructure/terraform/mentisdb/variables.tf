@@ -32,3 +32,9 @@ variable "mentisdb_version" {
   type        = string
   default     = "0.9.5"
 }
+
+variable "mentisdb_password" {
+  description = "HTTP Basic Auth password for the mentisdb user (sourced from MENTISDB_PASSWORD org secret via TF_VAR_mentisdb_password). Single source of truth: the org secret. Rotate by updating the secret + re-applying."
+  type        = string
+  sensitive   = true
+}
