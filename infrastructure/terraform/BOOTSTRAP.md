@@ -19,28 +19,28 @@ https://opentofu.org/docs/intro/install/
 CI uses `opentofu/setup-opentofu@v1` with `tofu_version: 1.8.5`.
 
 ## Required GitHub Secrets
-Set these as org or repo secrets.
+Set these as org-level secrets on `ai-pipeline-template`, except the inherited org secrets noted below.
 
 | Area | Secrets |
 | --- | --- |
+| Hetzner | `HCLOUD_TOKEN` |
 | State | `TOFU_STATE_BUCKET` |
 | State | `TOFU_STATE_REGION=eu-central-1` |
-| State | `TOFU_STATE_ENDPOINT=https://fsn1.your-objectstorage.com` |
+| State | `TOFU_STATE_ENDPOINT=https://hel1.your-objectstorage.com` |
 | State | `TOFU_STATE_ACCESS_KEY` |
 | State | `TOFU_STATE_SECRET_KEY` |
-| Hetzner | `HCLOUD_TOKEN` (org-level, shared with wgmesh) |
-| Hetzner | `HETZNER_SSH_PUBLIC_KEY` |
+| Hetzner | `HETZNER_SSH_PUBLIC_KEY` (public key only, for SSH access to deployed VPS) |
 | Cloudflare | `BEERPUB_CLOUDFLARE_API_TOKEN` (zone-scoped to beerpub.dev) |
-| Cloudflare | `CLOUDFLARE_ZONE_ID` |
 | Cloudflare | `BEERPUB_CLOUDFLARE_ZONE_ID` |
-| Pipeline | `PUSH_TOKEN` |
-| Pipeline | `OPENROUTER_API_KEY` |
+| Cloudflare | `CLOUDFLARE_ZONE_ID` |
+| Inherited from org | `OPENROUTER_API_KEY` |
+| Inherited from org | `PUSH_TOKEN` |
 
 ## One-Time Bucket Setup
 Create a private Hetzner Object Storage bucket in the Hetzner Console:
 ```text
 Project -> Object Storage -> Create Bucket
-Region: fsn1
+Region: hel1
 Privacy: Private
 ```
 Set the bucket name in `TOFU_STATE_BUCKET`.
@@ -123,12 +123,15 @@ tofu plan
 tofu apply
 ```
 
+The MentisDB stack renders `cloud-init.sh.tpl` into the Hetzner server `user_data`, so `tofu apply` provisions the VPS and configures the service in one workflow. The SSH public key is optional operator access for debugging, not a deploy credential.
+
 ## CI Workflow
 GitHub Actions generates `backend.hcl` per stack, runs
 `tofu init -backend-config=backend.hcl`, then passes provider credentials
 through `TF_VAR_*`. The GitHub provider reads `var.github_push_token`, the
-Hetzner provider reads `var.hcloud_token`, and Cloudflare reads
-`var.cloudflare_api_token`.
+Hetzner provider reads `var.hcloud_token`, Cloudflare reads
+`var.cloudflare_api_token`, and the MentisDB server configures itself through
+cloud-init on first boot.
 
 ## Locking Note
 Hetzner Object Storage does not provide DynamoDB-style state locking. Avoid

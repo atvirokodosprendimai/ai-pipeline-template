@@ -60,6 +60,11 @@ resource "hcloud_server" "mentisdb" {
   location     = "fra1"
   ssh_keys     = [hcloud_ssh_key.deploy.id]
   firewall_ids = [hcloud_firewall.mentisdb.id]
+  user_data = templatefile("${path.module}/cloud-init.sh.tpl", {
+    domain_name       = var.domain_name
+    letsencrypt_email = var.letsencrypt_email
+    mentisdb_version  = var.mentisdb_version
+  })
   labels = {
     role = "mentisdb"
     env  = "prod"
