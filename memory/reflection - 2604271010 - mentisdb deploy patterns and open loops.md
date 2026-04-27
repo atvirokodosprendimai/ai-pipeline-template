@@ -21,7 +21,7 @@ The original `infrastructure/` was AI-generated and contained ≥6 fabricated fa
 
 **Pattern**: any AI-generated infra targeting external software needs a "verify the upstream facts" pass BEFORE first apply: gh repo exists, version tag exists in crates.io/npm/pypi, port assumptions match `.env.example`, install method matches actual Cargo.toml/setup.py.
 
-Captured as `feedback_verify_ai_scaffolds.md`.
+(Operator captures this learning in their personal knowledge base — not committed to this repo because the same pattern applies to many projects, and the reflection's narrative form is enough for repo readers.)
 
 ### Org-secret-as-source-of-truth beats state-managed secrets for shared credentials
 
@@ -31,31 +31,28 @@ Started with `random_password` in tfstate (PR #590). Pivoted to org-secret-sourc
 - IaC reads via `TF_VAR_*: ${{ secrets.X }}` in workflow
 - Consumer repos reference `${{ secrets.X }}` directly
 
-This decouples IaC from downstream tooling. Captured in `feedback_mentisdb_no_rest_auth.md`.
+This decouples IaC from downstream tooling.
 
 ### Hetzner Cloud has location/server-type catalog drift
 
 `fra1` doesn't exist. `cx22` doesn't exist. `cpx21` is deprecated for new orders in `hel1`. Newer `cx23` works. The server-type "supported" flag in the datacenter API is NOT the same as "available for new orders" — only `apply` reveals the latter.
 
-Captured as `reference_hetzner_cloud_catalog.md`.
 
 ### TUI-coupled binaries running under systemd need a fake PTY
 
 mentisdbd 0.9.5 unconditionally opens `/dev/tty` for TUI init. Fails with `os error 6` (ENXIO) when no controlling terminal. Workaround: wrap ExecStart in `script -qfc CMD /dev/null`. Service user shell must NOT be `/usr/sbin/nologin` for `script` to resolve.
 
-This is a generic Rust-daemon-with-ratatui pattern, not mentisdb-specific. Captured in `feedback_cargo_install_gotchas.md`.
+This is a generic Rust-daemon-with-ratatui pattern, not mentisdb-specific.
 
 ### Codex subagent surfaces are misleading
 
 `codex-rescue` reports "Bash hook is blocking" when the actual cause is auth expiry, model deprecation, broker stale state, anything. `codex-companion.mjs setup --json` returns `loggedIn: true` while the actual API token is dead.
 
-Captured in `feedback_codex_setup_stale_auth.md` + `feedback_codex_rescue_misleading_errors.md`.
 
 ### Dippy body-match denies need allow rules ordered after
 
 `deny * /etc/*` and `deny * /usr/*` match the substring anywhere in the command line, not just prefix. Allow rules for legitimate command paths must be placed BELOW the denies (last-match-wins). For one-off SSH commands containing those paths in script body, the heredoc-stdin bypass works (script content goes via stdin, never lands in dippy's argv view).
 
-Captured in updated `reference_dippy_config.md`.
 
 ## Tasks (deferred items as concrete TODOs)
 
