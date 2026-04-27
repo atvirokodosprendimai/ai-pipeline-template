@@ -1,0 +1,25 @@
+infrastructure/terraform/mentisdb/README.md
+  15cce70529af2a08 20
+infrastructure/terraform/mentisdb/main.tf
+  15cce70529af2a08 29-31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "8cf3b65b1668947159c7dc803a7b1df56ad80309",
+  "prompts": {
+    "15cce70529af2a08": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "72637909-623d-4d2f-9625-3af88da6986e",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "~.~",
+      "messages": [],
+      "total_additions": 252,
+      "total_deletions": 179,
+      "accepted_lines": 340,
+      "overriden_lines": 0
+    }
+  }
+}
