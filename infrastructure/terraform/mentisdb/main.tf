@@ -33,7 +33,7 @@ resource "tls_private_key" "deploy" {
 
 resource "hcloud_ssh_key" "deploy" {
   name       = "mentisdb-deploy"
-  public_key = tls_private_key.deploy.public_key_openssh
+  public_key = trimspace(tls_private_key.deploy.public_key_openssh)
 }
 
 resource "hcloud_firewall" "mentisdb" {
