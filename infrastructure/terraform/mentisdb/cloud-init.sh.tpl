@@ -13,11 +13,20 @@ BASIC_AUTH_PASSWORD=$(cat <<'BASIC_AUTH_PASSWORD_END'
 ${basic_auth_password}
 BASIC_AUTH_PASSWORD_END
 )
-# Validate non-empty (an empty TF var would silently create empty Basic Auth).
+# Validate: non-empty + no newlines/CRLF.
+# (An empty TF var silently creates empty Basic Auth. A var with embedded
+#  newlines would only deliver up to the first \n via stdin to htpasswd,
+#  producing credentials that don't match the intended secret.)
 if [ -z "$BASIC_AUTH_PASSWORD" ] || [ "$(printf '%s' "$BASIC_AUTH_PASSWORD" | tr -d '[:space:]')" = "" ]; then
   echo "ERROR: basic_auth_password is empty or whitespace-only" >&2
   exit 1
 fi
+case "$BASIC_AUTH_PASSWORD" in
+  *$'\n'* | *$'\r'*)
+    echo "ERROR: basic_auth_password contains newline/CRLF — rejecting (would truncate via htpasswd -i)" >&2
+    exit 1
+    ;;
+esac
 DATA_DIR="/var/lib/mentisdb"
 USER="mentisdb"
 
@@ -143,10 +152,13 @@ EOF
 
 # --- 7b. Basic Auth credentials file ---
 # Use -i (stdin) instead of -b (argv) to avoid leaking the password via /proc.
+# Pre-create the htpasswd file with restrictive perms, then run htpasswd
+# without -c (no truncating create). This avoids the brief race window where
+# `htpasswd -c` would create the file with umask-default perms (often 0644 =
+# world-readable) before the explicit chmod ran.
+install -o root -g www-data -m 0640 /dev/null /etc/nginx/.htpasswd
 # Newline-terminated stdin — some htpasswd implementations expect a line.
-printf '%s\n' "$BASIC_AUTH_PASSWORD" | htpasswd -ciB /etc/nginx/.htpasswd mentisdb
-chown root:www-data /etc/nginx/.htpasswd
-chmod 0640 /etc/nginx/.htpasswd
+printf '%s\n' "$BASIC_AUTH_PASSWORD" | htpasswd -iB /etc/nginx/.htpasswd mentisdb
 # Drop the rendered password from the in-memory shell variable; the bcrypt
 # hash in /etc/nginx/.htpasswd is the only artifact we want to retain.
 unset BASIC_AUTH_PASSWORD
