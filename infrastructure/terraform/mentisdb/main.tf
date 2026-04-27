@@ -49,7 +49,7 @@ resource "hcloud_server" "mentisdb" {
   name         = "mentisdb-prod"
   image        = "ubuntu-24.04"
   server_type  = "cpx21"
-  location     = "fra1"
+  location     = "hel1"
   firewall_ids = [hcloud_firewall.mentisdb.id]
   user_data = templatefile("${path.module}/cloud-init.sh.tpl", {
     domain_name       = var.domain_name
