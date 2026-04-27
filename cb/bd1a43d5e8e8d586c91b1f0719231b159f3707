@@ -1,0 +1,48 @@
+infrastructure/terraform/README.md
+  e90d7c741471edf1 8
+infrastructure/terraform/mentisdb/README.md
+  e90d7c741471edf1 3,9,21-22,40-48,51-53,56-57,74,76
+infrastructure/terraform/mentisdb/variables.tf
+  e90d7c741471edf1 22-39
+infrastructure/terraform/mentisdb/cloud-init.sh.tpl
+  15cce70529af2a08 6
+  e90d7c741471edf1 1-5,7-76,84-85,93,99-145
+infrastructure/terraform/BOOTSTRAP.md
+  15cce70529af2a08 29,43
+  e90d7c741471edf1 22,26,32,35-37,126-127,132-134
+infrastructure/terraform/mentisdb/main.tf
+  e90d7c741471edf1 63-67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "cbbd1a43d5e8e8d586c91b1f0719231b159f3707",
+  "prompts": {
+    "15cce70529af2a08": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "72637909-623d-4d2f-9625-3af88da6986e",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "~.~",
+      "messages": [],
+      "total_additions": 150,
+      "total_deletions": 150,
+      "accepted_lines": 5,
+      "overriden_lines": 0
+    },
+    "e90d7c741471edf1": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019dccc8-d1ef-73a0-b127-31a0431898e3",
+        "model": "gpt-5.5"
+      },
+      "human_author": "~.~",
+      "messages": [],
+      "total_additions": 200,
+      "total_deletions": 409,
+      "accepted_lines": 199,
+      "overriden_lines": 0
+    }
+  }
+}
