@@ -1,0 +1,67 @@
+name: MentisDB Smoketest
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 4 * * *'  # daily 04:17 UTC, after certbot renewal at 03:17
+
+permissions:
+  contents: read
+
+jobs:
+  smoketest:
+    name: Round-trip thought append + search
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Append a Finding to the smoketest chain
+        env:
+          MENTISDB_URL: ${{ secrets.MENTISDB_URL }}
+          MENTISDB_USER: ${{ secrets.MENTISDB_USER }}
+          MENTISDB_PASSWORD: ${{ secrets.MENTISDB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          CHAIN="ai-pipeline-template-smoketest"
+          MARKER="run-${{ github.run_id }}-attempt-${{ github.run_attempt }}"
+          CONTENT="Smoketest append from GitHub Actions. marker=${MARKER}"
+
+          echo "::group::POST /v1/thoughts"
+          APPEND_RESPONSE=$(curl --fail-with-body --silent --show-error --max-time 10 \
+            -u "${MENTISDB_USER}:${MENTISDB_PASSWORD}" \
+            -X POST -H 'Content-Type: application/json' \
+            -d @- "${MENTISDB_URL}/v1/thoughts" <<JSON
+          {
+            "chain_key": "${CHAIN}",
+            "agent_id": "github-actions-smoketest",
+            "agent_name": "github-actions-smoketest",
+            "thought_type": "Finding",
+            "content": "${CONTENT}",
+            "tags": ["smoketest", "ci"],
+            "importance": 0.1
+          }
+          JSON
+          )
+          echo "${APPEND_RESPONSE}"
+          echo "::endgroup::"
+
+          echo "::group::POST /v1/search"
+          SEARCH_RESPONSE=$(curl --fail-with-body --silent --show-error --max-time 10 \
+            -u "${MENTISDB_USER}:${MENTISDB_PASSWORD}" \
+            -X POST -H 'Content-Type: application/json' \
+            -d @- "${MENTISDB_URL}/v1/search" <<JSON
+          {
+            "chain_key": "${CHAIN}",
+            "text": "${MARKER}",
+            "limit": 5
+          }
+          JSON
+          )
+          echo "${SEARCH_RESPONSE}"
+          echo "::endgroup::"
+
+          if echo "${SEARCH_RESPONSE}" | grep -q "${MARKER}"; then
+            echo "✅ smoketest passed — appended thought is searchable"
+          else
+            echo "❌ smoketest failed — could not find marker ${MARKER} in search response"
+            exit 1
+          fi
