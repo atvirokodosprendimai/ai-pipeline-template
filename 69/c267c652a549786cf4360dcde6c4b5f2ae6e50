@@ -1,0 +1,43 @@
+docs/plans/2026-04-27-001-feat-mentisdb-workflow-instrumentation-plan.md
+  d934944e0176dc7a 1-354
+.github/workflows/pipeline-health.yml
+  d934944e0176dc7a 818-855
+.github/workflows/copilot-undraft.yml
+  d934944e0176dc7a 39-76
+.github/workflows/heartbeat-pr-automerge.yml
+  d934944e0176dc7a 206-245
+.github/workflows/spec-validation.yml
+  d934944e0176dc7a 124-163
+.github/workflows/health-check.yml
+  d934944e0176dc7a 84-113
+.github/workflows/spec-merged-build.yml
+  d934944e0176dc7a 64-103
+.github/workflows/bot-pr-review-merge.yml
+  d934944e0176dc7a 40-79
+.github/workflows/impl-merged-close.yml
+  d934944e0176dc7a 41-81
+.github/workflows/copilot-triage.yml
+  d934944e0176dc7a 120-159
+.github/workflows/approve-build.yml
+  d934944e0176dc7a 158-199
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "69c267c652a549786cf4360dcde6c4b5f2ae6e50",
+  "prompts": {
+    "d934944e0176dc7a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bbf4f2ab-b801-4879-b6b7-defd627d2a7e",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "~.~",
+      "messages": [],
+      "total_additions": 743,
+      "total_deletions": 0,
+      "accepted_lines": 881,
+      "overriden_lines": 0
+    }
+  }
+}
