@@ -1,0 +1,29 @@
+"memory/session - 2604270958 - mentisdb hetzner deploy with basic auth.md"
+  15cce70529af2a08 87
+company/scripts/sanitise.sh
+  15cce70529af2a08 51-53
+infrastructure/terraform/mentisdb/cloud-init.sh.tpl
+  15cce70529af2a08 6,16-20,146-147,150-158
+"memory/session - 2604271010 - mentisdb smoketest end to end verified.md"
+  15cce70529af2a08 56
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "52e43232c542cc265113f32433b42cd9ef87eb0b",
+  "prompts": {
+    "15cce70529af2a08": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "72637909-623d-4d2f-9625-3af88da6986e",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "~.~",
+      "messages": [],
+      "total_additions": 22,
+      "total_deletions": 5,
+      "accepted_lines": 22,
+      "overriden_lines": 0
+    }
+  }
+}
