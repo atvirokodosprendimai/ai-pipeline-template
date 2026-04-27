@@ -48,7 +48,7 @@ resource "hcloud_firewall" "mentisdb" {
 resource "hcloud_server" "mentisdb" {
   name         = "mentisdb-prod"
   image        = "ubuntu-24.04"
-  server_type  = "cx22"
+  server_type  = "cpx21"
   location     = "fra1"
   firewall_ids = [hcloud_firewall.mentisdb.id]
   user_data = templatefile("${path.module}/cloud-init.sh.tpl", {
