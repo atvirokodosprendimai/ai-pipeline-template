@@ -29,7 +29,7 @@ POST `/v1/thoughts` shape (from `src/server.rs::AppendThoughtRequest`): required
 
 POST `/v1/search` shape: `chain_key`, `text`, `limit`, `thought_types[]`, `tags_any[]`, `since`/`until`, etc. Returns `{thoughts: [...]}`.
 
-Full REST route inventory + ThoughtType + ThoughtRole catalog now in `reference_mentisdb_facts.md`.
+Full REST route inventory + ThoughtType + ThoughtRole catalog captured in operator's personal knowledge base (Claude auto-memory, not in this repo).
 
 ## PR shipped this session
 
@@ -44,8 +44,7 @@ Full REST route inventory + ThoughtType + ThoughtRole catalog now in `reference_
 
 ## Memory updates
 
-- Extended `reference_mentisdb_facts.md` with full REST API canonical reference
-- Updated `reference_mentisdb_hetzner_deploy.md` PR chain with #593
+- Personal knowledge base updated with the full REST API canonical reference + this PR chain entry. (Repo doesn't carry these notes.)
 
 ## What's next (deferred)
 

@@ -87,25 +87,6 @@ curl -u mentisdb:<pass> ... → auth:200, real JSON response
 - ~~Rotate the password leaked in Claude conversation history.~~ (DONE 2026-04-27)
 - Test downstream consumer pattern from a wgmesh workflow (write a thought, read it back).
 
-## Memory artifacts created/updated this session
+## Memory artifacts
 
-Reference:
-- `reference_mentisdb_facts.md` — upstream facts (repo, ports, install method)
-- `reference_mentisdb_hetzner_deploy.md` — service deployment specifics
-- `reference_hetzner_cloud_catalog.md` — locations + server types catalog
-- `reference_cloudflare_ids.md` — account + zone IDs
-- `reference_repo_ruleset_protect_main.md` — ai-pipeline-template ruleset + admin bypass
-- `reference_org_secrets_inventory.md` (updated) — current state of all 3 repos + Hetzner naming inconsistency
-- `reference_dippy_config.md` (updated) — body-match deny precedence + heredoc bypass
-
-Feedback:
-- `feedback_verify_ai_scaffolds.md` — never trust AI infra without upstream verification
-- `feedback_codex_rescue_misleading_errors.md` — subagent dresses up auth failures
-- `feedback_codex_setup_stale_auth.md` — setup --json lies; smoke-test first
-- `feedback_workflow_path_race.md` — overlapping paths fire workflows in parallel
-- `feedback_terraform_provider_binaries_in_git.md` — `**/.terraform/` gitignore
-- `feedback_github_actions_secret_gotchas.md` — workflow_dispatch ≠ secret, github_actions_variable ≠ encrypted, default GITHUB_TOKEN read-only
-- `feedback_check_secrets_before_set.md` — mass-set incident
-- `feedback_terraform_templatefile_escaping.md` — `${}`/`$$`/`\$` rules + tls_private_key trimspace + SSH-debug pattern
-- `feedback_cargo_install_gotchas.md` — git tag ≠ semver + `*-sys` system deps + ENXIO PTY workaround + `set -e` crontab trap
-- `feedback_mentisdb_no_rest_auth.md` — mentisdb 0.9.5 has no REST auth + Basic Auth resolution + org-secret pivot
+The operator captures durable patterns + feedback notes in their personal knowledge base outside this repo (Claude auto-memory, not committed here). Topics covered from this session: AI-scaffold verification, codex subagent error surfaces, terraform templatefile escape rules, cargo install system-dep gotchas, Hetzner Cloud catalog quirks, GH Actions secret gotchas, mentisdb auth + org-secret pivot. The narrative above is the public-facing record; deeper file:line references stay private.
