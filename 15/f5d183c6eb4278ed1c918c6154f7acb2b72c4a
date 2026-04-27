@@ -1,0 +1,25 @@
+.github/workflows/terraform-deploy.yml
+  15cce70529af2a08 109,118
+infrastructure/terraform/BOOTSTRAP.md
+  15cce70529af2a08 31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "15f5d183c6eb4278ed1c918c6154f7acb2b72c4a",
+  "prompts": {
+    "15cce70529af2a08": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "72637909-623d-4d2f-9625-3af88da6986e",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "~.~",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 3,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    }
+  }
+}
