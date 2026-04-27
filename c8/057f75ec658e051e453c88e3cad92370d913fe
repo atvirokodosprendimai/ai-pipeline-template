@@ -1,0 +1,25 @@
+.github/workflows/heartbeat-pr-automerge.yml
+  14ced63574f88bdc 94
+.github/workflows/observation-loop.yml
+  14ced63574f88bdc 416-420,422-423,425,431-438,440-443,445,447-448,451,454-475,479,482,490
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "c8057f75ec658e051e453c88e3cad92370d913fe",
+  "prompts": {
+    "14ced63574f88bdc": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019dce03-659c-7433-8f29-83838bcb574e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "~.~",
+      "messages": [],
+      "total_additions": 50,
+      "total_deletions": 27,
+      "accepted_lines": 50,
+      "overriden_lines": 0
+    }
+  }
+}
