@@ -1,0 +1,59 @@
+infrastructure/terraform/mentisdb/README.md
+  c8d5d8297ffc6d4a 9-10,19,22-24,49-60,66,68,70,73-80,83,93-97,115,117
+infrastructure/terraform/mentisdb/main.tf
+  c8d5d8297ffc6d4a 87-89
+infrastructure/terraform/mentisdb/cloud-init.sh.tpl
+  c8d5d8297ffc6d4a 37-42,53-58,60-63,65-67,69-73,75-79,110,113-120,170-183
+infrastructure/terraform/mentisdb/variables.tf
+  c8d5d8297ffc6d4a 31,33-34
+docs/solutions/integration-issues/loop-pr-automerge-timing-race.md
+  d934944e0176dc7a 40-48
+docs/solutions/integration-issues/github-app-reviews-dont-trigger-workflows.md
+  d934944e0176dc7a 34-36
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "0d193c537e6db7dceccda9403c1a2c3836097c89",
+  "prompts": {
+    "15cce70529af2a08": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "72637909-623d-4d2f-9625-3af88da6986e",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "~.~",
+      "messages": [],
+      "total_additions": 15,
+      "total_deletions": 0,
+      "accepted_lines": 12,
+      "overriden_lines": 0
+    },
+    "c8d5d8297ffc6d4a": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019dcf45-4e6f-7bd3-a741-eb6322f1ac83",
+        "model": "gpt-5.5"
+      },
+      "human_author": "~.~",
+      "messages": [],
+      "total_additions": 95,
+      "total_deletions": 39,
+      "accepted_lines": 95,
+      "overriden_lines": 0
+    },
+    "d934944e0176dc7a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bbf4f2ab-b801-4879-b6b7-defd627d2a7e",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "~.~",
+      "messages": [],
+      "total_additions": 12,
+      "total_deletions": 1,
+      "accepted_lines": 12,
+      "overriden_lines": 0
+    }
+  }
+}
