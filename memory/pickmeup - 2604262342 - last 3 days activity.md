@@ -43,3 +43,9 @@ None committed in window. 5-day silence since 2026-04-21 realign.
 ## Where You Left Off
 
 You realigned the pipeline to customer acquisition on **2026-04-21**, then went dark for 5 days. Today (04-26) you started scaffolding **infrastructure-as-code**: a terraform module to codify the wgmesh repo, labels, Cloudflare DNS/redirects, and a pipeline-health alert config; plus an ansible playbook + GitHub workflow to deploy MentisDB on a Hetzner VPS. None of it is committed. Natural next step: decide whether this lives on a fresh branch (probably yes — `task/pickmeup-2604131950` is stale), commit the scaffold in two logical chunks (terraform infra, then ansible+mentisdb deploy), and check whether the loop is genuinely paused or just unobserved.
+
+---
+
+## Update 2026-04-26 23:30+
+
+After this snapshot was written, the original AI-hallucinated `infrastructure/` scaffold was rewritten and committed. Current state replaces Docker-based playbook with Rust binary install via `cargo install mentisdb 0.9.5.41`, systemd service, nginx reverse proxy, certbot. See PR #579 for the four commits implementing the rewrite + terraform module split + Hetzner Object Storage S3 backend. The "Still Open" list above is now obsolete; refer to PR #579 description for current blockers.

@@ -13,9 +13,6 @@ on:
         description: 'MentisDB crates.io version'
         required: false
         default: "0.9.5.41"
-      ssh_private_key:
-        description: 'SSH private key for VPS access'
-        required: true
 
 jobs:
   deploy:
@@ -23,43 +20,43 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Install Ansible
-      run: |
-        sudo apt update
-        sudo apt install -y ansible
+      - name: Install Ansible
+        run: |
+          sudo apt update
+          sudo apt install -y ansible
 
-    - name: Configure SSH key
-      run: |
-        mkdir -p ~/.ssh
-        echo "${{ inputs.ssh_private_key || secrets.HETZNER_SSH_KEY }}" > ~/.ssh/id_rsa
-        chmod 600 ~/.ssh/id_rsa
-        ssh-keyscan ${{ inputs.vps_ip || secrets.HETZNER_VPS_IP }} >> ~/.ssh/known_hosts
+      - name: Configure SSH key
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s' "${{ secrets.HETZNER_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ inputs.vps_ip || secrets.HETZNER_VPS_IP }} >> ~/.ssh/known_hosts
 
-    - name: Create Ansible inventory
-      run: |
-        echo "[mentisdb]" > inventory.ini
-        echo "${{ inputs.vps_ip || secrets.HETZNER_VPS_IP }} ansible_user=root" >> inventory.ini
+      - name: Create Ansible inventory
+        run: |
+          echo "[mentisdb]" > inventory.ini
+          echo "${{ inputs.vps_ip || secrets.HETZNER_VPS_IP }} ansible_user=root" >> inventory.ini
 
-    - name: Create Ansible variables
-      run: |
-        mkdir -p group_vars
-        cat > group_vars/all.yml <<EOF
-        mentisdb_version: "${{ inputs.mentisdb_version || '0.9.5.41' }}"
-        domain_name: "${{ inputs.domain_name || secrets.MENTISDB_DOMAIN || 'mem.beerpub.dev' }}"
-        letsencrypt_email: "admin@beerpub.dev"
-        EOF
+      - name: Create Ansible variables
+        run: |
+          mkdir -p group_vars
+          cat > group_vars/all.yml <<EOF
+          mentisdb_version: "${{ inputs.mentisdb_version || '0.9.5.41' }}"
+          domain_name: "${{ inputs.domain_name || secrets.MENTISDB_DOMAIN || 'mem.beerpub.dev' }}"
+          letsencrypt_email: "admin@beerpub.dev"
+          EOF
 
-    - name: Run Ansible playbook
-      run: ansible-playbook -i inventory.ini infrastructure/ansible/mentisdb-deploy.yml
+      - name: Run Ansible playbook
+        run: ansible-playbook -i inventory.ini infrastructure/ansible/mentisdb-deploy.yml
 
-    - name: Verify deployment
-      run: |
-        sleep 30
-        curl -fsSL https://${{ inputs.domain_name || secrets.MENTISDB_DOMAIN || 'mem.beerpub.dev' }}/health || true
+      - name: Verify deployment
+        run: |
+          sleep 30
+          curl -fsSL https://${{ inputs.domain_name || secrets.MENTISDB_DOMAIN || 'mem.beerpub.dev' }}/health
 
-    - name: Clean up
-      if: always()
-      run: rm -f ~/.ssh/id_rsa inventory.ini group_vars/all.yml
+      - name: Clean up
+        if: always()
+        run: rm -f ~/.ssh/id_rsa inventory.ini group_vars/all.yml

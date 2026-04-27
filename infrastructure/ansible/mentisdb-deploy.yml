@@ -52,8 +52,24 @@
         state: directory
         mode: "0755"
 
-    - name: Install Rust toolchain for MentisDB user
-      shell: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile minimal
+    - name: Download rustup-init (pinned, checksum-verified)
+      get_url:
+        url: https://static.rust-lang.org/rustup/archive/1.27.1/x86_64-unknown-linux-gnu/rustup-init
+        dest: /tmp/rustup-init
+        mode: "0755"
+        checksum: sha256:6aeece6993e902708983b209d04c0d1dbb14ebb405ddb87def578d41f920f56d
+      when: ansible_architecture == "x86_64"
+
+    - name: Download rustup-init for ARM64 (pinned, checksum-verified)
+      get_url:
+        url: https://static.rust-lang.org/rustup/archive/1.27.1/aarch64-unknown-linux-gnu/rustup-init
+        dest: /tmp/rustup-init
+        mode: "0755"
+        checksum: sha256:1cffbf51e63e634c746f741de50649bbbcbd9dbe1de363c9ecef64e278dba2b2
+      when: ansible_architecture == "aarch64"
+
+    - name: Install Rust toolchain via pinned rustup-init
+      command: /tmp/rustup-init -y --default-toolchain stable --profile minimal --no-modify-path
       become_user: "{{ mentisdb_user }}"
       args:
         creates: "{{ mentisdb_data_dir }}/.cargo/bin/cargo"
@@ -61,6 +77,11 @@
         HOME: "{{ mentisdb_data_dir }}"
         CARGO_HOME: "{{ mentisdb_data_dir }}/.cargo"
         RUSTUP_HOME: "{{ mentisdb_data_dir }}/.rustup"
+
+    - name: Cleanup rustup-init
+      file:
+        path: /tmp/rustup-init
+        state: absent
 
     - name: Install MentisDB from crates.io
       command: "{{ mentisdb_data_dir }}/.cargo/bin/cargo install mentisdb --version {{ mentisdb_version }} --locked"

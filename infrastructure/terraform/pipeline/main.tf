@@ -67,17 +67,20 @@ resource "github_issue_label" "copilot-triaging" {
   description = "Issue being triaged by Copilot"
 }
 
-# Repository Variables
-resource "github_actions_variable" "push_token" {
-  repository    = github_repository.wgmesh.name
-  variable_name = "PUSH_TOKEN"
-  value         = var.github_push_token
+# Repository Secrets
+# NOTE: If the previous github_actions_variable.push_token / .openrouter_key
+# were ever applied, the values were exposed in plaintext via the GitHub UI
+# and Actions logs. Rotate both credentials before applying this change.
+resource "github_actions_secret" "push_token" {
+  repository      = github_repository.wgmesh.name
+  secret_name     = "PUSH_TOKEN"
+  plaintext_value = var.github_push_token
 }
 
-resource "github_actions_variable" "openrouter_key" {
-  repository    = github_repository.wgmesh.name
-  variable_name = "OPENROUTER_API_KEY"
-  value         = var.openrouter_api_key
+resource "github_actions_secret" "openrouter_key" {
+  repository      = github_repository.wgmesh.name
+  secret_name     = "OPENROUTER_API_KEY"
+  plaintext_value = var.openrouter_api_key
 }
 
 # Cloudflare DNS for Dashboard
@@ -108,10 +111,10 @@ resource "github_repository_file" "pipeline_health_alert" {
   branch     = "main"
   file       = ".github/alerts/pipeline-health.json"
   content = jsonencode({
-    "critical_issues" = [525, 526, 527, 528],
+    "critical_issues" = var.critical_issue_numbers,
     "monitoring" = {
-      "velocity_threshold"    = 3.0,
-      "stale_threshold_hours" = 6
+      "velocity_threshold"    = var.monitoring_thresholds.velocity_threshold,
+      "stale_threshold_hours" = var.monitoring_thresholds.stale_threshold_hours
     }
   })
   commit_message      = "Add pipeline health monitoring configuration"
