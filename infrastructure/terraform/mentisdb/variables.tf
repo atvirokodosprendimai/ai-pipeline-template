@@ -28,9 +28,10 @@ variable "letsencrypt_email" {
 }
 
 variable "mentisdb_image" {
-  description = "Container image (with tag) for mentisdbd. Defaults to a fork tag while CloudLLM-ai/mentisdb#16 is pending merge; switch to ghcr.io/cloudllm-ai/mentisdb:0.9.5 once that PR lands."
+  description = "Container image (digest-pinned) for mentisdbd. Defaults to a fork build while CloudLLM-ai/mentisdb#16 is pending merge. To upgrade, pull the desired tag, capture its digest via `docker buildx imagetools inspect ghcr.io/<owner>/mentisdb:<tag> | grep -i digest`, and update this default. The accompanying tag for human-readability is documented as a comment, not a variable."
   type        = string
-  default     = "ghcr.io/nycterent/mentisdb:0.9.5-test4"
+  # ghcr.io/nycterent/mentisdb:0.9.5-test4 — verified live 2026-04-27
+  default = "ghcr.io/nycterent/mentisdb@sha256:93133ad85c3eac1ceda2edf5a65f8b19d176049a25568e682cca003939519f51"
 }
 
 variable "mentisdb_volume_size_gb" {

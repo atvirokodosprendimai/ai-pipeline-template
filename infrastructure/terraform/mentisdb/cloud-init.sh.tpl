@@ -34,10 +34,12 @@ apt-get install -y \
   curl nginx certbot python3-certbot-nginx ufw \
   ca-certificates apache2-utils docker.io
 
-# --- 2. Persistent volume mount ---
-# Hetzner Volume ${volume_id} attached at server creation. Mount it at
-# $DATA_DIR before any data is written so mentisdb chain data survives
-# server replacement (tofu apply -replace=hcloud_server.mentisdb).
+# --- 2. Persistent volume mount + bind mounts ---
+# Hetzner Volume ${volume_id} attached at server creation (via
+# hcloud_server.volumes arg, no race window). Mount at /srv/persistent,
+# then bind-mount subdirectories to the conventional paths so both
+# mentisdb chain data AND Let's Encrypt certificates survive server
+# replacement.
 VOLUME_DEVICE="/dev/disk/by-id/scsi-0HC_Volume_${volume_id}"
 echo "Waiting for volume device $VOLUME_DEVICE to appear..."
 for _ in $(seq 1 60); do
@@ -48,20 +50,33 @@ if [ ! -e "$VOLUME_DEVICE" ]; then
   echo "ERROR: volume device $VOLUME_DEVICE never appeared after 60s" >&2
   exit 1
 fi
-mkdir -p "$DATA_DIR"
-# Mount idempotently: skip if already mounted (cloud-init re-runs are rare
-# but keep the script safe to re-execute manually for diagnostics).
+mkdir -p /srv/persistent
+if ! mountpoint -q /srv/persistent; then
+  mount "$VOLUME_DEVICE" /srv/persistent
+fi
+mkdir -p /srv/persistent/mentisdb /srv/persistent/letsencrypt
+mkdir -p "$DATA_DIR" /etc/letsencrypt
 if ! mountpoint -q "$DATA_DIR"; then
-  mount "$VOLUME_DEVICE" "$DATA_DIR"
+  mount --bind /srv/persistent/mentisdb "$DATA_DIR"
 fi
-# Persist mount via /etc/fstab (nofail so a missing volume doesn't
-# block boot; we'd rather have a degraded server we can SSH into than
-# an emergency-shell boot we can't reach).
+if ! mountpoint -q /etc/letsencrypt; then
+  mount --bind /srv/persistent/letsencrypt /etc/letsencrypt
+fi
+# Persist all three mounts in /etc/fstab. nofail on the volume so a
+# missing volume doesn't block boot; the bind mounts implicitly require
+# the parent mount to succeed first.
 if ! grep -q "$VOLUME_DEVICE" /etc/fstab; then
-  echo "$VOLUME_DEVICE  $DATA_DIR  ext4  discard,nofail,defaults  0  0" >> /etc/fstab
+  cat >> /etc/fstab <<FSTAB
+$VOLUME_DEVICE  /srv/persistent  ext4  discard,nofail,defaults  0  0
+/srv/persistent/mentisdb  $DATA_DIR  none  bind  0  0
+/srv/persistent/letsencrypt  /etc/letsencrypt  none  bind  0  0
+FSTAB
 fi
-# Container internally runs as uid 991; ensure host dir is writable by it.
-chown -R 991:991 "$DATA_DIR"
+# Ownership for the container's mentisdb user (uid 991). Non-recursive
+# on $DATA_DIR — we only need the mount root owned correctly; descending
+# the whole tree on every boot scales linearly with chain size and is
+# unnecessary because mentisdbd inherits ownership from its own writes.
+chown 991:991 "$DATA_DIR"
 chmod 0750 "$DATA_DIR"
 
 # --- 3. Pull mentisdbd image + systemd unit wrapping `docker run` ---
@@ -92,9 +107,17 @@ ExecStart=/usr/bin/docker run --rm --name mentisdbd -t \\
   -e MENTISDB_THOUGHT_SOUNDS=false \\
   -e RUST_LOG=info \\
   $IMAGE
-ExecStop=/usr/bin/docker stop mentisdbd
+ExecStop=-/usr/bin/docker stop mentisdbd
 Restart=on-failure
 RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+# /var/run/docker.sock needs to be writable for `docker` CLI to talk
+# to the daemon; /etc/docker is needed for daemon config; /var/lib/docker
+# is the daemon's state.
+ReadWritePaths=/var/run /var/lib/docker /etc/docker
 
 [Install]
 WantedBy=multi-user.target
@@ -144,7 +167,20 @@ nginx -t
 systemctl reload nginx
 
 # --- 5. Let's Encrypt + auto-renewal ---
-certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos --email "$EMAIL" --redirect
+# Skip cert acquisition if cert already exists on the persistent
+# volume (post-server-replacement). certbot's reuse mode also handles
+# in-place runs by reusing existing valid certs without re-issuing, but
+# the explicit guard makes the intent clear and avoids a network
+# round-trip on every boot.
+if [ -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" ]; then
+  echo "Reusing existing Let's Encrypt cert at /etc/letsencrypt/live/$DOMAIN"
+  # nginx config still needs the SSL block; certbot's nginx installer
+  # can re-run against the existing cert without forcing re-issuance.
+  certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos --email "$EMAIL" --redirect --keep-until-expiring
+else
+  echo "No existing cert - requesting from Let's Encrypt"
+  certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos --email "$EMAIL" --redirect
+fi
 ( crontab -l 2>/dev/null || true; echo "17 3 * * * /usr/bin/certbot renew --quiet" ) | crontab -
 
 # --- 6. ufw firewall ---
