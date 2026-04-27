@@ -61,6 +61,22 @@ resource "hcloud_firewall" "mentisdb" {
   }
 }
 
+resource "hcloud_volume" "mentisdb_data" {
+  name              = "mentisdb-data"
+  size              = var.mentisdb_volume_size_gb
+  location          = "hel1"
+  format            = "ext4"
+  delete_protection = true
+
+  lifecycle {
+    # Defense in depth — even if delete_protection is dropped, terraform
+    # itself will refuse to destroy this resource without explicit
+    # `terraform state rm` first. Protects accumulated mentisdb chain
+    # data from being wiped on routine `tofu apply -replace` flows.
+    prevent_destroy = true
+  }
+}
+
 resource "hcloud_server" "mentisdb" {
   name         = "mentisdb-prod"
   image        = "ubuntu-24.04"
@@ -68,16 +84,25 @@ resource "hcloud_server" "mentisdb" {
   location     = "hel1"
   ssh_keys     = [hcloud_ssh_key.deploy.id]
   firewall_ids = [hcloud_firewall.mentisdb.id]
+  # Attach the volume at server creation so it's available before
+  # cloud-init runs the docker mount logic.
   user_data = templatefile("${path.module}/cloud-init.sh.tpl", {
     domain_name         = var.domain_name
     letsencrypt_email   = var.letsencrypt_email
     mentisdb_image      = var.mentisdb_image
     basic_auth_password = var.mentisdb_password
+    volume_id           = hcloud_volume.mentisdb_data.id
   })
   labels = {
     role = "mentisdb"
     env  = "prod"
   }
+}
+
+resource "hcloud_volume_attachment" "mentisdb_data" {
+  volume_id = hcloud_volume.mentisdb_data.id
+  server_id = hcloud_server.mentisdb.id
+  automount = false
 }
 
 resource "cloudflare_record" "mem_beerpub" {
