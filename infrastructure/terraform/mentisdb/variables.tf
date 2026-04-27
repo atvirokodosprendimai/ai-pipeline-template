@@ -30,5 +30,5 @@ variable "letsencrypt_email" {
 variable "mentisdb_version" {
   description = "MentisDB crates.io version to install"
   type        = string
-  default     = "0.9.5.41"
+  default     = "0.9.5"
 }

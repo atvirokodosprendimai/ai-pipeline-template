@@ -17,7 +17,7 @@ apt-get update -y
 apt-get upgrade -y
 apt-get install -y \
   build-essential curl git nginx certbot python3-certbot-nginx ufw \
-  pkg-config libssl-dev ca-certificates
+  pkg-config libssl-dev libasound2-dev ca-certificates
 
 # --- 2. System user + dirs ---
 id -u "$USER" >/dev/null 2>&1 || \
