@@ -815,3 +815,41 @@ jobs:
           echo "Created PR #${pr_number}"
 
           # Review-merge handled by bot-pr-review-merge.yml workflow
+
+      - name: Append pipeline-health outcome to MentisDB
+        if: always()
+        env:
+          MENTISDB_URL: ${{ secrets.MENTISDB_URL }}
+          MENTISDB_USER: ${{ secrets.MENTISDB_USER }}
+          MENTISDB_PASSWORD: ${{ secrets.MENTISDB_PASSWORD }}
+          OUTCOME: ${{ job.status }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          case "$OUTCOME" in
+            success)   TYPE="Insight";  IMP="0.4" ;;
+            failure)   TYPE="Mistake";  IMP="0.7" ;;
+            cancelled) TYPE="Mistake";  IMP="0.5" ;;
+            *)         TYPE="Mistake";  IMP="0.6" ;;
+          esac
+          STATE_SUMMARY=$(jq -r '"actions=" + (.actions_taken|tostring) + " errors=" + (.errors|tostring) + " stale_prs=" + (.stale_prs_closed|tostring) + " needs_human_closed=" + (.needs_human_closed|tostring)' company/pipeline-health-state.json 2>/dev/null || echo "state-unavailable")
+          PAYLOAD=$(jq -nc \
+            --arg type "$TYPE" \
+            --arg outcome "$OUTCOME" \
+            --arg run_url "$RUN_URL" \
+            --arg state "$STATE_SUMMARY" \
+            --arg imp "$IMP" \
+            '{
+              chain_key: "ai-pipeline-template",
+              agent_id: "pipeline-health",
+              agent_name: "pipeline-health",
+              thought_type: $type,
+              content: ("Pipeline self-heal cycle " + $outcome + " — " + $state + " (" + $run_url + ")"),
+              tags: ["ai-pipeline-template", "pipeline-health", $outcome],
+              importance: ($imp | tonumber)
+            }')
+          curl --fail-with-body --silent --show-error --max-time 15 \
+            -u "$MENTISDB_USER:$MENTISDB_PASSWORD" \
+            -X POST -H 'Content-Type: application/json' \
+            -d "$PAYLOAD" "$MENTISDB_URL/v1/thoughts" \
+            || echo "::warning::mentisdb append failed (non-fatal)"

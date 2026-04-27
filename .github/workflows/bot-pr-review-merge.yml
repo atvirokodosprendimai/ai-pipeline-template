@@ -37,3 +37,43 @@ jobs:
           APPROVED_AUTHORS: ${{ github.event.pull_request.user.login }}
         run: |
           bash company/scripts/pr-review-merge.sh
+
+      - name: Append review-merge outcome to MentisDB
+        if: always()
+        env:
+          MENTISDB_URL: ${{ secrets.MENTISDB_URL }}
+          MENTISDB_USER: ${{ secrets.MENTISDB_USER }}
+          MENTISDB_PASSWORD: ${{ secrets.MENTISDB_PASSWORD }}
+          OUTCOME: ${{ job.status }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          set -euo pipefail
+          case "$OUTCOME" in
+            success)   TYPE="TaskComplete"; IMP="0.7" ;;
+            failure)   TYPE="Mistake";      IMP="0.8" ;;
+            cancelled) TYPE="Mistake";      IMP="0.6" ;;
+            *)         TYPE="Mistake";      IMP="0.7" ;;
+          esac
+          PAYLOAD=$(jq -nc \
+            --arg type "$TYPE" \
+            --arg outcome "$OUTCOME" \
+            --arg run_url "$RUN_URL" \
+            --arg pr "$PR_NUMBER" \
+            --arg author "$PR_AUTHOR" \
+            --arg imp "$IMP" \
+            '{
+              chain_key: "ai-pipeline-template",
+              agent_id: "bot-pr-review-merge",
+              agent_name: "bot-pr-review-merge",
+              thought_type: $type,
+              content: ("PR #" + $pr + " by @" + $author + " — review-merge " + $outcome + " (" + $run_url + ")"),
+              tags: ["ai-pipeline-template", "pr-review-merge", $outcome],
+              importance: ($imp | tonumber)
+            }')
+          curl --fail-with-body --silent --show-error --max-time 15 \
+            -u "$MENTISDB_USER:$MENTISDB_PASSWORD" \
+            -X POST -H 'Content-Type: application/json' \
+            -d "$PAYLOAD" "$MENTISDB_URL/v1/thoughts" \
+            || echo "::warning::mentisdb append failed (non-fatal)"

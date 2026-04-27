@@ -31,7 +31,9 @@ Bot inline comments were also blocking the merge logic (fixed in PR #51). Howeve
 
 ## Solution
 
-Removed the dependency on external review events. Workflows now **self-merge their own PRs** directly after validation, eliminating the need for a separate `pull_request_review`-triggered workflow entirely (PRs #55, #57).
+Removed the dependency on external review events. Workflows now **self-merge their own PRs** directly after validation, eliminating the need for a separate `pull_request_review`-triggered workflow entirely (PRs #55, #57). The dead `loop-automerge.yml` workflow file was deleted in PR #67.
+
+Current implementation: [`.github/workflows/heartbeat-pr-automerge.yml`](../../../.github/workflows/heartbeat-pr-automerge.yml) triggers on `pull_request: [opened, reopened, synchronize]`, validates `loop:`/`heal:` titled PRs against scope checks (same-repo, not a fork, allowed bot author, file allowlist), and merges directly. No external review event dependency.
 
 ## Prevention
 

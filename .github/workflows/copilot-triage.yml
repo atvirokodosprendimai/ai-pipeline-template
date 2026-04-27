@@ -117,3 +117,43 @@ jobs:
             });
 
             console.log(`Triggered Copilot triage for issue #${issueNumber}`);
+
+      - name: Append issue-triage outcome to MentisDB
+        if: always()
+        env:
+          MENTISDB_URL: ${{ secrets.MENTISDB_URL }}
+          MENTISDB_USER: ${{ secrets.MENTISDB_USER }}
+          MENTISDB_PASSWORD: ${{ secrets.MENTISDB_PASSWORD }}
+          OUTCOME: ${{ job.status }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_LABEL: ${{ github.event.label.name }}
+        run: |
+          set -euo pipefail
+          case "$OUTCOME" in
+            success)   TYPE="ActionTaken"; IMP="0.5" ;;
+            failure)   TYPE="Mistake";     IMP="0.7" ;;
+            cancelled) TYPE="Mistake";     IMP="0.5" ;;
+            *)         TYPE="Mistake";     IMP="0.6" ;;
+          esac
+          PAYLOAD=$(jq -nc \
+            --arg type "$TYPE" \
+            --arg outcome "$OUTCOME" \
+            --arg run_url "$RUN_URL" \
+            --arg issue "$ISSUE_NUMBER" \
+            --arg label "$ISSUE_LABEL" \
+            --arg imp "$IMP" \
+            '{
+              chain_key: "ai-pipeline-template",
+              agent_id: "copilot-triage",
+              agent_name: "copilot-triage",
+              thought_type: $type,
+              content: ("Issue #" + $issue + " labeled \"" + $label + "\" — Copilot triage assignment " + $outcome + " (" + $run_url + ")"),
+              tags: ["ai-pipeline-template", "issue-triage", $outcome],
+              importance: ($imp | tonumber)
+            }')
+          curl --fail-with-body --silent --show-error --max-time 15 \
+            -u "$MENTISDB_USER:$MENTISDB_PASSWORD" \
+            -X POST -H 'Content-Type: application/json' \
+            -d "$PAYLOAD" "$MENTISDB_URL/v1/thoughts" \
+            || echo "::warning::mentisdb append failed (non-fatal)"

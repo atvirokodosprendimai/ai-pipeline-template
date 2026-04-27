@@ -37,3 +37,12 @@ The workflow checks for blocking reviews and inline comments, then merges if cle
 
 - Prefer event-driven workflows over polling when GitHub provides webhook events for the condition you're waiting on.
 - `pull_request_review` event fires regardless of review latency — no timing assumptions needed.
+
+## Follow-up
+
+The `loop-automerge.yml` workflow shown above was later removed in PR #67 because GitHub Apps authenticating with `GITHUB_TOKEN` cannot trigger `pull_request_review` workflow events — the event-driven trigger never fired for Copilot reviews. See [github-app-reviews-dont-trigger-workflows.md](./github-app-reviews-dont-trigger-workflows.md). The current architecture uses `heartbeat-pr-automerge.yml`, which validates and self-merges `loop:`/`heal:` PRs on `pull_request: opened|reopened|synchronize` — no review dependency.
+
+## Related
+
+- [github-app-reviews-dont-trigger-workflows.md](./github-app-reviews-dont-trigger-workflows.md) — why the event-driven `loop-automerge.yml` solution was abandoned
+- [autonomous-review-merge-bootstrap.md](./autonomous-review-merge-bootstrap.md) — broader pipeline bootstrap context
