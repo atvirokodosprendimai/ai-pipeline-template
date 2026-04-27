@@ -135,10 +135,10 @@ jobs:
         run: |
           set -euo pipefail
           case "$OUTCOME" in
-            success)   TYPE="Correction"; IMP="0.6" ;;
-            failure)   TYPE="Mistake";    IMP="0.7" ;;
-            cancelled) TYPE="Mistake";    IMP="0.5" ;;
-            *)         TYPE="Mistake";    IMP="0.6" ;;
+            success)   TYPE="ActionTaken"; IMP="0.5" ;;
+            failure)   TYPE="Mistake";     IMP="0.7" ;;
+            cancelled) TYPE="Mistake";     IMP="0.5" ;;
+            *)         TYPE="Mistake";     IMP="0.6" ;;
           esac
           PAYLOAD=$(jq -nc \
             --arg type "$TYPE" \
