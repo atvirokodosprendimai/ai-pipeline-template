@@ -121,3 +121,43 @@ jobs:
 
               core.setFailed('Spec validation failed — see PR comment for details');
             }
+
+      - name: Append spec-validation outcome to MentisDB
+        if: always()
+        env:
+          MENTISDB_URL: ${{ secrets.MENTISDB_URL }}
+          MENTISDB_USER: ${{ secrets.MENTISDB_USER }}
+          MENTISDB_PASSWORD: ${{ secrets.MENTISDB_PASSWORD }}
+          OUTCOME: ${{ job.status }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+          case "$OUTCOME" in
+            success)   TYPE="Correction"; IMP="0.6" ;;
+            failure)   TYPE="Mistake";    IMP="0.7" ;;
+            cancelled) TYPE="Mistake";    IMP="0.5" ;;
+            *)         TYPE="Mistake";    IMP="0.6" ;;
+          esac
+          PAYLOAD=$(jq -nc \
+            --arg type "$TYPE" \
+            --arg outcome "$OUTCOME" \
+            --arg run_url "$RUN_URL" \
+            --arg pr "$PR_NUMBER" \
+            --arg title "$PR_TITLE" \
+            --arg imp "$IMP" \
+            '{
+              chain_key: "ai-pipeline-template",
+              agent_id: "spec-validation",
+              agent_name: "spec-validation",
+              thought_type: $type,
+              content: ("Spec PR #" + $pr + " (" + $title + ") — validation " + $outcome + " (" + $run_url + ")"),
+              tags: ["ai-pipeline-template", "spec-validation", $outcome],
+              importance: ($imp | tonumber)
+            }')
+          curl --fail-with-body --silent --show-error --max-time 15 \
+            -u "$MENTISDB_USER:$MENTISDB_PASSWORD" \
+            -X POST -H 'Content-Type: application/json' \
+            -d "$PAYLOAD" "$MENTISDB_URL/v1/thoughts" \
+            || echo "::warning::mentisdb append failed (non-fatal)"
