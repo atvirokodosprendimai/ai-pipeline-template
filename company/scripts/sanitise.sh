@@ -30,14 +30,17 @@ patterns=(
 )
 
 for pattern in "${patterns[@]}"; do
-  if echo "$input" | grep -qEi -- "$pattern"; then
+  # Use printf '%s' instead of echo to avoid -n/-e flag interpretation
+  # mangling input that begins with those literals (could let a secret slip
+  # past the scan if the input happened to start with -n).
+  if printf '%s' "$input" | grep -qEi -- "$pattern"; then
     echo "SANITISE ERROR: Found potential secret matching pattern: $pattern" >&2
     found=1
   fi
 done
 
 # Email pattern (basic — catches most customer PII leaks)
-unknown_emails=$(echo "$input" | grep -oEi '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' | grep -viE '(noreply@|bot@|ghost\.lt|github\.com)' || true)
+unknown_emails=$(printf '%s' "$input" | grep -oEi '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' | grep -viE '(noreply@|bot@|ghost\.lt|github\.com)' || true)
 if [ -n "$unknown_emails" ]; then
   echo "SANITISE WARNING: Found potential PII email(s): $unknown_emails" >&2
   # Warning only — don't fail for emails, they might be in public commit history
