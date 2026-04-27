@@ -1,0 +1,25 @@
+infrastructure/terraform/mentisdb/cloud-init.sh.tpl
+  8089a65836734e1b 5,11-15,140-141
+.github/workflows/observation-loop.yml
+  8089a65836734e1b 458-467,469
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "ee29c3b7f65f68b71e5a843fad8c7832bf88f9b6",
+  "prompts": {
+    "8089a65836734e1b": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019dce85-df6e-7833-8465-683b29ec5be5",
+        "model": "gpt-5.5"
+      },
+      "human_author": "~.~",
+      "messages": [],
+      "total_additions": 19,
+      "total_deletions": 4,
+      "accepted_lines": 19,
+      "overriden_lines": 0
+    }
+  }
+}
