@@ -71,7 +71,7 @@ resource "hcloud_server" "mentisdb" {
   user_data = templatefile("${path.module}/cloud-init.sh.tpl", {
     domain_name         = var.domain_name
     letsencrypt_email   = var.letsencrypt_email
-    mentisdb_version    = var.mentisdb_version
+    mentisdb_image      = var.mentisdb_image
     basic_auth_password = var.mentisdb_password
   })
   labels = {

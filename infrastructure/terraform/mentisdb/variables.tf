@@ -27,10 +27,10 @@ variable "letsencrypt_email" {
   default     = "admin@beerpub.dev"
 }
 
-variable "mentisdb_version" {
-  description = "MentisDB crates.io version to install"
+variable "mentisdb_image" {
+  description = "Container image (with tag) for mentisdbd. Defaults to a fork tag while CloudLLM-ai/mentisdb#16 is pending merge; switch to ghcr.io/cloudllm-ai/mentisdb:0.9.5 once that PR lands."
   type        = string
-  default     = "0.9.5"
+  default     = "ghcr.io/nycterent/mentisdb:0.9.5-test4"
 }
 
 variable "mentisdb_password" {
