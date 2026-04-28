@@ -34,6 +34,7 @@ Last consolidated: 2026-04-10.
 
 - Spec-first: issues → Copilot writes spec → human reviews → Goose implements
 - Label-driven routing: `fn:dev` + `needs-triage` → Copilot, `approved-for-build` → Goose
+- CI lifecycle workflows append typed thoughts to MentisDB chain `ai-pipeline-template`; see `memory/reference_mentisdb_ci_integration_pattern.md`
 - All code needs tests (80%+ coverage target), table-driven t.Parallel() patterns in Go
 - Public repo: never commit secrets, PII, or exact revenue figures
 - Assessment PRs auto-merge only if Copilot review has zero comments and zero blocking reviews

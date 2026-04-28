@@ -106,8 +106,9 @@ jobs:
               tags: ["ai-pipeline-template", "endpoint-health", "failure"],
               importance: 0.7
             }')
+          URL="${MENTISDB_URL%/}/v1/thoughts"
           curl --fail-with-body --silent --show-error --max-time 15 \
             -u "$MENTISDB_USER:$MENTISDB_PASSWORD" \
             -X POST -H 'Content-Type: application/json' \
-            -d "$PAYLOAD" "$MENTISDB_URL/v1/thoughts" \
-            || echo "::warning::mentisdb append failed (non-fatal)"
+            -d "$PAYLOAD" "$URL" \
+            || { code=$?; echo "::warning::mentisdb append failed (curl exit $code, non-fatal)"; }
