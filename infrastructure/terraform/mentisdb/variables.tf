@@ -50,3 +50,9 @@ variable "mentisdb_password" {
   type        = string
   sensitive   = true
 }
+
+variable "mentisdb_dashboard_pin" {
+  description = "Native MentisDB dashboard PIN (sourced from MENTISDB_DASHBOARD_PIN org secret via TF_VAR_mentisdb_dashboard_pin). Separate from API Basic Auth."
+  type        = string
+  sensitive   = true
+}

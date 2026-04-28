@@ -17,6 +17,7 @@ export TF_VAR_hcloud_token="your_hetzner_cloud_token"
 export TF_VAR_cloudflare_api_token="your_cloudflare_api_token"
 export TF_VAR_beerpub_cloudflare_zone_id="your_beerpub_zone_id_here"
 export TF_VAR_mentisdb_password="your_basic_auth_password"
+export TF_VAR_mentisdb_dashboard_pin="your_dashboard_pin"
 ```
 
 The MentisDB container image is controlled by `var.mentisdb_image`. The default is digest-pinned for reproducible server replacement. To upgrade, update the digest value rather than using a mutable tag.
@@ -66,6 +67,16 @@ The public HTTP API is protected by single-user HTTP Basic Auth at nginx. The us
 The password is supplied through `var.mentisdb_password`, normally from the `MENTISDB_PASSWORD` GitHub organization secret exposed to the Terraform deployment workflow as `TF_VAR_mentisdb_password`.
 
 The `/.well-known/acme-challenge/` path remains unauthenticated so certbot can renew Let's Encrypt certificates.
+
+## Native Dashboard
+
+MentisDB's embedded native dashboard is proxied through nginx at:
+
+```text
+https://mem.beerpub.dev/dashboard
+```
+
+The daemon serves the dashboard locally on `https://127.0.0.1:9475/dashboard`; nginx terminates the public certificate and proxies dashboard traffic to that local HTTPS endpoint with upstream certificate verification disabled for MentisDB's self-signed internal certificate. Dashboard authentication is handled by MentisDB's native PIN gate using `MENTISDB_DASHBOARD_PIN`, separate from API Basic Auth.
 
 ## Operational Commands
 

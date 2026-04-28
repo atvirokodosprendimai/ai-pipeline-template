@@ -110,6 +110,7 @@ jobs:
           TF_VAR_cloudflare_api_token: ${{ secrets.BEERPUB_CLOUDFLARE_API_TOKEN }}
           TF_VAR_beerpub_cloudflare_zone_id: ${{ secrets.BEERPUB_CLOUDFLARE_ZONE_ID }}
           TF_VAR_mentisdb_password: ${{ secrets.MENTISDB_PASSWORD }}
+          TF_VAR_mentisdb_dashboard_pin: ${{ secrets.MENTISDB_DASHBOARD_PIN }}
 
       - name: Tofu Apply
         if: github.ref == 'refs/heads/main'
@@ -119,3 +120,4 @@ jobs:
           TF_VAR_cloudflare_api_token: ${{ secrets.BEERPUB_CLOUDFLARE_API_TOKEN }}
           TF_VAR_beerpub_cloudflare_zone_id: ${{ secrets.BEERPUB_CLOUDFLARE_ZONE_ID }}
           TF_VAR_mentisdb_password: ${{ secrets.MENTISDB_PASSWORD }}
+          TF_VAR_mentisdb_dashboard_pin: ${{ secrets.MENTISDB_DASHBOARD_PIN }}

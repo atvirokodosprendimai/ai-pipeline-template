@@ -13,14 +13,28 @@ BASIC_AUTH_PASSWORD=$(cat <<'BASIC_AUTH_PASSWORD_END'
 ${basic_auth_password}
 BASIC_AUTH_PASSWORD_END
 )
+DASHBOARD_PIN=$(cat <<'DASHBOARD_PIN_END'
+${dashboard_pin}
+DASHBOARD_PIN_END
+)
 # Validate: non-empty + no newlines/CRLF.
 if [ -z "$BASIC_AUTH_PASSWORD" ] || [ "$(printf '%s' "$BASIC_AUTH_PASSWORD" | tr -d '[:space:]')" = "" ]; then
   echo "ERROR: basic_auth_password is empty or whitespace-only" >&2
   exit 1
 fi
+if [ -z "$DASHBOARD_PIN" ] || [ "$(printf '%s' "$DASHBOARD_PIN" | tr -d '[:space:]')" = "" ]; then
+  echo "ERROR: dashboard_pin is empty or whitespace-only" >&2
+  exit 1
+fi
 case "$BASIC_AUTH_PASSWORD" in
   *$'\n'* | *$'\r'*)
     echo "ERROR: basic_auth_password contains newline/CRLF — rejecting (would truncate via htpasswd -i)" >&2
+    exit 1
+    ;;
+esac
+case "$DASHBOARD_PIN" in
+  *$'\n'* | *$'\r'*)
+    echo "ERROR: dashboard_pin contains newline/CRLF — rejecting" >&2
     exit 1
     ;;
 esac
@@ -103,8 +117,10 @@ ExecStart=/usr/bin/docker run --rm --name mentisdbd -t \\
   -p 127.0.0.1:9475:9475 \\
   -v $DATA_DIR:/var/lib/mentisdb \\
   -e MENTISDB_BIND_HOST=0.0.0.0 \\
+  -e MENTISDB_DASHBOARD_PIN=\"$DASHBOARD_PIN\" \\
   -e MENTISDB_STARTUP_SOUND=false \\
   -e MENTISDB_THOUGHT_SOUNDS=false \\
+  -e MENTISDB_UPDATE_CHECK=0 \\
   -e RUST_LOG=info \\
   $IMAGE
 ExecStop=-/usr/bin/docker stop mentisdbd
@@ -137,6 +153,28 @@ server {
         root /var/www/html;
     }
 
+    location = /dashboard {
+        proxy_pass https://127.0.0.1:9475/dashboard;
+        proxy_ssl_verify off;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 300s;
+    }
+
+    location /dashboard/ {
+        proxy_pass https://127.0.0.1:9475/dashboard/;
+        proxy_ssl_verify off;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 300s;
+    }
+
     location / {
         auth_basic           "MentisDB";
         auth_basic_user_file /etc/nginx/.htpasswd;
@@ -157,6 +195,7 @@ EOF
 install -o root -g www-data -m 0640 /dev/null /etc/nginx/.htpasswd
 printf '%s\n' "$BASIC_AUTH_PASSWORD" | htpasswd -iB /etc/nginx/.htpasswd mentisdb
 unset BASIC_AUTH_PASSWORD
+unset DASHBOARD_PIN
 if [ -f /var/lib/cloud/instance/user-data.txt ]; then
   shred -u /var/lib/cloud/instance/user-data.txt 2>/dev/null || rm -f /var/lib/cloud/instance/user-data.txt
 fi

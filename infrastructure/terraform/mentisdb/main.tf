@@ -88,11 +88,12 @@ resource "hcloud_server" "mentisdb" {
   # `volumes` argument on hcloud_server is not supported by the
   # hetznercloud/hcloud provider 1.x — see PR #610 + heal commit.
   user_data = templatefile("${path.module}/cloud-init.sh.tpl", {
-    domain_name         = var.domain_name
-    letsencrypt_email   = var.letsencrypt_email
-    mentisdb_image      = var.mentisdb_image
-    basic_auth_password = var.mentisdb_password
-    volume_id           = hcloud_volume.mentisdb_data.id
+    domain_name           = var.domain_name
+    letsencrypt_email     = var.letsencrypt_email
+    mentisdb_image        = var.mentisdb_image
+    basic_auth_password   = var.mentisdb_password
+    dashboard_pin         = var.mentisdb_dashboard_pin
+    volume_id             = hcloud_volume.mentisdb_data.id
   })
   labels = {
     role = "mentisdb"
