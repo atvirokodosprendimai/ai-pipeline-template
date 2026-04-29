@@ -42,6 +42,11 @@ resource "github_repository" "wgmesh" {
   }
 }
 
+import {
+  to = github_repository.wgmesh
+  id = "wgmesh"
+}
+
 # Repository Labels
 resource "github_issue_label" "critical" {
   repository  = github_repository.wgmesh.name
@@ -92,6 +97,9 @@ resource "cloudflare_page_rule" "dashboard_redirect" {
       url         = "https://wgmesh-agent-pipeline-dashboard.pages.dev/"
       status_code = 301
     }
+  }
+  lifecycle {
+    ignore_changes = all
   }
 }
 
