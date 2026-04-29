@@ -1,20 +1,20 @@
 {
-  "last_check": "2026-04-29T21:13:02Z",
+  "last_check": "2026-04-29T23:01:34Z",
   "check_interval_hours": 2,
-  "checks_run": 396,
+  "checks_run": 397,
   "issues_healed_total": 0,
   "retry_tracker": {},
   "funnel_signals": {
     "dogfood": true,
     "presence": true,
     "endpoint_details": "chimney:ok,cloudroof:ok,coroot:ok,tvcentras:ok",
-    "checked_at": "2026-04-29T21:13:02Z"
+    "checked_at": "2026-04-29T23:01:33Z"
   },
   "idle_signal": {
     "idle": false,
     "open_prs": 1,
     "active_pipeline_issues": 2,
-    "checked_at": "2026-04-29T21:13:02Z"
+    "checked_at": "2026-04-29T23:01:33Z"
   },
   "last_run_summary": {
     "stale_triage_found": 0,
