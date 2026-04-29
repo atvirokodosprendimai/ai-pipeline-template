@@ -89,19 +89,17 @@ resource "cloudflare_record" "dashboard" {
 }
 
 # Cloudflare Page Rule for Dashboard
-resource "cloudflare_page_rule" "dashboard_redirect" {
-  zone_id = var.cloudflare_zone_id
-  target  = "chimney.beerpub.dev/pipeline*"
-  actions {
-    forwarding_url {
-      url         = "https://wgmesh-agent-pipeline-dashboard.pages.dev/"
-      status_code = 301
-    }
-  }
-  lifecycle {
-    ignore_changes = all
-  }
-}
+# TODO: Uncomment when Cloudflare API token has Page Rules:Edit permission (error 9109)
+# resource "cloudflare_page_rule" "dashboard_redirect" {
+#   zone_id = var.cloudflare_zone_id
+#   target  = "chimney.beerpub.dev/pipeline*"
+#   actions {
+#     forwarding_url {
+#       url         = "https://wgmesh-agent-pipeline-dashboard.pages.dev/"
+#       status_code = 301
+#     }
+#   }
+# }
 
 # Monitoring Alerts
 resource "github_repository_file" "pipeline_health_alert" {
