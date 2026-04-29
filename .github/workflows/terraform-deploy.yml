@@ -84,13 +84,14 @@ jobs:
 
       - name: Validate required secrets
         run: |
-          for secret in MENTISDB_PASSWORD MENTISDB_DASHBOARD_PIN; do
-            val="\${{ secrets.\$secret }}"
-            if [ -z "\$val" ]; then
-              echo "ERROR: \$secret is not set" >&2
-              exit 1
-            fi
-          done
+          if [ -z "${{ secrets.MENTISDB_PASSWORD }}" ]; then
+            echo "ERROR: MENTISDB_PASSWORD is not set" >&2
+            exit 1
+          fi
+          if [ -z "${{ secrets.MENTISDB_DASHBOARD_PIN }}" ]; then
+            echo "ERROR: MENTISDB_DASHBOARD_PIN is not set" >&2
+            exit 1
+          fi
           echo "All required secrets are present"
 
       - name: Generate backend config
