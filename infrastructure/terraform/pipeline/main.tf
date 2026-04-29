@@ -35,6 +35,11 @@ resource "github_repository" "wgmesh" {
   has_issues   = true
   has_projects = false
   has_wiki     = false
+
+  lifecycle {
+    prevent_destroy = true
+    ignore_changes  = [description, homepage_url]
+  }
 }
 
 # Repository Labels
@@ -74,7 +79,7 @@ resource "cloudflare_record" "dashboard" {
   name    = "pipeline"
   value   = "wgmesh-agent-pipeline-dashboard.pages.dev"
   type    = "CNAME"
-  ttl     = 3600
+  ttl     = 1
   proxied = true
 }
 

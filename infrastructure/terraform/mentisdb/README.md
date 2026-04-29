@@ -68,6 +68,8 @@ The password is supplied through `var.mentisdb_password`, normally from the `MEN
 
 The `/.well-known/acme-challenge/` path remains unauthenticated so certbot can renew Let's Encrypt certificates.
 
+The native dashboard PIN is supplied through `var.mentisdb_dashboard_pin`, normally from the `MENTISDB_DASHBOARD_PIN` GitHub organization secret exposed to the Terraform deployment workflow as `TF_VAR_mentisdb_dashboard_pin`. This PIN is distinct from the API Basic Auth password and is handled by MentisDB's own PIN gate at `https://127.0.0.1:9475/dashboard`.
+
 ## Native Dashboard
 
 MentisDB's embedded native dashboard is proxied through nginx at:
@@ -77,6 +79,12 @@ https://mem.beerpub.dev/dashboard
 ```
 
 The daemon serves the dashboard locally on `https://127.0.0.1:9475/dashboard`; nginx terminates the public certificate and proxies dashboard traffic to that local HTTPS endpoint with upstream certificate verification disabled for MentisDB's self-signed internal certificate. Dashboard authentication is handled by MentisDB's native PIN gate using `MENTISDB_DASHBOARD_PIN`, separate from API Basic Auth.
+
+The following environment variables are set in the systemd unit:
+- `MENTISDB_DASHBOARD_PIN` — dashboard PIN for native auth
+- `MENTISDB_UPDATE_CHECK=0` — suppress update notifications on the dashboard
+- `MENTISDB_STARTUP_SOUND=false` — disable startup audio
+- `MENTISDB_THOUGHT_SOUNDS=false` — disable thought audio cues
 
 ## Operational Commands
 
