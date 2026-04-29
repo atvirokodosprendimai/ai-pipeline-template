@@ -1,0 +1,23 @@
+infrastructure/terraform/pipeline/main.tf
+  a9df32fd646b1444 92
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "b3ff6148bdfa8e722715ea14ca396d7f1966d0ce",
+  "prompts": {
+    "a9df32fd646b1444": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_22abbb6baffeROl5oe89lVj0nN",
+        "model": "minimax-coding-plan/MiniMax-M2.7"
+      },
+      "human_author": "~.~",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 11,
+      "accepted_lines": 139,
+      "overriden_lines": 0
+    }
+  }
+}
