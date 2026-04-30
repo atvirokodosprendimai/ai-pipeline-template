@@ -1,0 +1,31 @@
+infrastructure/terraform/reposwarm/cloud-init.sh.tpl
+  a9df32fd646b1444 1-244
+.github/workflows/terraform-deploy.yml
+  a9df32fd646b1444 136-201
+infrastructure/terraform/reposwarm/variables.tf
+  a9df32fd646b1444 1-60
+infrastructure/terraform/reposwarm/outputs.tf
+  a9df32fd646b1444 1-11
+infrastructure/terraform/reposwarm/main.tf
+  a9df32fd646b1444 1-93
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "9dec28ca1bd60fb9f4ff1c9e5344f2b20932c61b",
+  "prompts": {
+    "a9df32fd646b1444": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_22abbb6baffeROl5oe89lVj0nN",
+        "model": "minimax-coding-plan/MiniMax-M2.7"
+      },
+      "human_author": "~.~",
+      "messages": [],
+      "total_additions": 487,
+      "total_deletions": 13,
+      "accepted_lines": 612,
+      "overriden_lines": 0
+    }
+  }
+}
