@@ -6,6 +6,12 @@ on:
       - 'infrastructure/terraform/**'
     branches: [ main ]
   workflow_dispatch:
+    inputs:
+      replace_server:
+        description: "Force recreate reposwarm server (tofu apply -replace)"
+        required: false
+        default: "false"
+        type: boolean
 
 permissions:
   contents: read
@@ -191,7 +197,12 @@ jobs:
 
       - name: Tofu Apply
         if: github.ref == 'refs/heads/main'
-        run: tofu apply -auto-approve
+        run: |
+          EXTRA_ARGS=""
+          if [ "${{ github.event.inputs.replace_server }}" = "true" ]; then
+            EXTRA_ARGS="-replace=hcloud_server.reposwarm"
+          fi
+          tofu apply -auto-approve $EXTRA_ARGS
         env:
           TF_VAR_hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
           TF_VAR_cloudflare_api_token: ${{ secrets.BEERPUB_CLOUDFLARE_API_TOKEN }}
