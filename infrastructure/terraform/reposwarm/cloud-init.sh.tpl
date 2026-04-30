@@ -33,12 +33,16 @@ case "$$REPOSWARM_API_TOKEN" in *"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
 apt-get upgrade -y
-apt-get install -y curl nginx certbot python3-certbot-nginx ufw ca-certificates docker.io docker-compose-plugin
+apt-get install -y curl nginx certbot python3-certbot-nginx ufw ca-certificates docker.io
 
 systemctl enable --now docker
 
 INSTALL_DIR="/opt/reposwarm"
 mkdir -p "$$INSTALL_DIR"
+
+mkdir -p /usr/local/lib/docker/cli-plugins
+curl -fsSL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64" -o /usr/local/lib/docker/cli-plugins/docker-compose
+chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 
 cat > "$$INSTALL_DIR/docker-compose.yml" <<'COMPOSE'
 services:
