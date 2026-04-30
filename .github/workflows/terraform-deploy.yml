@@ -133,3 +133,69 @@ jobs:
           TF_VAR_beerpub_cloudflare_zone_id: ${{ secrets.BEERPUB_CLOUDFLARE_ZONE_ID }}
           TF_VAR_mentisdb_password: ${{ secrets.MENTISDB_PASSWORD }}
           TF_VAR_mentisdb_dashboard_pin: ${{ secrets.MENTISDB_DASHBOARD_PIN }}
+
+  reposwarm:
+    name: 'OpenTofu Apply (reposwarm)'
+    runs-on: ubuntu-latest
+    environment: production
+    defaults:
+      run:
+        working-directory: infrastructure/terraform/reposwarm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup OpenTofu
+        uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: 1.8.5
+
+      - name: Validate required secrets
+        run: |
+          if [ -z "${{ secrets.REPOSWARM_API_TOKEN }}" ]; then
+            echo "ERROR: REPOSWARM_API_TOKEN is not set" >&2
+            exit 1
+          fi
+          echo "All required secrets are present"
+
+      - name: Generate backend config
+        run: |
+          cat > backend.hcl <<EOF
+          bucket = "${{ secrets.TOFU_STATE_BUCKET }}"
+          region = "${{ secrets.TOFU_STATE_REGION }}"
+          endpoints = { s3 = "${{ secrets.TOFU_STATE_ENDPOINT }}" }
+          key = "reposwarm/terraform.tfstate"
+          access_key = "${{ secrets.TOFU_STATE_ACCESS_KEY }}"
+          secret_key = "${{ secrets.TOFU_STATE_SECRET_KEY }}"
+          skip_credentials_validation = true
+          skip_metadata_api_check     = true
+          skip_region_validation      = true
+          skip_requesting_account_id  = true
+          skip_s3_checksum            = true
+          use_path_style              = true
+          EOF
+
+      - name: Tofu Init
+        run: tofu init -backend-config=backend.hcl
+
+      - name: Tofu Plan
+        id: plan
+        run: tofu plan -no-color
+        env:
+          TF_VAR_hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
+          TF_VAR_cloudflare_api_token: ${{ secrets.BEERPUB_CLOUDFLARE_API_TOKEN }}
+          TF_VAR_beerpub_cloudflare_zone_id: ${{ secrets.BEERPUB_CLOUDFLARE_ZONE_ID }}
+          TF_VAR_reposwarm_api_token: ${{ secrets.REPOSWARM_API_TOKEN }}
+          TF_VAR_openrouter_api_key: ${{ secrets.OPENROUTER_API_KEY }}
+          TF_VAR_github_token: ${{ secrets.PUSH_TOKEN }}
+
+      - name: Tofu Apply
+        if: github.ref == 'refs/heads/main'
+        run: tofu apply -auto-approve
+        env:
+          TF_VAR_hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
+          TF_VAR_cloudflare_api_token: ${{ secrets.BEERPUB_CLOUDFLARE_API_TOKEN }}
+          TF_VAR_beerpub_cloudflare_zone_id: ${{ secrets.BEERPUB_CLOUDFLARE_ZONE_ID }}
+          TF_VAR_reposwarm_api_token: ${{ secrets.REPOSWARM_API_TOKEN }}
+          TF_VAR_openrouter_api_key: ${{ secrets.OPENROUTER_API_KEY }}
+          TF_VAR_github_token: ${{ secrets.PUSH_TOKEN }}
