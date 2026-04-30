@@ -1,0 +1,33 @@
+company/system-prompt.md
+  4e0960f5a8e78e53 242-249
+company/idle-policy.md
+  4e0960f5a8e78e53 1-121
+README.md
+  4e0960f5a8e78e53 172
+.github/workflows/observation-loop.yml
+  4e0960f5a8e78e53 162-169,247,254-255,309-314
+.github/workflows/pipeline-health.yml
+  4e0960f5a8e78e53 667-738,747,750,759,773
+.goosehints
+  4e0960f5a8e78e53 18-21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "439b7b79317aa3255d4c1876c620e4f9f4169463",
+  "prompts": {
+    "4e0960f5a8e78e53": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8154a27f-97da-4549-bbab-529a45909833",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "~.~",
+      "messages": [],
+      "total_additions": 228,
+      "total_deletions": 2,
+      "accepted_lines": 228,
+      "overriden_lines": 0
+    }
+  }
+}
