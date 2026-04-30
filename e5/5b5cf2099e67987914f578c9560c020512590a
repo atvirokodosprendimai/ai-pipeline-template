@@ -1,0 +1,23 @@
+infrastructure/terraform/reposwarm/cloud-init.sh.tpl
+  a9df32fd646b1444 40,42,64,174
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "e55b5cf2099e67987914f578c9560c020512590a",
+  "prompts": {
+    "a9df32fd646b1444": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_22abbb6baffeROl5oe89lVj0nN",
+        "model": "minimax-coding-plan/MiniMax-M2.7"
+      },
+      "human_author": "~.~",
+      "messages": [],
+      "total_additions": 6,
+      "total_deletions": 11,
+      "accepted_lines": 67,
+      "overriden_lines": 0
+    }
+  }
+}
