@@ -22,19 +22,13 @@ GITHUB_TOKEN_END
 )
 LLM_PROVIDER="${llm_provider}"
 
-for var_name in REPOSWARM_API_TOKEN; do
-  val="${!var_name}"
-  if [ -z "$val" ] || [ "$(printf '%s' "$val" | tr -d '[:space:]')" = "" ]; then
-    echo "ERROR: $var_name is empty or whitespace-only" >&2
-    exit 1
-  fi
-  case "$val" in
-    *$'\n'* | *$'\r'*)
-      echo "ERROR: $var_name contains newline/CRLF — rejecting" >&2
-      exit 1
-      ;;
-  esac
-done
+if [ -z "$$REPOSWARM_API_TOKEN" ] || [ "$$(printf '%s' "$$REPOSWARM_API_TOKEN" | tr -d '[:space:]')" = "" ]; then
+  echo "ERROR: REPOSWARM_API_TOKEN is empty or whitespace-only" >&2
+  exit 1
+fi
+case "$$REPOSWARM_API_TOKEN" in *"
+"* | *"
+"*) echo "ERROR: REPOSWARM_API_TOKEN contains newline/CRLF" >&2; exit 1;; esac
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
@@ -44,9 +38,9 @@ apt-get install -y curl nginx certbot python3-certbot-nginx ufw ca-certificates 
 systemctl enable --now docker
 
 INSTALL_DIR="/opt/reposwarm"
-mkdir -p "$INSTALL_DIR"
+mkdir -p "$$INSTALL_DIR"
 
-cat > "$INSTALL_DIR/docker-compose.yml" <<'COMPOSE'
+cat > "$$INSTALL_DIR/docker-compose.yml" <<'COMPOSE'
 services:
   postgres:
     image: postgres:16-alpine
@@ -107,7 +101,7 @@ services:
       - AWS_ACCESS_KEY_ID=dummy
       - AWS_SECRET_ACCESS_KEY=dummy
       - AWS_REGION=us-east-1
-      - API_TOKEN=${REPOSWARM_API_TOKEN}
+      - API_TOKEN=$${REPOSWARM_API_TOKEN}
       - PORT=3000
     ports:
       - "127.0.0.1:3000:3000"
@@ -121,7 +115,7 @@ services:
     image: ghcr.io/berriai/litellm:main-latest
     command: ["--model", "openrouter/anthropic/claude-sonnet-4-20250514", "--port", "4000"]
     environment:
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OPENROUTER_API_KEY=$${OPENROUTER_API_KEY}
     ports:
       - "127.0.0.1:4000:4000"
     healthcheck:
@@ -142,7 +136,7 @@ services:
     environment:
       - TEMPORAL_ADDRESS=temporal:7233
       - API_URL=http://api:3000/v1
-      - API_TOKEN=${REPOSWARM_API_TOKEN}
+      - API_TOKEN=$${REPOSWARM_API_TOKEN}
       - DYNAMODB_ENDPOINT=http://dynamodb:8000
       - AWS_ACCESS_KEY_ID=dummy
       - AWS_SECRET_ACCESS_KEY=dummy
@@ -150,9 +144,9 @@ services:
       - CLAUDE_PROVIDER=litellm
       - CLAUDE_CODE_USE_BEDROCK=0
       - LITELLM_URL=http://litellm:4000
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ANTHROPIC_API_KEY=$${ANTHROPIC_API_KEY}
       - ANTHROPIC_MODEL=claude-sonnet-4-20250514
-      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GITHUB_TOKEN=$${GITHUB_TOKEN}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 10s
@@ -174,11 +168,11 @@ volumes:
   postgres_data:
 COMPOSE
 
-REPOSWARM_API_TOKEN="$REPOSWARM_API_TOKEN" \
-ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
-OPENROUTER_API_KEY="$OPENROUTER_API_KEY" \
-GITHUB_TOKEN="$GITHUB_TOKEN" \
-docker compose -f "$INSTALL_DIR/docker-compose.yml" up -d
+REPOSWARM_API_TOKEN="$$REPOSWARM_API_TOKEN" \
+ANTHROPIC_API_KEY="$$ANTHROPIC_API_KEY" \
+OPENROUTER_API_KEY="$$OPENROUTER_API_KEY" \
+GITHUB_TOKEN="$$GITHUB_TOKEN" \
+docker compose -f "$$INSTALL_DIR/docker-compose.yml" up -d
 
 unset REPOSWARM_API_TOKEN ANTHROPIC_API_KEY OPENROUTER_API_KEY GITHUB_TOKEN
 
@@ -223,10 +217,10 @@ systemctl reload nginx
 
 if [ -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" ]; then
   echo "Reusing existing Let's Encrypt cert"
-  certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos --email "$EMAIL" --redirect --keep-until-expiring
+  certbot --nginx -d "$$DOMAIN" --non-interactive --agree-tos --email "$$EMAIL" --redirect --keep-until-expiring
 else
-  echo "Requesting new Let's Encrypt cert"
-  certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos --email "$EMAIL" --redirect
+  echo "No existing cert - requesting from Let's Encrypt"
+  certbot --nginx -d "$$DOMAIN" --non-interactive --agree-tos --email "$$EMAIL" --redirect
 fi
 ( crontab -l 2>/dev/null || true; echo "17 3 * * * /usr/bin/certbot renew --quiet" ) | crontab -
 
