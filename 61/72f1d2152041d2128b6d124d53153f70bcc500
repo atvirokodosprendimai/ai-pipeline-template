@@ -1,0 +1,23 @@
+.github/workflows/terraform-deploy.yml
+  a9df32fd646b1444 9-14,200-205
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "6172f1d2152041d2128b6d124d53153f70bcc500",
+  "prompts": {
+    "a9df32fd646b1444": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_22abbb6baffeROl5oe89lVj0nN",
+        "model": "minimax-coding-plan/MiniMax-M2.7"
+      },
+      "human_author": "~.~",
+      "messages": [],
+      "total_additions": 12,
+      "total_deletions": 1,
+      "accepted_lines": 75,
+      "overriden_lines": 0
+    }
+  }
+}
