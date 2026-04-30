@@ -37,14 +37,9 @@ apt-get install -y curl nginx certbot python3-certbot-nginx ufw ca-certificates 
 
 systemctl enable --now docker
 
-INSTALL_DIR="/opt/reposwarm"
-mkdir -p "$$INSTALL_DIR"
+mkdir -p /opt/reposwarm
 
-mkdir -p /usr/local/lib/docker/cli-plugins
-curl -fsSL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64" -o /usr/local/lib/docker/cli-plugins/docker-compose
-chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
-
-cat > "$$INSTALL_DIR/docker-compose.yml" <<'COMPOSE'
+cat > /opt/reposwarm/docker-compose.yml <<'COMPOSE'
 services:
   postgres:
     image: postgres:16-alpine
@@ -66,7 +61,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      - DB=postgresql
+      - DB=postgres12
       - DB_PORT=5432
       - POSTGRES_USER=temporal
       - POSTGRES_PWD=temporal
@@ -176,7 +171,7 @@ REPOSWARM_API_TOKEN="$$REPOSWARM_API_TOKEN" \
 ANTHROPIC_API_KEY="$$ANTHROPIC_API_KEY" \
 OPENROUTER_API_KEY="$$OPENROUTER_API_KEY" \
 GITHUB_TOKEN="$$GITHUB_TOKEN" \
-docker compose -f "$$INSTALL_DIR/docker-compose.yml" up -d
+docker compose -f /opt/reposwarm/docker-compose.yml up -d
 
 unset REPOSWARM_API_TOKEN ANTHROPIC_API_KEY OPENROUTER_API_KEY GITHUB_TOKEN
 
