@@ -1,21 +1,20 @@
 # Assessment: 2026-05-01
 
-**Stage**: Presence | **Run**: 120
+**Stage**: Reachable | **Run**: 121
 
-Correcting funnel stage from Reachable to Presence. Despite wgmesh being fully functional (v0.2.1, comprehensive mesh architecture), Polar.sh billing integration has failed with 'org not found' for 40+ days, preventing customer payment capability. Cannot be Stage 3 without working billing. Pipeline is healthy but idle with 14 PRs merged in 7 days. Applying Commercial Idle Policy to focus on customer acquisition over internal work.
+Correcting funnel stage: wgmesh is actually in Stage 3 (Reachable) based on functional product (v0.2.1, 10 stars, comprehensive mesh architecture) and established presence. Critical blocker: Polar.sh billing integration 'org not found' error persists for 44+ days, preventing Stage 4 advancement to first paying customer.
 
 ## Blockers
-- Polar.sh billing integration broken - 'org not found' error prevents customer payment capability required for Stage 3
-- No direct customer outreach or proof-of-value documentation to drive first paying customer
+- Polar.sh billing integration fails with 'org not found' error, blocking customer payment capability required for Stage 4 Pipeline
 
 ## Top Actions
-- **fn:gtm**: Create landing page with clear value proposition targeting DevOps teams managing multi-cloud networking (zero)
-- **fn:billing**: Fix Polar.sh billing integration to enable customer payment flow (zero)
-- **fn:gtm**: Document proof-of-value case study from internal mesh usage (zero)
+- **fn:gtm**: Create detailed wgmesh pilot program landing page with clear value proposition, pricing tiers, and enterprise evaluation checklist (zero)
+- **fn:billing**: Fix Polar.sh billing integration 'org not found' error to enable customer payments (zero)
+- **fn:dev**: Implement --version flag for CLI (issue #515) (zero)
 
 ## Contributions
-- **Marty**: 14 PRs merged in 7 days, active git commits
-- **~.~**: Recent git commits in past 7 days
+- **Marty**: Recent git commits and project maintenance
+- **~.~**: Recent git contributions in past 7 days
 
 ## Needs Human
-- [blocking] Set up Polar.sh organization properly or choose alternative billing provider
+- [blocking] Verify Polar.sh organization exists and provide correct organization name/credentials for billing integration
