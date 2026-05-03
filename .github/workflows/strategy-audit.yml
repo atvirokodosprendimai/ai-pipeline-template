@@ -147,13 +147,15 @@ jobs:
           paid_customers="null"
           fetch_status="fetch_failed"
           if curl --fail-with-body --silent --show-error --max-time 15 "$CHIMNEY_URL" -o /tmp/chimney.html; then
-            line=$(grep -i -E 'Paid subscribers' /tmp/chimney.html | head -n 1 || true)
-            extracted=$(printf '%s\n' "$line" | grep -oE '[0-9][0-9,]*' | head -n 1 | tr -d ',' || true)
+            # chimney renders "Paid subscriber" (singular) in <div class="stage-metric">,
+            # with the integer count in the following <div class="stage-status">N</div>.
+            # -A 1 captures the next line so the digit lands in the same grep window.
+            extracted=$(grep -i -A 1 'Paid subscriber' /tmp/chimney.html | grep -oE '[0-9]+' | head -n 1 || true)
             if [ -n "$extracted" ]; then
               paid_customers="$extracted"
               fetch_status="ok"
             else
-              echo "::warning::could not extract Paid subscribers from chimney HTML"
+              echo "::warning::could not extract Paid subscriber count from chimney HTML"
             fi
           else
             echo "::warning::failed to fetch chimney dashboard"
@@ -181,7 +183,7 @@ jobs:
                 ((($delta * 1000) | round) / 10) as $pct |
                 ((if $pct < 0 then -$pct else $pct end) as $pct_abs |
                 (if ($direction == "drop" and $delta <= -$threshold) or ($direction == "grow" and $delta >= $threshold) then true else false end) as $drift |
-                {key:$key,label:$label,baseline:$baseline,current:$current,delta:$delta,pct_abs:$pct_abs,delta_display:(if $pct > 0 then "+" else "" end) + ($pct|tostring) + "%",verdict:(if $drift then "DRIFT" else "OK" end),drift:$drift}))
+                {key:$key,label:$label,baseline:$baseline,current:$current,delta:$delta,pct_abs:$pct_abs,delta_display:((if $pct > 0 then "+" else "" end) + ($pct|tostring) + "%"),verdict:(if $drift then "DRIFT" else "OK" end),drift:$drift}))
               end'
           }
           metric_row paid_customers "Paid customers" drop "$(jq -r '.metrics.paid_customers // null' <<< "$previous")" "$PAID_CUSTOMERS" > /tmp/rows.jsonl
