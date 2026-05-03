@@ -1,0 +1,322 @@
+name: Strategy Drift Audit
+
+on:
+  schedule:
+    - cron: '0 9 1-7 * 1'
+  workflow_dispatch:
+    inputs:
+      target_repo:
+        description: 'Repo to measure (default: atvirokodosprendimai/wgmesh)'
+        required: false
+        default: 'atvirokodosprendimai/wgmesh'
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: read
+
+env:
+  DRIFT_THRESHOLD: '0.25'
+  CHIMNEY_URL: 'https://chimney.beerpub.dev/'
+
+jobs:
+  audit:
+    name: Compare strategy vs reality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          fetch-depth: 0
+
+      - name: Skip if STRATEGY.md missing or has no last_updated
+        id: skip-guard
+        run: |
+          set -euo pipefail
+          if [ ! -f STRATEGY.md ]; then
+            echo "::notice::STRATEGY.md not present — nothing to audit"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! grep -q '^last_updated:' STRATEGY.md; then
+            echo "::notice::STRATEGY.md has no last_updated frontmatter — skipping"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+      - name: Ensure needs-human label exists
+        if: steps.skip-guard.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          gh label create needs-human \
+            --description "Requires human review before merge" \
+            --color FBCA04 \
+            --force 2>/dev/null || true
+
+      - name: Compute self-heal rate and active stuck issues
+        if: steps.skip-guard.outputs.skip != 'true'
+        id: local-metrics
+        env:
+          GH_TOKEN: ${{ secrets.PUSH_TOKEN }}
+          TARGET_REPO: ${{ inputs.target_repo || 'atvirokodosprendimai/wgmesh' }}
+        run: |
+          set -euo pipefail
+          state_file="company/pipeline-health-state.json"
+          if [ -f "$state_file" ]; then
+            self_heal_rate=$(jq -r '(.last_run_summary.actions_taken // 0) as $a | (.last_run_summary.needs_human_closed // 0) as $n | if (($a + $n) == 0) then 0 else ($a / ($a + $n)) end' "$state_file")
+            now=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+            cooldown_count=$(jq -r --arg now "$now" '[.retry_tracker // {} | if type == "object" then .[] elif type == "array" then .[] else empty end | select((.cooldown_until // "") > $now)] | length' "$state_file")
+          else
+            self_heal_rate="0"
+            cooldown_count="0"
+          fi
+          needs_human_count=$(gh issue list --repo "$TARGET_REPO" --state open --label needs-human --limit 100 --json number | jq 'length')
+          active_stuck_issues=$((needs_human_count + cooldown_count))
+          echo "SELF_HEAL_RATE=$self_heal_rate" >> "$GITHUB_ENV"
+          echo "ACTIVE_STUCK_ISSUES=$active_stuck_issues" >> "$GITHUB_ENV"
+
+      - name: Compute lead time + autonomous-ship rate
+        if: steps.skip-guard.outputs.skip != 'true'
+        id: gh-metrics
+        env:
+          GH_TOKEN: ${{ secrets.PUSH_TOKEN }}
+          TARGET_REPO: ${{ inputs.target_repo || 'atvirokodosprendimai/wgmesh' }}
+        run: |
+          set -euo pipefail
+          cutoff_date=$(date -u -d '30 days ago' '+%Y-%m-%d' 2>/dev/null || date -u -v-30d '+%Y-%m-%d')
+          to_epoch() {
+            date -u -d "$1" '+%s' 2>/dev/null || date -u -j -f '%Y-%m-%dT%H:%M:%SZ' "$1" '+%s'
+          }
+          mapfile -t prs < <(gh pr list --repo "$TARGET_REPO" --state merged --search "merged:>=$cutoff_date" --limit 100 --json number --jq '.[].number')
+          lead_hours=()
+          bot_total=0
+          bot_clean=0
+          for pr in "${prs[@]}"; do
+            gh pr view "$pr" --repo "$TARGET_REPO" --json number,author,mergedAt,closingIssuesReferences,reviews,comments,labels > /tmp/pr.json
+            author=$(jq -r '.author.login // ""' /tmp/pr.json)
+            merged_at=$(jq -r '.mergedAt // empty' /tmp/pr.json)
+            while read -r issue; do
+              [ -n "$issue" ] || continue
+              labeled_at=$(gh api graphql -f owner="${TARGET_REPO%/*}" -f name="${TARGET_REPO#*/}" -F issue="$issue" -f query='
+                query($owner:String!, $name:String!, $issue:Int!) {
+                  repository(owner:$owner, name:$name) {
+                    issue(number:$issue) {
+                      timelineItems(first:100, itemTypes:LABELED_EVENT) {
+                        nodes { ... on LabeledEvent { createdAt label { name } } }
+                      }
+                    }
+                  }
+                }' --jq '[.data.repository.issue.timelineItems.nodes[]? | select(.label.name == "needs-triage") | .createdAt] | sort | .[0] // empty')
+              if [ -n "$labeled_at" ] && [ -n "$merged_at" ]; then
+                start=$(to_epoch "$labeled_at")
+                end=$(to_epoch "$merged_at")
+                if [ "$end" -ge "$start" ]; then
+                  lead_hours+=("$(jq -n --argjson s "$start" --argjson e "$end" '((($e - $s) / 3600) * 100 | round) / 100')")
+                fi
+              fi
+            done < <(jq -r '.closingIssuesReferences[]?.number // empty' /tmp/pr.json)
+            if [[ "$author" == "goose[bot]" || "$author" == "copilot-swe-agent[bot]" || "$author" == "pupabobas[bot]" ]]; then
+              bot_total=$((bot_total + 1))
+              non_bot_comments=$(jq '[.comments[]? | select((.author.login // "") | test("\\[bot\\]$") | not)] | length' /tmp/pr.json)
+              non_bot_reviews=$(jq '[.reviews[]? | select((.author.login // "") | test("\\[bot\\]$") | not) | select((.body // "") != "")] | length' /tmp/pr.json)
+              needs_human=$(jq '[.labels[]? | select(.name == "needs-human")] | length' /tmp/pr.json)
+              if [ "$non_bot_comments" -eq 0 ] && [ "$non_bot_reviews" -eq 0 ] && [ "$needs_human" -eq 0 ]; then
+                bot_clean=$((bot_clean + 1))
+              fi
+            fi
+          done
+          lead_time_hours=$(printf '%s\n' "${lead_hours[@]}" | jq -s 'sort | if length == 0 then null else .[(length / 2 | floor)] end')
+          autonomous_ship_rate=$(jq -n --argjson clean "$bot_clean" --argjson total "$bot_total" 'if $total == 0 then null else (($clean / $total) * 10000 | round) / 10000 end')
+          echo "LEAD_TIME_HOURS=$lead_time_hours" >> "$GITHUB_ENV"
+          echo "AUTONOMOUS_SHIP_RATE=$autonomous_ship_rate" >> "$GITHUB_ENV"
+
+      - name: Fetch paid customers from chimney
+        if: steps.skip-guard.outputs.skip != 'true'
+        id: paid
+        run: |
+          paid_customers="null"
+          fetch_status="fetch_failed"
+          if curl --fail-with-body --silent --show-error --max-time 15 "$CHIMNEY_URL" -o /tmp/chimney.html; then
+            line=$(grep -i -E 'Paid subscribers' /tmp/chimney.html | head -n 1 || true)
+            extracted=$(printf '%s\n' "$line" | grep -oE '[0-9][0-9,]*' | head -n 1 | tr -d ',' || true)
+            if [ -n "$extracted" ]; then
+              paid_customers="$extracted"
+              fetch_status="ok"
+            else
+              echo "::warning::could not extract Paid subscribers from chimney HTML"
+            fi
+          else
+            echo "::warning::failed to fetch chimney dashboard"
+          fi
+          echo "PAID_CUSTOMERS=$paid_customers" >> "$GITHUB_ENV"
+          echo "PAID_FETCH_STATUS=$fetch_status" >> "$GITHUB_ENV"
+
+      - name: Detect drift, build audit body, manage PR
+        if: steps.skip-guard.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          baseline_file="company/strategy-audit-baseline.json"
+          previous=$(jq -c '.audits[-1] // null' "$baseline_file")
+          first_run=$(jq -r 'if (.audits // [] | length) == 0 then "true" else "false" end' "$baseline_file")
+          metric_row() {
+            jq -nc --arg key "$1" --arg label "$2" --arg direction "$3" --argjson baseline "$4" --argjson current "$5" --argjson threshold "$DRIFT_THRESHOLD" '
+              def absn: if . < 0 then -. else . end;
+              if $baseline == null or $current == null then
+                {key:$key,label:$label,baseline:$baseline,current:$current,delta:null,pct_abs:null,delta_display:"n/a",verdict:"NO DATA",drift:false}
+              else
+                (($baseline | absn) as $absb | (if $absb < 0.0001 then 0.0001 else $absb end) as $denom |
+                (($current - $baseline) / $denom) as $delta |
+                ((($delta * 1000) | round) / 10) as $pct |
+                ((if $pct < 0 then -$pct else $pct end) as $pct_abs |
+                (if ($direction == "drop" and $delta <= -$threshold) or ($direction == "grow" and $delta >= $threshold) then true else false end) as $drift |
+                {key:$key,label:$label,baseline:$baseline,current:$current,delta:$delta,pct_abs:$pct_abs,delta_display:(if $pct > 0 then "+" else "" end) + ($pct|tostring) + "%",verdict:(if $drift then "DRIFT" else "OK" end),drift:$drift}))
+              end'
+          }
+          metric_row paid_customers "Paid customers" drop "$(jq -r '.metrics.paid_customers // null' <<< "$previous")" "$PAID_CUSTOMERS" > /tmp/rows.jsonl
+          metric_row autonomous_ship_rate "Autonomous-ship rate" drop "$(jq -r '.metrics.autonomous_ship_rate // null' <<< "$previous")" "$AUTONOMOUS_SHIP_RATE" >> /tmp/rows.jsonl
+          metric_row lead_time_hours "Lead time hours" grow "$(jq -r '.metrics.lead_time_hours // null' <<< "$previous")" "$LEAD_TIME_HOURS" >> /tmp/rows.jsonl
+          metric_row self_heal_rate "Self-heal rate" drop "$(jq -r '.metrics.self_heal_rate // null' <<< "$previous")" "$SELF_HEAL_RATE" >> /tmp/rows.jsonl
+          metric_row active_stuck_issues "Active stuck issues" grow "$(jq -r '.metrics.active_stuck_issues // null' <<< "$previous")" "$ACTIVE_STUCK_ISSUES" >> /tmp/rows.jsonl
+          jq -s '.' /tmp/rows.jsonl > /tmp/metric-rows.json
+          today=$(date -u '+%Y-%m-%d')
+          milestones='[]'
+          while IFS= read -r line; do
+            date_part=$(printf '%s\n' "$line" | sed -nE 's/^- \*\*([0-9]{4}-[0-9]{2}-[0-9]{2})\*\* .*/\1/p')
+            target=$(printf '%s\n' "$line" | sed -nE 's/^- \*\*[0-9-]+\*\* . (.*)$/\1/p')
+            [ -n "$date_part" ] || continue
+            current="not measured"
+            status="pending"
+            if printf '%s\n' "$target" | grep -qiE 'paying customer|customers'; then
+              target_num=$(printf '%s\n' "$target" | grep -oE '[0-9]+' | head -n 1 || true)
+              current="$PAID_CUSTOMERS paid customers"
+              if [ "$PAID_CUSTOMERS" != "null" ] && [ -n "$target_num" ] && [ "$PAID_CUSTOMERS" -ge "$target_num" ]; then
+                status="met"
+              elif [[ "$today" > "$date_part" || "$today" == "$date_part" ]]; then
+                status="overdue"
+              fi
+            elif [[ "$today" > "$date_part" || "$today" == "$date_part" ]]; then
+              status="overdue"
+            fi
+            milestones=$(jq -c --arg date "$date_part" --arg target "$target" --arg current "$current" --arg status "$status" '. + [{date:$date,target:$target,current:$current,status:$status}]' <<< "$milestones")
+          done < <(awk '/^## Milestones/{flag=1; next} /^## /{flag=0} flag && /^- /{print}' STRATEGY.md)
+          metric_drift_count=$(jq '[.[] | select(.drift)] | length' /tmp/metric-rows.json)
+          overdue_count=$(jq '[.[] | select(.status == "overdue")] | length' <<< "$milestones")
+          if [ "$first_run" = "true" ]; then
+            metric_drift_count=0
+            overdue_count=0
+          fi
+          current_metrics=$(jq -nc --argjson paid "$PAID_CUSTOMERS" --argjson auto "$AUTONOMOUS_SHIP_RATE" --argjson lead "$LEAD_TIME_HOURS" --argjson heal "$SELF_HEAL_RATE" --argjson stuck "$ACTIVE_STUCK_ISSUES" --arg paid_status "$PAID_FETCH_STATUS" '{paid_customers:$paid, autonomous_ship_rate:$auto, lead_time_hours:$lead, self_heal_rate:$heal, active_stuck_issues:$stuck, fetch_status:{paid_customers:$paid_status}}')
+          ran_at=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+          jq --arg ran_at "$ran_at" --argjson metrics "$current_metrics" --argjson milestones "$milestones" '.audits = (((.audits // []) + [{ran_at:$ran_at, metrics:$metrics, milestones_status:$milestones}]) | .[-24:])' "$baseline_file" > /tmp/strategy-audit-baseline.raw.json
+          if ! bash company/scripts/sanitise.sh < /tmp/strategy-audit-baseline.raw.json > /tmp/strategy-audit-baseline.clean.json; then
+            echo "::warning::strategy audit baseline failed sanitisation; skipping commit and PR"
+            echo "STRATEGY_AUDIT_MISTAKE=true" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          any_drift="false"
+          if [ "$metric_drift_count" -gt 0 ] || [ "$overdue_count" -gt 0 ]; then
+            any_drift="true"
+          fi
+          echo "DRIFT_DETECTED=$any_drift" >> "$GITHUB_ENV"
+          month=$(date -u '+%Y-%m')
+          if [ "$any_drift" = "true" ]; then
+            branch="audit/strategy-drift-$month"
+            title="audit: strategy drift detected $month"
+          else
+            branch="audit/strategy-baseline-$month"
+            title="audit: strategy baseline $month"
+          fi
+          {
+            echo "## Metric drift"
+            echo "| Metric | Baseline | Current | Delta | Verdict |"
+            echo "|---|---:|---:|---:|---|"
+            jq -r '.[] | "| \(.label) | \(.baseline // "null") | \(.current // "null") | \(.delta_display) | \(.verdict) |"' /tmp/metric-rows.json
+            echo
+            echo "## Milestone status"
+            echo "| Date | Target | Current | Status |"
+            echo "|---|---|---|---|"
+            jq -r '.[] | "| \(.date) | \(.target) | \(.current) | \(.status) |"' <<< "$milestones"
+            echo
+            echo "## Suggested edits"
+            jq -r '.[] | select(.drift) | [.key,.pct_abs,.baseline,.current] | @tsv' /tmp/metric-rows.json | while IFS=$'\t' read -r key pct baseline current; do
+              case "$key" in
+                paid_customers) echo "- Paid customers dropped ${pct}% (baseline ${baseline} → current ${current}). Consider revising the Y2 customer target or revisiting the Customer Factory track." ;;
+                lead_time_hours) echo "- Lead time grew ${pct}% (baseline ${baseline}h → current ${current}h). Convergence engine track may need attention; check Goose error patterns in audit-log.jsonl." ;;
+                self_heal_rate) echo "- Self-heal resolution rate dropped ${pct}% (baseline ${baseline} → current ${current}). Self-heal & resilience track is regressing; review recent needs-human escalations." ;;
+                autonomous_ship_rate) echo "- Autonomous-ship rate dropped ${pct}% (baseline ${baseline} → current ${current}). Bot-authored PRs are increasingly needing human intervention; check bot-pr-review-merge.yml outcomes." ;;
+                active_stuck_issues) echo "- Active stuck issues grew ${pct}% (baseline ${baseline} → current ${current}). Self-heal & resilience track is leaking work into needs-human; review escalation triggers." ;;
+              esac
+            done
+            jq -r '.[] | select(.status == "overdue") | "- Milestone \(.date) target (\(.target)) not met (current: \(.current)). Reaffirm in STRATEGY.md or revise the date/target."' <<< "$milestones"
+            if [ "$any_drift" != "true" ]; then
+              echo "- No STRATEGY.md edits suggested; this PR records the monthly strategy baseline."
+            fi
+          } > /tmp/audit-body.md
+          git config user.name "pupabobas[bot]"
+          git config user.email "pupabobas[bot]@users.noreply.github.com"
+          git fetch origin "+refs/heads/$branch:refs/remotes/origin/$branch" || true
+          if git show-ref --verify --quiet "refs/remotes/origin/$branch"; then
+            git checkout -B "$branch" "origin/$branch"
+          else
+            git checkout -B "$branch" origin/main
+          fi
+          mv /tmp/strategy-audit-baseline.clean.json "$baseline_file"
+          if git diff --quiet -- "$baseline_file"; then
+            echo "::notice::strategy audit baseline unchanged"
+          else
+            git commit -m "$title" -- "$baseline_file"
+            git push -u origin "$branch"
+          fi
+          existing=$(gh pr list --repo "$GITHUB_REPOSITORY" --search "$title in:title" --state all --json number,state --jq '[.[] | select(.state == "OPEN" or .state == "MERGED")] | .[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh pr edit "$existing" --repo "$GITHUB_REPOSITORY" --body-file /tmp/audit-body.md
+          elif [ "$any_drift" = "true" ]; then
+            gh pr create --repo "$GITHUB_REPOSITORY" --title "$title" --body-file /tmp/audit-body.md --base main --head "$branch" --label needs-human
+          else
+            gh pr create --repo "$GITHUB_REPOSITORY" --title "$title" --body-file /tmp/audit-body.md --base main --head "$branch"
+          fi
+
+      - name: Append audit outcome to MentisDB
+        if: always() && steps.skip-guard.outputs.skip != 'true'
+        env:
+          MENTISDB_URL: ${{ secrets.MENTISDB_URL }}
+          MENTISDB_USER: ${{ secrets.MENTISDB_USER }}
+          MENTISDB_PASSWORD: ${{ secrets.MENTISDB_PASSWORD }}
+          OUTCOME: ${{ job.status }}
+          DRIFT_DETECTED: ${{ env.DRIFT_DETECTED || 'false' }}
+          STRATEGY_AUDIT_MISTAKE: ${{ env.STRATEGY_AUDIT_MISTAKE || 'false' }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          TYPE="Mistake"
+          IMP="0.7"
+          if [ "$OUTCOME" = "success" ] && [ "$DRIFT_DETECTED" != "true" ] && [ "$STRATEGY_AUDIT_MISTAKE" != "true" ]; then
+            TYPE="Insight"
+            IMP="0.4"
+          fi
+          PAYLOAD=$(jq -nc --arg type "$TYPE" --arg outcome "$OUTCOME" --arg drift "$DRIFT_DETECTED" --arg run_url "$RUN_URL" --arg imp "$IMP" '{
+            chain_key: "ai-pipeline-template",
+            agent_id: "strategy-audit",
+            agent_name: "strategy-audit",
+            thought_type: $type,
+            content: ("Strategy drift audit " + $outcome + " drift_detected=" + $drift + " (" + $run_url + ")"),
+            tags: ["ai-pipeline-template", "strategy-audit", $outcome],
+            importance: ($imp | tonumber)
+          }')
+          URL="${MENTISDB_URL%/}/v1/thoughts"
+          curl --fail-with-body --silent --show-error --max-time 15 \
+            -u "$MENTISDB_USER:$MENTISDB_PASSWORD" \
+            -X POST -H 'Content-Type: application/json' \
+            -d "$PAYLOAD" "$URL" \
+            || { code=$?; echo "::warning::mentisdb append failed (curl exit $code, non-fatal)"; }
