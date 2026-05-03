@@ -1,3 +1,49 @@
 {
-  "audits": []
+  "audits": [
+    {
+      "ran_at": "2026-05-03T14:41:59Z",
+      "metrics": {
+        "paid_customers": 0,
+        "autonomous_ship_rate": null,
+        "lead_time_hours": 4.84,
+        "self_heal_rate": 0,
+        "active_stuck_issues": 0,
+        "fetch_status": {
+          "paid_customers": "ok"
+        }
+      },
+      "milestones_status": [
+        {
+          "date": "2026-06-30",
+          "target": "wgmesh edge node beta (first seeded product reaches public beta)",
+          "current": "not measured",
+          "status": "pending"
+        },
+        {
+          "date": "2026-08-01",
+          "target": "1 paying customer (90-day target)",
+          "current": "0 paid customers",
+          "status": "pending"
+        },
+        {
+          "date": "2027-05-03",
+          "target": "4 customers (Year 1)",
+          "current": "0 paid customers",
+          "status": "pending"
+        },
+        {
+          "date": "2028-05-03",
+          "target": "42 customers, $10K ARR (Year 2)",
+          "current": "0 paid customers",
+          "status": "pending"
+        },
+        {
+          "date": "2029-05-03",
+          "target": "420 customers, $100K ARR (Year 3, MSC)",
+          "current": "0 paid customers",
+          "status": "pending"
+        }
+      ]
+    }
+  ]
 }
