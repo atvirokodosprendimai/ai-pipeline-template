@@ -1,8 +1,8 @@
 # Assessment: 2026-05-03
 
-**Stage**: Reachable | **Run**: 126
+**Stage**: Reachable | **Run**: 127
 
-Stage 3, day 46. wgmesh remains fully functional (v0.2.1, 10 stars) with very healthy pipeline (14 PRs merged in 7d, only 2 dev issues active). Critical blocker unchanged: Polar.sh billing integration failing with 'org not found' error for 46+ days. Pipeline is idle - applying Commercial Idle Policy to create customer-ready proof of value content.
+Stage 3, day 46. wgmesh remains fully functional (v0.2.1, 10 stars) with very healthy pipeline (14 PRs merged in 7d, only 2 active dev issues). Critical blocker unchanged: Polar.sh billing integration failing with 'org not found' error for 46+ days. Pipeline is idle - applying Commercial Idle Policy.
 
 ## Blockers
 - Polar.sh billing integration failing with 'org not found' error for 46+ days, preventing customer payment capability required for Stage 4 advancement
