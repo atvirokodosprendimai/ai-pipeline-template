@@ -20,6 +20,7 @@ jobs:
       github.event.pull_request.user.login == 'copilot-swe-agent[bot]' ||
       github.event.pull_request.user.login == 'Copilot' ||
       github.event.pull_request.user.login == 'goose[bot]' ||
+      github.event.pull_request.user.login == 'pupabobas[bot]' ||
       github.event.pull_request.user.login == 'nycterent' ||
       contains(github.event.pull_request.title, 'impl:')
     runs-on: ubuntu-latest
