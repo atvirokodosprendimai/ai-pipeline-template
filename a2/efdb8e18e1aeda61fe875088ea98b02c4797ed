@@ -1,0 +1,23 @@
+.github/workflows/strategy-audit.yml
+  0a0e84e1f3ad7299 150-153,158,186
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "a2efdb8e18e1aeda61fe875088ea98b02c4797ed",
+  "prompts": {
+    "0a0e84e1f3ad7299": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "686ff151-ae6e-401e-914c-05f52dfa7c13",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "~.~",
+      "messages": [],
+      "total_additions": 68,
+      "total_deletions": 4,
+      "accepted_lines": 68,
+      "overriden_lines": 0
+    }
+  }
+}
