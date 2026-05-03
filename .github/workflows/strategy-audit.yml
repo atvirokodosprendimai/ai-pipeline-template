@@ -2,7 +2,7 @@ name: Strategy Drift Audit
 
 on:
   schedule:
-    - cron: '0 9 1-7 * 1'
+    - cron: '0 9 * * *'
   workflow_dispatch:
     inputs:
       target_repo:
@@ -16,7 +16,7 @@ permissions:
   actions: read
 
 env:
-  DRIFT_THRESHOLD: '0.25'
+  DRIFT_THRESHOLD: '0.10'
   CHIMNEY_URL: 'https://chimney.beerpub.dev/'
 
 jobs:

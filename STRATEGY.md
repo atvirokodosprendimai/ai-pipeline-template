@@ -24,6 +24,7 @@ Bet on actually converging autonomously from seed to shipped product, where auto
 - **Lead time spec → merge** — median hours from `needs-triage` issue to merged PR. Source: GitHub PR data. Leading.
 - **Self-heal resolution rate** — `actions_taken / (actions_taken + needs_human_closed)` — fraction healed without escalation. Source: `company/pipeline-health-state.json`. Leading.
 - **Active stuck issues** — open issues at `needs-human` or in retry cooldown >24h. Source: `gh issue list`. Leading.
+- **Cycle time to revenue** — median hours from first commit on a seed product → that seed's first paying customer event. Source: git log + Polar/Stripe webhook timestamps. Lagging — `null` until ≥1 customer exists. Tempo-anchor: target ≤72h.
 
 ## Tracks
 
@@ -47,11 +48,13 @@ _Why it serves the approach:_ converging on code without converging on revenue i
 
 ## Milestones
 
-- **2026-06-30** — wgmesh edge node beta (first seeded product reaches public beta)
-- **2026-08-01** — 1 paying customer (90-day target)
-- **2027-05-03** — 4 customers (Year 1)
-- **2028-05-03** — 42 customers, $10K ARR (Year 2)
-- **2029-05-03** — 420 customers, $100K ARR (Year 3, MSC)
+- **2026-05-10** — first audit-loop closes cleanly (drift PR opens, founder applies, doc updates, audit re-runs green)
+- **2026-05-17** — wgmesh edge node beta (first seeded product reaches public beta)
+- **2026-05-31** — 1 paying customer
+- **2026-06-14** — 2nd seed product spec'd and entering convergence engine
+- **2026-08-31** — 4 customers ($10K ARR run-rate path)
+- **2027-05-03** — 42 customers, $10K ARR
+- **2028-05-03** — 420 customers, $100K ARR (MSC)
 
 ## Not working on
 

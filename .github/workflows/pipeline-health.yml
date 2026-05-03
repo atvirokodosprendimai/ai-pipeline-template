@@ -2,7 +2,7 @@ name: Pipeline Health (Self-Healing)
 
 on:
   schedule:
-    - cron: '0 */2 * * *'   # every 2 hours
+    - cron: '*/30 * * * *'   # every 30 minutes
   workflow_dispatch:
     inputs:
       cutoff_override_minutes:
