@@ -25,6 +25,13 @@ jobs:
       contains(github.event.pull_request.title, 'impl:')
     runs-on: ubuntu-latest
     steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
       - name: Checkout main (script lives on main, not PR branch)
         uses: actions/checkout@v4
         with:
@@ -32,7 +39,7 @@ jobs:
 
       - name: Autonomous PR review and merge
         env:
-          GH_TOKEN: ${{ secrets.PUSH_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           TARGET_REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           APPROVED_AUTHORS: ${{ github.event.pull_request.user.login }}
