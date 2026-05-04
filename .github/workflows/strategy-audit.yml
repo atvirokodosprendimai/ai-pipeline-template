@@ -191,6 +191,12 @@ jobs:
           metric_row lead_time_hours "Lead time hours" grow "$(jq -r '.metrics.lead_time_hours // null' <<< "$previous")" "$LEAD_TIME_HOURS" >> /tmp/rows.jsonl
           metric_row self_heal_rate "Self-heal rate" drop "$(jq -r '.metrics.self_heal_rate // null' <<< "$previous")" "$SELF_HEAL_RATE" >> /tmp/rows.jsonl
           metric_row active_stuck_issues "Active stuck issues" grow "$(jq -r '.metrics.active_stuck_issues // null' <<< "$previous")" "$ACTIVE_STUCK_ISSUES" >> /tmp/rows.jsonl
+          # Cycle-time-to-revenue: declared in STRATEGY.md but not yet computable
+          # (no Polar webhook integration; depends on ≥1 paid customer existing).
+          # Emitted as null with fetch_status no_customers so the metric appears in
+          # the audit table and baseline JSON, keeping STRATEGY.md aligned with
+          # the audit's persisted shape.
+          metric_row cycle_time_to_revenue "Cycle time to revenue (hours)" grow "$(jq -r '.metrics.cycle_time_to_revenue // null' <<< "$previous")" null >> /tmp/rows.jsonl
           jq -s '.' /tmp/rows.jsonl > /tmp/metric-rows.json
           today=$(date -u '+%Y-%m-%d')
           milestones='[]'
@@ -201,6 +207,7 @@ jobs:
             current="not measured"
             status="pending"
             if printf '%s\n' "$target" | grep -qiE 'paying customer|customers'; then
+              # Customer-count milestone — comparable against PAID_CUSTOMERS
               target_num=$(printf '%s\n' "$target" | grep -oE '[0-9]+' | head -n 1 || true)
               current="$PAID_CUSTOMERS paid customers"
               if [ "$PAID_CUSTOMERS" != "null" ] && [ -n "$target_num" ] && [ "$PAID_CUSTOMERS" -ge "$target_num" ]; then
@@ -209,7 +216,13 @@ jobs:
                 status="overdue"
               fi
             elif [[ "$today" > "$date_part" || "$today" == "$date_part" ]]; then
-              status="overdue"
+              # Non-customer milestone past its date. Parser cannot compute
+              # whether the work shipped (e.g. "first audit-loop closes
+              # cleanly", "edge node beta", "2nd seed product spec'd"), so
+              # mark as pending-uncertain rather than overdue. This does NOT
+              # trigger drift; the milestone is a calendar reminder, and the
+              # founder confirms or revises in STRATEGY.md when they review.
+              status="pending-uncertain"
             fi
             milestones=$(jq -c --arg date "$date_part" --arg target "$target" --arg current "$current" --arg status "$status" '. + [{date:$date,target:$target,current:$current,status:$status}]' <<< "$milestones")
           done < <(awk '/^## Milestones/{flag=1; next} /^## /{flag=0} flag && /^- /{print}' STRATEGY.md)
@@ -219,9 +232,9 @@ jobs:
             metric_drift_count=0
             overdue_count=0
           fi
-          current_metrics=$(jq -nc --argjson paid "$PAID_CUSTOMERS" --argjson auto "$AUTONOMOUS_SHIP_RATE" --argjson lead "$LEAD_TIME_HOURS" --argjson heal "$SELF_HEAL_RATE" --argjson stuck "$ACTIVE_STUCK_ISSUES" --arg paid_status "$PAID_FETCH_STATUS" '{paid_customers:$paid, autonomous_ship_rate:$auto, lead_time_hours:$lead, self_heal_rate:$heal, active_stuck_issues:$stuck, fetch_status:{paid_customers:$paid_status}}')
+          current_metrics=$(jq -nc --argjson paid "$PAID_CUSTOMERS" --argjson auto "$AUTONOMOUS_SHIP_RATE" --argjson lead "$LEAD_TIME_HOURS" --argjson heal "$SELF_HEAL_RATE" --argjson stuck "$ACTIVE_STUCK_ISSUES" --arg paid_status "$PAID_FETCH_STATUS" '{paid_customers:$paid, autonomous_ship_rate:$auto, lead_time_hours:$lead, self_heal_rate:$heal, active_stuck_issues:$stuck, cycle_time_to_revenue:null, fetch_status:{paid_customers:$paid_status, cycle_time_to_revenue:"no_customers"}}')
           ran_at=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
-          jq --arg ran_at "$ran_at" --argjson metrics "$current_metrics" --argjson milestones "$milestones" '.audits = (((.audits // []) + [{ran_at:$ran_at, metrics:$metrics, milestones_status:$milestones}]) | .[-24:])' "$baseline_file" > /tmp/strategy-audit-baseline.raw.json
+          jq --arg ran_at "$ran_at" --argjson metrics "$current_metrics" --argjson milestones "$milestones" '.audits = (((.audits // []) + [{ran_at:$ran_at, metrics:$metrics, milestones_status:$milestones}]) | .[-365:])' "$baseline_file" > /tmp/strategy-audit-baseline.raw.json
           if ! bash company/scripts/sanitise.sh < /tmp/strategy-audit-baseline.raw.json > /tmp/strategy-audit-baseline.clean.json; then
             echo "::warning::strategy audit baseline failed sanitisation; skipping commit and PR"
             echo "STRATEGY_AUDIT_MISTAKE=true" >> "$GITHUB_ENV"
@@ -232,13 +245,16 @@ jobs:
             any_drift="true"
           fi
           echo "DRIFT_DETECTED=$any_drift" >> "$GITHUB_ENV"
-          month=$(date -u '+%Y-%m')
+          # Daily cron requires per-day idempotency keys, not per-month: monthly
+          # keys collide with the merged-and-deleted branch from earlier in the
+          # month, leaving subsequent baselines stranded on a dead branch.
+          day=$(date -u '+%Y-%m-%d')
           if [ "$any_drift" = "true" ]; then
-            branch="audit/strategy-drift-$month"
-            title="audit: strategy drift detected $month"
+            branch="audit/strategy-drift-$day"
+            title="audit: strategy drift detected $day"
           else
-            branch="audit/strategy-baseline-$month"
-            title="audit: strategy baseline $month"
+            branch="audit/strategy-baseline-$day"
+            title="audit: strategy baseline $day"
           fi
           {
             echo "## Metric drift"
@@ -263,7 +279,7 @@ jobs:
             done
             jq -r '.[] | select(.status == "overdue") | "- Milestone \(.date) target (\(.target)) not met (current: \(.current)). Reaffirm in STRATEGY.md or revise the date/target."' <<< "$milestones"
             if [ "$any_drift" != "true" ]; then
-              echo "- No STRATEGY.md edits suggested; this PR records the monthly strategy baseline."
+              echo "- No STRATEGY.md edits suggested; this PR records the daily strategy baseline."
             fi
           } > /tmp/audit-body.md
           git config user.name "pupabobas[bot]"

@@ -758,7 +758,7 @@ jobs:
 
           jq -n \
             --arg last_check "$now" \
-            --argjson check_interval_hours 2 \
+            --argjson check_interval_hours 0.5 \
             --argjson checks_run "$new_checks_run" \
             --argjson issues_healed_total "$new_healed" \
             --argjson retry_tracker "$existing_retry_tracker" \
