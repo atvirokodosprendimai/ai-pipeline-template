@@ -338,3 +338,22 @@ jobs:
             -X POST -H 'Content-Type: application/json' \
             -d "$PAYLOAD" "$URL" \
             || { code=$?; echo "::warning::mentisdb append failed (curl exit $code, non-fatal)"; }
+
+      - name: Emit strategy_audit_run to PostHog
+        if: always() && steps.skip-guard.outputs.skip != 'true'
+        env:
+          POSTHOG_PROJECT_KEY: ${{ secrets.POSTHOG_PROJECT_KEY }}
+          POSTHOG_HOST: ${{ vars.POSTHOG_HOST }}
+          OUTCOME: ${{ job.status }}
+          DRIFT_DETECTED: ${{ env.DRIFT_DETECTED || 'false' }}
+        run: |
+          PROPS=$(jq -nc \
+            --arg outcome "$OUTCOME" \
+            --arg drift "$DRIFT_DETECTED" \
+            --arg paid "${PAID_CUSTOMERS:-null}" \
+            --arg auto_ship "${AUTONOMOUS_SHIP_RATE:-null}" \
+            --arg lead "${LEAD_TIME_HOURS:-null}" \
+            --arg heal "${SELF_HEAL_RATE:-0}" \
+            --arg stuck "${ACTIVE_STUCK_ISSUES:-0}" \
+            '{outcome: $outcome, drift_detected: ($drift == "true"), paid_customers: $paid, autonomous_ship_rate: $auto_ship, lead_time_hours: $lead, self_heal_rate: $heal, active_stuck_issues: $stuck}')
+          bash company/scripts/posthog-emit.sh strategy_audit_run "strategy-audit" "$PROPS"

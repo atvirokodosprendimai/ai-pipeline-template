@@ -861,3 +861,22 @@ jobs:
             -X POST -H 'Content-Type: application/json' \
             -d "$PAYLOAD" "$URL" \
             || { code=$?; echo "::warning::mentisdb append failed (curl exit $code, non-fatal)"; }
+
+      - name: Emit pipeline_health_run to PostHog
+        if: always()
+        env:
+          POSTHOG_PROJECT_KEY: ${{ secrets.POSTHOG_PROJECT_KEY }}
+          POSTHOG_HOST: ${{ vars.POSTHOG_HOST }}
+          OUTCOME: ${{ job.status }}
+        run: |
+          PROPS=$(jq -nc \
+            --arg outcome "$OUTCOME" \
+            --argjson actions "${ACTIONS_TAKEN:-0}" \
+            --argjson errors "${ERRORS:-0}" \
+            --argjson stale_triage "${STALE_TRIAGE_FOUND:-0}" \
+            --argjson stale_copilot "${STALE_COPILOT_FOUND:-0}" \
+            --argjson stale_approved "${STALE_APPROVED_FOUND:-0}" \
+            --argjson needs_human_closed "${NEEDS_HUMAN_CLOSED:-0}" \
+            --arg circuit_breaker "${CIRCUIT_BREAKER_TRIPPED:-false}" \
+            '{outcome: $outcome, actions_taken: $actions, errors: $errors, stale_triage: $stale_triage, stale_copilot: $stale_copilot, stale_approved: $stale_approved, needs_human_closed: $needs_human_closed, circuit_breaker_tripped: ($circuit_breaker == "true")}')
+          bash company/scripts/posthog-emit.sh pipeline_health_run "pipeline-health" "$PROPS"
