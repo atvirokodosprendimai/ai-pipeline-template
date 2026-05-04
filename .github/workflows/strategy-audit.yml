@@ -347,6 +347,13 @@ jobs:
           OUTCOME: ${{ job.status }}
           DRIFT_DETECTED: ${{ env.DRIFT_DETECTED || 'false' }}
         run: |
+          # Earlier steps switched the working tree to an audit branch
+          # (audit/strategy-baseline-* or audit/strategy-drift-*) which
+          # may predate this script. Path-restricted checkout copies just
+          # the helper from main into the current tree without changing
+          # branch state. `|| true` for older runs where main wasn't
+          # fetched (fetch-depth: 0 makes that unlikely but harmless).
+          git checkout main -- company/scripts/posthog-emit.sh 2>/dev/null || true
           PROPS=$(jq -nc \
             --arg outcome "$OUTCOME" \
             --arg drift "$DRIFT_DETECTED" \

@@ -869,6 +869,11 @@ jobs:
           POSTHOG_HOST: ${{ vars.POSTHOG_HOST }}
           OUTCOME: ${{ job.status }}
         run: |
+          # The "Commit state via PR" step earlier switched to a
+          # pipeline-health/<date>-<run-id> branch which predates this
+          # helper script. Path-restricted checkout pulls just the helper
+          # from main without changing branch state.
+          git checkout main -- company/scripts/posthog-emit.sh 2>/dev/null || true
           PROPS=$(jq -nc \
             --arg outcome "$OUTCOME" \
             --argjson actions "${ACTIONS_TAKEN:-0}" \
