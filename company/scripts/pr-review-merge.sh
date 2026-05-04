@@ -239,10 +239,20 @@ run_guardrails() {
     return 1
   fi
 
+  # gh CLI returns "app/<slug>" for GitHub App authors, while workflow event
+  # payloads pass "<slug>[bot]". Normalize both forms to the bare slug so the
+  # author allowlist match works regardless of which surface produced the name.
+  normalize_login() {
+    local x="${1#app/}"
+    printf '%s' "${x%\[bot\]}"
+  }
+  local author_norm
+  author_norm=$(normalize_login "$author")
+
   local approved_found="false"
   IFS=',' read -ra approved_list <<< "$APPROVED_AUTHORS"
   for approved in "${approved_list[@]}"; do
-    if [[ "$author" == "$approved" ]]; then
+    if [[ "$(normalize_login "$approved")" == "$author_norm" ]]; then
       approved_found="true"
       break
     fi
