@@ -1,0 +1,31 @@
+company/scripts/posthog-emit.sh
+  0a0e84e1f3ad7299 1-56
+.github/workflows/strategy-audit.yml
+  0a0e84e1f3ad7299 341-359
+company/scripts/pr-review-merge.sh
+  0a0e84e1f3ad7299 85-96
+.github/workflows/bot-pr-review-merge.yml
+  0a0e84e1f3ad7299 46-47,91-108
+.github/workflows/pipeline-health.yml
+  0a0e84e1f3ad7299 864-882
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "1d32ee1efb1ea4dd7beda6f233efdcac6ea065e4",
+  "prompts": {
+    "0a0e84e1f3ad7299": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "686ff151-ae6e-401e-914c-05f52dfa7c13",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "~.~",
+      "messages": [],
+      "total_additions": 127,
+      "total_deletions": 1,
+      "accepted_lines": 126,
+      "overriden_lines": 0
+    }
+  }
+}
