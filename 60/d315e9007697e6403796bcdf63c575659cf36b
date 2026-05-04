@@ -1,0 +1,23 @@
+company/scripts/pr-review-merge.sh
+  0a0e84e1f3ad7299 242-251,255
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "60d315e9007697e6403796bcdf63c575659cf36b",
+  "prompts": {
+    "0a0e84e1f3ad7299": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "686ff151-ae6e-401e-914c-05f52dfa7c13",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "~.~",
+      "messages": [],
+      "total_additions": 11,
+      "total_deletions": 1,
+      "accepted_lines": 11,
+      "overriden_lines": 0
+    }
+  }
+}
