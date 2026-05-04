@@ -118,6 +118,41 @@ check_manual_only() {
 }
 
 # ---------------------------------------------------------------------------
+# is_auto_state_pr — detect bot-authored auto state-update PRs that don't
+# warrant Copilot review. Match title prefix AND author = pupabobas[bot] so
+# a hand-crafted PR with the same title prefix still gets the full review path.
+#
+# Skip-eligible patterns:
+#   "heal: pipeline health check ..."   — from pipeline-health.yml
+#   "audit: strategy baseline ..."      — from strategy-audit.yml no-drift case
+#
+# NOT skip-eligible:
+#   "audit: strategy drift detected ..." — drift PRs propose STRATEGY.md edits;
+#     these carry --label needs-human and should be reviewed by a human, not
+#     auto-merged. Drift PRs already get the full review path.
+# ---------------------------------------------------------------------------
+is_auto_state_pr() {
+  local pr="$1"
+  local meta title author
+  if ! meta=$(gh pr view "$pr" --repo "$TARGET_REPO" --json title,author --jq '{title, author: .author.login}' 2>/dev/null); then
+    return 1
+  fi
+  title=$(jq -r '.title' <<< "$meta")
+  author=$(jq -r '.author' <<< "$meta")
+
+  case "$author" in
+    pupabobas|app/pupabobas|pupabobas\[bot\]) ;;
+    *) return 1 ;;
+  esac
+
+  case "$title" in
+    "heal: pipeline health check"*) return 0 ;;
+    "audit: strategy baseline"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# ---------------------------------------------------------------------------
 # poll_for_review — wait for Copilot review within a single poll window
 # Returns 0 if review found, 1 on timeout.
 # ---------------------------------------------------------------------------
@@ -454,35 +489,20 @@ main() {
     exit 0
   fi
 
-  # T1.2: Poll for Copilot review across configured windows
-  local review_found="false"
-  for window in $(seq 1 "$REVIEW_WINDOWS"); do
-    if poll_for_review "$PR_NUMBER" "$window"; then
-      review_found="true"
-      break
-    fi
-  done
-
-  if [[ "$review_found" != "true" ]]; then
-    local total_seconds=$(( POLL_MAX_ATTEMPTS * POLL_INTERVAL * REVIEW_WINDOWS ))
-    escalate "$PR_NUMBER" "Copilot review timeout after ${REVIEW_WINDOWS} poll windows (${total_seconds}s)"
-    exit 0
+  # Auto state-update PRs (bot-authored heal:/audit: title prefixes) skip the
+  # Copilot poll + retry loop. Their content is mechanical (state JSON +
+  # audit-log append) so a 360s Copilot timeout + escalation comment is pure
+  # noise. Guardrails still run below to protect against accidental large or
+  # security-keyword diffs.
+  local auto_state_pr="false"
+  if is_auto_state_pr "$PR_NUMBER"; then
+    auto_state_pr="true"
+    log_audit "auto_state_pr" "Skipping Copilot review for trivial state-update PR"
   fi
 
-  # T1.2: Check for inline review comments + retry loop
-  local comment_count
-  comment_count=$(check_unresolved_threads "$PR_NUMBER")
-  log_audit "review_detected" "Review found, ${comment_count} unresolved threads"
-  local retry_count=0
-
-  while [[ "$comment_count" -gt 0 ]] && [[ "$retry_count" -lt "$MAX_RETRY_COUNT" ]]; do
-    retry_count=$((retry_count + 1))
-    log_audit "retry" "Retry ${retry_count}/${MAX_RETRY_COUNT} — ${comment_count} unresolved threads"
-
-    reassign_agent "$PR_NUMBER" "$retry_count"
-
-    # Poll for new review after agent push
-    review_found="false"
+  if [[ "$auto_state_pr" != "true" ]]; then
+    # T1.2: Poll for Copilot review across configured windows
+    local review_found="false"
     for window in $(seq 1 "$REVIEW_WINDOWS"); do
       if poll_for_review "$PR_NUMBER" "$window"; then
         review_found="true"
@@ -491,21 +511,49 @@ main() {
     done
 
     if [[ "$review_found" != "true" ]]; then
-      escalate "$PR_NUMBER" "Review timeout during retry ${retry_count}"
+      local total_seconds=$(( POLL_MAX_ATTEMPTS * POLL_INTERVAL * REVIEW_WINDOWS ))
+      escalate "$PR_NUMBER" "Copilot review timeout after ${REVIEW_WINDOWS} poll windows (${total_seconds}s)"
       exit 0
     fi
 
-    # Check for manual push (resets retry counter per PRD/AC-3.4)
-    if check_manual_push "$PR_NUMBER"; then
-      retry_count=0
-    fi
-
+    # T1.2: Check for inline review comments + retry loop
+    local comment_count
     comment_count=$(check_unresolved_threads "$PR_NUMBER")
-  done
+    log_audit "review_detected" "Review found, ${comment_count} unresolved threads"
+    local retry_count=0
 
-  if [[ "$comment_count" -gt 0 ]]; then
-    escalate "$PR_NUMBER" "Retries exhausted (${MAX_RETRY_COUNT}), ${comment_count} unresolved threads remain"
-    exit 0
+    while [[ "$comment_count" -gt 0 ]] && [[ "$retry_count" -lt "$MAX_RETRY_COUNT" ]]; do
+      retry_count=$((retry_count + 1))
+      log_audit "retry" "Retry ${retry_count}/${MAX_RETRY_COUNT} — ${comment_count} unresolved threads"
+
+      reassign_agent "$PR_NUMBER" "$retry_count"
+
+      # Poll for new review after agent push
+      review_found="false"
+      for window in $(seq 1 "$REVIEW_WINDOWS"); do
+        if poll_for_review "$PR_NUMBER" "$window"; then
+          review_found="true"
+          break
+        fi
+      done
+
+      if [[ "$review_found" != "true" ]]; then
+        escalate "$PR_NUMBER" "Review timeout during retry ${retry_count}"
+        exit 0
+      fi
+
+      # Check for manual push (resets retry counter per PRD/AC-3.4)
+      if check_manual_push "$PR_NUMBER"; then
+        retry_count=0
+      fi
+
+      comment_count=$(check_unresolved_threads "$PR_NUMBER")
+    done
+
+    if [[ "$comment_count" -gt 0 ]]; then
+      escalate "$PR_NUMBER" "Retries exhausted (${MAX_RETRY_COUNT}), ${comment_count} unresolved threads remain"
+      exit 0
+    fi
   fi
 
   # T1.3: run_guardrails — short-circuits on first failure
