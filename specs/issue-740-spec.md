@@ -10,7 +10,7 @@ both
 
 `STRATEGY.md` defines a single metric — **Goose autonomous-ship rate** — as the fraction of bot-authored PRs that merged with zero human intervention (no non-bot comments, no non-bot review body, no `needs-human` label). This definition treats "code merged cleanly" as equivalent to "bug actually fixed."
 
-The failure mode: PR #564 merged with 100 % clean-ship signal while its linked issue remained in `awaiting-verification`. Pulse showed 1/1 = 100 % autonomous-ship while the fix had not been confirmed to work under real conditions. This is the same pattern that prompted the L2+L3 gate (wgmesh#559).
+The failure mode: PR #564 merged with 100% clean-ship signal while its linked issue remained in `awaiting-verification`. Pulse showed 1/1 = 100 % autonomous-ship while the fix had not been confirmed to work under real conditions. This is the same pattern that prompted the L2+L3 gate (wgmesh#559).
 
 Concretely, the gap is in `strategy-audit.yml`, inside the step **"Compute lead time + autonomous-ship rate"**:
 
@@ -72,7 +72,7 @@ The `verified` label does not yet exist in `.github/labels.yml`. The `docs/pulse
   ```yaml
   # --- Pulse metric sources ---
   # pulse_metric_sources:
-  #   autonomous_ship_rate: seed-repo-pr-data   # PRs merged with no escalation_posted
+  #   autonomous_ship_rate: seed-repo-pr-data   # PRs merged with no escalation (no non-bot review/comment, no needs-human label)
   #   autonomous_close_rate: seed-repo-issues   # PRs merged AND linked issue closed via verified label (NOT auto-close keyword bypass, NOT manual close)
   ```
 
