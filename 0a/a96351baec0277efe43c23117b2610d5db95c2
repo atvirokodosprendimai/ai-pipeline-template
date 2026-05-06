@@ -1,0 +1,27 @@
+docs/pulse-reports/2026-05-06_05-30.md
+  0a0e84e1f3ad7299 3-5,43
+docs/pulse-reports/2026-05-06_05-30-corrected.md
+  0a0e84e1f3ad7299 42
+STRATEGY.md
+  0a0e84e1f3ad7299 25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "0aa96351baec0277efe43c23117b2610d5db95c2",
+  "prompts": {
+    "0a0e84e1f3ad7299": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "686ff151-ae6e-401e-914c-05f52dfa7c13",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "~.~",
+      "messages": [],
+      "total_additions": 69,
+      "total_deletions": 3,
+      "accepted_lines": 69,
+      "overriden_lines": 0
+    }
+  }
+}
