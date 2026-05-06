@@ -60,7 +60,12 @@ jobs:
         run: |
           set -uo pipefail
 
-          ALLOWED_AUTHORS='["copilot-swe-agent[bot]","Copilot","goose[bot]","pupabobas[bot]","nycterent"]'
+          # Accept both `gh pr list` form (`app/copilot-swe-agent`) AND
+          # `pull_request` event form (`copilot-swe-agent[bot]`). Per
+          # feedback_app_author_identifier_inconsistency.md — same App
+          # surfaces under different identifiers depending on the GitHub
+          # surface; matching exactly one form misses the rest.
+          ALLOWED_AUTHORS='["copilot-swe-agent[bot]","app/copilot-swe-agent","Copilot","goose[bot]","app/goose","pupabobas[bot]","app/pupabobas","nycterent"]'
 
           PRS=$(gh pr list --repo "$TARGET_REPO" \
                   --state open \
@@ -68,15 +73,17 @@ jobs:
                   --json number,title,author,labels,isDraft \
                   --limit 50)
 
+          # Drafts are accepted — Copilot opens spec PRs as drafts, and
+          # Spec Validation has already labeled them `approved-for-build`
+          # by the time we see them. We undraft inline before review.
           ELIGIBLE=$(echo "$PRS" | jq -c --argjson allowed "$ALLOWED_AUTHORS" '
             [ .[]
-              | select(.isDraft | not)
               | select(([.labels[].name] | index("needs-human")) == null)
               | select(
                   ($allowed | index(.author.login)) != null
                   or (.title | startswith("impl:"))
                 )
-              | {number, title, author: (.author.login)}
+              | {number, title, author: (.author.login), isDraft}
             ]')
 
           COUNT=$(echo "$ELIGIBLE" | jq 'length')
@@ -94,10 +101,33 @@ jobs:
             PR_NUMBER=$(echo "$pr_json" | jq -r '.number')
             PR_AUTHOR=$(echo "$pr_json" | jq -r '.author')
             PR_TITLE=$(echo "$pr_json" | jq -r '.title')
-            export PR_NUMBER PR_AUTHOR PR_TITLE
-            export APPROVED_AUTHORS="$PR_AUTHOR"
+            PR_DRAFT=$(echo "$pr_json" | jq -r '.isDraft')
 
-            echo "::group::PR #$PR_NUMBER ($PR_AUTHOR): $PR_TITLE"
+            # Normalize APPROVED_AUTHORS for downstream pr-review-merge.sh:
+            # the script expects the "[bot]" form so its internal allowlist
+            # checks match. If we got the `app/<name>` form from `gh pr list`,
+            # convert to `<name>[bot]`.
+            case "$PR_AUTHOR" in
+              app/*)
+                NORM_AUTHOR="${PR_AUTHOR#app/}[bot]"
+                ;;
+              *)
+                NORM_AUTHOR="$PR_AUTHOR"
+                ;;
+            esac
+
+            export PR_NUMBER PR_AUTHOR PR_TITLE
+            export APPROVED_AUTHORS="$NORM_AUTHOR"
+
+            echo "::group::PR #$PR_NUMBER ($PR_AUTHOR → $NORM_AUTHOR): $PR_TITLE"
+
+            # Undraft inline if needed. `gh pr ready` is idempotent on
+            # already-ready PRs but errors there are non-fatal.
+            if [ "$PR_DRAFT" = "true" ]; then
+              echo "PR is draft, marking ready for review..."
+              gh pr ready "$PR_NUMBER" --repo "$TARGET_REPO" \
+                || echo "::warning::gh pr ready failed for PR #$PR_NUMBER (non-fatal, attempting review-merge anyway)"
+            fi
 
             (
               bash company/scripts/pr-review-merge.sh
