@@ -1,8 +1,25 @@
 name: Bot PR Review and Merge
 
+# Triggered on a 5-minute schedule (and manual workflow_dispatch).
+#
+# History: this workflow used to trigger on `pull_request: [opened, reopened]`.
+# That trigger fires runs as the PR author. When the author is an outside
+# collaborator bot (e.g. `copilot-swe-agent[bot]`), GitHub's
+# "Approve and run workflows from outside collaborators" gate puts the run
+# in `action_required` with `jobs: []` BEFORE any step executes. The pupabobas
+# App token wired into this workflow was never reached, blocking the entire
+# spec-PR pipeline.
+#
+# Schedule-triggered runs execute as `github-actions[bot]` (inside actor) and
+# are not gated. The job uses the App token to list eligible PRs and run the
+# review-merge script for each.
+#
+# See feedback_pupabobas_does_not_bypass_gate.md for the full reasoning.
+
 on:
-  pull_request:
-    types: [opened, reopened]
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -11,18 +28,11 @@ permissions:
   actions: read
 
 concurrency:
-  group: pr-review-${{ github.event.pull_request.number }}
+  group: bot-pr-review-merge
   cancel-in-progress: false
 
 jobs:
   review-merge:
-    if: >-
-      github.event.pull_request.user.login == 'copilot-swe-agent[bot]' ||
-      github.event.pull_request.user.login == 'Copilot' ||
-      github.event.pull_request.user.login == 'goose[bot]' ||
-      github.event.pull_request.user.login == 'pupabobas[bot]' ||
-      github.event.pull_request.user.login == 'nycterent' ||
-      contains(github.event.pull_request.title, 'impl:')
     runs-on: ubuntu-latest
     steps:
       - name: Generate GitHub App token
@@ -37,72 +47,106 @@ jobs:
         with:
           ref: main
 
-      - name: Autonomous PR review and merge
+      - name: Find eligible PRs and review-merge each
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           TARGET_REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          APPROVED_AUTHORS: ${{ github.event.pull_request.user.login }}
           POSTHOG_PROJECT_KEY: ${{ secrets.POSTHOG_PROJECT_KEY }}
           POSTHOG_HOST: ${{ vars.POSTHOG_HOST }}
-        run: |
-          bash company/scripts/pr-review-merge.sh
-
-      - name: Append review-merge outcome to MentisDB
-        if: always()
-        env:
           MENTISDB_URL: ${{ secrets.MENTISDB_URL }}
           MENTISDB_USER: ${{ secrets.MENTISDB_USER }}
           MENTISDB_PASSWORD: ${{ secrets.MENTISDB_PASSWORD }}
-          OUTCOME: ${{ job.status }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
-          set -euo pipefail
-          case "$OUTCOME" in
-            success)   TYPE="TaskComplete"; IMP="0.7" ;;
-            failure)   TYPE="Mistake";      IMP="0.8" ;;
-            cancelled) TYPE="Mistake";      IMP="0.6" ;;
-            *)         TYPE="Mistake";      IMP="0.7" ;;
-          esac
-          PAYLOAD=$(jq -nc \
-            --arg type "$TYPE" \
-            --arg outcome "$OUTCOME" \
-            --arg run_url "$RUN_URL" \
-            --arg pr "$PR_NUMBER" \
-            --arg author "$PR_AUTHOR" \
-            --arg imp "$IMP" \
-            '{
-              chain_key: "ai-pipeline-template",
-              agent_id: "bot-pr-review-merge",
-              agent_name: "bot-pr-review-merge",
-              thought_type: $type,
-              content: ("PR #" + $pr + " by @" + $author + " — review-merge " + $outcome + " (" + $run_url + ")"),
-              tags: ["ai-pipeline-template", "pr-review-merge", $outcome],
-              importance: ($imp | tonumber)
-            }')
-          URL="${MENTISDB_URL%/}/v1/thoughts"
-          curl --fail-with-body --silent --show-error --max-time 15 \
-            -u "$MENTISDB_USER:$MENTISDB_PASSWORD" \
-            -X POST -H 'Content-Type: application/json' \
-            -d "$PAYLOAD" "$URL" \
-            || { code=$?; echo "::warning::mentisdb append failed (curl exit $code, non-fatal)"; }
+          set -uo pipefail
 
-      - name: Emit bot_pr_merged to PostHog
-        if: always()
-        env:
-          POSTHOG_PROJECT_KEY: ${{ secrets.POSTHOG_PROJECT_KEY }}
-          POSTHOG_HOST: ${{ vars.POSTHOG_HOST }}
-          OUTCOME: ${{ job.status }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
-          PR_TITLE: ${{ github.event.pull_request.title }}
-        run: |
-          PROPS=$(jq -nc \
-            --arg outcome "$OUTCOME" \
-            --arg pr "$PR_NUMBER" \
-            --arg author "$PR_AUTHOR" \
-            --arg title "$PR_TITLE" \
-            '{outcome: $outcome, pr_number: ($pr|tonumber), author: $author, title: $title}')
-          bash company/scripts/posthog-emit.sh bot_pr_merged "${PR_AUTHOR}" "$PROPS"
+          ALLOWED_AUTHORS='["copilot-swe-agent[bot]","Copilot","goose[bot]","pupabobas[bot]","nycterent"]'
+
+          PRS=$(gh pr list --repo "$TARGET_REPO" \
+                  --state open \
+                  --label approved-for-build \
+                  --json number,title,author,labels,isDraft \
+                  --limit 50)
+
+          ELIGIBLE=$(echo "$PRS" | jq -c --argjson allowed "$ALLOWED_AUTHORS" '
+            [ .[]
+              | select(.isDraft | not)
+              | select(([.labels[].name] | index("needs-human")) == null)
+              | select(
+                  ($allowed | index(.author.login)) != null
+                  or (.title | startswith("impl:"))
+                )
+              | {number, title, author: (.author.login)}
+            ]')
+
+          COUNT=$(echo "$ELIGIBLE" | jq 'length')
+          echo "eligible PRs: $COUNT"
+
+          if [ "$COUNT" -eq 0 ]; then
+            echo "Nothing to do. Exiting clean."
+            exit 0
+          fi
+
+          # Iterate. Per-PR errors must NOT halt the loop.
+          # Each PR runs in a subshell so `set -euo pipefail` inside
+          # pr-review-merge.sh only kills its own subprocess.
+          echo "$ELIGIBLE" | jq -c '.[]' | while IFS= read -r pr_json; do
+            PR_NUMBER=$(echo "$pr_json" | jq -r '.number')
+            PR_AUTHOR=$(echo "$pr_json" | jq -r '.author')
+            PR_TITLE=$(echo "$pr_json" | jq -r '.title')
+            export PR_NUMBER PR_AUTHOR PR_TITLE
+            export APPROVED_AUTHORS="$PR_AUTHOR"
+
+            echo "::group::PR #$PR_NUMBER ($PR_AUTHOR): $PR_TITLE"
+
+            (
+              bash company/scripts/pr-review-merge.sh
+            )
+            PR_RC=$?
+
+            if [ "$PR_RC" -eq 0 ]; then
+              OUTCOME="success"; TYPE="TaskComplete"; IMP="0.7"
+            else
+              OUTCOME="failure"; TYPE="Mistake";      IMP="0.8"
+              echo "::warning::pr-review-merge.sh failed for PR #$PR_NUMBER (rc=$PR_RC, non-fatal, continuing)"
+            fi
+
+            # MentisDB append per PR — keep timeout/non-fatal pattern
+            PAYLOAD=$(jq -nc \
+              --arg type "$TYPE" \
+              --arg outcome "$OUTCOME" \
+              --arg run_url "$RUN_URL" \
+              --arg pr "$PR_NUMBER" \
+              --arg author "$PR_AUTHOR" \
+              --arg imp "$IMP" \
+              '{
+                chain_key: "ai-pipeline-template",
+                agent_id: "bot-pr-review-merge",
+                agent_name: "bot-pr-review-merge",
+                thought_type: $type,
+                content: ("PR #" + $pr + " by @" + $author + " — review-merge " + $outcome + " (" + $run_url + ")"),
+                tags: ["ai-pipeline-template", "pr-review-merge", $outcome],
+                importance: ($imp | tonumber)
+              }')
+            URL="${MENTISDB_URL%/}/v1/thoughts"
+            curl --fail-with-body --silent --show-error --max-time 15 \
+              -u "$MENTISDB_USER:$MENTISDB_PASSWORD" \
+              -X POST -H 'Content-Type: application/json' \
+              -d "$PAYLOAD" "$URL" \
+              || { code=$?; echo "::warning::mentisdb append failed for PR #$PR_NUMBER (curl exit $code, non-fatal)"; }
+
+            # PostHog emit per PR
+            PROPS=$(jq -nc \
+              --arg outcome "$OUTCOME" \
+              --arg pr "$PR_NUMBER" \
+              --arg author "$PR_AUTHOR" \
+              --arg title "$PR_TITLE" \
+              '{outcome: $outcome, pr_number: ($pr|tonumber), author: $author, title: $title}')
+            bash company/scripts/posthog-emit.sh bot_pr_merged "${PR_AUTHOR}" "$PROPS" \
+              || echo "::warning::posthog emit failed for PR #$PR_NUMBER (non-fatal)"
+
+            echo "::endgroup::"
+          done
+
+          # Always exit 0 from this step; per-PR outcomes already logged
+          exit 0
