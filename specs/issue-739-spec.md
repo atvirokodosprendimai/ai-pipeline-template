@@ -61,7 +61,7 @@ The files involved are:
   - Checks the linked issue for the `awaiting-verification` label. If present: removes `awaiting-verification`, closes the issue, adds a comment `"Closed automatically: e2e workflow passed on commit <sha>."`.
   - Job `handle-e2e-red`: runs only when `github.event.workflow_run.conclusion != 'success'` and `!= 'skipped'` and `!= 'cancelled'`. Finds the same linked issue; if it carries `awaiting-verification`, adds label `e2e-failed`, posts a comment with the workflow run URL.
   - `permissions`: `issues: write`, `pull-requests: read`, `actions: read`.
-  - No `PUSH_TOKEN` secret reference in trigger-gated steps — use `secrets.PUSH_TOKEN` for issue write operations, consistent with the rest of the lifecycle workflows.
+  - Issue write operations (label changes, comments, state update) use `secrets.PUSH_TOKEN`. The workflow `on:` trigger condition itself requires no token — `workflow_run` events are triggered by GitHub Actions infrastructure, not by an authenticated API call.
 
 ### Task 4: Replace `verify-comment-close.yml` with a no-op notice
 
@@ -82,7 +82,7 @@ The files involved are:
 
   - All code changes need tests (target 80%+ coverage).
   - **Bug fixes on network or critical paths** (e.g., connection handling, protocol state machines, peer discovery, NAT traversal, relay routing, RPC, distributed state) must include at least one integration test that exercises the actual behavior path reported in the bug — predicate unit tests alone do not satisfy the gate.
-  - Integration test files must be named with the suffix `_integration_test` (Go), `_integration_test.py` (Python), or `.integration.test` (JS/TS) so the impl-merged-close gate can distinguish them from unit tests.
+  - Integration test files must be named with the suffix `_integration_test` (Go), `_integration_test.py` (Python), or `.integration.test` (JS/TS) so the impl-merged-close gate can distinguish them from unit tests. A _predicate unit test_ verifies an isolated decision function (e.g., "does `shouldRelayPeer()` return true when handshake is stale?") — it cannot reproduce network-level failure modes. An _integration test_ exercises the actual runtime path against real or simulated infrastructure (e.g., a two-node mesh that verifies the relay actually engages without a connectivity blackout).
   - Goose: when implementing a spec for a `type: bug` issue whose body describes a network or distributed-system behavior, always add an integration test in addition to any unit tests.
   ```
 
