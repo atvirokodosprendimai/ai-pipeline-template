@@ -1,0 +1,20 @@
+STRATEGY.md
+  s_0a0e84e1f3ad72::t_3dfb31fff3db4d 25
+  s_0a0e84e1f3ad72::t_333b28191bacba 29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "d2b5326adfacf1b2c7034f81a2f6af228e98b94b",
+  "prompts": {},
+  "sessions": {
+    "s_0a0e84e1f3ad72": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "686ff151-ae6e-401e-914c-05f52dfa7c13",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "~.~ <saint@ghost.lt>"
+    }
+  }
+}
