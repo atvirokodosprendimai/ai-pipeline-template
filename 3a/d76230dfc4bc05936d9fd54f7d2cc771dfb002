@@ -1,0 +1,19 @@
+.github/workflows/bot-pr-review-merge.yml
+  s_8a229b1c352de8::t_e217476dc336a6 3-18,20-22,31,50,61-152
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "3ad76230dfc4bc05936d9fd54f7d2cc771dfb002",
+  "prompts": {},
+  "sessions": {
+    "s_8a229b1c352de8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a02eb044-8edb-481c-bbc3-7bded81e7b49",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "~.~ <saint@ghost.lt>"
+    }
+  }
+}
