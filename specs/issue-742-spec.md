@@ -16,6 +16,8 @@ The `active_stuck_issues` metric in `STRATEGY.md` and the corresponding computat
 
 Additionally, the existing definition omits the `copilot-triaging >24h` bucket, which the proposal adds to make the list complete.
 
+**Label-timestamp vs. `createdAt` trade-off:** Precise staleness measurement for label-based buckets requires per-issue GraphQL calls to fetch `LabeledEvent` timestamps from the issue timeline (a pattern already present in the lead-time computation). However, this is expensive at scale. The age filters in `copilot-triaging >24h` and `awaiting-verification >6h` will use the issue's `createdAt` field as a conservative proxy — the same approach used in `docs/interfaces/github-api-pipeline.md` for other stale-label checks. Because labels can only be applied after issue creation, `createdAt` establishes a lower bound on label age; filtering by `createdAt < cutoff` may produce false positives (an old issue recently re-labeled), but is operationally acceptable and avoids an N-GraphQL-call fan-out. Implementation teams that need precise label-age filtering can refactor to use `LabeledEvent` timestamps once per-issue call cost is acceptable.
+
 The pulse report (strategy-audit drift PR body, rendered via the "Detect drift, build audit body, manage PR" step) shows `active_stuck_issues` as a single number with no per-bucket breakdown, so the founder cannot tell which state issues are stuck in.
 
 The three new labels (`awaiting-verification`, `e2e-stalled`, `e2e-failed`) are not defined in `.github/labels.yml`, so they would not appear in `gh issue list` results even if they were queried.
@@ -27,7 +29,7 @@ The three new labels (`awaiting-verification`, `e2e-stalled`, `e2e-failed`) are 
 - **File:** `STRATEGY.md` (modify)
 - **Where:** In the `## Key metrics` section, at the bullet starting `**Active stuck issues**`
 - **What:** Replace the definition with the extended source list
-- **Detail:** Change the text from `open issues at \`needs-human\` or in retry cooldown >24h` to `open issues matching: \`needs-human\`, OR \`copilot-triaging\` >24h, OR \`awaiting-verification\` >6h, OR \`e2e-stalled\`, OR \`e2e-failed\`, OR in retry cooldown >24h`. Keep `Source: \`gh issue list\`` and `Leading.` unchanged.
+- **Detail:** Change the text from `open issues at \`needs-human\` or in retry cooldown >24h` to `open issues matching: \`needs-human\`, or \`copilot-triaging\` >24h, or \`awaiting-verification\` >6h, or \`e2e-stalled\`, or \`e2e-failed\`, or in retry cooldown >24h`. Keep `Source: \`gh issue list\`` and `Leading.` unchanged.
 
 ### Task 2: Add new labels to `.github/labels.yml`
 
@@ -42,8 +44,8 @@ The three new labels (`awaiting-verification`, `e2e-stalled`, `e2e-failed`) are 
 - **Where:** Inside the "Compute self-heal rate and active stuck issues" step, after the `needs_human_count` line that runs `gh issue list --label needs-human`
 - **What:** Add four additional `gh issue list` queries and export per-bucket counts as `GITHUB_ENV` variables; replace the single `active_stuck_issues` arithmetic with a sum of all buckets.
 - **Detail:** Implement as follows. After the existing `needs_human_count` line, add:
-  1. `copilot_triaging_stale_count` — list open issues with label `copilot-triaging`, filter with `--jq` to keep only those where `createdAt` is more than 24h before `$now` (use the same `$now` variable already defined in the step); count with `jq 'length'`.
-  2. `awaiting_verification_stale_count` — list open issues with label `awaiting-verification`, filter to keep only those where `createdAt` is more than 6h before `$now`; count with `jq 'length'`.
+  1. `copilot_triaging_stale_count` — list open issues with label `copilot-triaging`, filter with `--jq` to keep only those where `createdAt` is more than 24h before `$now` (use the same `$now` variable already defined in the step; note this is a lower-bound proxy — see Problem Analysis for the label-timestamp trade-off); count with `jq 'length'`.
+  2. `awaiting_verification_stale_count` — list open issues with label `awaiting-verification`, filter to keep only those where `createdAt` is more than 6h before `$now` (same lower-bound proxy); count with `jq 'length'`.
   3. `e2e_stalled_count` — list all open issues with label `e2e-stalled`; count with `jq 'length'`.
   4. `e2e_failed_count` — list all open issues with label `e2e-failed`; count with `jq 'length'`.
   Replace `active_stuck_issues=$((needs_human_count + cooldown_count))` with a sum of all six buckets. Export each bucket count individually: `STUCK_NEEDS_HUMAN`, `STUCK_COPILOT_TRIAGING`, `STUCK_AWAITING_VERIFICATION`, `STUCK_E2E_STALLED`, `STUCK_E2E_FAILED`, `STUCK_COOLDOWN` to `$GITHUB_ENV`, in addition to the existing `ACTIVE_STUCK_ISSUES` total. Keep `SELF_HEAL_RATE` and `ACTIVE_STUCK_ISSUES` variable names unchanged so downstream steps (PostHog emit, baseline JSON, `metric_row` call) continue to work without modification.
@@ -94,7 +96,13 @@ The three new labels (`awaiting-verification`, `e2e-stalled`, `e2e-failed`) are 
 - **File:** None — this is a verification step, not a code change
 - **Where:** N/A
 - **What:** Before merging the implementation PR, verify that the verifier workflow introduced in wgmesh#568 applies the labels `awaiting-verification`, `e2e-stalled`, and `e2e-failed` with exactly those names on the wgmesh repo's issues. If the labels differ, update Task 2 and Task 3 to match the actual label names.
-- **Detail:** Run `gh label list --repo atvirokodosprendimai/wgmesh | grep -E "awaiting-verification|e2e-stalled|e2e-failed"` and compare against the names added in Task 2. Any mismatch is a blocking inconsistency.
+- **Detail:** Run the following three commands separately and assert each returns exactly one match; fail with an error message if any label is absent:
+  ```
+  gh label list --repo atvirokodosprendimai/wgmesh | grep -qF 'awaiting-verification' || echo "MISSING: awaiting-verification"
+  gh label list --repo atvirokodosprendimai/wgmesh | grep -qF 'e2e-stalled'           || echo "MISSING: e2e-stalled"
+  gh label list --repo atvirokodosprendimai/wgmesh | grep -qF 'e2e-failed'            || echo "MISSING: e2e-failed"
+  ```
+  Any missing label is a blocking inconsistency; update Task 2 and Task 3 to match the actual names before merging.
 
 ## Affected Files
 
