@@ -80,8 +80,7 @@ jobs:
           # `$allowed | index(.author.login)` looks intuitive but jq evaluates
           # `.author.login` against the piped-in value (the $allowed array
           # itself), not the outer PR object — fails with
-          # `Cannot index array with string "author"`. Same kind of scoping
-          # gotcha as feedback_jq_object_literal_concat_parens.md.
+          # `Cannot index array with string "author"`.
           ELIGIBLE=$(echo "$PRS" | jq -c --argjson allowed "$ALLOWED_AUTHORS" '
             [ .[]
               | .author.login as $login
