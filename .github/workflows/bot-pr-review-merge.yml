@@ -76,14 +76,20 @@ jobs:
           # Drafts are accepted — Copilot opens spec PRs as drafts, and
           # Spec Validation has already labeled them `approved-for-build`
           # by the time we see them. We undraft inline before review.
+          # NOTE: bind .author.login as $login BEFORE piping into $allowed.
+          # `$allowed | index(.author.login)` looks intuitive but jq evaluates
+          # `.author.login` against the piped-in value (the $allowed array
+          # itself), not the outer PR object — fails with
+          # `Cannot index array with string "author"`.
           ELIGIBLE=$(echo "$PRS" | jq -c --argjson allowed "$ALLOWED_AUTHORS" '
             [ .[]
+              | .author.login as $login
               | select(([.labels[].name] | index("needs-human")) == null)
               | select(
-                  ($allowed | index(.author.login)) != null
+                  ($allowed | index($login)) != null
                   or (.title | startswith("impl:"))
                 )
-              | {number, title, author: (.author.login), isDraft}
+              | {number, title, author: $login, isDraft}
             ]')
 
           COUNT=$(echo "$ELIGIBLE" | jq 'length')
