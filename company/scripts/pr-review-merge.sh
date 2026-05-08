@@ -554,17 +554,15 @@ main() {
     # latest reading; if threads were resolved during the window, the
     # second sample correctly reflects 0). If the first sample already
     # shows >0 threads, the race is moot — skip the sleep and proceed.
-    # Tunable via INLINE_GRACE_SECONDS (default 90s; set 0 to disable).
+    # Tunable via INLINE_GRACE_SECONDS (default 90s; set 0 to skip the
+    # settling window entirely — first sample becomes source of truth).
     #
-    # Round-2 fixes addressed: command-substitution exit under set -e
-    # (`|| true` after each call), skip-sleep on first>0, and use second
-    # sample as latest source-of-truth instead of MAX.
     # Round-4 fix: capture both stdout AND exit code from
-    # check_unresolved_threads. On API failure the function echoes "0"
-    # and returns non-zero — masking that with `|| true` and proceeding
-    # with comment_count=0 would let an unsafe merge through when thread
-    # state is actually unknown. Escalate instead.
-    local comment_count first_thread_count first_rc
+    # check_unresolved_threads via explicit `rc=$?`. On API failure the
+    # function echoes "0" and returns non-zero — masking that and
+    # proceeding with comment_count=0 would let an unsafe merge through
+    # when thread state is actually unknown. Escalate instead.
+    local comment_count first_thread_count first_rc settling_mode
     first_thread_count=$(check_unresolved_threads "$PR_NUMBER") && first_rc=0 || first_rc=$?
     if [[ "$first_rc" -ne 0 ]]; then
       escalate "$PR_NUMBER" "Failed to fetch review threads on first sample (rc=${first_rc}) — cannot verify clean state safely"
@@ -573,24 +571,33 @@ main() {
     first_thread_count="${first_thread_count:-0}"
     log_audit "inline_settling_first" "First sample: ${first_thread_count} unresolved threads"
 
+    # Validate INLINE_GRACE_SECONDS up-front so the value is usable in the
+    # branches below. Anything non-numeric (empty, "90s", "0.5", garbage)
+    # falls back to the default — avoids `[[ -gt ]]` errors and `sleep`
+    # failures under set -e.
+    local inline_grace_seconds="${INLINE_GRACE_SECONDS:-90}"
+    if ! [[ "$inline_grace_seconds" =~ ^[0-9]+$ ]]; then
+      echo "::warning::INLINE_GRACE_SECONDS='${inline_grace_seconds}' is not a non-negative integer; falling back to 90s"
+      inline_grace_seconds=90
+    fi
+
     if [[ "$first_thread_count" -gt 0 ]]; then
       # Race is moot — inline comments already visible. Skip the settling
       # window so retry/escalation is not delayed.
       comment_count="$first_thread_count"
+      settling_mode="skipped_first_sample_positive"
       log_audit "inline_no_settling_needed" "First sample > 0; skipping settling window"
+    elif [[ "$inline_grace_seconds" -eq 0 ]]; then
+      # Operator opted out of the settling window entirely (legacy fast
+      # path). Treat first sample as authoritative; no second probe.
+      comment_count="$first_thread_count"
+      settling_mode="disabled_grace_zero"
+      log_audit "inline_settling_disabled" "INLINE_GRACE_SECONDS=0; skipping second sample"
     else
-      # Validate INLINE_GRACE_SECONDS as a non-negative integer. Anything
-      # else (empty, "90s", "0.5", garbage) falls back to the default to
-      # avoid `[[ -gt ]]` errors and `sleep` failures under set -e.
-      local inline_grace_seconds="${INLINE_GRACE_SECONDS:-90}"
-      if ! [[ "$inline_grace_seconds" =~ ^[0-9]+$ ]]; then
-        echo "::warning::INLINE_GRACE_SECONDS='${inline_grace_seconds}' is not a non-negative integer; falling back to 90s"
-        inline_grace_seconds=90
-      fi
-      if [[ "$inline_grace_seconds" -gt 0 ]]; then
-        sleep "$inline_grace_seconds"
-      fi
-      # Same explicit rc capture as the first sample.
+      # Settling-window path: sleep + re-sample. Second sample is the
+      # latest reading, so threads resolved during the window correctly
+      # show as 0; threads that arrived late correctly show as N>0.
+      sleep "$inline_grace_seconds"
       local second_rc
       comment_count=$(check_unresolved_threads "$PR_NUMBER") && second_rc=0 || second_rc=$?
       if [[ "$second_rc" -ne 0 ]]; then
@@ -598,17 +605,19 @@ main() {
         exit 0
       fi
       comment_count="${comment_count:-0}"
+      settling_mode="settled_after_${inline_grace_seconds}s"
       log_audit "inline_settling_second" "Second sample after ${inline_grace_seconds}s: ${comment_count} unresolved threads"
       if [[ "$comment_count" -gt 0 ]]; then
         log_audit "inline_late_arrival" "Inline comments arrived during settling window (0 → ${comment_count})"
       fi
     fi
 
-    # Distinct audit action so this entry is not confused with the
-    # `review_detected` entry emitted by poll_for_review when the review
-    # record first appears. (Round-2 finding: same action name was
-    # ambiguous for log/metric consumers.)
-    log_audit "review_settled" "Review settled, ${comment_count} unresolved threads after grace window"
+    # Audit-event wording reflects whether settling actually occurred so
+    # downstream consumers can distinguish the three modes (skipped /
+    # disabled / settled). Round-2 finding: same `review_detected`
+    # action name was ambiguous; using `review_settled` only is also
+    # ambiguous when the grace window was bypassed.
+    log_audit "review_settled" "Review settled (${settling_mode}), ${comment_count} unresolved threads"
     local retry_count=0
 
     while [[ "$comment_count" -gt 0 ]] && [[ "$retry_count" -lt "$MAX_RETRY_COUNT" ]]; do
