@@ -1,0 +1,19 @@
+.github/workflows/polar-discovery.yml
+  s_1b97105afcd1ce::t_8150017d7fcb3d 25,35-38,40,52-57,59-61,64,67-68
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "296f6b276987d50d3b2d7c9ff763cec05627fa7c",
+  "prompts": {},
+  "sessions": {
+    "s_1b97105afcd1ce": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "08b7dbcb-979d-46df-8ef8-4cf3146ddd08",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "~.~ <saint@ghost.lt>"
+    }
+  }
+}
