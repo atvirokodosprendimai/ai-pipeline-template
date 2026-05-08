@@ -1,0 +1,9 @@
+company/scripts/pr-review-merge.sh
+  ai_agent 541-574
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "61058b9234b60ffcab140c6a609879bdea49c812",
+  "prompts": {}
+}
