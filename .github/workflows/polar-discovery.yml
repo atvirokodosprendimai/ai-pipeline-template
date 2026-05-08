@@ -24,7 +24,7 @@ jobs:
           POLAR_TOKEN: ${{ secrets.POLAR_TOKEN }}
           POLAR_ORG: atvirokodosprendimai
         run: |
-          set -euo pipefail
+          set -uo pipefail
           if [ -z "$POLAR_TOKEN" ]; then
             echo "::error::POLAR_TOKEN not configured"
             exit 1
@@ -32,9 +32,35 @@ jobs:
           API="https://api.polar.sh"
           AUTH="Authorization: Bearer $POLAR_TOKEN"
 
-          # 1. Resolve org id
-          org=$(curl -sf -H "$AUTH" -H "Accept: application/json" \
-            "$API/v1/organizations/?slug=$POLAR_ORG")
+          # Token-validity probe: /v1/users/me — should always 200 if token is valid.
+          echo "==== /v1/users/me (token-validity probe) ===="
+          curl -s -o /tmp/me.json -w "HTTP %{http_code}\n" -H "$AUTH" -H "Accept: application/json" "$API/v1/users/me"
+          jq '. | {email, id, accepted_terms_of_service}' /tmp/me.json 2>/dev/null || cat /tmp/me.json
+
+          echo ""
+          echo "==== /v1/organizations/ (orgs visible to token) ===="
+          curl -s -o /tmp/orgs.json -w "HTTP %{http_code}\n" -H "$AUTH" -H "Accept: application/json" "$API/v1/organizations/?limit=20"
+          jq '.items // . | map({id, slug, name, profile_settings: (.profile_settings // {})}) // .' /tmp/orgs.json 2>/dev/null || cat /tmp/orgs.json
+
+          echo ""
+          echo "==== /v1/organizations/?slug=$POLAR_ORG (org by slug) ===="
+          curl -s -o /tmp/org.json -w "HTTP %{http_code}\n" -H "$AUTH" -H "Accept: application/json" "$API/v1/organizations/?slug=$POLAR_ORG"
+          jq '.' /tmp/org.json 2>/dev/null || cat /tmp/org.json
+
+          # If we got an org id from any of the above, use it for products
+          org_id=$(jq -r '.items[0].id // empty' /tmp/orgs.json 2>/dev/null)
+          if [ -z "$org_id" ]; then
+            org_id=$(jq -r '.items[0].id // empty' /tmp/org.json 2>/dev/null)
+          fi
+          if [ -z "$org_id" ]; then
+            echo "::warning::No org id resolved; products step skipped."
+            exit 0
+          fi
+          echo ""
+          echo "Resolved org_id: $org_id"
+
+          # 1. Resolve org id (kept for parity with original; just use $org_id we already found)
+          org="$(cat /tmp/org.json)"
           org_id=$(echo "$org" | jq -r '.items[0].id // empty')
           org_slug=$(echo "$org" | jq -r '.items[0].slug // empty')
           org_pub=$(echo "$org" | jq -r '.items[0].profile_settings // {}')
