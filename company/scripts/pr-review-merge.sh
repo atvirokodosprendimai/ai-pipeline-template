@@ -538,9 +538,40 @@ main() {
       exit 0
     fi
 
-    # T1.2: Check for inline review comments + retry loop
-    local comment_count
-    comment_count=$(check_unresolved_threads "$PR_NUMBER")
+    # T1.2: Inline-settling grace period.
+    #
+    # Copilot's review submission is two-phase: it posts the summary review
+    # FIRST (creating a record with state COMMENTED that satisfies
+    # poll_for_review's reviews_count > 0 check), THEN posts inline comments
+    # which land as reviewThreads. Sampling threads immediately after the
+    # summary lands races the inline comments — the script sees 0 unresolved
+    # threads, passes guardrails, and merges. The inline comments arrive
+    # too late. PR #577 (wgmesh) hit exactly this in 2026-05-08 (13 inline
+    # findings posted ~24 minutes after summary; PR was already merged).
+    #
+    # Mitigation: sample reviewThreads twice across a settling window and
+    # take the MAX. This preserves the COMMENTED-with-0-threads = clean
+    # path for legitimate fast-merges (no inline comments ever land), while
+    # closing the race for the slow-inline path. Tunable via INLINE_GRACE_SECONDS.
+    local comment_count first_thread_count second_thread_count
+    first_thread_count=$(check_unresolved_threads "$PR_NUMBER")
+    log_audit "inline_settling_first" "First sample: ${first_thread_count} unresolved threads"
+
+    local inline_grace_seconds="${INLINE_GRACE_SECONDS:-90}"
+    if [[ "$inline_grace_seconds" -gt 0 ]]; then
+      sleep "$inline_grace_seconds"
+    fi
+
+    second_thread_count=$(check_unresolved_threads "$PR_NUMBER")
+    log_audit "inline_settling_second" "Second sample after ${inline_grace_seconds}s: ${second_thread_count} unresolved threads"
+
+    if [[ "$second_thread_count" -gt "$first_thread_count" ]]; then
+      comment_count="$second_thread_count"
+      log_audit "inline_late_arrival" "Inline comments arrived during settling window (${first_thread_count} → ${second_thread_count}); using max"
+    else
+      comment_count="$first_thread_count"
+    fi
+
     log_audit "review_detected" "Review found, ${comment_count} unresolved threads"
     local retry_count=0
 
