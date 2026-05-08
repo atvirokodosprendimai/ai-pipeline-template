@@ -549,27 +549,37 @@ main() {
     # too late. PR #577 (wgmesh) hit exactly this in 2026-05-08 (13 inline
     # findings posted ~24 minutes after summary; PR was already merged).
     #
-    # Mitigation: sample reviewThreads twice across a settling window and
-    # take the MAX. This preserves the COMMENTED-with-0-threads = clean
-    # path for legitimate fast-merges (no inline comments ever land), while
-    # closing the race for the slow-inline path. Tunable via INLINE_GRACE_SECONDS.
-    local comment_count first_thread_count second_thread_count
-    first_thread_count=$(check_unresolved_threads "$PR_NUMBER")
+    # Mitigation: take a first sample. If it shows 0 threads, sleep and
+    # re-sample — the second sample is the source of truth (it is the
+    # latest reading; if threads were resolved during the window, the
+    # second sample correctly reflects 0). If the first sample already
+    # shows >0 threads, the race is moot — skip the sleep and proceed.
+    # Tunable via INLINE_GRACE_SECONDS (default 90s; set 0 to disable).
+    #
+    # Round-2 fixes addressed: command-substitution exit under set -e
+    # (`|| true` after each call), skip-sleep on first>0, and use second
+    # sample as latest source-of-truth instead of MAX.
+    local comment_count first_thread_count
+    first_thread_count=$(check_unresolved_threads "$PR_NUMBER" || true)
+    first_thread_count="${first_thread_count:-0}"
     log_audit "inline_settling_first" "First sample: ${first_thread_count} unresolved threads"
 
-    local inline_grace_seconds="${INLINE_GRACE_SECONDS:-90}"
-    if [[ "$inline_grace_seconds" -gt 0 ]]; then
-      sleep "$inline_grace_seconds"
-    fi
-
-    second_thread_count=$(check_unresolved_threads "$PR_NUMBER")
-    log_audit "inline_settling_second" "Second sample after ${inline_grace_seconds}s: ${second_thread_count} unresolved threads"
-
-    if [[ "$second_thread_count" -gt "$first_thread_count" ]]; then
-      comment_count="$second_thread_count"
-      log_audit "inline_late_arrival" "Inline comments arrived during settling window (${first_thread_count} → ${second_thread_count}); using max"
-    else
+    if [[ "$first_thread_count" -gt 0 ]]; then
+      # Race is moot — inline comments already visible. Skip the settling
+      # window so retry/escalation is not delayed.
       comment_count="$first_thread_count"
+      log_audit "inline_no_settling_needed" "First sample > 0; skipping settling window"
+    else
+      local inline_grace_seconds="${INLINE_GRACE_SECONDS:-90}"
+      if [[ "$inline_grace_seconds" -gt 0 ]]; then
+        sleep "$inline_grace_seconds"
+      fi
+      comment_count=$(check_unresolved_threads "$PR_NUMBER" || true)
+      comment_count="${comment_count:-0}"
+      log_audit "inline_settling_second" "Second sample after ${inline_grace_seconds}s: ${comment_count} unresolved threads"
+      if [[ "$comment_count" -gt 0 ]]; then
+        log_audit "inline_late_arrival" "Inline comments arrived during settling window (0 → ${comment_count})"
+      fi
     fi
 
     log_audit "review_detected" "Review found, ${comment_count} unresolved threads"
