@@ -17,7 +17,9 @@ jobs:
   validate-and-merge:
     if: >-
       startsWith(github.event.pull_request.title, 'loop: ') ||
-      startsWith(github.event.pull_request.title, 'heal: ')
+      startsWith(github.event.pull_request.title, 'heal: ') ||
+      (startsWith(github.event.pull_request.title, 'audit: strategy baseline') &&
+       !contains(github.event.pull_request.labels.*.name, 'needs-human'))
     runs-on: ubuntu-latest
     steps:
       - name: Checkout PR head
@@ -76,6 +78,9 @@ jobs:
             heal:*)
               expected_branch='^pipeline-health/'
               ;;
+            'audit: strategy baseline'*)
+              expected_branch='^audit/strategy-baseline-'
+              ;;
             *)
               echo "::error::PR title does not match heartbeat prefixes: $PR_TITLE"
               exit 1
@@ -89,7 +94,7 @@ jobs:
 
           for path in "${changed_files[@]}"; do
             case "$path" in
-              company/loop-state.json|company/pipeline-health-state.json|company/audit-log.jsonl)
+              company/loop-state.json|company/pipeline-health-state.json|company/audit-log.jsonl|company/strategy-audit-baseline.json)
                 ;;
               company/loop-history/*.md)
                 ;;
@@ -121,7 +126,7 @@ jobs:
 
           for path in "${changed_files[@]}"; do
             case "$path" in
-              company/loop-state.json|company/pipeline-health-state.json)
+              company/loop-state.json|company/pipeline-health-state.json|company/strategy-audit-baseline.json)
                 jq empty "$path"
                 ;;
               company/audit-log.jsonl)
@@ -155,14 +160,41 @@ jobs:
             fi
           done
 
-      - name: Merge heartbeat PR (admin bypass)
+      - name: Merge heartbeat PR (admin bypass, retry on race)
         env:
           GH_TOKEN: ${{ secrets.PUSH_TOKEN }}
           TARGET_REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
-          gh pr merge "$PR_NUMBER" --repo "$TARGET_REPO" --squash --delete-branch --admin
+          attempts=0
+          max_attempts=5
+          while [ "$attempts" -lt "$max_attempts" ]; do
+            attempts=$((attempts + 1))
+            if out=$(gh pr merge "$PR_NUMBER" --repo "$TARGET_REPO" --squash --delete-branch --admin 2>&1); then
+              echo "Merged PR #$PR_NUMBER on attempt $attempts"
+              exit 0
+            fi
+            echo "$out"
+            if echo "$out" | grep -qiE "already merged|already closed|pull request is closed|state.*merged"; then
+              echo "::notice::PR #$PR_NUMBER is already merged/closed by another run; treating as success."
+              exit 0
+            fi
+            if echo "$out" | grep -qiE "Merge already in progress|merge_in_progress|Pull Request is in unstable status|Base branch was modified"; then
+              if [ "$attempts" -ge "$max_attempts" ]; then
+                echo "::notice::Transient merge race on attempt $attempts; no retries remain — falling through to exhaustion"
+                continue
+              fi
+              backoff=$((attempts * 10))
+              echo "::notice::Transient merge race on attempt $attempts; retrying in ${backoff}s"
+              sleep "$backoff"
+              continue
+            fi
+            echo "::error::gh pr merge failed with non-retryable error (full output above)"
+            exit 1
+          done
+          echo "::error::gh pr merge exhausted $max_attempts attempts"
+          exit 1
 
       - name: Comment on validation failure
         if: failure()
