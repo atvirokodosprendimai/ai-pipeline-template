@@ -559,8 +559,17 @@ main() {
     # Round-2 fixes addressed: command-substitution exit under set -e
     # (`|| true` after each call), skip-sleep on first>0, and use second
     # sample as latest source-of-truth instead of MAX.
-    local comment_count first_thread_count
-    first_thread_count=$(check_unresolved_threads "$PR_NUMBER" || true)
+    # Round-4 fix: capture both stdout AND exit code from
+    # check_unresolved_threads. On API failure the function echoes "0"
+    # and returns non-zero — masking that with `|| true` and proceeding
+    # with comment_count=0 would let an unsafe merge through when thread
+    # state is actually unknown. Escalate instead.
+    local comment_count first_thread_count first_rc
+    first_thread_count=$(check_unresolved_threads "$PR_NUMBER") && first_rc=0 || first_rc=$?
+    if [[ "$first_rc" -ne 0 ]]; then
+      escalate "$PR_NUMBER" "Failed to fetch review threads on first sample (rc=${first_rc}) — cannot verify clean state safely"
+      exit 0
+    fi
     first_thread_count="${first_thread_count:-0}"
     log_audit "inline_settling_first" "First sample: ${first_thread_count} unresolved threads"
 
@@ -581,7 +590,13 @@ main() {
       if [[ "$inline_grace_seconds" -gt 0 ]]; then
         sleep "$inline_grace_seconds"
       fi
-      comment_count=$(check_unresolved_threads "$PR_NUMBER" || true)
+      # Same explicit rc capture as the first sample.
+      local second_rc
+      comment_count=$(check_unresolved_threads "$PR_NUMBER") && second_rc=0 || second_rc=$?
+      if [[ "$second_rc" -ne 0 ]]; then
+        escalate "$PR_NUMBER" "Failed to fetch review threads on second sample (rc=${second_rc}) — cannot verify clean state safely"
+        exit 0
+      fi
       comment_count="${comment_count:-0}"
       log_audit "inline_settling_second" "Second sample after ${inline_grace_seconds}s: ${comment_count} unresolved threads"
       if [[ "$comment_count" -gt 0 ]]; then
