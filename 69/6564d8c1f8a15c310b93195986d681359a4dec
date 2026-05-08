@@ -1,0 +1,19 @@
+company/scripts/pr-review-merge.sh
+  s_1b97105afcd1ce::t_a6d522fce76119 562-572,593-599
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "696564d8c1f8a15c310b93195986d681359a4dec",
+  "prompts": {},
+  "sessions": {
+    "s_1b97105afcd1ce": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "08b7dbcb-979d-46df-8ef8-4cf3146ddd08",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "~.~ <saint@ghost.lt>"
+    }
+  }
+}
