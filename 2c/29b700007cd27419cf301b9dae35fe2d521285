@@ -1,0 +1,21 @@
+.github/workflows/observation-loop.yml
+  s_1b97105afcd1ce::t_a9c614d1378c89 45
+company/system-prompt.md
+  s_1b97105afcd1ce::t_b11aa25e2e5e39 27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "2c29b700007cd27419cf301b9dae35fe2d521285",
+  "prompts": {},
+  "sessions": {
+    "s_1b97105afcd1ce": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "08b7dbcb-979d-46df-8ef8-4cf3146ddd08",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "~.~ <saint@ghost.lt>"
+    }
+  }
+}
