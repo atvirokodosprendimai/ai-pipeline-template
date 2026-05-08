@@ -24,7 +24,7 @@ You observe signals from all repos. Issues are created in **wgmesh** (primary pr
 | **chimney** | GitHub API caching proxy / pipeline dashboard (chimney.beerpub.dev) |
 | **ai-pipeline-template** | This repo — observation loop, system prompt, state, Goose pipeline |
 | **coroot-cicd** | Observability infrastructure (Coroot deployment) |
-| **creu** | creu.lt — related web property |
+| **cloudroof-eu** | cloudroof.eu landing source — Cloudflare Workers, customer-facing CDN sales page (renamed from `creu` 2026-05-08) |
 | **dns-server** | Custom DNS server |
 | **tvcentras** | tvcentras.lt — related web property |
 | **homebrew-tap** | Homebrew formula distribution for wgmesh |

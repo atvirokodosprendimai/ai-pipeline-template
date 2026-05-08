@@ -538,10 +538,77 @@ main() {
       exit 0
     fi
 
-    # T1.2: Check for inline review comments + retry loop
-    local comment_count
-    comment_count=$(check_unresolved_threads "$PR_NUMBER")
-    log_audit "review_detected" "Review found, ${comment_count} unresolved threads"
+    # T1.2: Inline-settling grace period.
+    #
+    # Copilot's review submission is two-phase: it posts the summary review
+    # FIRST (creating a record with state COMMENTED that satisfies
+    # poll_for_review's reviews_count > 0 check), THEN posts inline comments
+    # which land as reviewThreads. Sampling threads immediately after the
+    # summary lands races the inline comments — the script sees 0 unresolved
+    # threads, passes guardrails, and merges. The inline comments arrive
+    # too late. PR #577 (wgmesh) hit exactly this in 2026-05-08 (13 inline
+    # findings posted ~24 minutes after summary; PR was already merged).
+    #
+    # Mitigation: take a first sample. If it shows 0 threads, sleep and
+    # re-sample — the second sample is the source of truth (it is the
+    # latest reading; if threads were resolved during the window, the
+    # second sample correctly reflects 0). If the first sample already
+    # shows >0 threads, the race is moot — skip the sleep and proceed.
+    # Tunable via INLINE_GRACE_SECONDS (default 90s; set 0 to disable).
+    #
+    # Round-2 fixes addressed: command-substitution exit under set -e
+    # (`|| true` after each call), skip-sleep on first>0, and use second
+    # sample as latest source-of-truth instead of MAX.
+    # Round-4 fix: capture both stdout AND exit code from
+    # check_unresolved_threads. On API failure the function echoes "0"
+    # and returns non-zero — masking that with `|| true` and proceeding
+    # with comment_count=0 would let an unsafe merge through when thread
+    # state is actually unknown. Escalate instead.
+    local comment_count first_thread_count first_rc
+    first_thread_count=$(check_unresolved_threads "$PR_NUMBER") && first_rc=0 || first_rc=$?
+    if [[ "$first_rc" -ne 0 ]]; then
+      escalate "$PR_NUMBER" "Failed to fetch review threads on first sample (rc=${first_rc}) — cannot verify clean state safely"
+      exit 0
+    fi
+    first_thread_count="${first_thread_count:-0}"
+    log_audit "inline_settling_first" "First sample: ${first_thread_count} unresolved threads"
+
+    if [[ "$first_thread_count" -gt 0 ]]; then
+      # Race is moot — inline comments already visible. Skip the settling
+      # window so retry/escalation is not delayed.
+      comment_count="$first_thread_count"
+      log_audit "inline_no_settling_needed" "First sample > 0; skipping settling window"
+    else
+      # Validate INLINE_GRACE_SECONDS as a non-negative integer. Anything
+      # else (empty, "90s", "0.5", garbage) falls back to the default to
+      # avoid `[[ -gt ]]` errors and `sleep` failures under set -e.
+      local inline_grace_seconds="${INLINE_GRACE_SECONDS:-90}"
+      if ! [[ "$inline_grace_seconds" =~ ^[0-9]+$ ]]; then
+        echo "::warning::INLINE_GRACE_SECONDS='${inline_grace_seconds}' is not a non-negative integer; falling back to 90s"
+        inline_grace_seconds=90
+      fi
+      if [[ "$inline_grace_seconds" -gt 0 ]]; then
+        sleep "$inline_grace_seconds"
+      fi
+      # Same explicit rc capture as the first sample.
+      local second_rc
+      comment_count=$(check_unresolved_threads "$PR_NUMBER") && second_rc=0 || second_rc=$?
+      if [[ "$second_rc" -ne 0 ]]; then
+        escalate "$PR_NUMBER" "Failed to fetch review threads on second sample (rc=${second_rc}) — cannot verify clean state safely"
+        exit 0
+      fi
+      comment_count="${comment_count:-0}"
+      log_audit "inline_settling_second" "Second sample after ${inline_grace_seconds}s: ${comment_count} unresolved threads"
+      if [[ "$comment_count" -gt 0 ]]; then
+        log_audit "inline_late_arrival" "Inline comments arrived during settling window (0 → ${comment_count})"
+      fi
+    fi
+
+    # Distinct audit action so this entry is not confused with the
+    # `review_detected` entry emitted by poll_for_review when the review
+    # record first appears. (Round-2 finding: same action name was
+    # ambiguous for log/metric consumers.)
+    log_audit "review_settled" "Review settled, ${comment_count} unresolved threads after grace window"
     local retry_count=0
 
     while [[ "$comment_count" -gt 0 ]] && [[ "$retry_count" -lt "$MAX_RETRY_COUNT" ]]; do
