@@ -176,6 +176,10 @@ jobs:
               exit 0
             fi
             echo "$out"
+            if echo "$out" | grep -qiE "already merged|already closed|pull request is closed|state.*merged"; then
+              echo "::notice::PR #$PR_NUMBER is already merged/closed by another run; treating as success."
+              exit 0
+            fi
             if echo "$out" | grep -qiE "Merge already in progress|merge_in_progress|Pull Request is in unstable status|Base branch was modified"; then
               backoff=$((attempts * 10))
               echo "::notice::Transient merge race on attempt $attempts; retrying in ${backoff}s"
