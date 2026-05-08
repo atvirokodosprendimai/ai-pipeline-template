@@ -1,0 +1,22 @@
+.github/workflows/checkout-monitor.yml
+  s_1b97105afcd1ce::t_bc9317b1e837ea 37-39
+  s_1b97105afcd1ce::t_4dc398c46cb709 117-121
+  s_1b97105afcd1ce::t_d81e18bc82ca9b 144,146-149
+  s_1b97105afcd1ce::t_8714705039b6d9 10
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "109239993615bf557f9cb1626caf1c3c5b365541",
+  "prompts": {},
+  "sessions": {
+    "s_1b97105afcd1ce": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "08b7dbcb-979d-46df-8ef8-4cf3146ddd08",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "~.~ <saint@ghost.lt>"
+    }
+  }
+}
