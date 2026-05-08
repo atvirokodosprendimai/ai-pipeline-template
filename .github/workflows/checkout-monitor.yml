@@ -7,7 +7,7 @@ name: Checkout Monitor (synthetic)
 # returns 200 to a naive HEAD check, masking the failure.
 #
 # Run policy:
-#   - schedule: every 6 hours (96 ms / month — negligible cost)
+#   - schedule: every 6 hours (~120 runs/month — negligible cost)
 #   - workflow_dispatch: manual smoke test after CTA edits
 #
 # Failure surface: opens a `needs-human` issue with the dead URL + the
@@ -34,8 +34,9 @@ jobs:
         run: |
           set -uo pipefail
           if [ -z "$POLAR_TOKEN" ]; then
-            echo "::error::POLAR_TOKEN not configured — cannot discover canonical URLs"
-            exit 1
+            echo "::warning::POLAR_TOKEN not configured — cannot discover canonical URLs"
+            echo "missing=token-unconfigured" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
 
           API="https://api.polar.sh"
@@ -113,7 +114,11 @@ jobs:
             # which is 200 but does NOT contain the product name or "Subscribe"
             # button, so a 200-only check passes while the click fails.
             page=$(curl -sSL --max-time 15 "$url")
-            status=$(curl -sI -o /dev/null -w "%{http_code}" --max-time 15 "$url")
+            # `-L` follows redirects so the final status reflects the rendered
+            # checkout page, not an intermediate 302/301. Without `-L`, valid
+            # canonicalization redirects (e.g., http→https) get flagged as
+            # BAD_STATUS even though the page renders fine.
+            status=$(curl -sIL -o /dev/null -w "%{http_code}" --max-time 15 "$url")
 
             # Minimal shape assertion: page contains the word "Subscribe" or
             # "Sponsor" or "checkout" (Polar's checkout page reliably has at
@@ -136,9 +141,12 @@ jobs:
           fi
 
       - name: Open issue on failure
-        if: steps.verify.outputs.failed == 'true' || steps.probe.outputs.failed == 'true' || steps.discover.outputs.missing != '0'
+        if: steps.verify.outputs.failed == 'true' || steps.probe.outputs.failed == 'true' || (steps.discover.outputs.missing != '0' && steps.discover.outputs.missing != '')
         env:
-          GH_TOKEN: ${{ secrets.PUSH_TOKEN }}
+          # Built-in GITHUB_TOKEN is sufficient: the workflow already declares
+          # `permissions: issues: write`. Avoids the long-lived PAT exposure
+          # surface flagged by reviewer.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
 
