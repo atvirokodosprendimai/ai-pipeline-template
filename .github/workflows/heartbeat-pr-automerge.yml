@@ -181,6 +181,10 @@ jobs:
               exit 0
             fi
             if echo "$out" | grep -qiE "Merge already in progress|merge_in_progress|Pull Request is in unstable status|Base branch was modified"; then
+              if [ "$attempts" -ge "$max_attempts" ]; then
+                echo "::notice::Transient merge race on attempt $attempts; no retries remain — falling through to exhaustion"
+                continue
+              fi
               backoff=$((attempts * 10))
               echo "::notice::Transient merge race on attempt $attempts; retrying in ${backoff}s"
               sleep "$backoff"
