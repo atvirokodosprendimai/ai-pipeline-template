@@ -570,7 +570,14 @@ main() {
       comment_count="$first_thread_count"
       log_audit "inline_no_settling_needed" "First sample > 0; skipping settling window"
     else
+      # Validate INLINE_GRACE_SECONDS as a non-negative integer. Anything
+      # else (empty, "90s", "0.5", garbage) falls back to the default to
+      # avoid `[[ -gt ]]` errors and `sleep` failures under set -e.
       local inline_grace_seconds="${INLINE_GRACE_SECONDS:-90}"
+      if ! [[ "$inline_grace_seconds" =~ ^[0-9]+$ ]]; then
+        echo "::warning::INLINE_GRACE_SECONDS='${inline_grace_seconds}' is not a non-negative integer; falling back to 90s"
+        inline_grace_seconds=90
+      fi
       if [[ "$inline_grace_seconds" -gt 0 ]]; then
         sleep "$inline_grace_seconds"
       fi
@@ -582,7 +589,11 @@ main() {
       fi
     fi
 
-    log_audit "review_detected" "Review found, ${comment_count} unresolved threads"
+    # Distinct audit action so this entry is not confused with the
+    # `review_detected` entry emitted by poll_for_review when the review
+    # record first appears. (Round-2 finding: same action name was
+    # ambiguous for log/metric consumers.)
+    log_audit "review_settled" "Review settled, ${comment_count} unresolved threads after grace window"
     local retry_count=0
 
     while [[ "$comment_count" -gt 0 ]] && [[ "$retry_count" -lt "$MAX_RETRY_COUNT" ]]; do
