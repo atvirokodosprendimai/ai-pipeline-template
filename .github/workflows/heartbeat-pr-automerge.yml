@@ -182,7 +182,7 @@ jobs:
               sleep "$backoff"
               continue
             fi
-            echo "::error::gh pr merge failed with non-retryable error: $out"
+            echo "::error::gh pr merge failed with non-retryable error (full output above)"
             exit 1
           done
           echo "::error::gh pr merge exhausted $max_attempts attempts"
