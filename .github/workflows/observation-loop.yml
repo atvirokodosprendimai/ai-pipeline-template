@@ -181,7 +181,7 @@ jobs:
             exit 0
           fi
 
-          POLAR_ORG="atvirokodosprendimai"
+          POLAR_ORG="it-uoga-mb"  # Real Polar org slug (was atvirokodosprendimai — that slug never existed in Polar; observation-loop has been silently failing). Confirmed via authed API 2026-05-08: org id 25cac772-140e-44da-8b69-194926b93595.
           API="https://api.polar.sh"
 
           # List active subscriptions for the org
