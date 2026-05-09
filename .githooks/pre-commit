@@ -29,27 +29,45 @@ if [ "${#staged[@]}" -eq 0 ]; then
   exit 0
 fi
 
-email_pattern='[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
-allow_pattern='@(example\.com|noreply\.github\.com|users\.noreply\.github\.com)'
+# Patterns via ENVIRON — awk -v strips backslashes (\. → . over-matches)
+export EMAIL_PATTERN='[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
+export ALLOW_PATTERN='^@(example\.com|noreply\.github\.com|users\.noreply\.github\.com)$'
 
 fail=0
 for f in "${staged[@]}"; do
   [ -f "$f" ] || continue
 
-  # Block any handle-keyed customer file
-  if [[ "$f" =~ ^docs/customers/.+\.md$ ]]; then
+  # Hard block: ANY content under docs/customers/.
+  # Subtree is reserved policy-banned namespace.
+  if [[ "$f" =~ ^docs/customers/ ]]; then
     printf 'BLOCKED: %s\n' "$f" >&2
-    printf '  docs/customers/<handle>.md is policy-banned. Sponsor/customer\n' >&2
+    printf '  docs/customers/** is a policy-banned subtree. Customer/sponsor\n' >&2
     printf '  exchanges go to private operator notes (1Password / encrypted file).\n' >&2
     printf '  See company/system-prompt.md Public/private boundary.\n\n' >&2
     fail=1
     continue
   fi
 
-  # Email scan against the staged content (not just working tree)
+  # Email scan against the staged content (not just working tree).
+  # Extract emails individually so per-line allow-list filtering can't
+  # drop a disallowed email sharing a line with an allow-listed one.
   hits=$(git show ":$f" 2>/dev/null \
-         | grep -nE "$email_pattern" \
-         | grep -vE "$allow_pattern" \
+         | awk 'BEGIN { pat = ENVIRON["EMAIL_PATTERN"] }
+                {
+                  line = $0
+                  while (match(line, pat)) {
+                    m = substr(line, RSTART, RLENGTH)
+                    printf "%d:%s\n", NR, m
+                    line = substr(line, RSTART + RLENGTH)
+                  }
+                }' \
+         | awk -F: 'BEGIN { allow = ENVIRON["ALLOW_PATTERN"] }
+                    {
+                      email = $2
+                      pos = index(email, "@")
+                      domain = substr(email, pos)
+                      if (domain !~ allow) print
+                    }' \
          || true)
 
   if [ -n "$hits" ]; then

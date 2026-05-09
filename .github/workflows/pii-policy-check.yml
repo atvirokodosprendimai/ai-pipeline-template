@@ -1,18 +1,22 @@
 name: PII Policy Check
 
-# Blocks merge of any PR that introduces email addresses or handle-keyed
-# customer files in policy-restricted paths. Per company/system-prompt.md
-# "Public/private boundary": names + emails forbidden in docs/outreach/
-# and docs/customers/. PII for sponsor/customer exchanges goes to private
-# operator notes (off-repo).
+# Path-scoped pre-merge gate enforcing a STRICTER subset of the repo-wide
+# Public/private boundary defined in company/system-prompt.md. The repo-wide
+# rule forbids names/emails everywhere in this public repo; this workflow
+# adds an automated enforcement floor on the two paths most likely to
+# accumulate PII (docs/outreach/, docs/customers/), where prior incidents
+# landed (2026-05-09 PR #820: 5 stargazer emails on public main 9 min before
+# manual remediation).
 #
-# Catches the same class of incident as 2026-05-09 PR #820 (5 stargazer
-# emails landed on public main 9 minutes before manual remediation).
+# The whole docs/customers/** subtree is policy-banned regardless of file
+# name — that path is reserved as an unused namespace so it can't accrete
+# customer-keyed content. Operator stores sponsor/customer exchanges in
+# private notes (1Password / encrypted file).
 #
 # Why this and not GitGuardian / Trufflehog / Gitleaks: those tools are
 # secret-focused (API keys, tokens, creds). Email addresses are noisy
 # globally and benign in CHANGELOG/fixtures. Path-scoped grep is the
-# right blast radius for this policy.
+# right blast radius for content-policy boundaries.
 
 on:
   pull_request:
@@ -38,9 +42,10 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Resolve files in this PR that touch policy-restricted paths
+          # Include rename (R) + copy (C) + type-change (T) in addition to
+          # add (A) + modify (M) so a renamed file can't bypass scanning.
           mapfile -t files < <(
-            git diff --name-only --diff-filter=AM "origin/${BASE_REF}...HEAD" \
+            git diff --name-only --diff-filter=ACMRT "origin/${BASE_REF}...HEAD" \
               | grep -E '^docs/(outreach|customers)/' \
               || true
           )
@@ -56,25 +61,47 @@ jobs:
 
           fail=0
 
-          # Email regex with allow-list for known-benign forms
-          # (example.com is RFC 2606 reserved; noreply.github.com is GH bot)
-          email_pattern='[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
-          allow_pattern='@(example\.com|noreply\.github\.com|users\.noreply\.github\.com)'
+          # Email regex with allow-list for known-benign forms.
+          # example.com is RFC 2606 reserved; *.noreply.github.com is GitHub bot.
+          # Patterns are passed via ENVIRON to avoid awk's -v backslash stripping
+          # (which would turn `\.` into `.` and over-match across whitespace).
+          export EMAIL_PATTERN='[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
+          export ALLOW_PATTERN='^@(example\.com|noreply\.github\.com|users\.noreply\.github\.com)$'
 
           for f in "${files[@]}"; do
             [ -f "$f" ] || continue
 
-            # 1. Block any handle-keyed customer file outright
-            if [[ "$f" =~ ^docs/customers/.+\.md$ ]]; then
-              echo "::error file=${f}::docs/customers/<handle>.md is policy-banned. Sponsor/customer exchanges go to private operator notes (1Password, encrypted file). See company/system-prompt.md Public/private boundary."
+            # 1. Hard block: ANY content under docs/customers/. Subtree is
+            # reserved as a policy-banned namespace (no customer-keyed files,
+            # no handle-keyed files, no readme that would invite content).
+            # Operator stores customer exchanges in private notes.
+            if [[ "$f" =~ ^docs/customers/ ]]; then
+              echo "::error file=${f}::docs/customers/** is a policy-banned subtree. Customer/sponsor exchanges go to private operator notes (1Password / encrypted file). See company/system-prompt.md Public/private boundary."
               fail=1
               continue
             fi
 
-            # 2. Email scan (filtered)
-            hits=$(grep -nE "$email_pattern" "$f" \
-                   | grep -vE "$allow_pattern" \
-                   || true)
+            # 2. Email scan. Extract every email match individually so
+            # per-line allow-list filtering can't drop a disallowed email
+            # sharing a line with an allow-listed one.
+            #
+            # awk extracts each match with its line number, then the
+            # allow-list filter compares the @domain part exactly.
+            hits=$(awk 'BEGIN { pat = ENVIRON["EMAIL_PATTERN"] }
+            {
+              line = $0
+              while (match(line, pat)) {
+                m = substr(line, RSTART, RLENGTH)
+                printf "%d:%s\n", NR, m
+                line = substr(line, RSTART + RLENGTH)
+              }
+            }' -- "$f" | awk -F: 'BEGIN { allow = ENVIRON["ALLOW_PATTERN"] }
+            {
+              email = $2
+              pos = index(email, "@")
+              domain = substr(email, pos)
+              if (domain !~ allow) print
+            }' || true)
 
             if [ -n "$hits" ]; then
               fail=1
@@ -99,11 +126,11 @@ jobs:
         if: always()
         run: |
           cat <<'EOF'
-          Heads-up: this check enforces email policy via regex.
-          Full names + GitHub handles attached to recipient sections are
-          ALSO banned by company/system-prompt.md but are not regex-detectable
-          without high false-positive cost. Reviewer must confirm visually
-          on any PR touching docs/outreach/** that recipient sections are
-          keyed by anonymous letter (Stargazer A-E) or similar, not by
+          Heads-up: this check enforces email policy via regex on emails only.
+          Full names + GitHub handles attached to recipient sections are also
+          banned by company/system-prompt.md but are not regex-detectable
+          without prohibitive false-positive cost. Reviewer must confirm
+          visually on any PR touching docs/outreach/** that recipient sections
+          are keyed by anonymous letter (Stargazer A-E) or similar, not by
           name/handle/email.
           EOF

@@ -15,8 +15,9 @@ remote="$1"
 url="$2"
 
 PATHS_REGEX='^docs/(outreach|customers)/'
-email_pattern='[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
-allow_pattern='@(example\.com|noreply\.github\.com|users\.noreply\.github\.com)'
+# Patterns via ENVIRON — awk -v strips backslashes (\. → . over-matches)
+export EMAIL_PATTERN='[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
+export ALLOW_PATTERN='^@(example\.com|noreply\.github\.com|users\.noreply\.github\.com)$'
 
 # stdin format per githooks(5): <local_ref> <local_sha> <remote_ref> <remote_sha>
 fail=0
@@ -36,9 +37,10 @@ while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do
     range="${remote_sha}..${local_sha}"
   fi
 
-  # Files in policy-restricted paths touched by this push
+  # Files in policy-restricted paths touched by this push.
+  # Include rename/copy/type-change so renames into the path can't bypass.
   mapfile -t files < <(
-    git diff --name-only --diff-filter=AM "$range" 2>/dev/null \
+    git diff --name-only --diff-filter=ACMRT "$range" 2>/dev/null \
       | grep -E "$PATHS_REGEX" \
       || true
   )
@@ -46,18 +48,33 @@ while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do
   [ "${#files[@]}" -eq 0 ] && continue
 
   for f in "${files[@]}"; do
-    # Hard block on customer-handle path
-    if [[ "$f" =~ ^docs/customers/.+\.md$ ]]; then
+    # Hard block: ANY content under docs/customers/.
+    if [[ "$f" =~ ^docs/customers/ ]]; then
       printf 'BLOCKED in push %s..%s: %s\n' "${remote_sha:0:7}" "${local_sha:0:7}" "$f" >&2
-      printf '  docs/customers/<handle>.md is policy-banned.\n\n' >&2
+      printf '  docs/customers/** is a policy-banned subtree.\n\n' >&2
       fail=1
       continue
     fi
 
-    # Inspect the file content at the push tip (not working tree)
+    # Inspect file content at push tip. Extract emails individually +
+    # apply allow-list per-match.
     hits=$(git show "${local_sha}:${f}" 2>/dev/null \
-           | grep -nE "$email_pattern" \
-           | grep -vE "$allow_pattern" \
+           | awk 'BEGIN { pat = ENVIRON["EMAIL_PATTERN"] }
+                  {
+                    line = $0
+                    while (match(line, pat)) {
+                      m = substr(line, RSTART, RLENGTH)
+                      printf "%d:%s\n", NR, m
+                      line = substr(line, RSTART + RLENGTH)
+                    }
+                  }' \
+           | awk -F: 'BEGIN { allow = ENVIRON["ALLOW_PATTERN"] }
+                      {
+                        email = $2
+                        pos = index(email, "@")
+                        domain = substr(email, pos)
+                        if (domain !~ allow) print
+                      }' \
            || true)
 
     if [ -n "$hits" ]; then
