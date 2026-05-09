@@ -1,0 +1,19 @@
+.github/workflows/rah-bounty-review.yml
+  s_6228f0963b1408::t_26c0c4baff1f62 1-46
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "d2cb2b10860fa2852ed43b4d4af6a25c6cf9222b",
+  "prompts": {},
+  "sessions": {
+    "s_6228f0963b1408": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a190c21c-56dd-4794-a92f-b581e88483f7",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "~.~ <saint@ghost.lt>"
+    }
+  }
+}
