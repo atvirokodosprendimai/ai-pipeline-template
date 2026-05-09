@@ -1,0 +1,46 @@
+name: RAH Bounty Review (read-only)
+
+# workflow_dispatch-only utility to fetch application(s) for a RAH bounty
+# using the org-level RENTAHUMAN_API_KEY. Read-only — does not accept or
+# reject applications. Output goes to the run log for operator review.
+
+on:
+  workflow_dispatch:
+    inputs:
+      bounty_id:
+        description: RAH bounty ID (e.g. zWFeTTTCYQlLBgIOX6aW)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  fetch-applications:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch bounty + applications
+        env:
+          RAH_KEY: ${{ secrets.RENTAHUMAN_API_KEY }}
+          BOUNTY_ID: ${{ inputs.bounty_id }}
+        run: |
+          set -euo pipefail
+          if [ -z "${RAH_KEY:-}" ]; then
+            echo "::error::RENTAHUMAN_API_KEY secret missing"
+            exit 1
+          fi
+
+          echo "=== bounty ==="
+          curl -sS "https://rentahuman.ai/api/bounties/${BOUNTY_ID}" \
+            -H "Accept: application/json" \
+            -H "X-API-Key: ${RAH_KEY}" \
+            | jq '{id: .bounty.id, title: .bounty.title, status: .bounty.status, viewCount: .bounty.viewCount, applicationCount: .bounty.applicationCount, spotsRemaining: .bounty.spotsRemaining, deadline: .bounty.deadline, depositPaid: .bounty.depositPaid}' \
+            || cat
+
+          echo
+          echo "=== applications ==="
+          curl -sS "https://rentahuman.ai/api/bounties/${BOUNTY_ID}/applications" \
+            -H "Accept: application/json" \
+            -H "X-API-Key: ${RAH_KEY}" \
+            | jq '.' \
+            || cat
