@@ -32,4 +32,12 @@ chmod +x .githooks/pre-commit .githooks/pre-push
 printf 'githooks: configured\n'
 printf '  core.hooksPath = .githooks\n'
 printf '  enabled hooks:\n'
-ls -1 .githooks/ | grep -vE '^(setup\.sh|README\.md)$' | sed 's/^/    /'
+# Listing is non-fatal: under `set -euo pipefail`, a `grep` that finds
+# no matches exits non-zero and would kill an already-successful setup.
+# Trap that case with `|| true` so the configure step's success is never
+# undone by a cosmetic listing failure.
+{
+  ls -1 .githooks/ \
+    | grep -vE '^(setup\.sh|README\.md)$' \
+    | sed 's/^/    /'
+} || true
