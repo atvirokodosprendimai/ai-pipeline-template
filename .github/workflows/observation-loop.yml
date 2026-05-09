@@ -172,21 +172,33 @@ jobs:
           POLAR_TOKEN: ${{ secrets.POLAR_TOKEN }}
         run: |
           # Poll Polar.sh API for subscription/revenue data.
-          # This lets the observation loop observe revenue — the missing piece
-          # for advancing past Dogfood (Stage 1) to Revenue (Stage 3).
-          # Uses Option B (polling) from agent-memory billing gap analysis.
+          #
+          # Filters subscriptions to the seeded-product cohort (cloudroof tiers).
+          # Earlier versions queried all subs in the org, which mixed in
+          # unrelated products (e.g. TrueVIP Mailbox). The 2026-05-09 daily
+          # assessment then attributed those org-level subs to wgmesh and
+          # claimed Stage 5 revenue — wrong (see PR #825 inline review).
+          # See memory/project_observation_loop_product_aggregation_2026_05_08.md
+          # and feedback_memory_must_be_injected_into_loop_prompts.md.
           if [ -z "$POLAR_TOKEN" ]; then
             echo '::warning::POLAR_TOKEN not configured — revenue signals unavailable'
-            echo '{"source":"polar","error":"POLAR_TOKEN not configured","subscribers":0,"revenue_mrr_eur":0}' > /tmp/polar.json
+            echo '{"source":"polar","error":"POLAR_TOKEN not configured","seed_product_subscribers":0,"seed_product_mrr_cents":0,"seed_product_mrr_eur":0,"all_org_subscribers":0,"all_org_mrr_cents":0}' > /tmp/polar.json
             exit 0
           fi
 
-          POLAR_ORG="it-uoga-mb"  # Real Polar org slug (was atvirokodosprendimai — that slug never existed in Polar; observation-loop has been silently failing). Confirmed via authed API 2026-05-08: org id 25cac772-140e-44da-8b69-194926b93595.
+          POLAR_ORG="it-uoga-mb"  # Real Polar org slug. Org id 25cac772-140e-44da-8b69-194926b93595.
           API="https://api.polar.sh"
 
-          # List active subscriptions for the org
-          # Polar API v1: GET /v1/subscriptions/?organization_id=...&active=true
-          # First get organization ID, then query subscriptions
+          # Cloudroof seeded-product cohort. UUIDs sourced from
+          # docs/solutions/integration-issues/polar-checkout-404s-from-stale-config-2026-05-08.md
+          # Stage progression is gated on these products only.
+          # Founding $5/mo, Edge Node $20/mo, Mesh Operator $100/mo.
+          SEED_PRODUCT_IDS=(
+            "3f5d75de-936b-49d8-a21b-4b79d9fd22c1"
+            "1927e637-4cfd-4c94-8bee-c5518803bc89"
+            "eb20683e-55ea-4354-9d8c-070e55a4eff5"
+          )
+
           org_data=$(curl -sf \
             -H "Authorization: Bearer $POLAR_TOKEN" \
             -H "Accept: application/json" \
@@ -195,43 +207,74 @@ jobs:
           org_id=$(echo "$org_data" | jq -r '.items[0].id // empty')
           if [ -z "$org_id" ]; then
             echo '::warning::Could not resolve Polar organization ID'
-            echo '{"source":"polar","error":"org not found","subscribers":0,"revenue_mrr_eur":0}' > /tmp/polar.json
+            echo '{"source":"polar","error":"org not found","seed_product_subscribers":0,"seed_product_mrr_cents":0,"seed_product_mrr_eur":0,"all_org_subscribers":0,"all_org_mrr_cents":0}' > /tmp/polar.json
             exit 0
           fi
 
-          # Query active subscriptions
-          subs=$(curl -sf \
+          # 1. Org-level subs (used for context only — DO NOT report as wgmesh/cloudroof revenue).
+          all_subs=$(curl -sf \
             -H "Authorization: Bearer $POLAR_TOKEN" \
             -H "Accept: application/json" \
             "$API/v1/subscriptions/?organization_id=$org_id&active=true&limit=50" 2>/dev/null \
             || echo '{"items":[]}')
 
-          sub_count=$(echo "$subs" | jq '.items | length')
-          # Sum MRR from active subscriptions (amount is in cents)
-          mrr_cents=$(echo "$subs" | jq '[.items[].amount // 0] | add // 0')
-          mrr_eur=$((mrr_cents / 100))
+          all_sub_count=$(echo "$all_subs" | jq '.items | length')
+          all_mrr_cents=$(echo "$all_subs" | jq '[.items[].amount // 0] | add // 0')
 
-          # Also check recent orders (one-time + new subscriptions)
+          # 2. Seed-product cohort: per-product, sum across cloudroof tiers only.
+          # This is the canonical "is the product getting paid customers?" signal.
+          seed_subs_total=0
+          seed_mrr_cents=0
+          seed_per_product=()
+          for pid in "${SEED_PRODUCT_IDS[@]}"; do
+            ps=$(curl -sf \
+              -H "Authorization: Bearer $POLAR_TOKEN" \
+              -H "Accept: application/json" \
+              "$API/v1/subscriptions/?organization_id=$org_id&product_id=$pid&active=true&limit=50" 2>/dev/null \
+              || echo '{"items":[]}')
+            pcount=$(echo "$ps" | jq '.items | length')
+            pmrr=$(echo "$ps" | jq '[.items[].amount // 0] | add // 0')
+            seed_subs_total=$((seed_subs_total + pcount))
+            seed_mrr_cents=$((seed_mrr_cents + pmrr))
+            seed_per_product+=("$(jq -n --arg id "$pid" --argjson c "$pcount" --argjson m "$pmrr" '{product_id: $id, active_subscribers: $c, mrr_cents: $m}')")
+          done
+          # Convert seed cohort cents → EUR with two-decimal precision.
+          seed_mrr_eur=$(awk -v c="$seed_mrr_cents" 'BEGIN { printf "%.2f", c / 100 }')
+
+          # Also check recent orders (one-time + new subscriptions). Org-level for now;
+          # downstream LLM should NOT attribute these to seed cohort without product_id check.
           orders=$(curl -sf \
             -H "Authorization: Bearer $POLAR_TOKEN" \
             -H "Accept: application/json" \
             "$API/v1/orders/?organization_id=$org_id&limit=10" 2>/dev/null \
             || echo '{"items":[]}')
 
-          recent_orders=$(echo "$orders" | jq '[.items[] | {id: .id, amount: .amount, status: .status, created_at: .created_at}]')
+          recent_orders=$(echo "$orders" | jq '[.items[] | {id: .id, amount_cents: .amount, status: .status, created_at: .created_at, product_id: .product_id}]')
 
-          echo "Polar subscribers: $sub_count, MRR: ${mrr_eur} EUR cents"
+          echo "Polar SEED-cohort (cloudroof) subs=$seed_subs_total mrr_cents=$seed_mrr_cents (€${seed_mrr_eur})"
+          echo "Polar ALL-org subs=$all_sub_count mrr_cents=$all_mrr_cents (CONTEXT ONLY — includes unrelated products)"
+
+          per_product_json=$(printf '%s\n' "${seed_per_product[@]}" | jq -s '.')
 
           jq -n \
-            --argjson subs "$sub_count" \
-            --argjson mrr "$mrr_eur" \
+            --argjson seed_subs "$seed_subs_total" \
+            --argjson seed_mrr_c "$seed_mrr_cents" \
+            --arg seed_mrr_e "$seed_mrr_eur" \
+            --argjson all_subs "$all_sub_count" \
+            --argjson all_mrr_c "$all_mrr_cents" \
+            --argjson per_product "$per_product_json" \
             --argjson orders "$recent_orders" \
             --arg collected_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
             '{
               source: "polar",
               collected_at: $collected_at,
-              active_subscribers: $subs,
-              revenue_mrr_cents: $mrr,
+              note: "SEED cohort = cloudroof tier products only. Use seed_product_* for stage progression. ALL-org includes unrelated products (e.g. mailbox); do NOT attribute to wgmesh/cloudroof.",
+              seed_product_subscribers: $seed_subs,
+              seed_product_mrr_cents: $seed_mrr_c,
+              seed_product_mrr_eur: $seed_mrr_e,
+              seed_per_product: $per_product,
+              all_org_subscribers: $all_subs,
+              all_org_mrr_cents: $all_mrr_c,
               recent_orders: $orders
             }' > /tmp/polar.json
 
