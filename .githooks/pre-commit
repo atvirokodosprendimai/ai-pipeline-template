@@ -18,9 +18,10 @@ set -euo pipefail
 # Restrict scope to the same path policy as the workflow
 PATHS_REGEX='^docs/(outreach|customers)/'
 
-# Files staged for THIS commit
+# Files staged for THIS commit. Include rename/copy/type-change so a file
+# can't sneak into a restricted path via mv (consistent with workflow + pre-push).
 mapfile -t staged < <(
-  git diff --cached --name-only --diff-filter=AM \
+  git diff --cached --name-only --diff-filter=ACMRT \
     | grep -E "$PATHS_REGEX" \
     || true
 )

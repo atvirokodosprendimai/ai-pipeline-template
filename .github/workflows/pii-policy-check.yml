@@ -18,11 +18,14 @@ name: PII Policy Check
 # globally and benign in CHANGELOG/fixtures. Path-scoped grep is the
 # right blast radius for content-policy boundaries.
 
+# Runs on EVERY PR (no path filter). When configured as a required status
+# check, GitHub waits for *some* completion before allowing merge — a
+# path-filtered workflow that doesn't trigger on a given PR will leave the
+# status indefinitely "expected" and block merge. The in-script check below
+# exits 0 immediately when no policy-restricted paths are touched, so the
+# cost of always-running is one cheap diff invocation.
 on:
   pull_request:
-    paths:
-      - 'docs/outreach/**'
-      - 'docs/customers/**'
 
 permissions:
   contents: read
@@ -62,7 +65,10 @@ jobs:
           fail=0
 
           # Email regex with allow-list for known-benign forms.
-          # example.com is RFC 2606 reserved; *.noreply.github.com is GitHub bot.
+          # example.com is RFC 2606 reserved.
+          # noreply.github.com is GitHub system mail.
+          # users.noreply.github.com is the per-user GitHub privacy domain.
+          # The allow-list pattern matches these THREE domains exactly (anchored).
           # Patterns are passed via ENVIRON to avoid awk's -v backslash stripping
           # (which would turn `\.` into `.` and over-match across whitespace).
           export EMAIL_PATTERN='[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'

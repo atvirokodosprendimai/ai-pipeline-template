@@ -27,12 +27,35 @@ while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do
     continue
   fi
 
-  # Determine the diff range. New branch (remote_sha = 0000...) means scan
-  # local_sha against its merge-base with origin/HEAD; otherwise diff range
-  # is remote_sha..local_sha
+  # Determine the diff range.
+  #
+  # New-branch case (remote_sha all zeros): scan local_sha back to its
+  # nearest existing ancestor on the remote being pushed to. Resolve the
+  # base by trying, in order:
+  #   1. ${local_ref}@{upstream} — upstream of the ref being pushed (NOT
+  #      the currently-checked-out branch's @{u}, which is what plain
+  #      `@{u}` resolves to and would be wrong when pushing a non-checked-
+  #      out branch).
+  #   2. <remote>/HEAD — default branch on the remote being pushed to.
+  #   3. <remote>/main — fallback if HEAD ref is unset.
+  # Then merge-base local_sha against that to find the divergence point.
+  #
+  # Existing-branch update: range is simply remote_sha..local_sha.
   if [[ "$remote_sha" =~ ^0+$ ]]; then
-    base=$(git merge-base "$local_sha" "$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || echo origin/HEAD)" 2>/dev/null || git rev-parse "${local_sha}^" 2>/dev/null || echo "")
-    range="${base:+$base..}$local_sha"
+    upstream=$(git rev-parse --abbrev-ref "${local_ref}@{u}" 2>/dev/null \
+               || git rev-parse --abbrev-ref "${remote}/HEAD" 2>/dev/null \
+               || echo "${remote}/main")
+    base=$(git merge-base "$local_sha" "$upstream" 2>/dev/null \
+           || git rev-parse "${local_sha}^" 2>/dev/null \
+           || echo "")
+    if [ -z "$base" ] || [ "$base" = "$local_sha" ]; then
+      # No ancestor on remote (truly initial commit on a new repo): diff
+      # against git's well-known empty-tree object so every file is "added".
+      empty_tree=4b825dc642cb6eb9a060e54bf8d69288fbee4904
+      range="${empty_tree}..${local_sha}"
+    else
+      range="${base}..${local_sha}"
+    fi
   else
     range="${remote_sha}..${local_sha}"
   fi
