@@ -1,21 +1,16 @@
 {
-  "title": "Validate cloudroof.eu Polar checkout end-to-end ($5 sub reimbursed)",
-  "description": "I just shipped Polar checkout CTAs on https://cloudroof.eu (managed WireGuard mesh CDN pilot). Need 1 human to walk the full visitor → paid-subscriber flow and prove the success path works.\n\n**What you do:**\n\n1. Open https://cloudroof.eu in a normal browser (not incognito; cookies allowed).\n2. Scroll to the Pilot Program section near the bottom of the slide deck.\n3. Click the **$5 / month — Founding** tier (left card, 'Become a founding member →' button).\n4. Complete the Polar checkout with your real card. **You will be charged $5/mo.**\n5. After checkout, screenshot the Polar success page (the URL should redirect to chimney.beerpub.dev/?checkout=success).\n6. Screenshot the confirmation email from Polar / Stripe.\n7. Open https://chimney.beerpub.dev/ and screenshot the customer-count widget (top of page, says 'X of 1 customer').\n\n**What you submit (3 screenshots + 1 line):**\n- Polar success-page screenshot\n- Confirmation email screenshot (subject + first 2 lines visible, no need to share full content)\n- Chimney customer-count screenshot\n- One sentence on how the experience felt (good, broken, awkward, etc).\n\n**Reimbursement:** the bounty payout includes $5 to cover the first month's subscription + $5 service fee for your time. After your task is accepted you can cancel the subscription anytime in your Polar account — no obligation past the first month.\n\n**Why this matters:** I haven't manually verified my own checkout flow yet (no real card runs). This bounty tests whether the chain actually works. If it breaks, I'll see exactly where.",
+  "title": "Validate cloudroof Polar checkout end-to-end (sub reimbursed)",
+  "description": "I just shipped checkout buttons on a managed WireGuard mesh CDN landing page. Need 1 human to walk the full visitor → paid-subscriber flow and prove the success path works.\n\n**What you do:**\n\n1. Open the landing page (search 'cloudroof' in your browser; it is the dot-eu domain).\n2. Scroll to the Pilot Program section near the bottom of the slide deck.\n3. Click the **$5 / month — Founding** tier (left card).\n4. Complete the Polar checkout with your real card. **You will be charged $5/mo.**\n5. After checkout, screenshot the Polar success page (it should redirect to the chimney dashboard).\n6. Screenshot the confirmation email from Polar / Stripe.\n7. Open the chimney pipeline dashboard (search 'chimney beerpub') and screenshot the customer-count widget at the top.\n\n**What you submit (3 screenshots + 1 line):**\n- Polar success-page screenshot\n- Confirmation email screenshot (subject + first 2 lines visible, redact personal info if you want)\n- Chimney customer-count screenshot\n- One sentence on how the experience felt (good, broken, awkward, etc).\n\n**Reimbursement:** the bounty payout includes $5 to cover the first month's subscription + $5 service fee for your time. After your task is accepted you can cancel the subscription anytime in your Polar account — no obligation past the first month.\n\n**Why this matters:** I have not manually verified my own checkout flow yet (no real card runs). This bounty tests whether the chain actually works. If it breaks, I will see exactly where.",
   "requirements": [
-    "Must have a real credit card capable of charging $5 USD/EUR",
-    "Must be in a country where Polar.sh accepts customers (most of US/EU; check polar.sh)",
+    "Must have a real credit card capable of charging $5 USD or EUR",
+    "Must be in a country where Polar.sh accepts customers (most of US/EU)",
     "Must complete within 24 hours of acceptance",
     "Comfortable taking screenshots and uploading them"
   ],
-  "startInstructions": "If the cloudroof.eu page does not show 'Pilot Program' or the buttons return errors, screenshot the failure and submit that — the bounty pays out for documenting the broken state too. The whole point is to find out which path is real.",
+  "startInstructions": "If the landing page does not show 'Pilot Program' or the buttons return errors, screenshot the failure and submit that — the bounty pays out for documenting the broken state too. The whole point is to find out which path is real.",
   "skillsNeeded": ["attention to detail", "screenshots", "research"],
   "category": "research-fieldwork",
-  "location": {
-    "city": "",
-    "state": "",
-    "country": "",
-    "isRemoteAllowed": true
-  },
+  "location": {"city": "", "state": "", "country": "", "isRemoteAllowed": true},
   "deadline": "2026-05-15T20:00:00.000Z",
   "estimatedHours": 0.5,
   "estimatedDurationUnit": "hours",
