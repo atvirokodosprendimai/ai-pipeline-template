@@ -2,7 +2,13 @@
 # One-shot setup: wire git to use .githooks/ for client-side policy hooks.
 #
 # Usage:
-#   .githooks/setup.sh
+#   bash .githooks/setup.sh
+#
+# Invocation via `bash` is the documented form because some clones / file
+# systems can strip the +x bit, in which case `.githooks/setup.sh` (without
+# `bash`) would fail with "Permission denied". `bash <path>` always works.
+# After this script runs, `chmod +x` is applied to the hook scripts so
+# subsequent direct invocations also work.
 #
 # Idempotent. Run after fresh clone, or as part of any agent (Codex/Aider/etc)
 # bootstrap. CI does NOT run this — workflow-level enforcement lives in

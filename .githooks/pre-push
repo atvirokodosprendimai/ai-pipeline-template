@@ -70,20 +70,12 @@ while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do
     range="${remote_sha}..${local_sha}"
   fi
 
-  # Union of policy-restricted file paths touched anywhere in the push range.
-  # Include rename/copy/type-change so renames into the path can't bypass.
-  mapfile -t files < <(
-    git diff --name-only --diff-filter=ACMRT "$range" 2>/dev/null \
-      | grep -E "$PATHS_REGEX" \
-      || true
-  )
-
-  [ "${#files[@]}" -eq 0 ] && continue
-
-  # All commits in the push range. We scan EACH commit's blob for each
-  # restricted-path file separately so PII committed-then-removed within
-  # the range is still caught — once it lands in a pushed commit object,
-  # it's recoverable via SHA URL even if a later commit deletes the file.
+  # All commits in the push range. We collect restricted-path files
+  # PER-COMMIT (via git diff-tree on each commit) so that files that
+  # existed in a restricted path in an intermediate commit but were
+  # renamed/moved OUT before local_sha are still scanned. The endpoint-
+  # diff approach (git diff base..head) would miss the commit-then-move
+  # bypass.
   #
   # Special-case the empty-tree base (no verified ancestor on remote):
   # rev-list can't take a tree as the left side of `..`, so list ALL
@@ -101,7 +93,18 @@ while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do
   [ "${#commits[@]}" -eq 0 ] && continue
 
   for commit in "${commits[@]}"; do
-    for f in "${files[@]}"; do
+    # Files this specific commit touched (A/C/M/R/T) under a restricted path.
+    # -M emits both old+new path on rename, so renames-out-of restricted are
+    # also captured for content scan via the source path.
+    mapfile -t commit_files < <(
+      git diff-tree --no-commit-id --name-only -r -M --diff-filter=ACMRT "$commit" 2>/dev/null \
+        | grep -E "$PATHS_REGEX" \
+        || true
+    )
+
+    [ "${#commit_files[@]}" -eq 0 ] && continue
+
+    for f in "${commit_files[@]}"; do
       # Hard block: ANY content under docs/customers/ at any commit in range.
       if [[ "$f" =~ ^docs/customers/ ]]; then
         if git cat-file -e "${commit}:${f}" 2>/dev/null; then
@@ -113,7 +116,8 @@ while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do
         continue
       fi
 
-      # Inspect file content at THIS commit. Skip if file did not exist there.
+      # Inspect file content at THIS commit. Skip if file did not exist there
+      # (rename-out cases where source path no longer resolves at this commit).
       content=$(git cat-file -p "${commit}:${f}" 2>/dev/null) || continue
       [ -z "$content" ] && continue
 

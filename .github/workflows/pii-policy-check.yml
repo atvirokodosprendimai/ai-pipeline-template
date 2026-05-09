@@ -56,36 +56,19 @@ jobs:
             exit 1
           fi
 
-          # Union of policy-restricted files touched anywhere in the PR range.
-          # Include rename (R) + copy (C) + type-change (T) in addition to
-          # add (A) + modify (M) so a renamed file can't bypass.
-          mapfile -t files < <(
-            git diff --name-only --diff-filter=ACMRT "${BASE_SHA}..HEAD" \
-              | grep -E '^docs/(outreach|customers)/' \
-              || true
-          )
-
-          if [ "${#files[@]}" -eq 0 ]; then
-            echo "No policy-restricted paths touched in this PR. PASS."
-            exit 0
-          fi
-
-          echo "Scanning ${#files[@]} file path(s) across all commits in ${BASE_SHA:0:7}..HEAD:"
-          printf '  - %s\n' "${files[@]}"
-          echo
-
-          # All commits in the PR range. We scan each commit's blob for each
-          # restricted-path file separately so that PII committed-then-removed
-          # within the range is still caught (it survives in pushed history).
+          # All commits in the PR range. We collect restricted-path files
+          # PER-COMMIT (via git diff-tree on each commit) rather than from
+          # the endpoint diff (BASE..HEAD), so files that existed in a
+          # restricted path in an intermediate commit but were renamed/moved
+          # OUT before HEAD are still scanned. The endpoint-diff approach
+          # would miss the commit-then-move-out bypass.
           mapfile -t commits < <(git rev-list "${BASE_SHA}..HEAD")
           if [ "${#commits[@]}" -eq 0 ]; then
             echo "No commits in range. PASS."
             exit 0
           fi
-          echo "Inspecting ${#commits[@]} commit(s) in range."
+          echo "Inspecting ${#commits[@]} commit(s) in range ${BASE_SHA:0:7}..HEAD"
           echo
-
-          fail=0
 
           # Email regex with allow-list for known-benign forms.
           # example.com is RFC 2606 reserved.
@@ -95,8 +78,23 @@ jobs:
           export EMAIL_PATTERN='[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
           export ALLOW_PATTERN='^@(example\.com|noreply\.github\.com|users\.noreply\.github\.com)$'
 
+          fail=0
+          any_restricted_seen=0
+
           for commit in "${commits[@]}"; do
-            for f in "${files[@]}"; do
+            # Files this specific commit added/modified/renamed/copied/type-changed
+            # under a restricted path. Captures BOTH renames-into and renames-out-of
+            # by emitting both source + dest paths via -M / --name-only.
+            mapfile -t commit_files < <(
+              git diff-tree --no-commit-id --name-only -r -M --diff-filter=ACMRT "$commit" \
+                | grep -E '^docs/(outreach|customers)/' \
+                || true
+            )
+
+            [ "${#commit_files[@]}" -eq 0 ] && continue
+            any_restricted_seen=1
+
+            for f in "${commit_files[@]}"; do
 
               # 1. Hard block: ANY content under docs/customers/ at ANY commit.
               # If the commit ADDED a file under that prefix, fail — even if a
@@ -151,7 +149,11 @@ jobs:
             exit 1
           fi
 
-          echo "PII policy check PASSED across all commits in range."
+          if [ "$any_restricted_seen" -eq 0 ]; then
+            echo "No policy-restricted paths touched in any commit in range. PASS."
+          else
+            echo "PII policy check PASSED across all commits in range."
+          fi
 
       - name: Note on names + handles (manual review)
         if: always()
