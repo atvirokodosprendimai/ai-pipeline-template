@@ -1,0 +1,109 @@
+name: PII Policy Check
+
+# Blocks merge of any PR that introduces email addresses or handle-keyed
+# customer files in policy-restricted paths. Per company/system-prompt.md
+# "Public/private boundary": names + emails forbidden in docs/outreach/
+# and docs/customers/. PII for sponsor/customer exchanges goes to private
+# operator notes (off-repo).
+#
+# Catches the same class of incident as 2026-05-09 PR #820 (5 stargazer
+# emails landed on public main 9 minutes before manual remediation).
+#
+# Why this and not GitGuardian / Trufflehog / Gitleaks: those tools are
+# secret-focused (API keys, tokens, creds). Email addresses are noisy
+# globally and benign in CHANGELOG/fixtures. Path-scoped grep is the
+# right blast radius for this policy.
+
+on:
+  pull_request:
+    paths:
+      - 'docs/outreach/**'
+      - 'docs/customers/**'
+
+permissions:
+  contents: read
+
+jobs:
+  pii-policy-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan changed files in policy-restricted paths
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+
+          # Resolve files in this PR that touch policy-restricted paths
+          mapfile -t files < <(
+            git diff --name-only --diff-filter=AM "origin/${BASE_REF}...HEAD" \
+              | grep -E '^docs/(outreach|customers)/' \
+              || true
+          )
+
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No policy-restricted paths touched in this PR. PASS."
+            exit 0
+          fi
+
+          echo "Scanning ${#files[@]} file(s):"
+          printf '  - %s\n' "${files[@]}"
+          echo
+
+          fail=0
+
+          # Email regex with allow-list for known-benign forms
+          # (example.com is RFC 2606 reserved; noreply.github.com is GH bot)
+          email_pattern='[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
+          allow_pattern='@(example\.com|noreply\.github\.com|users\.noreply\.github\.com)'
+
+          for f in "${files[@]}"; do
+            [ -f "$f" ] || continue
+
+            # 1. Block any handle-keyed customer file outright
+            if [[ "$f" =~ ^docs/customers/.+\.md$ ]]; then
+              echo "::error file=${f}::docs/customers/<handle>.md is policy-banned. Sponsor/customer exchanges go to private operator notes (1Password, encrypted file). See company/system-prompt.md Public/private boundary."
+              fail=1
+              continue
+            fi
+
+            # 2. Email scan (filtered)
+            hits=$(grep -nE "$email_pattern" "$f" \
+                   | grep -vE "$allow_pattern" \
+                   || true)
+
+            if [ -n "$hits" ]; then
+              fail=1
+              while IFS= read -r line; do
+                lineno=$(printf '%s' "$line" | cut -d: -f1)
+                echo "::error file=${f},line=${lineno}::PII boundary violation — email address detected. company/system-prompt.md forbids names/emails in this path."
+              done <<< "$hits"
+              echo "    matches in $f:"
+              printf '      %s\n' "$hits"
+            fi
+          done
+
+          if [ "$fail" -ne 0 ]; then
+            echo
+            echo "PII policy check FAILED. Redact and re-push, OR move the offending content to a private operator system."
+            exit 1
+          fi
+
+          echo "PII policy check PASSED for all changed files."
+
+      - name: Note on names + handles (manual review)
+        if: always()
+        run: |
+          cat <<'EOF'
+          Heads-up: this check enforces email policy via regex.
+          Full names + GitHub handles attached to recipient sections are
+          ALSO banned by company/system-prompt.md but are not regex-detectable
+          without high false-positive cost. Reviewer must confirm visually
+          on any PR touching docs/outreach/** that recipient sections are
+          keyed by anonymous letter (Stargazer A-E) or similar, not by
+          name/handle/email.
+          EOF
