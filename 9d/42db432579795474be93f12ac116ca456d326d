@@ -1,0 +1,19 @@
+.github/workflows/observation-loop.yml
+  s_6228f0963b1408::t_e272253637a5d4 178-186,189-199,203,206-209,225-235,239-240,251,268-269,278-287,292,303
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "9d42db432579795474be93f12ac116ca456d326d",
+  "prompts": {},
+  "sessions": {
+    "s_6228f0963b1408": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a190c21c-56dd-4794-a92f-b581e88483f7",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "~.~ <saint@ghost.lt>"
+    }
+  }
+}
