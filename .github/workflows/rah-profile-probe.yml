@@ -1,0 +1,29 @@
+name: RAH Profile Probe
+on:
+  workflow_dispatch:
+    inputs:
+      human_ids:
+        required: true
+permissions:
+  contents: read
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe profile endpoints for each human ID
+        env:
+          RAH_KEY: ${{ secrets.RENTAHUMAN_API_KEY }}
+          IDS: ${{ inputs.human_ids }}
+        run: |
+          set -euo pipefail
+          IFS=',' read -ra arr <<< "$IDS"
+          for id in "${arr[@]}"; do
+            echo "================="
+            echo "humanId: $id"
+            echo "--- /api/humans/$id ---"
+            curl -sS "https://rentahuman.ai/api/humans/${id}" -H "Accept: application/json" -H "X-API-Key: ${RAH_KEY}" | jq '.' || cat
+            echo
+            echo "--- /api/humans/${id}/profile ---"
+            curl -sS "https://rentahuman.ai/api/humans/${id}/profile" -H "Accept: application/json" -H "X-API-Key: ${RAH_KEY}" | jq '.' || cat
+            echo
+          done
