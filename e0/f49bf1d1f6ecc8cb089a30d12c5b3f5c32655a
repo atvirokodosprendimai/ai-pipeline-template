@@ -1,0 +1,23 @@
+.githooks/pre-push
+  s_6228f0963b1408::t_acbd206c3e3769 1-77
+.githooks/pre-commit
+  s_6228f0963b1408::t_893176aea0fcee 1-68
+.githooks/setup.sh
+  s_6228f0963b1408::t_4e1e3e857993f6 1-29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "e0f49bf1d1f6ecc8cb089a30d12c5b3f5c32655a",
+  "prompts": {},
+  "sessions": {
+    "s_6228f0963b1408": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a190c21c-56dd-4794-a92f-b581e88483f7",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "~.~ <saint@ghost.lt>"
+    }
+  }
+}
