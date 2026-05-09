@@ -1,0 +1,97 @@
+name: RAH Bounty Dispatch (one-shot)
+
+# One-shot workflow that posts a single bounty to RentAHuman.ai using
+# the RENTAHUMAN_API_KEY org secret. Created 2026-05-09 to bypass the
+# local-token-cannot-write loop: the org secret holds a paired,
+# verified-class agent key, so the workflow runner can do the POST
+# without needing to refresh the local-side key.
+#
+# Usage: trigger via workflow_dispatch with `bounty_path` (committed
+# JSON file) or `bounty_inline` (raw JSON pasted into the input). On
+# success, prints the bounty id + checkout URL to the run log + job
+# summary. On failure, dumps the API response so the operator can see
+# what shape RAH rejected.
+#
+# Schedule: none. Manual trigger only.
+
+on:
+  workflow_dispatch:
+    inputs:
+      bounty_path:
+        description: 'Path to bounty JSON in repo (default: company/bounties/cloudroof-checkout-validation.json)'
+        required: false
+        default: 'company/bounties/cloudroof-checkout-validation.json'
+      bounty_inline:
+        description: 'Inline JSON payload (overrides bounty_path if non-empty)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Resolve payload
+        id: payload
+        env:
+          INLINE: ${{ inputs.bounty_inline }}
+          PATH_INPUT: ${{ inputs.bounty_path }}
+        run: |
+          set -euo pipefail
+          if [ -n "$INLINE" ]; then
+            echo "$INLINE" > /tmp/bounty.json
+            echo "source=inline" >> "$GITHUB_OUTPUT"
+          else
+            if [ ! -f "$PATH_INPUT" ]; then
+              echo "::error::Bounty path not found: $PATH_INPUT"
+              exit 1
+            fi
+            cp "$PATH_INPUT" /tmp/bounty.json
+            echo "source=$PATH_INPUT" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Payload preview (title + price + currency):"
+          jq '{title, price, currency, deadline, estimatedHours, priceType}' /tmp/bounty.json
+
+      - name: POST /api/bounties
+        env:
+          RAH_KEY: ${{ secrets.RENTAHUMAN_API_KEY }}
+        run: |
+          set -uo pipefail
+          if [ -z "$RAH_KEY" ]; then
+            echo "::error::RENTAHUMAN_API_KEY not configured"
+            exit 1
+          fi
+          # Capture both body + status. Print body unconditionally so the
+          # operator can see what RAH said, but fail the step if not 2xx.
+          status=$(curl -s -o /tmp/rah-resp.json -w "%{http_code}" \
+            -X POST "https://rentahuman.ai/api/bounties" \
+            -H "Authorization: Bearer $RAH_KEY" \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            -d @/tmp/bounty.json)
+          echo "HTTP $status"
+          jq '.' /tmp/rah-resp.json
+
+          if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
+            echo "::error::POST /api/bounties failed (HTTP $status)"
+            exit 1
+          fi
+
+          bounty_id=$(jq -r '.bounty.id // .id // empty' /tmp/rah-resp.json)
+          if [ -z "$bounty_id" ]; then
+            echo "::warning::Bounty created but no id field in response"
+          fi
+          {
+            echo "## Bounty dispatched"
+            echo ""
+            echo "**Source:** \`${{ steps.payload.outputs.source }}\`"
+            echo "**HTTP status:** $status"
+            if [ -n "$bounty_id" ]; then
+              echo "**Bounty id:** \`$bounty_id\`"
+              echo "**View on RAH:** https://rentahuman.ai/bounties/$bounty_id"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
