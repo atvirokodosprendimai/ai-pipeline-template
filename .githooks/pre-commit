@@ -39,12 +39,13 @@ for f in "${staged[@]}"; do
   [ -f "$f" ] || continue
 
   # Hard block: ANY content under docs/customers/.
-  # Subtree is reserved policy-banned namespace.
+  # Subtree is reserved policy-banned namespace by THIS hook (on top of
+  # company/system-prompt.md, which only bans customer names/emails/payment
+  # details directly — that part is upstream policy).
   if [[ "$f" =~ ^docs/customers/ ]]; then
     printf 'BLOCKED: %s\n' "$f" >&2
     printf '  docs/customers/** is a policy-banned subtree. Customer/sponsor\n' >&2
-    printf '  exchanges go to private operator notes (1Password / encrypted file).\n' >&2
-    printf '  See company/system-prompt.md Public/private boundary.\n\n' >&2
+    printf '  exchanges go to private operator notes (1Password / encrypted file).\n\n' >&2
     fail=1
     continue
   fi
