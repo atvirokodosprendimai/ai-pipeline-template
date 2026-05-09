@@ -67,9 +67,12 @@ jobs:
           fi
           # Capture both body + status. Print body unconditionally so the
           # operator can see what RAH said, but fail the step if not 2xx.
+          # RAH REST API authenticates via `X-API-Key` header per their docs,
+          # NOT `Authorization: Bearer`. The Bearer form returns 401
+          # `auth_missing` on writes. Discovered 2026-05-09 KPI loop tick.
           status=$(curl -s -o /tmp/rah-resp.json -w "%{http_code}" \
             -X POST "https://rentahuman.ai/api/bounties" \
-            -H "Authorization: Bearer $RAH_KEY" \
+            -H "X-API-Key: $RAH_KEY" \
             -H "Content-Type: application/json" \
             -H "Accept: application/json" \
             -d @/tmp/bounty.json)
