@@ -1,0 +1,25 @@
+.githooks/pre-push
+  s_6228f0963b1408::t_9fcacc233ec709 30-43,45-51,56-58
+  s_6228f0963b1408::t_1111947f76db38 52-55
+.github/workflows/pii-policy-check.yml
+  s_6228f0963b1408::t_3820d6a00f1e48 21-26
+  s_6228f0963b1408::t_9766f1cf253960 68-71
+.githooks/pre-commit
+  s_6228f0963b1408::t_1e2f54d1048559 21-22,24
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "e940be55e440d7a4721faec847125d5cf0b11c8b",
+  "prompts": {},
+  "sessions": {
+    "s_6228f0963b1408": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a190c21c-56dd-4794-a92f-b581e88483f7",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "~.~ <saint@ghost.lt>"
+    }
+  }
+}
