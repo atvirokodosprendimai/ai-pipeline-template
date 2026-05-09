@@ -1,0 +1,19 @@
+docs/outreach/2026-05-08-pilot-launch.md
+  s_6228f0963b1408::t_6bd1638538b74d 1-336
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "37350933c884baa448204690ee856f30f76e75c3",
+  "prompts": {},
+  "sessions": {
+    "s_6228f0963b1408": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a190c21c-56dd-4794-a92f-b581e88483f7",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "~.~ <saint@ghost.lt>"
+    }
+  }
+}
