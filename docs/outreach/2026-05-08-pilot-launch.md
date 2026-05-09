@@ -1,6 +1,6 @@
 # cloudroof founding sponsor outreach drafts (2026-05-08)
 
-Note: Reframed 2026-05-09 to Founding-only ($5/mo). $20 and $100 higher-tier drafts removed; will re-author once Phase 1 route-control plane is live (per memory/project_cloudroof_path_b_2026_05_09.md).
+Note: Reframed 2026-05-09 to Founding-only ($5/mo). $20 and $100 higher-tier drafts removed; will re-author once Phase 1 route-control plane is live.
 
 Single CTA for all channels:
 <https://buy.polar.sh/polar_cl_MIoEXmQ6vlAmJSyoFQsvuNyzSbxtk2OZqacJb1VzxpN>
@@ -169,6 +169,8 @@ Body:
 
 ## 4. Direct email (5 personalized stargazers)
 
+> **PII boundary** — recipient names + emails are NEVER committed to this public repo. Operator keeps the address book privately (1Password, encrypted note, etc.). The five templates below are keyed by the public GitHub handle only. Operator fills in salutation + email field at send time.
+
 Send one email per stargazer. Keep the subject, the core status line, and the single Founding checkout. Swap only the personalized paragraph.
 
 **Subject:**
@@ -177,9 +179,9 @@ Send one email per stargazer. Keep the subject, the core status line, and the si
 You starred wgmesh — quick note on cloudroof
 ```
 
-### 4a. @blinkinglight — mz@9g.lt
+### 4a. Stargazer A (handle in private notes)
 
-> Hey blinkinglight,
+> Hi,
 >
 > Saw you starred wgmesh and have already been filing useful issues, so I won't pitch this as "new project exists."
 >
@@ -195,14 +197,13 @@ You starred wgmesh — quick note on cloudroof
 >
 > Why I thought of you: your issue feedback is exactly the kind of practical pressure this needs before it becomes anything public-facing. If the $5 sponsorship makes sense, great; if not, 2-3 blunt sentences on what Phase 2 should prioritize would be just as useful.
 >
-> Thanks,
-> Marty
+> Thanks
 
-### 4b. @cablehead / Andy Gayton — andy@thecablelounge.com
+### 4b. Stargazer B (handle in private notes)
 
-> Hey Andy,
+> Hi,
 >
-> Saw you starred wgmesh — thanks. Given your work around small, useful infrastructure tools and the Cable Lounge world, I thought this direction might be relevant.
+> Saw you starred wgmesh — thanks. Given your work around small, useful infrastructure tools, I thought this direction might be relevant.
 >
 > I'm building **cloudroof** — an OSS, EU-based CDN-alternative on top of wgmesh. Phase 1 = **single POP, IPv6-only, no SLA**. No production claims yet; this is explicitly research-grade.
 >
@@ -216,14 +217,13 @@ You starred wgmesh — quick note on cloudroof
 >
 > Why I thought of you: I suspect you would care less about marketing claims and more about whether the underlying network is inspectable, hackable, and honestly scoped. That's exactly the line I'm trying to hold here.
 >
-> Thanks,
-> Marty
+> Thanks
 
-### 4c. @sausagenoods / Irem Kuyucu — siren@kernal.eu
+### 4c. Stargazer C (handle in private notes)
 
-> Hey Irem,
+> Hi,
 >
-> Saw you starred wgmesh — thanks. Since you're local to Vilnius and working around the Kernal orbit, I wanted to send the early version before posting more widely.
+> Saw you starred wgmesh — thanks. Since you're local and working in the same orbit, I wanted to send the early version before posting more widely.
 >
 > I'm building **cloudroof** — an OSS, EU-based CDN-alternative on top of wgmesh. Phase 1 = **single POP, IPv6-only, no SLA**. No production claims yet; this is explicitly research-grade.
 >
@@ -237,14 +237,13 @@ You starred wgmesh — quick note on cloudroof
 >
 > Why I thought of you: local infrastructure people will spot weak assumptions faster than a broad launch crowd. If the $5 sponsorship fits, great; otherwise I'd value the harshest product-shape feedback.
 >
-> Thanks,
-> Marty
+> Thanks
 
-### 4d. @YingliangCai — yingliangcai@ikesy.com
+### 4d. Stargazer D (handle in private notes)
 
-> Hey Yingliang,
+> Hi,
 >
-> Saw you starred wgmesh — thanks. Given your work at Ikesy and the Shenzhen infrastructure/software context, I thought the early cloudroof direction might be worth a quick note.
+> Saw you starred wgmesh — thanks. Given your infrastructure/software context across regions, I thought the early cloudroof direction might be worth a quick note.
 >
 > I'm building **cloudroof** — an OSS, EU-based CDN-alternative on top of wgmesh. Phase 1 = **single POP, IPv6-only, no SLA**. No production claims yet; this is explicitly research-grade.
 >
@@ -258,14 +257,13 @@ You starred wgmesh — quick note on cloudroof
 >
 > Why I thought of you: cross-region networking assumptions break quickly once they leave a single EU test environment. If you have a view on what would make this worth testing from your side, that would directly shape Phase 2.
 >
-> Thanks,
-> Marty
+> Thanks
 
-### 4e. @XavierBeheydt / Xavier — xavier.beheydt@gmail.com
+### 4e. Stargazer E (handle in private notes)
 
-> Hey Xavier,
+> Hi,
 >
-> Saw you starred wgmesh — thanks. Given your open-source engineering work in France, I thought you might care about the EU-based, OSS-first angle here.
+> Saw you starred wgmesh — thanks. Given your open-source engineering work, I thought you might care about the EU-based, OSS-first angle here.
 >
 > I'm building **cloudroof** — an OSS, EU-based CDN-alternative on top of wgmesh. Phase 1 = **single POP, IPv6-only, no SLA**. No production claims yet; this is explicitly research-grade.
 >
@@ -279,8 +277,7 @@ You starred wgmesh — quick note on cloudroof
 >
 > Why I thought of you: this needs practical open-source users who will push for a small, understandable alpha rather than a polished promise. If you sponsor, you'll help set that bar early.
 >
-> Thanks,
-> Marty
+> Thanks
 
 ---
 
@@ -336,4 +333,4 @@ If a CTA breaks at any point: stop sending, fix, resume.
 
 - [ ] Watch paid sponsor count
 - [ ] Watch GitHub stars as a secondary leading indicator
-- [ ] Save any sponsor or serious feedback exchange to `docs/customers/<handle>.md`
+- [ ] Capture any sponsor or serious feedback exchange in a private operator system (1Password, encrypted notes, off-repo Markdown). NEVER commit handle-keyed customer files to this public repo (`company/system-prompt.md` Public/private boundary).
