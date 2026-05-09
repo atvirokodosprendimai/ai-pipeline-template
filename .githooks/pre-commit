@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# Local pre-commit gate. Same checks as .github/workflows/pii-policy-check.yml
+# but fires BEFORE content reaches GitHub object store.
+#
+# Setup: git config core.hooksPath .githooks  (or run .githooks/setup.sh)
+#
+# Bypass (do not use without operator approval): git commit --no-verify
+#
+# Why both this AND the workflow:
+# - Workflow = required status check on PR; unbypassable but reactive (content
+#   already pushed to a branch on GitHub).
+# - Hook = local; bypassable but stops content from ever leaving the machine.
+# - Agent-dispatched commits (Codex/Aider/etc) need both: hook catches if env
+#   ran setup; workflow catches if hook was bypassed or env wasn't configured.
+
+set -euo pipefail
+
+# Restrict scope to the same path policy as the workflow
+PATHS_REGEX='^docs/(outreach|customers)/'
+
+# Files staged for THIS commit
+mapfile -t staged < <(
+  git diff --cached --name-only --diff-filter=AM \
+    | grep -E "$PATHS_REGEX" \
+    || true
+)
+
+if [ "${#staged[@]}" -eq 0 ]; then
+  exit 0
+fi
+
+email_pattern='[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
+allow_pattern='@(example\.com|noreply\.github\.com|users\.noreply\.github\.com)'
+
+fail=0
+for f in "${staged[@]}"; do
+  [ -f "$f" ] || continue
+
+  # Block any handle-keyed customer file
+  if [[ "$f" =~ ^docs/customers/.+\.md$ ]]; then
+    printf 'BLOCKED: %s\n' "$f" >&2
+    printf '  docs/customers/<handle>.md is policy-banned. Sponsor/customer\n' >&2
+    printf '  exchanges go to private operator notes (1Password / encrypted file).\n' >&2
+    printf '  See company/system-prompt.md Public/private boundary.\n\n' >&2
+    fail=1
+    continue
+  fi
+
+  # Email scan against the staged content (not just working tree)
+  hits=$(git show ":$f" 2>/dev/null \
+         | grep -nE "$email_pattern" \
+         | grep -vE "$allow_pattern" \
+         || true)
+
+  if [ -n "$hits" ]; then
+    fail=1
+    printf 'BLOCKED: %s\n' "$f" >&2
+    printf '  PII boundary violation — email address(es) detected:\n' >&2
+    printf '%s\n' "$hits" | sed 's/^/    /' >&2
+    printf '  Redact, OR move content to a private operator system.\n\n' >&2
+  fi
+done
+
+if [ "$fail" -ne 0 ]; then
+  printf 'pre-commit: PII policy check failed. Commit aborted.\n' >&2
+  printf 'Bypass (only with operator approval): git commit --no-verify\n' >&2
+  exit 1
+fi

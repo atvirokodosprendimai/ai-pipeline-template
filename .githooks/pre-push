@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# Last-line local defense before content hits GitHub.
+#
+# Scans the diff being pushed (across all commits in the push range) against
+# the same policy as pre-commit. Catches:
+# - hook-bypassed commits (--no-verify)
+# - commits made before this hook existed
+# - stale local branches with PII that someone forgot about
+#
+# Bypass: git push --no-verify   (do NOT use without operator approval)
+
+set -euo pipefail
+
+remote="$1"
+url="$2"
+
+PATHS_REGEX='^docs/(outreach|customers)/'
+email_pattern='[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
+allow_pattern='@(example\.com|noreply\.github\.com|users\.noreply\.github\.com)'
+
+# stdin format per githooks(5): <local_ref> <local_sha> <remote_ref> <remote_sha>
+fail=0
+while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do
+  # Skip branch deletions (local_sha = 0000...)
+  if [[ "$local_sha" =~ ^0+$ ]]; then
+    continue
+  fi
+
+  # Determine the diff range. New branch (remote_sha = 0000...) means scan
+  # local_sha against its merge-base with origin/HEAD; otherwise diff range
+  # is remote_sha..local_sha
+  if [[ "$remote_sha" =~ ^0+$ ]]; then
+    base=$(git merge-base "$local_sha" "$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || echo origin/HEAD)" 2>/dev/null || git rev-parse "${local_sha}^" 2>/dev/null || echo "")
+    range="${base:+$base..}$local_sha"
+  else
+    range="${remote_sha}..${local_sha}"
+  fi
+
+  # Files in policy-restricted paths touched by this push
+  mapfile -t files < <(
+    git diff --name-only --diff-filter=AM "$range" 2>/dev/null \
+      | grep -E "$PATHS_REGEX" \
+      || true
+  )
+
+  [ "${#files[@]}" -eq 0 ] && continue
+
+  for f in "${files[@]}"; do
+    # Hard block on customer-handle path
+    if [[ "$f" =~ ^docs/customers/.+\.md$ ]]; then
+      printf 'BLOCKED in push %s..%s: %s\n' "${remote_sha:0:7}" "${local_sha:0:7}" "$f" >&2
+      printf '  docs/customers/<handle>.md is policy-banned.\n\n' >&2
+      fail=1
+      continue
+    fi
+
+    # Inspect the file content at the push tip (not working tree)
+    hits=$(git show "${local_sha}:${f}" 2>/dev/null \
+           | grep -nE "$email_pattern" \
+           | grep -vE "$allow_pattern" \
+           || true)
+
+    if [ -n "$hits" ]; then
+      fail=1
+      printf 'BLOCKED in push %s..%s: %s\n' "${remote_sha:0:7}" "${local_sha:0:7}" "$f" >&2
+      printf '  PII boundary violation — email(s) at %s:\n' "$f" >&2
+      printf '%s\n' "$hits" | sed 's/^/    /' >&2
+      printf '  Redact in a new commit, OR rewrite history before pushing.\n\n' >&2
+    fi
+  done
+done
+
+if [ "$fail" -ne 0 ]; then
+  printf 'pre-push: PII policy check failed. Push aborted.\n' >&2
+  printf 'Bypass (only with operator approval): git push --no-verify\n' >&2
+  exit 1
+fi
