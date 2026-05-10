@@ -1,0 +1,9 @@
+.github/workflows/rah-self-discover.yml
+  ai_agent 1-17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "25fb820ab6b4c4fc7e66b32ec45a8bb3d5ab6ac0",
+  "prompts": {}
+}
