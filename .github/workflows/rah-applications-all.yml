@@ -92,8 +92,11 @@ jobs:
             echo "| \`$bid\` | $(echo "$title" | head -c 60) | $spots | $apps_n | $views | $status | $dl |" >> "$GITHUB_STEP_SUMMARY"
 
             curl -sS "${API}/bounties/${bid}/applications" "${AUTH[@]}" -o /tmp/a.json
-            jq '{bountyId: "'"$bid"'", count: (.applications|length), applications: [.applications[] | {id, humanId, humanName, status, cl_len: (.coverLetter // "" | length), coverLetter, conversationId, created: (.createdAt._seconds | strftime("%Y-%m-%d %H:%M"))}]}' /tmp/a.json
-            n=$(jq -r '.applications | length' /tmp/a.json)
+            # Defensive: response may be {applications:null}, {error:...},
+            # or have no applications key at all (assigned/closed/expired
+            # bounties). Treat any of those as zero applications.
+            jq --arg bid "$bid" '{bountyId: $bid, count: ((.applications // []) | length), applications: ((.applications // []) | map({id, humanId, humanName, status, cl_len: ((.coverLetter // "") | length), coverLetter, conversationId, created: (try (.createdAt._seconds | strftime("%Y-%m-%d %H:%M")) // "?")}))}' /tmp/a.json || cat /tmp/a.json
+            n=$(jq -r '(.applications // []) | length' /tmp/a.json 2>/dev/null || echo 0)
             total_apps=$((total_apps + n))
           done
 
