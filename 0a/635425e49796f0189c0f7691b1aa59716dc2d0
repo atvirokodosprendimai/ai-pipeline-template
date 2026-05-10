@@ -1,0 +1,19 @@
+.github/workflows/rah-self-discover.yml
+  s_afc92c7f2735b4::t_0c1b2ea6ae44ce 11,13,15-17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "0a635425e49796f0189c0f7691b1aa59716dc2d0",
+  "prompts": {},
+  "sessions": {
+    "s_afc92c7f2735b4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d9f0418e-ce5a-4170-82f0-d09f393be1f1",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "~.~ <saint@ghost.lt>"
+    }
+  }
+}
