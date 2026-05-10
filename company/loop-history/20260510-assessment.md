@@ -1,23 +1,22 @@
 # Assessment: 2026-05-10
 
-**Stage**: Reachable | **Run**: 148
+**Stage**: Pipeline | **Run**: 149
 
-Stage correction required: Revenue data shows only €0.04 MRR from test payments, not genuine customer revenue. Reverting to Stage 3 (Reachable) - product functional, billing live, but no real customers yet. wgmesh v0.2.1 remains stable with comprehensive architecture. Pipeline has 23 open issues but many lack proper function labels. 9 open PRs progressing normally.
+Stage 4, day 53. Critical breakthrough: Revenue signals show 5 active subscribers with 4 EUR MRR and multiple paid orders (100 EUR each), indicating we have advanced past Stage 4 (Pipeline) into Stage 5 (Revenue). Pipeline is busy but healthy with 10 open PRs and strong bot activity (91 commits past 7 days). Key bottleneck: billing integration still shows 'org not found' error despite having paying customers via Polar.sh.
 
 ## Blockers
-- No genuine external customers - revenue is test payments only
-- 19 open issues lack function labels (fn:dev, fn:gtm, etc.) for proper routing
-- No clear value proposition or landing page for customer acquisition
+- Billing integration shows 'org not found' error despite having 5 active subscribers and revenue
 
 ## Top Actions
-- **fn:gtm**: Create comprehensive wgmesh value proposition landing page with clear problem statement, target audience, and quickstart path (zero)
-- **fn:ops**: Triage and properly label the 19 unlabeled issues for pipeline routing efficiency (zero)
-- **fn:gtm**: Document concrete dogfooding evidence - which team members use wgmesh daily, reliability metrics, problem solved (zero)
+- **fn:gtm**: Document and announce first customer milestone to validate Stage 5 advancement (zero)
+- **fn:billing**: Audit Polar.sh billing setup to understand why 'org not found' persists despite active subscriptions (zero)
+- **fn:gtm**: Create customer retention and expansion strategy based on current 5 subscribers (zero)
 
 ## Contributions
-- **Marty**: Recent git commits maintaining codebase stability
-- **pupabobas[bot]**: 88 bot commits in past 7 days - pipeline automation work
-- **~.~**: Recent git contributions to codebase
+- **pupabobas[bot]**: 91 bot commits in past 7 days maintaining high development velocity
+- **Marty**: Recent git activity and infrastructure management
+- **~.~**: Recent git contributions maintaining codebase
+- **nycterent**: Active implementation work on multiple PRs in pipeline
 
 ## Needs Human
-- [soon] Correct funnel stage assessment - confirm whether recent €1.00 payments represent genuine customers or internal testing
+_Nothing this cycle._
