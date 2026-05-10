@@ -1,0 +1,17 @@
+name: RAH Self Discover
+on: {workflow_dispatch: {}}
+permissions: {contents: read}
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          K: ${{ secrets.RENTAHUMAN_API_KEY }}
+        run: |
+          set -uo pipefail
+          A="https://rentahuman.ai/api"
+          for ep in "/account/status" "/me" "/account" "/agents/me" "/bounties/zWFeTTTCYQlLBgIOX6aW"; do
+            echo "--- $ep ---"
+            curl -sS "$A$ep" -H "X-API-Key: $K" -H "Accept: application/json" | jq '.' 2>&1 | head -30
+            echo
+          done
