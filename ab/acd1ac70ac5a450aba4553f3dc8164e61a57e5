@@ -1,0 +1,19 @@
+.github/workflows/rah-application-decide.yml
+  s_afc92c7f2735b4::t_190e3c872efba3 1-136
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "abacd1ac70ac5a450aba4553f3dc8164e61a57e5",
+  "prompts": {},
+  "sessions": {
+    "s_afc92c7f2735b4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d9f0418e-ce5a-4170-82f0-d09f393be1f1",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "~.~ <saint@ghost.lt>"
+    }
+  }
+}
