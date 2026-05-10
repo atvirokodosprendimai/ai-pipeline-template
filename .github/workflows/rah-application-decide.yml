@@ -20,10 +20,10 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: accept | reject | message
+        description: accept | reject | message | fund_escrow
         required: true
         type: choice
-        options: [accept, reject, message]
+        options: [accept, reject, message, fund_escrow]
       bounty_id:
         description: Bounty ID (required for accept/reject)
         required: false
@@ -119,9 +119,27 @@ jobs:
                 echo "::error::message requires conversation_id + reason (= message body)"
                 exit 1
               fi
-              BODY=$(jq -nc --arg c "$REASON" '{content: $c}')
+              # senderType/senderId required by RAH server. agentId discovered
+              # from /api/bounties/{id}.bounty.agentId (rah-self-discover run).
+              AGENT_ID="agent_47dc2135b8dc72d9"
+              BODY=$(jq -nc --arg c "$REASON" --arg sid "$AGENT_ID" '{senderType: "agent", senderId: $sid, content: $c}')
               if call POST "/conversations/${CONV}/messages" "$BODY"; then
                 echo "## message sent" >> "$GITHUB_STEP_SUMMARY"
+                exit 0
+              fi
+              exit 1
+              ;;
+            fund_escrow)
+              if [ -z "$BOUNTY" ] || [ -z "$APP" ]; then
+                echo "::error::fund_escrow requires bounty_id + application_id"
+                exit 1
+              fi
+              BODY=$(jq -nc --arg b "$BOUNTY" --arg a "$APP" '{bountyId: $b, applicationId: $a}')
+              if call POST "/escrow/checkout" "$BODY"; then
+                URL=$(jq -r '.url // .checkout_url // .stripeCheckoutUrl // empty' /tmp/r.body)
+                echo "## escrow checkout URL" >> "$GITHUB_STEP_SUMMARY"
+                echo "**Pay here:** $URL" >> "$GITHUB_STEP_SUMMARY"
+                echo "::notice::Escrow checkout URL: $URL"
                 exit 0
               fi
               exit 1
