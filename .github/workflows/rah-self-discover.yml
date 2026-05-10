@@ -8,10 +8,11 @@ jobs:
       - env:
           K: ${{ secrets.RENTAHUMAN_API_KEY }}
         run: |
-          set -uo pipefail
+          set +e
           A="https://rentahuman.ai/api"
-          for ep in "/account/status" "/me" "/account" "/agents/me" "/bounties/zWFeTTTCYQlLBgIOX6aW"; do
+          for ep in "/keys" "/account/status" "/me" "/account" "/agents/me" "/agents" "/bounties/zWFeTTTCYQlLBgIOX6aW"; do
             echo "--- $ep ---"
-            curl -sS "$A$ep" -H "X-API-Key: $K" -H "Accept: application/json" | jq '.' 2>&1 | head -30
-            echo
+            curl -sS "$A$ep" -H "X-API-Key: $K" -H "Accept: application/json" -o /tmp/r.json -w "HTTP %{http_code}\n"
+            head -c 800 /tmp/r.json
+            echo; echo
           done
