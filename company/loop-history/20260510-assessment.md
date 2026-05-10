@@ -1,22 +1,22 @@
 # Assessment: 2026-05-10
 
-**Stage**: Pipeline | **Run**: 149
+**Stage**: Revenue | **Run**: 150
 
-Stage 4, day 53. Critical breakthrough: Revenue signals show 5 active subscribers with 4 EUR MRR and multiple paid orders (100 EUR each), indicating we have advanced past Stage 4 (Pipeline) into Stage 5 (Revenue). Pipeline is busy but healthy with 10 open PRs and strong bot activity (91 commits past 7 days). Key bottleneck: billing integration still shows 'org not found' error despite having paying customers via Polar.sh.
+Stage 5 achieved: First customer payments received! 5 active subscribers, €0.04 MRR, with recent orders totaling €700 since March. Product remains fully functional (v0.2.1) with healthy pipeline (9 PRs, 30 merged in 7d). Critical milestone: wgmesh has paying customers and recurring revenue.
 
 ## Blockers
-- Billing integration shows 'org not found' error despite having 5 active subscribers and revenue
+- Stage 5 exit criteria unclear - need to define what constitutes sustained revenue success
 
 ## Top Actions
-- **fn:gtm**: Document and announce first customer milestone to validate Stage 5 advancement (zero)
-- **fn:billing**: Audit Polar.sh billing setup to understand why 'org not found' persists despite active subscriptions (zero)
-- **fn:gtm**: Create customer retention and expansion strategy based on current 5 subscribers (zero)
+- **fn:dev**: Define Stage 5 Revenue exit criteria and next growth milestone (zero)
+- **fn:gtm**: Announce first customer milestone publicly to build credibility (zero)
+- **fn:dev**: Analyze customer usage patterns to optimize retention and expansion (zero)
 
 ## Contributions
-- **pupabobas[bot]**: 91 bot commits in past 7 days maintaining high development velocity
-- **Marty**: Recent git activity and infrastructure management
-- **~.~**: Recent git contributions maintaining codebase
-- **nycterent**: Active implementation work on multiple PRs in pipeline
+- **paying-customers**: 5 active subscribers contributing €0.04 MRR with multiple paid orders since March
+- **Marty**: Recent git commits maintaining product stability through revenue milestone
+- **pupabobas[bot]**: 94 bot commits in past 7 days maintaining pipeline operations
+- **~.~**: Recent git contributions supporting product development
 
 ## Needs Human
-_Nothing this cycle._
+- [soon] Verify customer satisfaction and gather feedback from active subscribers
