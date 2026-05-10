@@ -1,0 +1,103 @@
+name: RAH All Applications (read-only)
+
+# workflow_dispatch-only utility to enumerate all bounties owned by this
+# operator and dump every application across them. Read-only — does not
+# accept or reject.
+#
+# Discovery strategy: probes 5 candidate "list my bounties" endpoints,
+# uses the first one that returns a non-empty array. If none work, falls
+# back to a comma-separated bounty_ids input.
+
+on:
+  workflow_dispatch:
+    inputs:
+      bounty_ids:
+        description: 'Optional fallback comma-separated bounty IDs (skip discovery if set)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  enumerate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Discover + fetch
+        env:
+          RAH_KEY: ${{ secrets.RENTAHUMAN_API_KEY }}
+          BOUNTY_IDS_INPUT: ${{ inputs.bounty_ids }}
+        run: |
+          set -uo pipefail
+          if [ -z "${RAH_KEY:-}" ]; then
+            echo "::error::RENTAHUMAN_API_KEY secret missing"
+            exit 1
+          fi
+          API="https://rentahuman.ai/api"
+          AUTH=(-H "Accept: application/json" -H "X-API-Key: ${RAH_KEY}")
+
+          ids=""
+          if [ -n "${BOUNTY_IDS_INPUT:-}" ]; then
+            ids="$BOUNTY_IDS_INPUT"
+            echo "::notice::Using operator-supplied bounty_ids (skipping discovery)"
+          else
+            echo "=== probing list endpoints ==="
+            for ep in \
+                "/bounties?mine=true" \
+                "/bounties/mine" \
+                "/me/bounties" \
+                "/operator/bounties" \
+                "/bounties"; do
+              code=$(curl -sS -o /tmp/r.json -w "%{http_code}" "${API}${ep}" "${AUTH[@]}" || echo 000)
+              count=$(jq -r '(.bounties // .items // .data // []) | length' /tmp/r.json 2>/dev/null || echo 0)
+              echo "GET ${ep} → HTTP $code, count=$count"
+              if [ "$code" = "200" ] && [ "$count" -gt 0 ] 2>/dev/null; then
+                ids=$(jq -r '(.bounties // .items // .data // [])[].id' /tmp/r.json | paste -sd,)
+                echo "::notice::Discovered ${count} bounty IDs via ${ep}"
+                break
+              fi
+            done
+          fi
+
+          if [ -z "$ids" ]; then
+            echo "::warning::No bounty IDs discovered. Pass bounty_ids manually."
+            echo "## No bounties discovered" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          echo
+          echo "=== bounties: $ids ==="
+
+          IFS=',' read -ra arr <<< "$ids"
+          total_apps=0
+          {
+            echo "## RAH applications across $(echo "$ids" | tr ',' '\n' | wc -l | tr -d ' ') bounties"
+            echo
+            echo "| bounty | title | spots | apps | views | status | deadline |"
+            echo "|---|---|---|---|---|---|---|"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          for bid in "${arr[@]}"; do
+            echo "================="
+            echo "bounty: $bid"
+            curl -sS "${API}/bounties/${bid}" "${AUTH[@]}" -o /tmp/b.json
+            title=$(jq -r '.bounty.title // .title // "?"' /tmp/b.json)
+            status=$(jq -r '.bounty.status // .status // "?"' /tmp/b.json)
+            spots=$(jq -r '.bounty.spotsRemaining // "?"' /tmp/b.json)
+            views=$(jq -r '.bounty.viewCount // "?"' /tmp/b.json)
+            apps_n=$(jq -r '.bounty.applicationCount // "?"' /tmp/b.json)
+            dl=$(jq -r '.bounty.deadline // "?"' /tmp/b.json)
+            echo "  title: $title"
+            echo "  status: $status  spots: $spots  views: $views  apps: $apps_n  deadline: $dl"
+            echo "| \`$bid\` | $(echo "$title" | head -c 60) | $spots | $apps_n | $views | $status | $dl |" >> "$GITHUB_STEP_SUMMARY"
+
+            curl -sS "${API}/bounties/${bid}/applications" "${AUTH[@]}" -o /tmp/a.json
+            jq '{bountyId: "'"$bid"'", count: (.applications|length), applications: [.applications[] | {id, humanId, humanName, status, cl_len: (.coverLetter // "" | length), coverLetter, conversationId, created: (.createdAt._seconds | strftime("%Y-%m-%d %H:%M"))}]}' /tmp/a.json
+            n=$(jq -r '.applications | length' /tmp/a.json)
+            total_apps=$((total_apps + n))
+          done
+
+          {
+            echo
+            echo "**Total applications across all bounties:** $total_apps"
+          } >> "$GITHUB_STEP_SUMMARY"
