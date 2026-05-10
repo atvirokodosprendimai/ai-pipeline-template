@@ -4,7 +4,17 @@ name: RAH Application Decide (write)
 # conversation message. WRITE actions — gated by manual dispatch only.
 #
 # Auth: X-API-Key header with org secret RENTAHUMAN_API_KEY (verified-class
-# agent key, paired 2026-05-08T21:27Z). Same auth as rah-bounty-dispatch.yml.
+# agent key, paired 2026-05-08T21:27Z).
+#
+# Endpoints reverse-engineered from rentahuman-mcp@1.11.7 (npm tarball)
+# 2026-05-10:
+#   accept/reject: PATCH /api/bounties/{bid}/applications/{aid}
+#                  body: {action: "accept"|"reject", response: <reason>}
+#   message:       POST /api/conversations/{cid}/messages
+#                  body: {content: <body>}
+#
+# Validation: a 200 with HTML body (Next.js SPA fallthrough) is NOT
+# success. Probe rejects responses lacking application/json Content-Type.
 
 on:
   workflow_dispatch:
@@ -27,7 +37,7 @@ on:
         required: false
         default: ''
       reason:
-        description: Reject reason (reject) OR message body (message)
+        description: Reject reason (reject) / message body (message) / accept response (accept)
         required: false
         default: ''
 
@@ -53,22 +63,42 @@ jobs:
             exit 1
           fi
           API="https://rentahuman.ai/api"
-          AUTH=(-H "X-API-Key: ${RAH_KEY}" -H "Accept: application/json" -H "Content-Type: application/json")
 
-          probe() {
+          # call <method> <path> <body_json>; exits 1 if not 2xx JSON
+          call() {
             local method="$1"; local path="$2"; local body="$3"
             echo "--- ${method} ${path} ---"
-            local code
-            if [ -n "$body" ]; then
-              code=$(curl -sS -o /tmp/r.json -w "%{http_code}" -X "$method" "${API}${path}" "${AUTH[@]}" -d "$body")
+            local code ct
+            code=$(curl -sS -o /tmp/r.body -D /tmp/r.hdr -w "%{http_code}" \
+              -X "$method" "${API}${path}" \
+              -H "X-API-Key: ${RAH_KEY}" \
+              -H "Accept: application/json" \
+              -H "Content-Type: application/json" \
+              -d "$body")
+            ct=$(grep -i '^content-type:' /tmp/r.hdr | head -1 | tr -d '\r')
+            echo "HTTP $code  ${ct}"
+            if echo "$ct" | grep -qi 'application/json'; then
+              jq '.' /tmp/r.body
             else
-              code=$(curl -sS -o /tmp/r.json -w "%{http_code}" -X "$method" "${API}${path}" "${AUTH[@]}")
+              echo "(non-JSON body, first 200 chars:)"
+              head -c 200 /tmp/r.body; echo
             fi
-            echo "HTTP $code"
-            jq '.' /tmp/r.json 2>/dev/null || cat /tmp/r.json
-            echo
-            [ "$code" -ge 200 ] && [ "$code" -lt 300 ] && return 0
-            return 1
+            if [ "$code" -lt 200 ] || [ "$code" -ge 300 ]; then
+              echo "::error::HTTP $code"
+              return 1
+            fi
+            if ! echo "$ct" | grep -qi 'application/json'; then
+              echo "::error::Response is not JSON (Content-Type: $ct) — likely SPA fallthrough, route does not exist"
+              return 1
+            fi
+            # Final check: server may 200 with {success:false, error:...}
+            local errmsg
+            errmsg=$(jq -r 'if (.error // .errorMessage // .errorCode) then (.error // .errorMessage // .errorCode) else empty end' /tmp/r.body 2>/dev/null)
+            if [ -n "$errmsg" ]; then
+              echo "::error::API returned error: $errmsg"
+              return 1
+            fi
+            return 0
           }
 
           case "$ACTION" in
@@ -77,31 +107,11 @@ jobs:
                 echo "::error::accept/reject requires bounty_id + application_id"
                 exit 1
               fi
-              REASON_JSON=$(jq -nc --arg r "$REASON" '{reason: $r}')
-              # Probe candidate endpoint shapes — RAH undocumented; first 2xx wins.
-              for ep in \
-                  "/bounties/${BOUNTY}/applications/${APP}/${ACTION}" \
-                  "/applications/${APP}/${ACTION}" \
-                  "/bounties/${BOUNTY}/applications/${APP}"; do
-                method="POST"
-                body="$REASON_JSON"
-                # last endpoint = PATCH with status field
-                if [ "$ep" = "/bounties/${BOUNTY}/applications/${APP}" ]; then
-                  method="PATCH"
-                  if [ "$ACTION" = "accept" ]; then
-                    body=$(jq -nc '{status: "accepted"}')
-                  else
-                    body=$(jq -nc --arg r "$REASON" '{status: "rejected", reason: $r}')
-                  fi
-                fi
-                if probe "$method" "$ep" "$body"; then
-                  echo "::notice::${ACTION} succeeded via ${method} ${ep}"
-                  echo "## ${ACTION} OK" >> "$GITHUB_STEP_SUMMARY"
-                  echo "**endpoint:** \`${method} ${ep}\`" >> "$GITHUB_STEP_SUMMARY"
-                  exit 0
-                fi
-              done
-              echo "::error::All ${ACTION} endpoint candidates failed"
+              BODY=$(jq -nc --arg a "$ACTION" --arg r "$REASON" '{action: $a, response: $r}')
+              if call PATCH "/bounties/${BOUNTY}/applications/${APP}" "$BODY"; then
+                echo "## ${ACTION} OK" >> "$GITHUB_STEP_SUMMARY"
+                exit 0
+              fi
               exit 1
               ;;
             message)
@@ -109,24 +119,11 @@ jobs:
                 echo "::error::message requires conversation_id + reason (= message body)"
                 exit 1
               fi
-              MSG_JSON=$(jq -nc --arg c "$REASON" '{content: $c, message: $c, body: $c}')
-              for ep in \
-                  "/conversations/${CONV}/messages" \
-                  "/messages" \
-                  "/conversations/${CONV}"; do
-                method="POST"
-                body="$MSG_JSON"
-                if [ "$ep" = "/messages" ]; then
-                  body=$(jq -nc --arg c "$REASON" --arg cid "$CONV" '{conversationId: $cid, content: $c, message: $c}')
-                fi
-                if probe "$method" "$ep" "$body"; then
-                  echo "::notice::message sent via ${method} ${ep}"
-                  echo "## message sent" >> "$GITHUB_STEP_SUMMARY"
-                  echo "**endpoint:** \`${method} ${ep}\`" >> "$GITHUB_STEP_SUMMARY"
-                  exit 0
-                fi
-              done
-              echo "::error::All message endpoint candidates failed"
+              BODY=$(jq -nc --arg c "$REASON" '{content: $c}')
+              if call POST "/conversations/${CONV}/messages" "$BODY"; then
+                echo "## message sent" >> "$GITHUB_STEP_SUMMARY"
+                exit 0
+              fi
               exit 1
               ;;
             *)
