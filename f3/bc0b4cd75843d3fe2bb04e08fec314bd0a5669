@@ -1,0 +1,19 @@
+.github/workflows/rah-applications-all.yml
+  s_afc92c7f2735b4::t_1b50e25e7fded1 1-103
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "f3bc0b4cd75843d3fe2bb04e08fec314bd0a5669",
+  "prompts": {},
+  "sessions": {
+    "s_afc92c7f2735b4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d9f0418e-ce5a-4170-82f0-d09f393be1f1",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "~.~ <saint@ghost.lt>"
+    }
+  }
+}
