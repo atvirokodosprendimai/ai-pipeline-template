@@ -1,23 +1,21 @@
 # Assessment: 2026-05-11
 
-**Stage**: Revenue | **Run**: 152
+**Stage**: Revenue | **Run**: 153
 
-Stage 5, day 54. Revenue stage confirmed with 5 active subscribers and €0.04 MRR from recent paid orders. Pipeline is active with 10 PRs and 35 merged in 7d, indicating healthy development velocity. The company has successfully moved beyond first revenue into sustained customer engagement.
+Stage 5 (Revenue), run 152. Major stage correction: we are NOT in Stage 3 (Reachable) as previous assessments claimed. Revenue data shows 5 active subscribers, €0.04 MRR, and recent paid orders (€1 each) — we have paying customers and are firmly in Stage 5. The persistent 'Polar.sh billing error' narrative was incorrect. Pipeline is active with 10 open PRs, 35 merged in 7 days.
 
 ## Blockers
-- Stage 6 criteria undefined - no clear exit conditions to advance beyond current revenue stage
+- No Stage 6 definition or growth strategy beyond initial revenue milestone
 
 ## Top Actions
-- **fn:dev**: Define Stage 6 exit criteria and growth milestones (zero)
-- **fn:dev**: Implement customer satisfaction verification for active subscribers (zero)
-- **fn:dev**: Build automated customer analytics to track usage and engagement patterns (zero)
+- **fn:dev**: Define Stage 6 exit criteria and growth milestones to continue funnel progression (zero)
+- **fn:dev**: Build customer satisfaction verification system to ensure revenue retention (zero)
+- **fn:dev**: Implement customer usage analytics to understand engagement patterns (zero)
 
 ## Contributions
-- **Marty**: Active git commits maintaining codebase in past 7 days
-- **pupabobas[bot]**: 92 bot commits in 7d - automated pipeline contributions
-- **~.~**: Recent git contributions to development
-- **nycterent**: Multiple active PRs including #617 testlab improvements
-- **app/copilot-swe-agent**: Generated specifications for multiple PRs including #611, #592, #585
+- **Marty**: Recent git commits maintaining project stability
+- **pupabobas[bot]**: 90 bot commits in past 7 days driving pipeline operations
+- **~.~**: Recent git contributions to codebase development
 
 ## Needs Human
 _Nothing this cycle._
