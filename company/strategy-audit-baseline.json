@@ -221,6 +221,65 @@
           "status": "pending"
         }
       ]
+    },
+    {
+      "ran_at": "2026-05-14T11:12:40Z",
+      "metrics": {
+        "paid_customers": 0,
+        "autonomous_ship_rate": null,
+        "lead_time_hours": 6.33,
+        "self_heal_rate": 0,
+        "active_stuck_issues": 0,
+        "cycle_time_to_revenue": null,
+        "fetch_status": {
+          "paid_customers": "ok",
+          "cycle_time_to_revenue": "no_customers"
+        }
+      },
+      "milestones_status": [
+        {
+          "date": "2026-05-10",
+          "target": "first audit-loop closes cleanly (drift PR opens, founder applies, doc updates, audit re-runs green)",
+          "current": "not measured",
+          "status": "pending-uncertain"
+        },
+        {
+          "date": "2026-05-17",
+          "target": "wgmesh edge node beta (first seeded product reaches public beta)",
+          "current": "not measured",
+          "status": "pending"
+        },
+        {
+          "date": "2026-05-31",
+          "target": "1 paying customer",
+          "current": "0 paid customers",
+          "status": "pending"
+        },
+        {
+          "date": "2026-06-14",
+          "target": "2nd seed product spec'd and entering convergence engine",
+          "current": "not measured",
+          "status": "pending"
+        },
+        {
+          "date": "2026-08-31",
+          "target": "4 customers ($10K ARR run-rate path)",
+          "current": "0 paid customers",
+          "status": "pending"
+        },
+        {
+          "date": "2027-05-03",
+          "target": "42 customers, $10K ARR",
+          "current": "0 paid customers",
+          "status": "pending"
+        },
+        {
+          "date": "2028-05-03",
+          "target": "420 customers, $100K ARR (MSC)",
+          "current": "0 paid customers",
+          "status": "pending"
+        }
+      ]
     }
   ]
 }
