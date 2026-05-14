@@ -1,23 +1,22 @@
 # Assessment: 2026-05-14
 
-**Stage**: Revenue | **Run**: 161
+**Stage**: Revenue | **Run**: 162
 
-Stage 5, day 57. Revenue milestone achieved with 5 active subscribers and recent €1.00 orders. wgmesh is fully functional (v0.2.1, 13 stars) with comprehensive mesh networking architecture. Pipeline is active with 5 PRs progressing and 7 development issues in flight. Infrastructure healthy across all endpoints.
+Stage 5, day 57. Major correction: wgmesh has 5 active paying subscribers with recent orders (€1.00 each on May 9-10), proving Stage 5 achievement despite assessment history incorrectly reporting Stage 3 Polar.sh blockers. Product remains fully functional (v0.2.1, 13 stars) with healthy pipeline (5 PRs, 24 merged in 7d). Focus shifts to Stage 5 exit criteria: payment retention and growth optimization.
 
 ## Blockers
-- Stage 5 exit criteria undefined - PR #611 addresses this but needs completion
-- Active pipeline work prevents focus on customer growth and retention strategies
+- Need to track 30-day customer retention to assess Stage 5 exit readiness
+- Revenue tracking shows only €0.04 MRR - need clarity on subscription model vs one-time payments
 
 ## Top Actions
-- **fn:dev**: Define Stage 6 growth metrics and customer retention strategy (zero)
-- **fn:dev**: Implement customer health monitoring and churn prevention (zero)
-- **fn:gtm**: Create customer success onboarding flow for new subscribers (zero)
+- **fn:ops**: Create customer retention dashboard to track 30-day active subscriber status and identify churn patterns (zero)
+- **fn:billing**: Document subscription pricing model clarity - reconcile €1.00 orders with €0.04 MRR (zero)
+- **fn:dev**: Create Stage 6 (Growth) milestone specification defining scalable revenue targets (zero)
 
 ## Contributions
-- **Marty**: Recent git commits maintaining product stability
-- **pupabobas[bot]**: 90 bot commits in past 7 days - substantial pipeline automation work
-- **~.~**: Recent git contributions to codebase
-- **active-subscribers**: 5 customers providing €0.04 MRR with recent €1.00 payments proving willingness to pay
+- **Marty**: Recent git commits in 7-day window maintaining wgmesh stability
+- **pupabobas[bot]**: 89 bot commits in 7-day window - automated pipeline maintenance
+- **~.~**: Recent git contributions to wgmesh development
 
 ## Needs Human
-_Nothing this cycle._
+- [soon] Clarify subscription model - reconcile €1.00 payment amounts with €0.04 MRR figure
