@@ -1,0 +1,39 @@
+.github/scripts/assert-state-mutation.sh
+  s_0466ad20a1e7b9::t_a2041a4f4e8d4c 45-49
+  s_ae1673f354b6ff::t_9de5f22c55f1c8 1-4,9-11,29-44,50-122,128-157
+  s_0466ad20a1e7b9::t_4696908cfc7898 5-8,12-28,123-127
+.github/scripts/test-assert-state-mutation.sh
+  s_0466ad20a1e7b9::t_a2041a4f4e8d4c 1-180
+company/pipeline-health-state.json
+  s_ae1673f354b6ff::t_9de5f22c55f1c8 6
+.github/workflows/pipeline-health.yml
+  s_0466ad20a1e7b9::t_5130f13c60ac4a 52,56,774,781,796,810-823,859-863
+  s_0466ad20a1e7b9::t_8c01b36e16c5aa 49-50
+  s_0466ad20a1e7b9::t_cc2dba065afd9f 65
+  s_0466ad20a1e7b9::t_7097b34061f9cb 749
+  s_0466ad20a1e7b9::t_976b10ee5eed50 60,105,115,199,257,267,350,394,490,608
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "49acfa9a218f655e69ca01656e4bcf7cc44a5690",
+  "prompts": {},
+  "sessions": {
+    "s_0466ad20a1e7b9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e2d8e-d0a6-7a81-ab28-99c364214045",
+        "model": "gpt-5.5"
+      },
+      "human_author": "~.~ <saint@ghost.lt>"
+    },
+    "s_ae1673f354b6ff": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e2d76-bbae-7891-babe-d46a695f971c",
+        "model": "gpt-5.5"
+      },
+      "human_author": "~.~ <saint@ghost.lt>"
+    }
+  }
+}
