@@ -46,17 +46,23 @@ jobs:
         id: state
         run: |
           state_file="company/pipeline-health-state.json"
+          # shellcheck disable=SC2129
+          echo "STATE_FILE=$state_file" >> "$GITHUB_ENV"
           if [ -f "$state_file" ]; then
+            PRE_RUN_LAST_CHECK=$(jq -r '.last_check // ""' "$state_file")
             echo "checks_run=$(jq -r '.checks_run // 0' "$state_file")" >> "$GITHUB_ENV"
             echo "issues_healed_total=$(jq -r '.issues_healed_total // 0' "$state_file")" >> "$GITHUB_ENV"
           else
+            PRE_RUN_LAST_CHECK=""
             echo "checks_run=0" >> "$GITHUB_ENV"
             echo "issues_healed_total=0" >> "$GITHUB_ENV"
           fi
+          echo "PRE_RUN_LAST_CHECK=$PRE_RUN_LAST_CHECK" >> "$GITHUB_ENV"
 
       # ── Initialize run counters ───────────────────────────────
       - name: Initialize run counters
         run: |
+          # shellcheck disable=SC2129
           echo "ACTIONS_TAKEN=0" >> "$GITHUB_ENV"
           echo "ERRORS=0" >> "$GITHUB_ENV"
           echo "ISSUES_CREATED=0" >> "$GITHUB_ENV"
@@ -96,6 +102,7 @@ jobs:
 
           echo "Cutoff: $cutoff"
 
+          # shellcheck disable=SC2016
           gh issue list --repo "$TARGET_REPO" --state open \
             --label "needs-triage" --limit 50 \
             --json number,title,createdAt,labels \
@@ -105,6 +112,7 @@ jobs:
 
           while read -r issue; do
             number=$(echo "$issue" | jq -r '.number')
+            # shellcheck disable=SC2034
             title=$(echo "$issue" | jq -r '.title')
             labels=$(echo "$issue" | jq -r '[.labels[].name] | join(",")')
 
@@ -188,6 +196,7 @@ jobs:
           done < /tmp/stale_triage.json
 
           # Write counters to GITHUB_ENV
+          # shellcheck disable=SC2129
           echo "ACTIONS_TAKEN=$((ACTIONS_TAKEN + local_actions))" >> "$GITHUB_ENV"
           echo "ERRORS=$((ERRORS + local_errors))" >> "$GITHUB_ENV"
           echo "ISSUES_CREATED=$((ISSUES_CREATED + local_issues_created))" >> "$GITHUB_ENV"
@@ -245,6 +254,7 @@ jobs:
 
           echo "Cutoff: $cutoff"
 
+          # shellcheck disable=SC2016
           gh issue list --repo "$TARGET_REPO" --state open \
             --label "copilot-triaging" --limit 50 \
             --json number,title,createdAt,labels \
@@ -254,6 +264,7 @@ jobs:
 
           while read -r issue; do
             number=$(echo "$issue" | jq -r '.number')
+            # shellcheck disable=SC2034
             title=$(echo "$issue" | jq -r '.title')
             labels=$(echo "$issue" | jq -r '[.labels[].name] | join(",")')
 
@@ -336,6 +347,7 @@ jobs:
           done < /tmp/stale_copilot.json
 
           # Write counters to GITHUB_ENV
+          # shellcheck disable=SC2129
           echo "ACTIONS_TAKEN=$((ACTIONS_TAKEN + local_actions))" >> "$GITHUB_ENV"
           echo "ERRORS=$((ERRORS + local_errors))" >> "$GITHUB_ENV"
           echo "ISSUES_CREATED=$((ISSUES_CREATED + local_issues_created))" >> "$GITHUB_ENV"
@@ -379,6 +391,7 @@ jobs:
 
           echo "Cutoff: $cutoff"
 
+          # shellcheck disable=SC2016
           gh pr list --repo "$TARGET_REPO" --state open \
             --label "approved-for-build" --limit 50 \
             --json number,title,updatedAt,labels \
@@ -474,6 +487,7 @@ jobs:
           done < /tmp/stale_approved.json
 
           # Write counters to GITHUB_ENV
+          # shellcheck disable=SC2129
           echo "ACTIONS_TAKEN=$((ACTIONS_TAKEN + local_actions))" >> "$GITHUB_ENV"
           echo "ERRORS=$((ERRORS + local_errors))" >> "$GITHUB_ENV"
           echo "ISSUES_CREATED=$((ISSUES_CREATED + local_issues_created))" >> "$GITHUB_ENV"
@@ -591,6 +605,7 @@ jobs:
           done < /tmp/needs_human.json
 
           # Write counters to GITHUB_ENV
+          # shellcheck disable=SC2129
           echo "ACTIONS_TAKEN=$((ACTIONS_TAKEN + local_actions))" >> "$GITHUB_ENV"
           echo "ERRORS=$((ERRORS + local_errors))" >> "$GITHUB_ENV"
           echo "NEEDS_HUMAN_CLOSED=$((NEEDS_HUMAN_CLOSED + local_closed))" >> "$GITHUB_ENV"
@@ -731,6 +746,7 @@ jobs:
             exit 0
           fi
 
+          # shellcheck disable=SC2102
           gh api \
             --method POST \
             -H "Accept: application/vnd.github+json" \
@@ -755,12 +771,14 @@ jobs:
           existing_retry_tracker=$(jq '.retry_tracker // {}' "$STATE_FILE")
           existing_funnel_signals=$(jq '.funnel_signals // {}' "$STATE_FILE")
           existing_idle_signal=$(jq '.idle_signal // {}' "$STATE_FILE")
+          existing_consecutive_no_mutation_runs=$(jq '.consecutive_no_mutation_runs // 0' "$STATE_FILE")
 
           jq -n \
             --arg last_check "$now" \
             --argjson check_interval_hours 0.5 \
             --argjson checks_run "$new_checks_run" \
             --argjson issues_healed_total "$new_healed" \
+            --argjson consecutive_no_mutation_runs "$existing_consecutive_no_mutation_runs" \
             --argjson retry_tracker "$existing_retry_tracker" \
             --argjson funnel_signals "$existing_funnel_signals" \
             --argjson idle_signal "$existing_idle_signal" \
@@ -775,6 +793,7 @@ jobs:
               check_interval_hours: $check_interval_hours,
               checks_run: $checks_run,
               issues_healed_total: $issues_healed_total,
+              consecutive_no_mutation_runs: $consecutive_no_mutation_runs,
               retry_tracker: $retry_tracker,
               funnel_signals: $funnel_signals,
               idle_signal: $idle_signal,
@@ -787,6 +806,20 @@ jobs:
                 errors: $errors
               }
             }' > "$STATE_FILE"
+
+      - name: Assert state mutation
+        if: always() && hashFiles('.github/scripts/assert-state-mutation.sh') != ''
+        continue-on-error: true
+        id: assert_mutation
+        env:
+          STATE_FILE: ${{ env.STATE_FILE }}
+          PRE_RUN_LAST_CHECK: ${{ env.PRE_RUN_LAST_CHECK }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          bash .github/scripts/assert-state-mutation.sh \
+            "$PRE_RUN_LAST_CHECK" \
+            "$(jq -r '.last_check // ""' "$STATE_FILE")"
 
       # ── Sanitise before commit ────────────────────────────────
       - name: Sanitise before commit
@@ -822,6 +855,12 @@ jobs:
           echo "Created PR #${pr_number}"
 
           # Review-merge handled by bot-pr-review-merge.yml workflow
+
+      - name: Fail if state mutation assertion failed
+        if: always() && steps.assert_mutation.outcome == 'failure'
+        run: |
+          echo "::error::State mutation assertion failed — supervisor may be clogged"
+          exit 1
 
       - name: Append pipeline-health outcome to MentisDB
         if: always()
