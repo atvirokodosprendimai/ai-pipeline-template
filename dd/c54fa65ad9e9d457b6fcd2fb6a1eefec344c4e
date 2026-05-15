@@ -1,0 +1,64 @@
+.github/workflows/observation-loop.yml
+  2acd831a87414e9b 482,486
+.github/workflows/bot-pr-review-merge.yml
+  2acd831a87414e9b 75,79-80
+.github/workflows/impl-merged-close.yml
+  2acd831a87414e9b 77,81-82
+.compound-engineering/config.local.example.yaml
+  5f85b78e2e3ffc30 11-12
+.github/workflows/heartbeat-pr-automerge.yml
+  2acd831a87414e9b 241,245-246
+.github/workflows/copilot-undraft.yml
+  2acd831a87414e9b 72,76-77
+memory/MEMORY.md
+  2acd831a87414e9b 37
+.github/workflows/health-check.yml
+  2acd831a87414e9b 109,113-114
+memory/reference_mentisdb_ci_integration_pattern.md
+  2acd831a87414e9b 1-64
+.github/workflows/copilot-triage.yml
+  2acd831a87414e9b 155,159-160
+.gitignore
+  5f85b78e2e3ffc30 11-13
+.github/workflows/approve-build.yml
+  2acd831a87414e9b 78-120,238,242-243
+.github/workflows/spec-validation.yml
+  2acd831a87414e9b 159,163-164
+.github/workflows/spec-merged-build.yml
+  2acd831a87414e9b 99,103-104
+.github/workflows/pipeline-health.yml
+  2acd831a87414e9b 851,855-856
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "ddc54fa65ad9e9d457b6fcd2fb6a1eefec344c4e",
+  "prompts": {
+    "2acd831a87414e9b": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_22bfdda7affe6USZsBfcGRG5zl",
+        "model": "openai/gpt-5.5"
+      },
+      "human_author": "~.~",
+      "messages": [],
+      "total_additions": 142,
+      "total_deletions": 23,
+      "accepted_lines": 140,
+      "overriden_lines": 0
+    },
+    "5f85b78e2e3ffc30": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_22c07faccffe0lZof9qQNt44DJ",
+        "model": "openai/gpt-5.4"
+      },
+      "human_author": "~.~",
+      "messages": [],
+      "total_additions": 5,
+      "total_deletions": 2,
+      "accepted_lines": 5,
+      "overriden_lines": 0
+    }
+  }
+}
