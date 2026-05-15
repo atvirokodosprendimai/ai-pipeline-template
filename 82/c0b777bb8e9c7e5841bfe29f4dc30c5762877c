@@ -1,0 +1,24 @@
+.github/scripts/publish-rank.sh
+  s_ce700edfdd7052::t_3b2b4b7025046b 130-147,156-157,197-198,208-210
+  s_ce700edfdd7052::t_cbe574ac289a61 33,37,46-72
+.github/workflows/supervisor-rank.yml
+  s_ce700edfdd7052::t_843ee2c8a8db97 95-108,122
+.github/scripts/test-publish.sh
+  s_ce700edfdd7052::t_48736530a3e956 10,12,15,19-20,23-27,29,32,36-41,45,51,55-60,64-67,76-109
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "82c0b777bb8e9c7e5841bfe29f4dc30c5762877c",
+  "prompts": {},
+  "sessions": {
+    "s_ce700edfdd7052": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0307b888-a033-4abf-80bd-a1daa9d5cc6c",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "~.~ <saint@ghost.lt>"
+    }
+  }
+}
