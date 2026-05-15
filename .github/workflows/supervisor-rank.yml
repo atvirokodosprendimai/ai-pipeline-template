@@ -92,6 +92,20 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           set -euo pipefail
+          # Material-fingerprint gate. publish-rank.sh writes this sentinel; if false,
+          # skip commit + PR entirely. Prevents the ~6 PRs/day audit-drift pile-up
+          # this supervisor was built to PREVENT. See memory:
+          # feedback_monitor_workflows_state_per_run_creates_anti_pattern.md
+          sentinel="${SUPERVISOR_MATERIAL_SENTINEL:-/tmp/supervisor-rank-material-changed}"
+          if [ ! -f "$sentinel" ]; then
+            echo "::warning::material-change sentinel missing; skipping commit"
+            exit 0
+          fi
+          if [ "$(cat "$sentinel")" != "true" ]; then
+            echo "No material change in supervisor-rank state; skipping commit + PR"
+            exit 0
+          fi
+
           git config user.name "pupabobas[bot]"
           git config user.email "pupabobas[bot]@users.noreply.github.com"
           git add company/supervisor-rank-state.json
@@ -105,7 +119,7 @@ jobs:
 
           gh pr create \
             --title "chore: supervisor-rank state $today" \
-            --body "Automated state update from supervisor-rank workflow." \
+            --body "Automated state update from supervisor-rank workflow (material fingerprint changed)." \
             --base main \
             --head "$branch"
 

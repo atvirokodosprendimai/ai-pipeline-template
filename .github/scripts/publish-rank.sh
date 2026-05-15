@@ -30,9 +30,11 @@ new_state="$tmpdir/supervisor-rank-state.json"
 
 previous_top="[]"
 previous_run=0
+previous_fingerprint=""
 if [ -f "$STATE_FILE" ] && jq empty "$STATE_FILE" >/dev/null 2>&1; then
   previous_top="$(jq -c '.last_run_top_ids // []' "$STATE_FILE")"
   previous_run="$(jq -r '.run_number // 0' "$STATE_FILE")"
+  previous_fingerprint="$(jq -r '.material_fingerprint // ""' "$STATE_FILE")"
 fi
 
 current_top="$(jq -c '[.top[0:3][]?.id]' "$RANKED_JSON")"
@@ -40,6 +42,34 @@ rank_changed="false"
 if [ "$previous_top" != "[]" ] && [ "$previous_top" != "$current_top" ]; then
   rank_changed="true"
 fi
+
+# Material fingerprint — sha256 over the fields whose change should drive a
+# commit + PR. Metadata fields like last_run_at, run_number, generated_at are
+# EXCLUDED so they cannot drive PR-per-run pile-up (the anti-pattern this
+# supervisor is supposed to clear, not create).
+stage_summary_json="$(jq -c '.stage_summary // {}' "$RANKED_JSON")"
+unknown_count="$(jq -c '(.unknown // []) | length' "$RANKED_JSON")"
+top_actions_json="$(jq -c '[.top[0:5][]? | {id, action: (.recommended_action // null)}]' "$RANKED_JSON")"
+material_payload="$(jq -Sc -n \
+  --argjson top_ids "$current_top" \
+  --argjson stage_summary "$stage_summary_json" \
+  --argjson unknown_count "$unknown_count" \
+  --argjson top_actions "$top_actions_json" \
+  '{top_ids: $top_ids, stage_summary: $stage_summary, unknown_count: $unknown_count, top_actions: $top_actions}')"
+if command -v sha256sum >/dev/null 2>&1; then
+  new_fingerprint="$(printf '%s' "$material_payload" | sha256sum | awk '{print $1}')"
+else
+  new_fingerprint="$(printf '%s' "$material_payload" | shasum -a 256 | awk '{print $1}')"
+fi
+
+material_changed="true"
+if [ -n "$previous_fingerprint" ] && [ "$previous_fingerprint" = "$new_fingerprint" ]; then
+  material_changed="false"
+fi
+
+# Emit sentinel for the workflow's Commit state step to gate on.
+sentinel_file="${SUPERVISOR_MATERIAL_SENTINEL:-/tmp/supervisor-rank-material-changed}"
+printf '%s\n' "$material_changed" > "$sentinel_file"
 
 generated_at="$(jq -r '.generated_at // ""' "$RANKED_JSON")"
 run_number=$((previous_run + 1))
@@ -97,6 +127,24 @@ retry_gh() {
 
 issue_number=""
 issue_url=""
+# Preserve prior issue identity when skipping due to no material change.
+if [ -f "$STATE_FILE" ] && jq empty "$STATE_FILE" >/dev/null 2>&1; then
+  prior_issue_number="$(jq -r '.issue_number // ""' "$STATE_FILE")"
+  prior_issue_url="$(jq -r '.issue_url // ""' "$STATE_FILE")"
+  if [ -n "$prior_issue_number" ] && [ "$prior_issue_number" != "null" ]; then
+    issue_number="$prior_issue_number"
+  fi
+  if [ -n "$prior_issue_url" ] && [ "$prior_issue_url" != "null" ]; then
+    issue_url="$prior_issue_url"
+  fi
+fi
+
+if [ "$material_changed" = "false" ]; then
+  echo "no material change (fingerprint=$new_fingerprint); skipping issue + state mutation" >&2
+  echo "supervisor-rank issue: ${issue_url:-unchanged}"
+  exit 0
+fi
+
 if [ "$DRY_RUN" = "1" ]; then
   mkdir -p "$(dirname "$STATE_FILE")"
   issue_number="${SUPERVISOR_PUBLISH_DRY_RUN_ISSUE:-999}"
@@ -105,6 +153,8 @@ if [ "$DRY_RUN" = "1" ]; then
     {
       echo "DRY_RUN issue_number=$issue_number"
       echo "DRY_RUN rank_changed=$rank_changed"
+      echo "DRY_RUN material_changed=$material_changed"
+      echo "DRY_RUN fingerprint=$new_fingerprint"
       echo "DRY_RUN body_file=$body_file"
     } >> "$SUPERVISOR_PUBLISH_LOG"
   fi
@@ -144,6 +194,8 @@ jq -n \
   --argjson run_number "$run_number" \
   --arg issue_number "$issue_number" \
   --arg issue_url "$issue_url" \
+  --arg material_fingerprint "$new_fingerprint" \
+  --argjson top_actions "$top_actions_json" \
   --slurpfile ranked "$RANKED_JSON" \
   '{
     last_run_at: $last_run_at,
@@ -153,7 +205,9 @@ jq -n \
     issue_number: (if $issue_number == "" then null else ($issue_number | tonumber) end),
     issue_url: (if $issue_url == "" then null else $issue_url end),
     stage_summary: ($ranked[0].stage_summary // {}),
-    unknown_count: (($ranked[0].unknown // []) | length)
+    unknown_count: (($ranked[0].unknown // []) | length),
+    top_actions: $top_actions,
+    material_fingerprint: $material_fingerprint
   }' > "$new_state"
 
 mv "$new_state" "$STATE_FILE"
