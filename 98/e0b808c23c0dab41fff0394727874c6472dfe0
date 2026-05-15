@@ -1,0 +1,66 @@
+.github/scripts/rank-clogs.sh
+  s_ae1673f354b6ff::t_a37e86676a5aa6 48-64
+  s_ae1673f354b6ff::t_28332dfa2dd583 1-47,65-74
+.github/scripts/test-rank.sh
+  s_ae1673f354b6ff::t_28332dfa2dd583 1-50
+.github/scripts/test-publish.sh
+  s_ae1673f354b6ff::t_6954e7f3650fac 1-53
+.github/scripts/fixtures/classified-fixture.json
+  s_ae1673f354b6ff::t_69fca7a4d9fff2 1-170
+.github/scripts/snapshot-clogs.sh
+  s_ae1673f354b6ff::t_28332dfa2dd583 1-69
+.github/scripts/test-classify.sh
+  s_ae1673f354b6ff::t_28332dfa2dd583 1-43
+company/supervisor-rank-state.json
+  s_ae1673f354b6ff::t_69fca7a4d9fff2 1-6
+.github/scripts/recommend-actions.sh
+  s_ae1673f354b6ff::t_28332dfa2dd583 1-44
+.github/scripts/publish-rank.sh
+  s_ae1673f354b6ff::t_6954e7f3650fac 1-160
+docs/pulse-reports/2026-05-15_22-33.md
+  s_ce700edfdd7052::t_82680684925043 1-33
+.github/scripts/fixtures/snapshot-fixture.json
+  s_ae1673f354b6ff::t_69fca7a4d9fff2 1-150
+docs/plans/2026-05-15-001-feat-supervisor-clog-ranker-plan.md
+  s_ce700edfdd7052::t_c3710eee5f1577 1-485
+.github/scripts/fixtures/ranked-fixture.json
+  s_ae1673f354b6ff::t_69fca7a4d9fff2 1-98
+.github/scripts/classify-clogs.sh
+  s_ae1673f354b6ff::t_28332dfa2dd583 1-18,21-24,26-36,44,46-47,50-51,53-54,56-59,61,64-65,76-77,81-83,86-95
+  s_ae1673f354b6ff::t_a37e86676a5aa6 19-20,25
+  s_ae1673f354b6ff::t_ddf855a95511db 37-41,43,45,48-49,52,55,60,62-63,66-67,69-75,78-80,84-85
+  s_ae1673f354b6ff::t_504ef1100d6882 42
+  s_ae1673f354b6ff::t_97032c1c44d4d1 68
+.github/workflows/supervisor-rank.yml
+  s_ae1673f354b6ff::t_6954e7f3650fac 1-120
+.github/scripts/validate-spec.sh
+  s_ae1673f354b6ff::t_787828bbcd2f29 20,75
+docs/brainstorms/2026-05-15-supervisor-clog-ranker-requirements.md
+  s_ce700edfdd7052::t_8467bb57f90cda 1-121
+company/pipeline-stages.json
+  s_ae1673f354b6ff::t_69fca7a4d9fff2 1-108
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "98e0b808c23c0dab41fff0394727874c6472dfe0",
+  "prompts": {},
+  "sessions": {
+    "s_ae1673f354b6ff": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e2d76-bbae-7891-babe-d46a695f971c",
+        "model": "gpt-5.5"
+      },
+      "human_author": "~.~ <saint@ghost.lt>"
+    },
+    "s_ce700edfdd7052": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0307b888-a033-4abf-80bd-a1daa9d5cc6c",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "~.~ <saint@ghost.lt>"
+    }
+  }
+}
