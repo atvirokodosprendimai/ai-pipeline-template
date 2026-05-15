@@ -47,4 +47,19 @@ if ! grep -q "warning: no recommended action" /tmp/unknown-stage.err; then
   exit 1
 fi
 
-echo "PASS test-rank: 6 scenarios"
+# Stdin-pipe equivalence for rank-clogs.sh and recommend-actions.sh.
+# Regression guard for double-stdin-read.
+rank_stdin_out="/tmp/ranked-stdin.out"
+SUPERVISOR_NOW="2026-05-15T22:00:00Z" bash .github/scripts/rank-clogs.sh < "$classified" > "$rank_stdin_out"
+if ! diff -u <(jq -S . "$ranked") <(jq -S . "$rank_stdin_out"); then
+  echo "FAIL: stdin rank diverged from file rank" >&2
+  exit 1
+fi
+recommend_stdin_out="/tmp/recommended-stdin.out"
+bash .github/scripts/recommend-actions.sh < "$ranked" > "$recommend_stdin_out"
+if ! diff -u <(jq -S . "$recommended") <(jq -S . "$recommend_stdin_out"); then
+  echo "FAIL: stdin recommend diverged from file recommend" >&2
+  exit 1
+fi
+
+echo "PASS test-rank: 8 scenarios"

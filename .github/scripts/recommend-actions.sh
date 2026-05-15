@@ -2,7 +2,14 @@
 set -euo pipefail
 
 TAXONOMY_FILE="${TAXONOMY_FILE:-company/pipeline-stages.json}"
-INPUT="${1:-/dev/stdin}"
+INPUT="${1:-}"
+
+# Buffer stdin to a tempfile so the input can be validated then re-read.
+if [ -z "$INPUT" ] || [ "$INPUT" = "-" ] || [ "$INPUT" = "/dev/stdin" ]; then
+  INPUT="$(mktemp)"
+  trap 'rm -f "$INPUT"' EXIT
+  cat > "$INPUT"
+fi
 
 if [ ! -f "$TAXONOMY_FILE" ]; then
   echo "error: missing taxonomy file: $TAXONOMY_FILE" >&2

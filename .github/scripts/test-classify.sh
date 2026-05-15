@@ -40,4 +40,13 @@ if ! grep -q "bad rule" /tmp/bad-classify.err; then
   exit 1
 fi
 
-echo "PASS test-classify: 6 scenarios"
+# Stdin-pipe equivalence: piping the snapshot into classify-clogs.sh must produce
+# the same result as passing the path as $1. Regression guard for double-stdin-read.
+stdin_out="/tmp/classified-stdin.out"
+SUPERVISOR_NOW="2026-05-15T22:00:00Z" bash .github/scripts/classify-clogs.sh < "$fixture" > "$stdin_out"
+if ! diff -u <(jq -S . "$actual") <(jq -S . "$stdin_out"); then
+  echo "FAIL: stdin classify diverged from file classify" >&2
+  exit 1
+fi
+
+echo "PASS test-classify: 7 scenarios"

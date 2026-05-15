@@ -1,9 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-INPUT="${1:-/dev/stdin}"
+INPUT="${1:-}"
 TOP_N="${TOP_N:-5}"
 NOW="${SUPERVISOR_NOW:-$(date -u '+%Y-%m-%dT%H:%M:%SZ')}"
+
+# Buffer stdin to a tempfile so the input can be validated then re-read.
+if [ -z "$INPUT" ] || [ "$INPUT" = "-" ] || [ "$INPUT" = "/dev/stdin" ]; then
+  INPUT="$(mktemp)"
+  trap 'rm -f "$INPUT"' EXIT
+  cat > "$INPUT"
+fi
 
 if ! jq empty "$INPUT" >/dev/null 2>&1; then
   echo "error: malformed classified JSON: $INPUT" >&2
