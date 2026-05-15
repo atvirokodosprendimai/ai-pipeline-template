@@ -1,22 +1,23 @@
 # Assessment: 2026-05-15
 
-**Stage**: Revenue | **Run**: 164
+**Stage**: Revenue | **Run**: 165
 
-Stage 5 (Revenue), day 58. Major advancement: Polar.sh billing integration now working with 5 active subscribers and recent €1.00 payments received. Pipeline extremely healthy with 37 PRs merged in 7 days, only 6 open issues. Product stable at v0.2.1 with full mesh networking architecture.
+Stage 5, run 164. Revenue confirmed with 5 paying subscribers (€1.00 payments received May 9-14), but €0.04 MRR figure needs clarification. Product fully functional with high velocity (36 PRs merged in 7 days). Pipeline nearly idle with 0 open PRs, triggering Commercial Idle Policy to prioritize customer acquisition over internal maintenance.
 
 ## Blockers
-- Revenue data inconsistency: €1.00 payment amounts vs €0.04 MRR figure needs clarification
-- Need to understand customer retention and usage patterns to validate Stage 5 exit criteria (customer active after 30 days)
+- Revenue scale insufficient for sustainable growth - need expanded customer base and clearer pricing model
+- Disconnect between €1.00 payment amounts and €0.04 MRR reporting creates subscription model confusion
 
 ## Top Actions
-- **needs-human**: Clarify subscription pricing model and resolve €1.00 payment vs €0.04 MRR discrepancy (zero)
-- **fn:dev**: Add Polar checkout CTAs to wgmesh.dev and cloudroof.eu landing pages to convert additional traffic (zero)
-- **fn:dev**: Fix key rotation IP address change bug for customer stability (zero)
+- **fn:gtm**: Create enterprise network admin pilot evaluation framework with 30-day trial structure, success metrics checklist, and concrete ROI calculator targeting organizations with 50+ distributed endpoints (zero)
+- **fn:billing**: Reconcile subscription billing model - investigate €1.00 payment vs €0.04 MRR discrepancy and document actual pricing structure for customer clarity (zero)
+- **fn:gtm**: Document internal dogfood deployment case study with quantified metrics (uptime, performance, cost vs alternatives) for credibility with enterprise prospects (zero)
 
 ## Contributions
-- **Marty**: Recent git commits maintaining project stability
-- **pupabobas[bot]**: 86 bot commits in past 7 days driving pipeline automation
-- **~.~**: Recent git contributions in past 7 days
+- **Marty**: Recent git commits maintaining codebase stability
+- **pupabobas[bot]**: 85 automated commits in past 7 days driving development pipeline
+- **~.~**: Recent git contributions to codebase
+- **paying-customers**: 5 active subscribers with recent €1.00 payments providing revenue validation
 
 ## Needs Human
-- [soon] Clarify subscription model - reconcile €1.00 payment amounts with €0.04 MRR figure
+- [soon] Clarify subscription billing model - investigate discrepancy between €1.00 payment amounts shown in recent orders vs €0.04 MRR figure in revenue data
