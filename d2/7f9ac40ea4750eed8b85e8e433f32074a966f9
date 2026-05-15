@@ -1,0 +1,19 @@
+.github/scripts/snapshot-clogs.sh
+  s_ce700edfdd7052::t_f5041197a52df4 38-42
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "d27f9ac40ea4750eed8b85e8e433f32074a966f9",
+  "prompts": {},
+  "sessions": {
+    "s_ce700edfdd7052": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0307b888-a033-4abf-80bd-a1daa9d5cc6c",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "~.~ <saint@ghost.lt>"
+    }
+  }
+}
