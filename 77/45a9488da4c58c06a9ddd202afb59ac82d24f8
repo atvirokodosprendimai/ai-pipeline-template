@@ -1,0 +1,27 @@
+.github/scripts/test-classify.sh
+  s_ce700edfdd7052::t_1c1c87bac328c0 43-52
+.github/scripts/recommend-actions.sh
+  s_ce700edfdd7052::t_c87b8e7fcd9ddb 5-12
+.github/scripts/rank-clogs.sh
+  s_ce700edfdd7052::t_6601be67399db0 4,8-13
+.github/scripts/test-rank.sh
+  s_ce700edfdd7052::t_5cec8c7cef74e5 50-65
+.github/scripts/classify-clogs.sh
+  s_ce700edfdd7052::t_a4815dbf00482f 5,8-14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "7745a9488da4c58c06a9ddd202afb59ac82d24f8",
+  "prompts": {},
+  "sessions": {
+    "s_ce700edfdd7052": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0307b888-a033-4abf-80bd-a1daa9d5cc6c",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "~.~ <saint@ghost.lt>"
+    }
+  }
+}
