@@ -1,0 +1,150 @@
+[
+  {
+    "repo": "atvirokodosprendimai/ai-pipeline-template",
+    "type": "issue",
+    "number": 101,
+    "title": "Triage stuck in Copilot",
+    "labels": [
+      {
+        "name": "copilot-triaging"
+      }
+    ],
+    "created_at": "2026-05-12T22:00:00Z",
+    "updated_at": "2026-05-15T10:00:00Z",
+    "is_draft": false
+  },
+  {
+    "repo": "atvirokodosprendimai/ai-pipeline-template",
+    "type": "issue",
+    "number": 102,
+    "title": "Approved issue waiting for implementation",
+    "labels": [
+      {
+        "name": "approved-for-build"
+      },
+      {
+        "name": "type:feature"
+      }
+    ],
+    "created_at": "2026-05-13T22:00:00Z",
+    "updated_at": "2026-05-14T22:00:00Z",
+    "is_draft": false
+  },
+  {
+    "repo": "atvirokodosprendimai/ai-pipeline-template",
+    "type": "issue",
+    "number": 103,
+    "title": "Bookkeeping note",
+    "labels": [
+      {
+        "name": "manual-only"
+      }
+    ],
+    "created_at": "2026-05-14T22:00:00Z",
+    "updated_at": "2026-05-14T22:00:00Z",
+    "is_draft": false
+  },
+  {
+    "repo": "atvirokodosprendimai/ai-pipeline-template",
+    "type": "pr",
+    "number": 201,
+    "title": "spec: Issue #102 - implementation plan",
+    "labels": [
+      {
+        "name": "approved-for-build"
+      }
+    ],
+    "created_at": "2026-05-11T22:00:00Z",
+    "updated_at": "2026-05-12T22:00:00Z",
+    "is_draft": false,
+    "review_decision": "REVIEW_REQUIRED",
+    "merge_state_status": "UNKNOWN"
+  },
+  {
+    "repo": "atvirokodosprendimai/ai-pipeline-template",
+    "type": "pr",
+    "number": 202,
+    "title": "impl: Issue #102 - ranker script",
+    "labels": [
+      {
+        "name": "needs-review"
+      }
+    ],
+    "created_at": "2026-05-14T22:00:00Z",
+    "updated_at": "2026-05-15T00:00:00Z",
+    "is_draft": false,
+    "review_decision": "REVIEW_REQUIRED",
+    "merge_state_status": "BLOCKED"
+  },
+  {
+    "repo": "atvirokodosprendimai/ai-pipeline-template",
+    "type": "pr",
+    "number": 203,
+    "title": "impl: Issue #120 - clean approved PR",
+    "labels": [],
+    "created_at": "2026-05-14T10:00:00Z",
+    "updated_at": "2026-05-14T12:00:00Z",
+    "is_draft": false,
+    "review_decision": "APPROVED",
+    "merge_state_status": "CLEAN"
+  },
+  {
+    "repo": "atvirokodosprendimai/wgmesh",
+    "type": "issue",
+    "number": 301,
+    "title": "Verify merged implementation",
+    "labels": [
+      {
+        "name": "needs-e2e"
+      }
+    ],
+    "created_at": "2026-05-10T22:00:00Z",
+    "updated_at": "2026-05-11T22:00:00Z",
+    "is_draft": false
+  },
+  {
+    "repo": "atvirokodosprendimai/wgmesh",
+    "type": "issue",
+    "number": 302,
+    "title": "Customer-zero still zero",
+    "labels": [
+      {
+        "name": "customer-zero"
+      }
+    ],
+    "created_at": "2026-05-08T22:00:00Z",
+    "updated_at": "2026-05-09T22:00:00Z",
+    "is_draft": false
+  },
+  {
+    "repo": "atvirokodosprendimai/wgmesh",
+    "type": "issue",
+    "number": 303,
+    "title": "Human escalation beats triage",
+    "labels": [
+      {
+        "name": "needs-human"
+      },
+      {
+        "name": "copilot-triaging"
+      }
+    ],
+    "created_at": "2026-05-05T22:00:00Z",
+    "updated_at": "2026-05-15T20:00:00Z",
+    "is_draft": false
+  },
+  {
+    "repo": "atvirokodosprendimai/wgmesh",
+    "type": "issue",
+    "number": 304,
+    "title": "Unknown labeled item",
+    "labels": [
+      {
+        "name": "manual-only"
+      }
+    ],
+    "created_at": "2026-05-15T00:00:00Z",
+    "updated_at": "2026-05-15T00:00:00Z",
+    "is_draft": false
+  }
+]

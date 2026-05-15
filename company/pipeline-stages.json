@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "notes": "Initial dwell thresholds; tune from observed supervisor-rank runs.",
+  "stages": [
+    "triage",
+    "spec",
+    "build",
+    "review",
+    "merge",
+    "verify",
+    "revenue"
+  ],
+  "classification_rules": {
+    "triage": {
+      "label_any": [
+        "copilot-triaging",
+        "needs-triage"
+      ],
+      "issue_without_type_label": true,
+      "title_prefix_any": []
+    },
+    "spec": {
+      "label_any": [
+        "spec",
+        "spec-ready"
+      ],
+      "title_prefix_any": [
+        "spec:"
+      ]
+    },
+    "build": {
+      "label_any": [
+        "approved-for-build",
+        "goose-implementation"
+      ],
+      "title_prefix_any": [
+        "impl:"
+      ]
+    },
+    "review": {
+      "label_any": [
+        "needs-human",
+        "needs-review",
+        "copilot-review-pending",
+        "changes-requested"
+      ],
+      "title_prefix_any": []
+    },
+    "merge": {
+      "label_any": [
+        "merge-ready",
+        "approved"
+      ],
+      "review_decision_any": [
+        "APPROVED"
+      ],
+      "merge_state_status_any": [
+        "CLEAN",
+        "HAS_HOOKS"
+      ],
+      "title_prefix_any": []
+    },
+    "verify": {
+      "label_any": [
+        "needs-e2e",
+        "needs-verify",
+        "verification",
+        "verify"
+      ],
+      "title_prefix_any": []
+    },
+    "revenue": {
+      "label_any": [
+        "customer-zero",
+        "customer-factory",
+        "revenue",
+        "growth"
+      ],
+      "title_prefix_any": []
+    }
+  },
+  "dwell_thresholds_hours": {
+    "triage": 72,
+    "spec": 48,
+    "build": 24,
+    "review": 48,
+    "merge": 24,
+    "verify": 96,
+    "revenue": 168
+  },
+  "recommended_actions": {
+    "triage": "bounce-label",
+    "spec": "manual-merge",
+    "build": "retry-copilot",
+    "review": "escalate-needs-human",
+    "merge": "manual-merge",
+    "verify": "post-rah-bounty",
+    "revenue": "post-rah-bounty"
+  },
+  "allowed_actions": [
+    "retry-copilot",
+    "bounce-label",
+    "auto-close-superseded",
+    "post-rah-bounty",
+    "escalate-needs-human",
+    "manual-merge"
+  ]
+}
