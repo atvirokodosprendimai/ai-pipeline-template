@@ -35,7 +35,11 @@ for repo in "${repos[@]}"; do
     --json number,title,labels,createdAt,updatedAt,url \
     > "$issues_file"
 
-  jq --arg repo "$repo" '
+  # --slurp: collect the two input files into a single array so .[0] is the PR
+  # array and .[1] is the issue array. Without -s, jq processes each document
+  # separately and .[0] indexes into the first PR object, which fails on
+  # `.[0][]` with "Cannot index string with string".
+  jq -s --arg repo "$repo" '
     [
       (.[0][] | {
         repo: $repo,
