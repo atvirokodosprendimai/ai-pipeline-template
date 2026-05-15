@@ -118,7 +118,7 @@ else
   match_count="$(jq 'length' <<< "$matches")"
 
   if [ "$match_count" -eq 0 ]; then
-    issue_url="$(retry_gh issue create --repo "$GH_REPO" --title "$TITLE" --body-file "$body_file" --label supervisor)"
+    issue_url="$(retry_gh issue create --repo "$GH_REPO" --title "$TITLE" --body-file "$body_file")"
     issue_number="${issue_url##*/}"
   elif [ "$match_count" -eq 1 ]; then
     issue_number="$(jq -r '.[0].number' <<< "$matches")"
