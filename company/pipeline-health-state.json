@@ -3,6 +3,7 @@
   "check_interval_hours": 0.5,
   "checks_run": 519,
   "issues_healed_total": 0,
+  "consecutive_no_mutation_runs": 0,
   "retry_tracker": {},
   "funnel_signals": {
     "dogfood": true,
