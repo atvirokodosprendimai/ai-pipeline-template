@@ -1,0 +1,98 @@
+{
+  "generated_at": "2026-05-15T22:00:00Z",
+  "top": [
+    {
+      "rank": 1,
+      "id": "atvirokodosprendimai/wgmesh#303",
+      "repo": "atvirokodosprendimai/wgmesh",
+      "type": "issue",
+      "number": 303,
+      "title": "Human escalation beats triage",
+      "stage": "review",
+      "dwell_hours": 240,
+      "downstream_blocked_count": 1,
+      "score": 240,
+      "recommended_action": "escalate-needs-human"
+    },
+    {
+      "rank": 2,
+      "id": "atvirokodosprendimai/wgmesh#302",
+      "repo": "atvirokodosprendimai/wgmesh",
+      "type": "issue",
+      "number": 302,
+      "title": "Customer-zero still zero",
+      "stage": "revenue",
+      "dwell_hours": 168,
+      "downstream_blocked_count": 1,
+      "score": 168,
+      "recommended_action": "post-rah-bounty"
+    },
+    {
+      "rank": 3,
+      "id": "atvirokodosprendimai/wgmesh#301",
+      "repo": "atvirokodosprendimai/wgmesh",
+      "type": "issue",
+      "number": 301,
+      "title": "Verify merged implementation",
+      "stage": "verify",
+      "dwell_hours": 120,
+      "downstream_blocked_count": 1,
+      "score": 120,
+      "recommended_action": "post-rah-bounty"
+    },
+    {
+      "rank": 4,
+      "id": "atvirokodosprendimai/ai-pipeline-template#201",
+      "repo": "atvirokodosprendimai/ai-pipeline-template",
+      "type": "pr",
+      "number": 201,
+      "title": "spec: Issue #102 - implementation plan",
+      "stage": "spec",
+      "dwell_hours": 96,
+      "downstream_blocked_count": 1,
+      "score": 96,
+      "recommended_action": "manual-merge"
+    },
+    {
+      "rank": 5,
+      "id": "atvirokodosprendimai/ai-pipeline-template#102",
+      "repo": "atvirokodosprendimai/ai-pipeline-template",
+      "type": "issue",
+      "number": 102,
+      "title": "Approved issue waiting for implementation",
+      "stage": "build",
+      "dwell_hours": 48,
+      "downstream_blocked_count": 1,
+      "score": 48,
+      "recommended_action": "retry-copilot"
+    }
+  ],
+  "stage_summary": {
+    "triage": 1,
+    "spec": 1,
+    "build": 1,
+    "review": 2,
+    "merge": 1,
+    "verify": 1,
+    "revenue": 1,
+    "unknown": 2
+  },
+  "unknown": [
+    {
+      "id": "atvirokodosprendimai/ai-pipeline-template#103",
+      "repo": "atvirokodosprendimai/ai-pipeline-template",
+      "type": "issue",
+      "number": 103,
+      "title": "Bookkeeping note",
+      "stage": "unknown"
+    },
+    {
+      "id": "atvirokodosprendimai/wgmesh#304",
+      "repo": "atvirokodosprendimai/wgmesh",
+      "type": "issue",
+      "number": 304,
+      "title": "Unknown labeled item",
+      "stage": "unknown"
+    }
+  ]
+}

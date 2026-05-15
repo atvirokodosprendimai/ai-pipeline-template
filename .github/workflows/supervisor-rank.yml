@@ -1,0 +1,120 @@
+name: Supervisor Rank
+
+on:
+  schedule:
+    - cron: '0 */4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: read
+  actions: read
+
+concurrency:
+  group: supervisor-rank
+  cancel-in-progress: false
+
+env:
+  TARGET_REPOS: atvirokodosprendimai/ai-pipeline-template,atvirokodosprendimai/wgmesh
+
+jobs:
+  rank:
+    name: Snapshot → Rank → Publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          fetch-depth: 0
+
+      - name: Check ranker scripts present
+        id: script-guard
+        if: always() && hashFiles('.github/scripts/snapshot-clogs.sh') != ''
+        run: |
+          echo "present=true" >> "$GITHUB_OUTPUT"
+
+      - name: Skip until ranker scripts are on main
+        if: always() && hashFiles('.github/scripts/snapshot-clogs.sh') == ''
+        run: |
+          echo "::notice::supervisor-rank scripts are not present on this checkout yet; skipping self-bootstrap run"
+
+      - name: Snapshot clogs
+        if: steps.script-guard.outputs.present == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          bash .github/scripts/snapshot-clogs.sh > /tmp/snapshot.json
+          jq empty /tmp/snapshot.json
+
+      - name: Classify clogs
+        if: steps.script-guard.outputs.present == 'true'
+        run: |
+          set -euo pipefail
+          bash .github/scripts/classify-clogs.sh /tmp/snapshot.json > /tmp/classified.json
+          jq empty /tmp/classified.json
+
+      - name: Rank clogs
+        if: steps.script-guard.outputs.present == 'true'
+        run: |
+          set -euo pipefail
+          bash .github/scripts/rank-clogs.sh /tmp/classified.json > /tmp/ranked.raw.json
+          jq empty /tmp/ranked.raw.json
+
+      - name: Recommend actions
+        if: steps.script-guard.outputs.present == 'true'
+        run: |
+          set -euo pipefail
+          bash .github/scripts/recommend-actions.sh /tmp/ranked.raw.json > /tmp/ranked.json
+          jq empty /tmp/ranked.json
+
+      - name: Publish supervisor rank
+        if: steps.script-guard.outputs.present == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          bash .github/scripts/publish-rank.sh /tmp/ranked.json company/supervisor-rank-state.json
+
+      - name: Commit state
+        if: steps.script-guard.outputs.present == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          git config user.name "pupabobas[bot]"
+          git config user.email "pupabobas[bot]@users.noreply.github.com"
+          git add company/supervisor-rank-state.json
+          git diff --cached --quiet && echo "No state changes to commit" && exit 0
+
+          today=$(date -u '+%Y-%m-%d')
+          branch="supervisor-rank/state-${today}-${GITHUB_RUN_ID}"
+          git checkout -b "$branch" origin/main
+          git commit -m "chore(supervisor): update supervisor-rank state $today"
+          git push -u origin "$branch"
+
+          gh pr create \
+            --title "chore: supervisor-rank state $today" \
+            --body "Automated state update from supervisor-rank workflow." \
+            --base main \
+            --head "$branch"
+
+      - name: Assert ranked output emitted
+        if: steps.script-guard.outputs.present == 'true'
+        run: |
+          set -euo pipefail
+          if [ ! -s /tmp/ranked.json ]; then
+            echo "::error::ranked output missing or empty"
+            exit 1
+          fi
+          jq -e 'has("top") and (.top | type == "array") and has("stage_summary") and (.stage_summary | type == "object")' /tmp/ranked.json >/dev/null

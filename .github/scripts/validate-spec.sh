@@ -17,6 +17,7 @@ ERRORS=0
 
 # ── Helper: strip HTML comments and fenced code blocks ──
 strip_comments_and_code() {
+  # shellcheck disable=SC2016
   sed '/<!--/,/-->/d' | sed '/^```/,/^```/d'
 }
 
@@ -71,7 +72,7 @@ if [ -n "$AF_SECTION" ]; then
     # Skip empty lines, comments, and lines with (no-test)
     [[ -z "$line" || "$line" =~ ^[[:space:]]*$ ]] && continue
     [[ "$line" =~ "<!--" ]] && continue
-    [[ "$line" =~ "(no-test)" ]] && continue
+    [[ "$line" =~ \(no-test\) ]] && continue
 
     # Extract file path (first non-whitespace token)
     filepath=$(echo "$line" | awk '{print $1}')
