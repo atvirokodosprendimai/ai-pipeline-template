@@ -1,23 +1,21 @@
 # Assessment: 2026-05-15
 
-**Stage**: Revenue | **Run**: 165
+**Stage**: Reachable | **Run**: 166
 
-Stage 5, run 164. Revenue confirmed with 5 paying subscribers (€1.00 payments received May 9-14), but €0.04 MRR figure needs clarification. Product fully functional with high velocity (36 PRs merged in 7 days). Pipeline nearly idle with 0 open PRs, triggering Commercial Idle Policy to prioritize customer acquisition over internal maintenance.
+Major correction: wgmesh is in Stage 3 (Reachable), not Stage 5. Revenue data shows 0 subscribers for seed products (cloudroof tier) - the 5 subscribers are for unrelated products. Seed product bucket remains 'pre-revenue'. Pipeline is nearly idle (7 issues, 0 PRs) triggering Commercial Idle Policy for customer acquisition work.
 
 ## Blockers
-- Revenue scale insufficient for sustainable growth - need expanded customer base and clearer pricing model
-- Disconnect between €1.00 payment amounts and €0.04 MRR reporting creates subscription model confusion
+- Zero paying customers for cloudroof/wgmesh products despite functional product and billing integration
 
 ## Top Actions
-- **fn:gtm**: Create enterprise network admin pilot evaluation framework with 30-day trial structure, success metrics checklist, and concrete ROI calculator targeting organizations with 50+ distributed endpoints (zero)
-- **fn:billing**: Reconcile subscription billing model - investigate €1.00 payment vs €0.04 MRR discrepancy and document actual pricing structure for customer clarity (zero)
-- **fn:gtm**: Document internal dogfood deployment case study with quantified metrics (uptime, performance, cost vs alternatives) for credibility with enterprise prospects (zero)
+- **fn:gtm**: Create comprehensive cloudroof.eu value proposition page targeting network administrators with specific ROI calculations, pilot pricing, and clear CTA (zero)
+- **fn:gtm**: Document internal dogfood usage case study with concrete metrics (uptime, cost savings, setup time) for credibility (zero)
+- **fn:dev**: Fix issue triage workflow cold-start gap preventing reopened issues from triggering automation (zero)
 
 ## Contributions
 - **Marty**: Recent git commits maintaining codebase stability
-- **pupabobas[bot]**: 85 automated commits in past 7 days driving development pipeline
-- **~.~**: Recent git contributions to codebase
-- **paying-customers**: 5 active subscribers with recent €1.00 payments providing revenue validation
+- **pupabobas[bot]**: 84 bot commits in past 7 days maintaining pipeline operations
+- **~.~**: Recent git contributions to project development
 
 ## Needs Human
-- [soon] Clarify subscription billing model - investigate discrepancy between €1.00 payment amounts shown in recent orders vs €0.04 MRR figure in revenue data
+- [soon] Verify cloudroof.eu target customer profile and pricing strategy before major landing page investment
