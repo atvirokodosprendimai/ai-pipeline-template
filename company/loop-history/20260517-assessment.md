@@ -1,20 +1,20 @@
 # Assessment: 2026-05-17
 
-**Stage**: Reachable | **Run**: 170
+**Stage**: Reachable | **Run**: 171
 
-Major correction: Company is in Stage 3 (Reachable), not Stage 5. Revenue data shows 0 subscribers for seed products (cloudroof/wgmesh) - recent orders are for unrelated products. Product is stable (v0.2.1, 14 stars) with healthy pipeline (5 issues, 0 PRs, 34 recent merges). Core blocker: zero paying customers despite functional billing integration. Pipeline idle state triggers Commercial Idle Policy for customer acquisition work.
+Stage 3, day 60. wgmesh remains fully functional (v0.2.1, 14 stars) with comprehensive mesh networking architecture. Pipeline is nearly idle (5 open issues, 0 PRs) with healthy infrastructure. Critical reality: 0 paying customers for seed products despite functional billing. Recent orders are for unrelated products, not cloudroof/wgmesh tier. Applying Commercial Idle Policy for customer acquisition focus.
 
 ## Blockers
-- Zero paying customers for cloudroof/wgmesh products despite functional product and billing integration
+- Zero paying customers for cloudroof/wgmesh products despite 60 days in Reachable stage with functional billing integration
 
 ## Top Actions
-- **fn:gtm**: Create comprehensive cloudroof.eu value proposition landing page with specific ROI calculations, clear pilot pricing, and strong CTA targeting network administrators (zero)
-- **fn:gtm**: Document internal dogfood case study with concrete metrics (uptime, cost savings, setup time vs alternatives) for credibility (zero)
-- **fn:dev**: Fix issue triage workflow cold-start gap preventing reopened issues from triggering automation (zero)
+- **fn:gtm**: Create internal dogfood proof-of-value case study documenting specific wgmesh usage outcomes (uptime %, cost savings, setup time vs alternatives) with concrete metrics for credibility (zero)
+- **fn:dev**: Fix issue triage workflow cold-start gap that prevents reopened issues from triggering automation workflows (zero)
+- **fn:dev**: Add Polar checkout CTAs to wgmesh.dev and cloudroof.eu landing pages to capture existing organic traffic (zero)
 
 ## Contributions
-- **Marty**: Recent git commits maintaining codebase stability
-- **pupabobas[bot]**: 83 bot commits in past 7 days maintaining pipeline automation and high development velocity
+- **Marty**: Recent git commits maintaining wgmesh codebase stability
+- **pupabobas[bot]**: 82 bot commits in past 7 days maintaining pipeline operations
 
 ## Needs Human
 _Nothing this cycle._
