@@ -1,21 +1,20 @@
 # Assessment: 2026-05-24
 
-**Stage**: Reachable | **Run**: 191
+**Stage**: Reachable | **Run**: 192
 
-Correcting funnel stage: We are at Stage 3 (Reachable), not Stage 5. Revenue data shows 0 cloudroof/wgmesh subscribers - all recent orders are for unrelated product ID. Pipeline is exceptionally healthy (6 issues, 0 PRs, CI green) - ideal for customer acquisition work. Need to clarify revenue attribution and focus on first wgmesh customer.
+Stage 3, day 67. wgmesh remains fully functional (v0.2.1, 14 stars) with comprehensive mesh networking architecture. Pipeline is nearly idle (5 open issues, 0 PRs) with healthy infrastructure. Critical blocker unchanged: 0 paying customers for seed products after 67 days despite functional billing integration. Recent orders continue to be for unrelated products only. Applying Commercial Idle Policy for customer acquisition focus.
 
 ## Blockers
-- Zero paying customers for cloudroof/wgmesh products despite billing integration being live
-- Revenue attribution unclear - paying product appears unrelated to seeded business line
+- Zero paying customers for cloudroof/wgmesh products after 67 days in Reachable stage with functional billing integration
 
 ## Top Actions
-- **fn:gtm**: Create concrete pilot program landing page with evaluation framework, success metrics, and 30-day trial structure targeting network administrators (zero)
-- **fn:gtm**: Document internal dogfood usage with specific reliability metrics, uptime data, and problem-solved evidence as proof points (zero)
-- **fn:billing**: Clarify revenue attribution - determine if paying product relates to cloudroof/wgmesh or represents separate business line (zero)
+- **fn:gtm**: Create comprehensive cloudroof.eu value proposition page targeting network administrators with specific ROI calculations, concrete use cases, and clear pilot pricing structure (zero)
+- **fn:gtm**: Document internal dogfood proof-of-value case study with concrete metrics (uptime %, cost savings vs alternatives, setup time) for credibility (zero)
+- **fn:dev**: Fix issue triage workflow cold-start gap that prevents reopened issues from triggering automation workflows (zero)
 
 ## Contributions
-- **Marty**: Recent git commits maintaining project stability
-- **pupabobas[bot]**: 72 bot commits in past 7 days driving pipeline operations
+- **Marty**: Recent git commits maintaining wgmesh codebase stability
+- **pupabobas[bot]**: 72 bot commits in past 7 days maintaining pipeline operations
 
 ## Needs Human
-- [soon] Confirm revenue attribution - verify whether product ID 8e8e1c33-cd06-4652-9032-6cb3b49ec6b4 relates to cloudroof/wgmesh business or separate product line
+_Nothing this cycle._
