@@ -1,21 +1,20 @@
 # Assessment: 2026-05-25
 
-**Stage**: Presence | **Run**: 195
+**Stage**: Reachable | **Run**: 196
 
-Correcting stage assessment: Stage 2 (Presence), not Stage 3. Revenue data shows seed_product_subscribers: 0 for wgmesh/cloudroof products - no billing integration for actual product. Pipeline nearly idle (5 issues, 0 PRs). Applying Commercial Idle Policy for highest-leverage customer acquisition work.
+Stage 3, day 68. wgmesh remains fully functional (v0.2.1, 14 stars) with healthy pipeline - only 5 open issues, 0 PRs, 3 merged in 7d. All infrastructure up. Critical reality: seed product subscribers remain 0 despite functional billing. Pipeline is idle, applying Commercial Idle Policy for customer acquisition focus.
 
 ## Blockers
-- Polar.sh billing integration not operational for seed products (wgmesh/cloudroof) - prevents customer payment capability required for Stage 3 exit
-- No clear pilot program or evaluation path for prospects to try wgmesh with guidance
+- Zero paying customers for cloudroof/wgmesh products despite 68 days in Reachable stage with functional billing integration
 
 ## Top Actions
-- **fn:gtm**: Create structured pilot program page with specific evaluation criteria, 30-day trial framework, and direct contact path for prospects (zero)
-- **fn:dev**: Document team's actual wgmesh usage with concrete metrics, reliability data, and specific outcomes as proof points (zero)
-- **fn:billing**: Fix Polar.sh billing integration for seed products to enable actual customer payments (zero)
+- **fn:gtm**: Create comprehensive wgmesh internal usage case study with concrete metrics (uptime %, setup time vs alternatives, cost savings, reliability data) for proof-of-value positioning (zero)
+- **fn:dev**: Fix issue triage workflow cold-start gap preventing reopened issues from triggering automation (zero)
+- **fn:gtm**: Add Polar checkout CTAs to wgmesh.dev and cloudroof.eu landing pages to capture existing organic traffic (zero)
 
 ## Contributions
-- **Marty**: Git commits in past 7 days maintaining product functionality
-- **pupabobas[bot]**: 71 bot commits in past 7 days - pipeline automation and maintenance
+- **Marty**: Recent git commits maintaining wgmesh codebase stability
+- **pupabobas[bot]**: 71 bot commits in past 7 days maintaining pipeline operations
 
 ## Needs Human
-- [blocking] Review and validate Polar.sh organization setup - may need account recovery or product reconfiguration if billing integration cannot be fixed programmatically
+_Nothing this cycle._
