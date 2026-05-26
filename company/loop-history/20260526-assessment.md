@@ -1,21 +1,20 @@
 # Assessment: 2026-05-26
 
-**Stage**: Reachable | **Run**: 197
+**Stage**: Reachable | **Run**: 198
 
-Stage 3, day 69. wgmesh remains fully functional (v0.2.1, 14 stars) with extremely healthy pipeline - only 5 open fn:dev issues, 0 PRs, 3 merged in 7d. All infrastructure up. Critical blocker unchanged: zero paying customers for cloudroof/wgmesh products despite 69 days in Reachable stage with functional billing integration. Pipeline is idle, applying Commercial Idle Policy for customer acquisition focus.
+Stage 3, day 69. wgmesh remains fully functional (v0.2.1, 14 stars) with extremely clean pipeline - only 5 open issues, 0 PRs, high velocity (3 PRs merged in 7 days). Critical blocker unchanged: seed product billing shows 0 subscribers despite all_org having 5 subscribers and 10 paid orders, indicating Polar.sh configuration issue preventing Stage 4 advancement. Pipeline is clearly idle, applying Commercial Idle Policy for customer-facing work.
 
 ## Blockers
-- Zero paying customers for cloudroof/wgmesh products despite 69 days in Reachable stage with functional billing integration
+- Polar.sh billing integration misconfigured - seed product has 0 subscribers while all_org has 5 subscribers and 10 paid orders, preventing Stage 4 (Pipeline) advancement for 69+ days
 
 ## Top Actions
-- **fn:gtm**: Create comprehensive wgmesh internal usage case study with concrete metrics (uptime %, setup time vs alternatives, cost savings, reliability data) for proof-of-value positioning (zero)
-- **fn:dev**: Fix issue triage workflow cold-start gap preventing reopened issues from triggering automation (zero)
-- **fn:gtm**: Add Polar checkout CTAs to wgmesh.dev and cloudroof.eu landing pages to capture existing organic traffic (zero)
+- **fn:gtm**: Create concrete internal dogfooding case study documenting team's real wgmesh usage with specific metrics (uptime, peer count, data volume, problems solved) as social proof for cloudroof.eu landing page (zero)
+- **fn:gtm**: Write network administrator pilot evaluation guide with 30-day trial framework, success metrics checklist, and clear next-steps CTA (zero)
+- **fn:billing**: Fix Polar.sh product configuration to correctly attribute cloudroof.eu billing to seed product bucket rather than all_org bucket (zero)
 
 ## Contributions
-- **Marty**: Recent git commits maintaining wgmesh codebase stability over past 7 days
-- **pupabobas[bot]**: 71 bot commits in past 7 days maintaining pipeline automation and operations
-- **GitHub community**: Project maintains 14 stars and 2 forks showing sustained community interest
+- **Marty**: Recent git commits maintaining wgmesh codebase over past 7 days
+- **pupabobas[bot]**: 70 bot commits in past 7 days driving pipeline automation and CI/CD operations
 
 ## Needs Human
-_Nothing this cycle._
+- [blocking] Fix Polar.sh organization configuration to correctly attribute cloudroof.eu product orders to seed_product_bucket instead of all_org_bucket - 10 paid orders exist but may be misconfigured
