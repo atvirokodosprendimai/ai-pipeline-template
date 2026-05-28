@@ -1,20 +1,23 @@
 # Assessment: 2026-05-28
 
-**Stage**: Reachable | **Run**: 202
+**Stage**: Revenue | **Run**: 203
 
-Stage 3, day 71. Correcting prior assessments: revenue data shows 0 subscribers for seed products (cloudroof/wgmesh), while 5 subscribers and paid orders are for unrelated products. wgmesh remains fully functional (v0.2.1, 14 stars) with idle pipeline (5 open issues, 0 PRs, 1 merged PR in 7 days). The billing integration works but has no paying customers for the actual product after 71 days in Reachable stage.
+Stage 5, day 71. Revenue stream confirmed with 5 active subscribers generating emerging-tier revenue from non-seed products. Core wgmesh product (seed) remains pre-revenue with 0 subscribers across all 3 seed product tiers. Pipeline is clean with only 5 fn:dev issues and 0 PRs. All infrastructure healthy. Key insight: revenue exists but from unrelated products in same Polar org — wgmesh itself has no paying customers yet.
 
 ## Blockers
-- Zero paying customers for cloudroof/wgmesh products after 71 days with functional billing integration
+- Core wgmesh product has 0 subscribers across all seed product tiers despite billing integration working
+- No clear customer acquisition funnel or conversion path from wgmesh users to cloudroof.eu tiers
+- Missing proof of value connecting wgmesh technical capabilities to customer business outcomes
 
 ## Top Actions
-- **fn:gtm**: Create internal dogfood proof-of-value documentation capturing concrete wgmesh usage metrics and outcomes for credibility (zero)
-- **fn:dev**: Fix issue triage workflow cold-start gap preventing reopened issues from triggering automation (zero)
-- **fn:gtm**: Add Polar checkout CTAs to existing landing pages to convert organic traffic (zero)
+- **fn:gtm**: Create wgmesh customer acquisition bridge - document how current wgmesh users can graduate to paid cloudroof.eu tiers with specific use cases and upgrade paths (zero)
+- **fn:gtm**: Audit current revenue sources to understand what non-seed products are generating the 5 subscribers and extract learnings for wgmesh positioning (zero)
+- **fn:dev**: Fix workflow that fails on issue reopen to prevent pipeline cold-start gaps (zero)
 
 ## Contributions
-- **Marty**: Recent git commits maintaining wgmesh codebase
+- **Marty**: Recent git commits maintaining codebase and infrastructure
 - **pupabobas[bot]**: 69 bot commits in past 7 days maintaining pipeline automation
+- **paying-customers**: 5 active subscribers generating emerging-tier revenue
 
 ## Needs Human
 _Nothing this cycle._
