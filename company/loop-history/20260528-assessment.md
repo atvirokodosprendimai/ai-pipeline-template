@@ -1,23 +1,21 @@
 # Assessment: 2026-05-28
 
-**Stage**: Revenue | **Run**: 203
+**Stage**: Reachable | **Run**: 204
 
-Stage 5, day 71. Revenue stream confirmed with 5 active subscribers generating emerging-tier revenue from non-seed products. Core wgmesh product (seed) remains pre-revenue with 0 subscribers across all 3 seed product tiers. Pipeline is clean with only 5 fn:dev issues and 0 PRs. All infrastructure healthy. Key insight: revenue exists but from unrelated products in same Polar org — wgmesh itself has no paying customers yet.
+Correcting funnel stage: Despite revenue data showing paid orders, all orders trace to product ID 8e8e1c33-cd06-4652-9032-6cb3b49ec6b4 (non-seed). The 3 seed cloudroof products have 0 active subscribers. Stage 5 (Revenue) requires payment for the seeded product line, not unrelated products. Pipeline is idle (5 open issues, 0 PRs) - applying Commercial Idle Policy for customer acquisition focus.
 
 ## Blockers
-- Core wgmesh product has 0 subscribers across all seed product tiers despite billing integration working
-- No clear customer acquisition funnel or conversion path from wgmesh users to cloudroof.eu tiers
-- Missing proof of value connecting wgmesh technical capabilities to customer business outcomes
+- Zero paying customers for cloudroof/wgmesh products despite functional billing integration and 71+ days in Reachable stage
 
 ## Top Actions
-- **fn:gtm**: Create wgmesh customer acquisition bridge - document how current wgmesh users can graduate to paid cloudroof.eu tiers with specific use cases and upgrade paths (zero)
-- **fn:gtm**: Audit current revenue sources to understand what non-seed products are generating the 5 subscribers and extract learnings for wgmesh positioning (zero)
-- **fn:dev**: Fix workflow that fails on issue reopen to prevent pipeline cold-start gaps (zero)
+- **fn:gtm**: Create comprehensive wgmesh internal usage case study documenting team deployment with concrete metrics (uptime %, peer count, setup time vs alternatives, cost savings, reliability incidents) (zero)
+- **fn:gtm**: Add Polar checkout CTAs to wgmesh.dev and cloudroof.eu landing pages to capture existing organic traffic (zero)
+- **fn:dev**: Fix issue triage workflow cold-start gap preventing reopened issues from triggering automation (zero)
 
 ## Contributions
-- **Marty**: Recent git commits maintaining codebase and infrastructure
-- **pupabobas[bot]**: 69 bot commits in past 7 days maintaining pipeline automation
-- **paying-customers**: 5 active subscribers generating emerging-tier revenue
+- **Marty**: Recent git commits maintaining wgmesh codebase stability over past 7 days
+- **pupabobas[bot]**: 68 bot commits in past 7 days maintaining pipeline operations and automation
+- **GitHub community**: Project reached 15 stars and 2 forks showing sustained organic interest
 
 ## Needs Human
 _Nothing this cycle._
