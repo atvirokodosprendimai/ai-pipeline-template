@@ -1,22 +1,21 @@
 # Assessment: 2026-05-29
 
-**Stage**: Revenue | **Run**: 206
+**Stage**: Reachable | **Run**: 207
 
-Stage 5, day 72. Correcting funnel stage: company has active revenue with 5 paying subscribers, indicating Revenue stage despite seed products having 0 subscribers. wgmesh remains fully functional (v0.2.1, 15 stars) with very healthy pipeline - only 5 open issues, 0 PRs. Revenue attribution issue persists: all payments trace to non-seed product ID 8e8e1c33-cd06-4652-9032-6cb3b49ec6b4 while cloudroof products have zero uptake. Pipeline is idle, applying Commercial Idle Policy to bridge working product to cloudroof customer acquisition.
+Stage 3, day 72. Correcting previous Revenue stage assessments: seed products (cloudroof tier) have 0 active subscribers - wgmesh remains pre-revenue. Paid orders from product ID 8e8e1c33-cd06-4652-9032-6cb3b49ec6b4 represent separate business line. Pipeline nearly idle (0 PRs, 5 issues). Product is fully functional (v0.2.1, 15 stars) but needs customer acquisition focus.
 
 ## Blockers
-- Seed cloudroof products have 0 active subscribers despite functional wgmesh product and billing integration
-- Revenue disconnect: active payments from non-seed product while wgmesh/cloudroof line remains pre-revenue
+- Seed products have 0 active subscribers despite functional billing integration - no external customers for wgmesh/cloudroof
+- No proof-of-value documentation showing concrete benefits to attract first external customer
 
 ## Top Actions
-- **fn:gtm**: Create wgmesh internal usage case study with concrete metrics, uptime data, problem-solution evidence, and ROI calculations to serve as primary proof-of-value for cloudroof prospects (zero)
-- **fn:dev**: Fix issue triage workflow cold-start gap that prevents reopened issues from triggering automation (zero)
-- **fn:gtm**: Add prominent Polar checkout CTAs to cloudroof.eu landing page to capture existing organic traffic (zero)
+- **fn:gtm**: Create internal usage case study documenting team's production wgmesh deployment with specific reliability metrics, peer connectivity data, and problem-solution evidence (zero)
+- **fn:dev**: Add Polar checkout CTAs to wgmesh.dev and cloudroof.eu landing pages to drive seed product adoption (zero)
+- **fn:dev**: Fix key rotation bug that changes node IP addresses, affecting production reliability (zero)
 
 ## Contributions
-- **Marty**: Recent git commits maintaining wgmesh stability and development
-- **pupabobas[bot]**: 68 bot commits in past 7 days driving pipeline automation
-- **GitHub community**: Project reached 15 stars showing continued interest growth
+- **Marty**: Recent git commits maintaining project stability
+- **pupabobas[bot]**: 67 bot commits in past 7 days driving pipeline automation
 
 ## Needs Human
-- [soon] Clarify business relationship between paying product ID 8e8e1c33-cd06-4652-9032-6cb3b49ec6b4 and the cloudroof/wgmesh product line to understand revenue attribution
+- [soon] Clarify business relationship between paying product ID 8e8e1c33-cd06-4652-9032-6cb3b49ec6b4 and the wgmesh/cloudroof product line
