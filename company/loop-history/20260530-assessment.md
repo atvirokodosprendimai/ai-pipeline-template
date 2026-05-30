@@ -1,22 +1,21 @@
 # Assessment: 2026-05-30
 
-**Stage**: Revenue | **Run**: 208
+**Stage**: Reachable | **Run**: 209
 
-Stage 5 (Revenue), day 72. wgmesh continues operating with paying customers (5 active subscribers, recent €1 orders). Product remains fully functional (v0.2.1, 15 stars). Pipeline is nearly idle with only 5 open fn:dev issues, no open PRs, zero merges in 7d. The Commercial Idle Policy applies — should focus on customer acquisition over internal work.
+Stage 3, day 73. Correcting funnel stage from Revenue back to Reachable — seed products (cloudroof tiers) have 0 subscribers despite recent orders being from unrelated org products. Pipeline is effectively idle with only 5 fn:dev issues and zero PRs. Applying Commercial Idle Policy to create customer-ready proof of value.
 
 ## Blockers
-- No defined Stage 5 exit criteria or growth strategy beyond initial revenue milestone
-- Pipeline idle state indicates need for customer-facing work rather than internal optimization
+- No subscribers for seed product tiers (cloudroof) despite billing integration being live
+- No documented proof of value or internal usage metrics to support first customer acquisition
 
 ## Top Actions
-- **fn:gtm**: Add Polar checkout CTAs to cloudroof.eu landing page to convert existing traffic into paying customers (zero)
-- **fn:dev**: Write customer success verification system to track retention of existing 5 subscribers (zero)
-- **fn:dev**: Define Stage 5 exit criteria and Stage 6 growth milestones based on current revenue patterns (zero)
+- **fn:gtm**: Create internal usage case study documenting team's wgmesh deployment with specific metrics, reliability data, and problem-solution evidence (zero)
+- **fn:gtm**: Write network administrator pilot evaluation guide with 30-day trial framework and success metrics checklist (zero)
+- **fn:dev**: Fix key rotation IP address change bug affecting mesh stability (zero)
 
 ## Contributions
-- **Marty**: Recent git commits maintaining codebase stability
-- **pupabobas[bot]**: 66 bot commits in past 7 days managing pipeline operations
-- **paying-customers**: 5 active subscribers generating recurring revenue with recent €1 orders
+- **Marty**: Recent git commits maintaining codebase stability and project development
+- **pupabobas[bot]**: 66 bot commits in past 7 days driving pipeline automation and infrastructure maintenance
 
 ## Needs Human
 _Nothing this cycle._
