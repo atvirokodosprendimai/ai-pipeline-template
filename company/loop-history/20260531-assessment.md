@@ -1,16 +1,18 @@
 # Assessment: 2026-05-31
 
-**Stage**: Reachable | **Run**: 212
+**Stage**: Reachable | **Run**: 213
 
-Stage 3, day 74. Critical correction from recent assessments: wgmesh has ZERO revenue - all paid orders are for unrelated products in the Polar org, not the 3 seed products. Product remains stable (v0.2.1, 15 stars) with healthy pipeline (5 dev issues, 0 PRs). Billing integration works but no wgmesh customers exist. Pipeline is idle - applying Commercial Idle Policy.
+Stage 3, day 74. wgmesh remains at zero revenue with 0 subscribers to seed products (cloudroof tiers). All paid orders in Polar org are from unrelated products. Product is stable (v0.2.1, 15 stars) but pipeline is idle with 0 PRs and 5 fn:dev issues. Core bottleneck: no external customers despite functional billing integration.
 
 ## Blockers
-- Zero wgmesh customers despite functional billing - product-market fit gap between working product and customer willingness to pay
+- Zero subscribers to cloudroof seed products despite 74+ days of functional billing integration
+- No documented proof of value from internal team usage to attract external customers
+- Product-market fit gap between working product and customer willingness to pay
 
 ## Top Actions
-- **fn:gtm**: Create comprehensive proof-of-value case study documenting internal team's wgmesh usage with specific reliability metrics, performance data, and concrete operational benefits (zero)
-- **fn:dev**: Fix key rotation IP address change bug affecting production reliability and customer confidence (zero)
-- **fn:gtm**: Write target customer evaluation guide with 30-day pilot framework and success criteria checklist (zero)
+- **fn:gtm**: Create comprehensive internal usage case study documenting team's production wgmesh deployment with specific uptime metrics, peer connectivity data, problem-solution evidence, and operational benefits (zero)
+- **fn:dev**: Fix key rotation bug that changes node IP addresses affecting mesh stability and production reliability (zero)
+- **fn:dev**: Add prominent Polar checkout CTAs to wgmesh.dev and cloudroof.eu landing pages to drive seed product adoption (zero)
 
 ## Contributions
 - **Marty**: Recent git commits maintaining project stability and development velocity
