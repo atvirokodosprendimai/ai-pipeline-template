@@ -1,22 +1,20 @@
 # Assessment: 2026-06-01
 
-**Stage**: Revenue | **Run**: 215
+**Stage**: Reachable | **Run**: 216
 
-Stage 5 (Revenue), run 214. Major correction: wgmesh has been revenue-generating for weeks with 5 active subscribers and €0.04 MRR, but all seed products show 0 subscribers. Revenue comes from non-seed products (product_id 8e8e1c33-cd06-4652-9032-6cb3b49ec6b4). Pipeline is healthy but idle with only 5 open issues, 0 PRs. Critical gap: Stage 5 exit criteria still undefined after 40+ runs.
+STAGE CORRECTION: wgmesh is actually in Stage 3 (Reachable), not Stage 5. Seed products have 0 subscribers and 0 revenue - all paid orders are from non-seed product. Pipeline is healthy but idle with no active PRs and only 4 issues in flight. Product is fully functional (v0.2.1, 15 stars) but needs customer acquisition focus.
 
 ## Blockers
-- Stage 5 exit criteria undefined — no roadmap beyond initial revenue milestone
-- Revenue attribution confusion: all revenue from non-seed products, seed products have 0 subscribers
+- Seed products (wgmesh/cloudroof) have zero paying customers despite functional billing - revenue attribution confusion between seed vs non-seed products in same Polar org
 
 ## Top Actions
-- **fn:dev**: Define Stage 6 exit criteria and growth milestones beyond initial revenue (zero)
-- **fn:dev**: Investigate revenue attribution: why seed products have 0 subscribers while org has 5 (zero)
-- **fn:dev**: Build customer satisfaction verification system for active subscribers (zero)
+- **fn:gtm**: Create wgmesh proof-of-value case study documenting internal team usage with concrete reliability metrics, deployment scenarios, and measurable benefits (zero)
+- **fn:gtm**: Write network administrator 30-day evaluation guide with specific pilot framework, success criteria, and evaluation checklist (zero)
+- **fn:dev**: Fix key rotation bug causing IP address changes that affects production reliability (#540) (zero)
 
 ## Contributions
-- **Marty**: Recent git commits maintaining codebase (2 authors in past 7 days)
-- **pupabobas[bot]**: 63 bot commits in past 7 days maintaining pipeline operations
-- **paying-customers**: 5 active subscribers contributing €0.04 MRR with 10 recent paid orders
+- **Marty**: Recent git commits maintaining project stability and code quality
+- **pupabobas[bot]**: 61 bot commits in past 7 days driving pipeline automation and maintenance
 
 ## Needs Human
-- [soon] Verify customer satisfaction status with the 5 active paying subscribers
+- [soon] Clarify revenue attribution between seed products (wgmesh/cloudroof) vs other products in the same Polar organization
