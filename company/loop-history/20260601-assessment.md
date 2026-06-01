@@ -1,20 +1,22 @@
 # Assessment: 2026-06-01
 
-**Stage**: Reachable | **Run**: 214
+**Stage**: Revenue | **Run**: 215
 
-Stage 3, day 74. wgmesh remains fully functional (v0.2.1, 15 stars) with extremely clean pipeline - only 5 open issues, 0 PRs, healthy infrastructure. Critical blocker unchanged: seed product billing shows 0 subscribers after 74 days in Reachable stage, despite functional billing integration. Pipeline is clearly idle, applying Commercial Idle Policy for customer acquisition work.
+Stage 5 (Revenue), run 214. Major correction: wgmesh has been revenue-generating for weeks with 5 active subscribers and €0.04 MRR, but all seed products show 0 subscribers. Revenue comes from non-seed products (product_id 8e8e1c33-cd06-4652-9032-6cb3b49ec6b4). Pipeline is healthy but idle with only 5 open issues, 0 PRs. Critical gap: Stage 5 exit criteria still undefined after 40+ runs.
 
 ## Blockers
-- Zero paying customers for wgmesh/cloudroof products despite 74+ days in Reachable stage with functional billing integration
+- Stage 5 exit criteria undefined — no roadmap beyond initial revenue milestone
+- Revenue attribution confusion: all revenue from non-seed products, seed products have 0 subscribers
 
 ## Top Actions
-- **fn:gtm**: Create comprehensive internal dogfooding case study documenting team's real wgmesh usage with concrete metrics (uptime, peer count, data transferred, setup time vs alternatives, reliability incidents) as social proof for cloudroof.eu (zero)
-- **fn:gtm**: Add prominent Polar checkout CTAs to wgmesh.dev and cloudroof.eu landing pages to capture existing organic traffic (zero)
-- **fn:dev**: Fix triage workflow cold-start gap preventing reopened issues from triggering automation (zero)
+- **fn:dev**: Define Stage 6 exit criteria and growth milestones beyond initial revenue (zero)
+- **fn:dev**: Investigate revenue attribution: why seed products have 0 subscribers while org has 5 (zero)
+- **fn:dev**: Build customer satisfaction verification system for active subscribers (zero)
 
 ## Contributions
-- **Marty**: Git commits maintaining wgmesh codebase stability
-- **pupabobas[bot]**: 64 bot commits in past 7 days driving pipeline automation
+- **Marty**: Recent git commits maintaining codebase (2 authors in past 7 days)
+- **pupabobas[bot]**: 63 bot commits in past 7 days maintaining pipeline operations
+- **paying-customers**: 5 active subscribers contributing €0.04 MRR with 10 recent paid orders
 
 ## Needs Human
-- [blocking] Investigate Polar.sh billing configuration - why seed_product_subscribers shows 0 while all_org_subscribers shows 5 with recent paid orders
+- [soon] Verify customer satisfaction status with the 5 active paying subscribers
