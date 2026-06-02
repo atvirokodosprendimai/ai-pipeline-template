@@ -1,22 +1,20 @@
 # Assessment: 2026-06-02
 
-**Stage**: Reachable | **Run**: 217
+**Stage**: Reachable | **Run**: 218
 
-CRITICAL CORRECTION: wgmesh is Stage 3 (Reachable), not Revenue. The seed products have 0 subscribers and 0 revenue - all recent orders are from non-seed products in the Polar org. Pipeline is extremely healthy (5 open issues, 0 PRs) making this ideal for customer acquisition focus per Commercial Idle Policy.
+Stage 3, day 76. wgmesh remains fully functional (v0.2.1, 15 stars) with extremely healthy pipeline - only 5 open issues, 0 PRs, all infrastructure up. Revenue data shows 0 seed product subscribers despite functional billing. Recent orders are for unrelated products (product_id 8e8e1c33...), not cloudroof/wgmesh tiers. Pipeline is idle - applying Commercial Idle Policy for customer acquisition focus.
 
 ## Blockers
-- No paying customers for wgmesh/cloudroof despite functional billing - seed products have 0 active subscribers
-- Revenue attribution confusion - need to distinguish seed product revenue from other org products
+- Zero paying customers for wgmesh/cloudroof products despite 76 days in Reachable stage with functional billing integration
 
 ## Top Actions
-- **fn:gtm**: Create wgmesh internal usage case study with concrete reliability metrics, uptime data, and specific team benefits to prove value for external prospects (zero)
-- **fn:gtm**: Write network administrator evaluation guide with 30-day pilot framework, success criteria checklist, and decision rubric (zero)
-- **fn:dev**: Implement Polar revenue attribution tracking to distinguish seed product revenue from other org revenue (zero)
+- **fn:gtm**: Create comprehensive wgmesh internal usage case study with specific reliability metrics, cost savings data, and setup time comparisons vs alternatives (zero)
+- **fn:dev**: Fix issue triage workflow cold-start gap preventing reopened issues from triggering automation (zero)
+- **fn:gtm**: Add Polar checkout CTAs to wgmesh.dev and cloudroof.eu landing pages to capture existing organic traffic (zero)
 
 ## Contributions
-- **Marty**: Recent git commits maintaining project stability and development velocity
-- **pupabobas[bot]**: 61 bot commits in past 7 days driving pipeline automation and maintenance
-- **GitHub community**: 15 stars and 2 forks indicating growing interest in the project
+- **Marty**: Recent git commits maintaining wgmesh codebase stability
+- **pupabobas[bot]**: 61 bot commits in past 7 days maintaining pipeline automation and infrastructure
 
 ## Needs Human
-- [soon] Clarify which Polar products should be attributed to wgmesh/cloudroof vs other business activities in the organization
+_Nothing this cycle._
