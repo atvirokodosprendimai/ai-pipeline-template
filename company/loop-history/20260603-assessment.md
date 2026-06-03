@@ -1,21 +1,22 @@
 # Assessment: 2026-06-03
 
-**Stage**: Reachable | **Run**: 220
+**Stage**: Reachable | **Run**: 221
 
-Stage 3, day 77. Correcting previous assessments: wgmesh is in Stage 3 (Reachable), not Revenue. All paid orders trace to non-seed product ID 8e8e1c33-cd06-4652-9032-6cb3b49ec6b4 (separate business line). The 3 seed cloudroof products remain at 0 subscribers despite functional billing integration. Pipeline is exceptionally clean with only 5 open issues, no PRs.
+Stage 3, day 77. wgmesh remains fully functional (v0.2.1, 16 stars) with very healthy pipeline - only 5 open fn:dev issues, strong development velocity. Critical insight: billing works (5 active subscribers, €4+ MRR, recent paid orders) but seed products show 0 subscribers while other Polar org products generate actual revenue. This indicates product-market fit misalignment rather than billing issues.
 
 ## Blockers
-- Seed product (cloudroof tier) has 0 active subscribers despite 77 days of functional billing integration
-- No clear customer acquisition funnel or proof points for cloudroof.eu target market
+- Seed products (cloudroof tier) have 0 active subscribers despite functional billing integration
+- Revenue comes from non-seed products in the Polar org, indicating misaligned positioning or product offering
 
 ## Top Actions
-- **fn:gtm**: Create concrete proof-of-value documentation from internal wgmesh usage with specific reliability metrics and team productivity gains (zero)
-- **fn:dev**: Fix key rotation bug that changes node IP addresses, affecting production reliability (zero)
-- **fn:gtm**: Create network administrator evaluation framework with 30-day pilot checklist and success criteria (zero)
+- **fn:gtm**: Create wgmesh value proposition audit comparing seed vs revenue-generating products to identify positioning gaps (zero)
+- **fn:gtm**: Write cloudroof.eu competitive analysis identifying specific advantages over existing solutions (zero)
+- **fn:dev**: Fix key rotation IP address change bug affecting production reliability (zero)
 
 ## Contributions
-- **Marty**: Recent git commits maintaining codebase stability
-- **pupabobas[bot]**: 60 bot commits in past 7 days driving pipeline automation
+- **Marty**: Recent git commits maintaining project stability and development velocity
+- **pupabobas[bot]**: 59 bot commits in past 7 days driving pipeline operations and maintaining high development velocity
+- **polar-customers**: 5 active subscribers maintaining €4+ MRR with consistent monthly payments, proving billing integration works
 
 ## Needs Human
-- [soon] Clarify business relationship between paying product ID 8e8e1c33-cd06-4652-9032-6cb3b49ec6b4 and the cloudroof/wgmesh product line
+- [soon] Clarify which Polar products should be attributed to wgmesh/cloudroof vs other business activities in the same org
