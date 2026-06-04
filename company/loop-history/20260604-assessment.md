@@ -1,22 +1,20 @@
 # Assessment: 2026-06-04
 
-**Stage**: Revenue | **Run**: 223
+**Stage**: Reachable | **Run**: 224
 
-Stage 5, day 78. wgmesh is generating revenue with multiple paid orders but seed product subscribers remain 0. Pipeline is extremely healthy with only 5 open issues and strong development velocity (5 recent contributors, 58 bot commits in 7d). Critical insight: revenue exists but attribution is unclear - need to identify which products are actually generating payments vs the 3 seed products showing 0 adoption.
+Stage 3, day 78. wgmesh remains fully functional (v0.2.1, 16 stars) with comprehensive architecture. Pipeline is nearly idle (5 fn:dev issues, 0 PRs) with healthy infrastructure (all endpoints up). Critical blocker persists: 0 paying customers for seed products despite 78 days with functional billing. Revenue shows 5 subscribers for unrelated products only. Applying Commercial Idle Policy for customer acquisition focus.
 
 ## Blockers
-- Revenue attribution unclear - payments exist but seed products show 0 subscribers
-- No direct wgmesh customer despite functional product and billing integration
+- Zero paying customers for cloudroof/wgmesh products despite 78 days in Reachable stage with functional billing integration
 
 ## Top Actions
-- **fn:gtm**: Create comprehensive wgmesh value proposition landing section documenting internal team usage metrics, reliability data, and concrete networking benefits for evaluation by prospects (zero)
-- **fn:gtm**: Build wgmesh pilot evaluation guide with 30-day trial framework, success metrics checklist, and technical evaluation criteria for network administrators (zero)
-- **fn:dev**: Fix key rotation IP address change bug that affects production reliability and pilot confidence (zero)
+- **fn:gtm**: Create internal dogfood proof-of-value case study with specific metrics: network uptime %, setup time vs alternatives, cost savings, reliability incidents prevented (zero)
+- **fn:dev**: Fix issue triage workflow cold-start gap preventing reopened issues from triggering automation workflows (zero)
+- **fn:gtm**: Build 30-day pilot evaluation framework targeting network administrators with specific success criteria and pricing model (zero)
 
 ## Contributions
-- **Marty**: Recent git commits maintaining project stability and development velocity
-- **pupabobas[bot]**: 58 bot commits in past 7 days driving pipeline automation and maintenance
-- **GitHub community**: Growing interest with 16 stars and 2 forks
+- **Marty**: Recent git commits maintaining wgmesh codebase stability
+- **pupabobas[bot]**: 58 bot commits in past 7 days maintaining pipeline automation
 
 ## Needs Human
-- [soon] Clarify which Polar products should be attributed to wgmesh/cloudroof vs other business activities in the same organization
+_Nothing this cycle._
