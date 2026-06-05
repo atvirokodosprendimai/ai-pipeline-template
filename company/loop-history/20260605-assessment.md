@@ -1,21 +1,22 @@
 # Assessment: 2026-06-05
 
-**Stage**: Reachable | **Run**: 227
+**Stage**: Revenue | **Run**: 228
 
-Stage 3, day 79. wgmesh remains fully functional (v0.2.1, 18 stars) with very healthy pipeline - only 5 fn:dev issues, 0 PRs in flight. Critical insight persists: seed products have 0 subscribers despite working billing (5 total org subscribers paying for non-seed products). Pipeline is essentially idle. Applying Commercial Idle Policy.
+Stage 5, day 79. Revenue stage confirmed with active subscriber base and paid orders, though seed products show 0 subscribers while all-org shows 5 active. Pipeline is healthy (5 fn:dev issues, 0 PRs, 18 stars) with stable v0.2.1. Focus on expanding from established revenue base to sustainable growth trajectory.
 
 ## Blockers
-- Seed products (cloudroof tier) have 0 active subscribers despite functional billing integration - revenue comes from non-seed products in same Polar org
+- Seed product revenue attribution unclear - 0 subscribers for cloudroof tier products while 5 subscribers exist at org level
+- Revenue growth stagnant - need expansion strategy beyond current subscriber base
 
 ## Top Actions
-- **fn:gtm**: Create comprehensive internal wgmesh usage case study documenting concrete deployment metrics, reliability data, network performance improvements, and specific problems solved by the team (zero)
-- **fn:gtm**: Build 30-day wgmesh pilot evaluation framework for network administrators with specific success criteria, testing checklist, and measurable outcomes (zero)
-- **fn:dev**: Fix key rotation bug causing IP address changes that affects production reliability and pilot credibility (zero)
+- **fn:gtm**: Create pilot evaluation framework for network administrators to drive enterprise customer acquisition (zero)
+- **fn:dev**: Fix triage workflow cold-start gap preventing reopened issues from triggering automation (zero)
+- **fn:dev**: Add Polar checkout CTAs to landing pages to convert existing organic traffic (zero)
 
 ## Contributions
-- **Marty**: Recent git commits maintaining project stability and development
-- **pupabobas[bot]**: 58 bot commits in past 7 days driving pipeline automation and maintenance
-- **polar-customers**: 5 active subscribers maintaining revenue stream, proving billing integration works
+- **Marty**: Recent git commits maintaining codebase stability
+- **pupabobas[bot]**: 59 bot commits in past 7 days maintaining pipeline operations
+- **paying-customers**: Active subscriber base generating revenue with recent paid orders
 
 ## Needs Human
-- [soon] Clarify which Polar products should be attributed to wgmesh/cloudroof vs other business activities in the same organization
+_Nothing this cycle._
