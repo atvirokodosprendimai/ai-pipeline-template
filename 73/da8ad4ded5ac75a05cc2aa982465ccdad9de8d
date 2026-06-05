@@ -1,0 +1,19 @@
+.github/scripts/test-publish.sh
+  s_c6950890734aec::t_9a67086a34c3ba 205-222
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "73da8ad4ded5ac75a05cc2aa982465ccdad9de8d",
+  "prompts": {},
+  "sessions": {
+    "s_c6950890734aec": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d388116d-5ba2-4f53-85dd-6dcc092088e6",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
