@@ -1,0 +1,19 @@
+.goosehints
+  s_7b31431ad3293f::t_7128712b245e51 1-3,7-11,15,17-20,22,24,35
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "da858e55b9b9a412c1d19ba556a97e618f0f1c63",
+  "prompts": {},
+  "sessions": {
+    "s_7b31431ad3293f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "aee57c09-ec85-4a83-a993-9f74c5b2544e",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
