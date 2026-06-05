@@ -1,0 +1,19 @@
+CONCEPTS.md
+  s_7dbec94f38f9f5::t_a64b1c550b1a91 1-90
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "1ed4a1cf0a7f6b596c0eba20c2bb99cc3edd85fd",
+  "prompts": {},
+  "sessions": {
+    "s_7dbec94f38f9f5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ea66f21b-234d-493a-8e80-a14e4e624317",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
