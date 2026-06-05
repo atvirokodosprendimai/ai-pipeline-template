@@ -155,6 +155,11 @@ jobs:
             fi
           fi
           jq empty /tmp/goal_sprint.json || { echo "::error::Invalid /tmp/goal_sprint.json"; exit 1; }
+          goal_sprint_content="$(cat /tmp/goal_sprint.json)"
+          if ! printf '%s' "$goal_sprint_content" | bash company/scripts/sanitise.sh > /dev/null; then
+            echo "::error::sanitise.sh rejected /tmp/goal_sprint.json"
+            exit 1
+          fi
 
       - name: Fingerprint goal sprint
         run: scripts/goal-sprint/fingerprint.sh
@@ -192,6 +197,11 @@ jobs:
 
           git config user.name "pupabobas[bot]"
           git config user.email "pupabobas[bot]@users.noreply.github.com"
+          state_content="$(cat company/goal-sprint-state.json)"
+          if ! printf '%s' "$state_content" | bash company/scripts/sanitise.sh > /dev/null; then
+            echo "::error::sanitise.sh rejected company/goal-sprint-state.json"
+            exit 1
+          fi
           git add company/goal-sprint-state.json
           git diff --cached --quiet && echo "No state changes to commit" && exit 0
 

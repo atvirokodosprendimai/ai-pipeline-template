@@ -2,7 +2,7 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TOTAL=7
+TOTAL=9
 PASSED=0
 
 pass() {
@@ -17,11 +17,16 @@ fail() {
 make_workspace() {
   local work
   work="$(mktemp -d)"
-  mkdir -p "$work/scripts/goal-sprint" "$work/company" "$work/docs/pulse-reports"
+  mkdir -p "$work/scripts/goal-sprint" "$work/company/scripts" "$work/docs/pulse-reports"
   cp "$SCRIPT_DIR/build-context.sh" "$work/scripts/goal-sprint/build-context.sh"
   cp "$SCRIPT_DIR/fingerprint.sh" "$work/scripts/goal-sprint/fingerprint.sh"
   cp "$SCRIPT_DIR/emit.sh" "$work/scripts/goal-sprint/emit.sh"
   chmod +x "$work/scripts/goal-sprint/"*.sh
+  cat > "$work/company/scripts/sanitise.sh" <<'EOF_SANITISE'
+#!/usr/bin/env bash
+cat
+EOF_SANITISE
+  chmod +x "$work/company/scripts/sanitise.sh"
   printf '%s\n' "$work"
 }
 
@@ -59,7 +64,11 @@ install_gh_mock() {
 #!/usr/bin/env bash
 echo "$*" >> /tmp/gh-mock-calls.log
 if [ "${1:-}" = "issue" ] && [ "${2:-}" = "list" ]; then
-  printf '[]\n'
+  if [ -n "${GH_MOCK_ISSUES:-}" ]; then
+    printf '%s\n' "$GH_MOCK_ISSUES"
+  else
+    printf '[]\n'
+  fi
   exit 0
 fi
 if [ "${1:-}" = "issue" ] && [ "${2:-}" = "create" ]; then
@@ -135,7 +144,7 @@ scenario_3() {
   write_goal_json /tmp/goal_sprint.json automatable "Ship Real Metric" "ship-real-metric"
   echo true > /tmp/goal-sprint-material-changed
   reset_mock_log
-  (cd "$work" && PATH="$mock:$PATH" SEED_REPO=example/repo scripts/goal-sprint/emit.sh >/tmp/scenario3.out 2>&1)
+  (cd "$work" && PATH="$mock:$PATH" GITHUB_WORKSPACE="$work" SEED_REPO=example/repo scripts/goal-sprint/emit.sh >/tmp/scenario3.out 2>&1)
   rc=$?
   creates="$(grep -c '^issue create ' /tmp/gh-mock-calls.log || true)"
   if [ "$rc" -eq 0 ] && [ "$creates" = "1" ] && grep -q -- '--label goal-sprint,needs-triage' /tmp/gh-mock-calls.log && ! grep -q 'needs-human' /tmp/gh-mock-calls.log; then
@@ -155,7 +164,7 @@ scenario_4() {
   write_goal_json /tmp/goal_sprint.json automatable "Ship Real Metric" "ship-real-metric"
   echo true > /tmp/goal-sprint-material-changed
   reset_mock_log
-  (cd "$work" && PATH="$mock:$PATH" SEED_REPO=example/repo scripts/goal-sprint/emit.sh >/tmp/scenario4.out 2>&1)
+  (cd "$work" && PATH="$mock:$PATH" GITHUB_WORKSPACE="$work" SEED_REPO=example/repo scripts/goal-sprint/emit.sh >/tmp/scenario4.out 2>&1)
   rc=$?
   creates="$(grep -c '^issue create ' /tmp/gh-mock-calls.log || true)"
   if [ "$rc" -eq 0 ] && [ "$creates" = "0" ]; then
@@ -175,7 +184,7 @@ scenario_5() {
   write_goal_json /tmp/goal_sprint.json needs-human "Call Buyers This Week" "call-buyers-this-week"
   echo true > /tmp/goal-sprint-material-changed
   reset_mock_log
-  (cd "$work" && PATH="$mock:$PATH" SEED_REPO=example/repo scripts/goal-sprint/emit.sh >/tmp/scenario5.out 2>&1)
+  (cd "$work" && PATH="$mock:$PATH" GITHUB_WORKSPACE="$work" SEED_REPO=example/repo scripts/goal-sprint/emit.sh >/tmp/scenario5.out 2>&1)
   rc=$?
   if [ "$rc" -eq 0 ] && grep -q -- '--label goal-sprint,needs-human' /tmp/gh-mock-calls.log && grep -q 'Autonomy ladder: attempt via pipeline -> Codex -> RAH bounty -> operator.' /tmp/gh-mock-calls.log; then
     pass "$desc"
@@ -214,6 +223,54 @@ scenario_7() {
   fi
 }
 
+scenario_8() {
+  local desc="emit.sh sanitise rejection blocks issue creation"
+  local work mock creates rc
+  work="$(make_workspace)"
+  mock="$work/mock-bin"
+  install_gh_mock "$mock"
+  cat > "$work/company/scripts/sanitise.sh" <<'EOF_SANITISE'
+#!/usr/bin/env bash
+cat >/dev/null
+exit 1
+EOF_SANITISE
+  chmod +x "$work/company/scripts/sanitise.sh"
+  printf '{ "last_fingerprint": "", "last_week": "", "ledger": [], "last_issue": null }\n' > "$work/company/goal-sprint-state.json"
+  write_goal_json /tmp/goal_sprint.json automatable "Ship Real Metric" "ship-real-metric"
+  echo true > /tmp/goal-sprint-material-changed
+  reset_mock_log
+  (cd "$work" && PATH="$mock:$PATH" GITHUB_WORKSPACE="$work" SEED_REPO=example/repo scripts/goal-sprint/emit.sh >/tmp/scenario8.out 2>&1)
+  rc=$?
+  creates="$(grep -c '^issue create ' /tmp/gh-mock-calls.log || true)"
+  if [ "$rc" -ne 0 ] && [ "$creates" = "0" ] && grep -q '::error:: sanitise.sh rejected issue content' /tmp/scenario8.out; then
+    pass "$desc"
+  else
+    fail "$desc" "$(cat /tmp/scenario8.out) $(cat /tmp/gh-mock-calls.log)"
+  fi
+}
+
+scenario_9() {
+  local desc="empty-keyword title falls back to exact-title dedup"
+  local work mock creates rc_emit rc_fingerprint
+  work="$(make_workspace)"
+  mock="$work/mock-bin"
+  install_gh_mock "$mock"
+  printf '{ "last_fingerprint": "", "last_week": "", "ledger": [], "last_issue": null }\n' > "$work/company/goal-sprint-state.json"
+  write_goal_json /tmp/goal_sprint.json automatable "the and or" "the-and-or"
+  echo true > /tmp/goal-sprint-material-changed
+  reset_mock_log
+  (cd "$work" && PATH="$mock:$PATH" GITHUB_WORKSPACE="$work" SEED_REPO=example/repo GH_MOCK_ISSUES='[{"title":"the and or"}]' scripts/goal-sprint/emit.sh >/tmp/scenario9-emit.out 2>&1)
+  rc_emit=$?
+  creates="$(grep -c '^issue create ' /tmp/gh-mock-calls.log || true)"
+  (cd "$work" && PATH="$mock:$PATH" SEED_REPO=example/repo GH_MOCK_ISSUES='[{"title":"the and or"}]' scripts/goal-sprint/fingerprint.sh >/tmp/scenario9-fingerprint.out 2>&1)
+  rc_fingerprint=$?
+  if [ "$rc_emit" -eq 0 ] && [ "$creates" = "0" ] && grep -q 'SKIP: duplicate detected' /tmp/scenario9-emit.out && [ "$rc_fingerprint" -eq 0 ] && [ "$(cat /tmp/goal-sprint-material-changed)" = "false" ]; then
+    pass "$desc"
+  else
+    fail "$desc" "$(cat /tmp/scenario9-emit.out) $(cat /tmp/scenario9-fingerprint.out) $(cat /tmp/gh-mock-calls.log)"
+  fi
+}
+
 scenario_1
 scenario_2
 scenario_3
@@ -221,6 +278,8 @@ scenario_4
 scenario_5
 scenario_6
 scenario_7
+scenario_8
+scenario_9
 
 if [ "$PASSED" -eq "$TOTAL" ]; then
   echo "PASS $PASSED/$TOTAL"

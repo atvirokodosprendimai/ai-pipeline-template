@@ -1,5 +1,6 @@
 # Compound Engineering -- local config
-# Copy to .compound-engineering/config.local.yaml in your project root.
+# This file is committed in-repo and consumed by workflows at CI runtime
+# (for example, goal-sprint reads pulse_seed_product_repo).
 # All settings are optional. Invalid values fall through to defaults.
 
 # --- Work delegation (Codex) ---

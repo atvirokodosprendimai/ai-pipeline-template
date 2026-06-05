@@ -20,6 +20,12 @@ keywords_from_slug() {
     head -5 || true
 }
 
+normalise_title() {
+  printf '%s\n' "$1" |
+    tr '[:upper:]' '[:lower:]' |
+    sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//; s/[[:space:]]+/ /g'
+}
+
 [ -f "$json" ] || fail "$json not found"
 command -v jq >/dev/null 2>&1 || fail "jq is required"
 
@@ -41,13 +47,23 @@ seed_repo="${SEED_REPO:-}"
 [ -n "$seed_repo" ] || fail "SEED_REPO is required"
 command -v gh >/dev/null 2>&1 || fail "gh is required"
 
-open_json="$(gh issue list --repo "$seed_repo" --label goal-sprint --state open --json title)" || fail "failed to list open goal-sprint issues"
+open_json="$(gh issue list --repo "$seed_repo" --label goal-sprint --state open --limit 200 --json title)" || fail "failed to list open goal-sprint issues"
 open_titles="/tmp/goal-sprint-open-titles.txt"
 printf '%s\n' "$open_json" | jq -r '.[].title // empty' > "$open_titles" || fail "failed to parse open issue titles"
 
 keywords="$(keywords_from_slug "$fingerprint")"
+fingerprint_exact="$(normalise_title "$fingerprint")"
+fingerprint_title_exact="$(normalise_title "$(printf '%s\n' "$fingerprint" | tr '-' ' ')")"
 match_count=0
 while IFS= read -r existing_title; do
+  if [ -z "$keywords" ]; then
+    existing_exact="$(normalise_title "$existing_title")"
+    if [ "$existing_exact" = "$fingerprint_exact" ] || [ "$existing_exact" = "$fingerprint_title_exact" ]; then
+      match_count=$((match_count + 1))
+      break
+    fi
+    continue
+  fi
   existing_lower="$(printf '%s\n' "$existing_title" | tr '[:upper:]' '[:lower:]')"
   hits=0
   for kw in $keywords; do

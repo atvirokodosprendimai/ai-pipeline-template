@@ -19,6 +19,21 @@ keywords_from_title() {
     head -5 || true
 }
 
+normalise_title() {
+  printf '%s\n' "$1" |
+    tr '[:upper:]' '[:lower:]' |
+    sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//; s/[[:space:]]+/ /g'
+}
+
+script_dir="$(cd "$(dirname "$0")" && pwd)"
+if [ -n "${GITHUB_WORKSPACE:-}" ]; then
+  repo_root="$GITHUB_WORKSPACE"
+else
+  repo_root="$(git -C "$script_dir" rev-parse --show-toplevel)" || fail "failed to resolve repo root"
+fi
+SANITISE="$repo_root/company/scripts/sanitise.sh"
+[ -f "$SANITISE" ] || fail "$SANITISE not found"
+
 [ -f "$sentinel" ] || fail "$sentinel not found"
 if [ "$(cat "$sentinel")" != "true" ]; then
   echo "SKIP: material change sentinel is not true"
@@ -50,13 +65,21 @@ if [ "$fingerprint" = "$last" ]; then
   exit 0
 fi
 
-issue_json="$(gh issue list --repo "$seed_repo" --state all --json title)" || fail "failed to list seed repo issues"
+issue_json="$(gh issue list --repo "$seed_repo" --state all --limit 200 --json title)" || fail "failed to list seed repo issues"
 all_titles="/tmp/goal-sprint-all-titles.txt"
 printf '%s\n' "$issue_json" | jq -r '.[].title // empty' > "$all_titles" || fail "failed to parse seed repo issue titles"
 
 keywords="$(keywords_from_title "$title")"
+title_exact="$(normalise_title "$title")"
 match_count=0
 while IFS= read -r existing_title; do
+  if [ -z "$keywords" ]; then
+    if [ "$(normalise_title "$existing_title")" = "$title_exact" ]; then
+      match_count=$((match_count + 1))
+      break
+    fi
+    continue
+  fi
   existing_lower="$(printf '%s\n' "$existing_title" | tr '[:upper:]' '[:lower:]')"
   hits=0
   for kw in $keywords; do
@@ -99,6 +122,12 @@ if [ "$class" = "automatable" ]; then
   labels="${labels},needs-triage"
 else
   labels="${labels},needs-human"
+fi
+
+BODY="$(cat "$body_file")"
+if ! printf '%s' "$title $BODY" | bash "$SANITISE" > /dev/null 2>&1; then
+  echo "::error:: sanitise.sh rejected issue content"
+  exit 1
 fi
 
 issue_url="$(gh issue create --repo "$seed_repo" --title "$title" --body-file "$body_file" --label "$labels")" || fail "failed to create goal-sprint issue"
