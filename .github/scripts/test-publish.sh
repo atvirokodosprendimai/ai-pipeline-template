@@ -202,4 +202,21 @@ assert_gh_count "$record" "issue edit 10" 1
 assert_gh_count "$record" "issue close 22" 1
 assert_gh_count "$record" "issue close 37" 1
 
-echo "PASS test-publish: 9 scenarios"
+# Scenario 10: regression guard — dedup must look up open issues via the List API
+# (--state), never the Search API (--search). The Search API is eventually-consistent
+# and mis-tokenizes the colon in "supervisor-rank:" → 0 matches → create-every-run was
+# the root cause of the duplicate-issue flood. See
+# feedback_gh_issue_dedup_search_api_floods. Without this, the suite would still pass
+# if publish-rank.sh regressed back to --search.
+if ! grep -qF -- "--state" "$record"; then
+  echo "FAIL: dedup must query open issues via the List API (--state); none recorded" >&2
+  cat "$record" >&2
+  exit 1
+fi
+if grep -qF -- "--search" "$record"; then
+  echo "FAIL: dedup must NOT use the Search API (--search) — root cause of the dup flood" >&2
+  cat "$record" >&2
+  exit 1
+fi
+
+echo "PASS test-publish: 10 scenarios"
