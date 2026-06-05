@@ -1,0 +1,11 @@
+.github/scripts/test-publish.sh
+  ai_agent 12-88,93,110,129,142,159,174,186-205
+.github/scripts/publish-rank.sh
+  ai_agent 164-165,175-191
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "64ff66ca9a24e9e2ef0818380da6e785f2a417ff",
+  "prompts": {}
+}
