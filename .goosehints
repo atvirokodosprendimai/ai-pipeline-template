@@ -15,6 +15,8 @@ __PROJECT_STRUCTURE__
 
 __ARCHITECTURE_NOTES__
 
+- `CONCEPTS.md` (repo root) — shared domain vocabulary (entities, named processes, status concepts); read when orienting to the codebase or before discussing domain concepts.
+
 ## Commercial Focus
 
 When the pipeline is idle, prefer the highest-leverage 2–4 hour task that increases the probability of getting the first paying customer. Bias toward proof of value, offer clarity, onboarding, distribution, and customer delivery readiness over internal polish.
