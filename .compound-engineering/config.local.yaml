@@ -1,0 +1,64 @@
+# Compound Engineering -- local config
+# Copy to .compound-engineering/config.local.yaml in your project root.
+# All settings are optional. Invalid values fall through to defaults.
+
+# --- Work delegation (Codex) ---
+
+# work_delegate: codex           # codex | false (default: false)
+# work_delegate_consent: true    # true | false (default: false)
+# work_delegate_sandbox: yolo    # yolo | full-auto (default: yolo)
+# work_delegate_decision: auto   # auto | ask (default: auto)
+# work_delegate_model: gpt-5.4   # any valid codex model (omit to use ~/.codex/config.toml default)
+# work_delegate_effort: high     # minimal | low | medium | high | xhigh (omit to use ~/.codex/config.toml default)
+
+# --- Product Pulse (ce-product-pulse) ---
+#
+# 2026-05-06 correction: pulse_primary_event was bot_pr_merged, which
+# counted heal:/loop: maintenance PRs in this meta-pipeline repo as
+# product convergence. STRATEGY.md says convergence happens in the
+# SEEDED PRODUCT repo (atvirokodosprendimai/wgmesh). Repointed events
+# accordingly. See docs/pulse-reports/2026-05-06_05-30-corrected.md
+# for the incident.
+
+pulse_product_name: ai-pipeline-template
+# pulse_seed_product_repo identifies where actual product convergence
+# is measured. NOT used by the upstream ce-product-pulse skill yet,
+# but consumed by the corrected pulse generation in this repo.
+pulse_seed_product_repo: atvirokodosprendimai/wgmesh
+pulse_primary_event: product_pr_merged
+pulse_value_event: autonomous_impl_merge_clean
+pulse_completion_events: paid_customer_added
+pulse_quality_scoring: false
+pulse_analytics_source: github-pr-data
+pulse_tracing_source: github-actions
+pulse_payments_source: polar
+pulse_db_enabled: false
+pulse_lookback_default: 24h
+# Per-metric source notes:
+#   autonomous_ship_rate  = impl: PRs merged in seed repo with no escalation_posted events
+#   lead_time_hours       = median(spec_pr_opened_at → impl_pr_merged_at) per Issue #N
+#   spec_coverage         = (issues with spec PR) / (open issues in seed repo)
+#   active_stuck_issues   = needs-human OR copilot-triaging >24h OR retry cooldown >24h
+#   self_heal_rate        = company/pipeline-health-state.json on this repo (issues_healed_total/checks_run)
+#   paid_customers        = chimney HTML scrape (until Polar webhook integration)
+#   cycle_time_to_revenue = pending Polar integration; null today
+#   pr_processing_rate    = goal-aligned-terminal / dispositioned. PROCESSED = merged
+#                           OR closed-with-written-reason that cites the goal. Bulk-close
+#                           with no reason does NOT count as processed — it is discard.
+#                           Open PRs are not "processed"; they are work-in-flight or dwell.
+#   pr_dwell_violations   = open PRs older than pulse_pr_processing_sla_days with no
+#                           review/merge action — the unprocessed-defect count.
+pulse_metric_sources: paid_customers=chimney-html,autonomous_ship_rate=seed-repo-pr-data,lead_time_hours=seed-repo-pr-data,spec_coverage=seed-repo-pr-data,self_heal_rate=company/pipeline-health-state.json,active_stuck_issues=seed-repo-issues,cycle_time_to_revenue=polar,supervisor_rank_state=company/supervisor-rank-state.json,pr_processing_rate=meta-repo-pr-data,pr_dwell_violations=meta-repo-pr-data
+pulse_pending_metrics: cycle_time_to_revenue,spec_coverage
+# --- PR-processing KPI (added 2026-06-05) ---
+# Intent: open PRs must be ACTED ON per the goal, never bulk-closed to clear backlog.
+# Every disposition needs a goal-aligned reason. Dwelling = defect, not idle.
+pulse_pr_processing_kpi: enabled
+pulse_pr_processing_sla_days: 7
+
+goal_sprint_enabled: true
+goal_sprint_cadence: weekly
+goal_sprint_seed_repo_source: pulse_seed_product_repo
+# goal-sprint step: weekly LLM-driven ideation that emits one spec issue into
+# the autonomous builder chain (atvirokodosprendimai/wgmesh or pulse_seed_product_repo).
+# Triggered every Monday 07:00 UTC. Anti-flood: only emits when fingerprint changes.
