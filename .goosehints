@@ -1,21 +1,27 @@
-This is __PROJECT_NAME__ — __PROJECT_DESCRIPTION__.
+This is ai-pipeline-template — the control plane for an autonomous company that builds, markets, sells, and operates wgmesh (decentralized WireGuard mesh networking with managed ingress). This repo is the brain and pipeline, not the product.
+
+Canonical guidance lives in AGENTS.md — read it first. The notes below are a quick orientation; AGENTS.md is the source of truth.
 
 ## Structure
 
-__PROJECT_STRUCTURE__
+- `.github/workflows/` — crons: observation-loop (daily LLM assessment), pipeline-health ("heal"), supervisor-rank (clog ranker), plus spec/build/merge automation and RAH/Polar integrations.
+- `.github/scripts/` — supervisor-rank pipeline (snapshot → classify → rank → recommend → publish) and `test-*.sh` harnesses.
+- `company/` — loop state JSON, system-prompt.md (the control-loop operating prompt), scripts/ collectors, loop-history/.
+- `docs/` — solutions/ (compounded learnings), brainstorms/, plans/, pulse-reports/.
+- `memory/MEMORY.md` — curated cross-session learnings. `CONCEPTS.md` — shared domain vocabulary (glossary).
 
 ## Commands
 
-- Build: __BUILD_CMD__
-- Test: __TEST_CMD__
-- Lint: __LINT_CMD__
-- Format: __FORMAT_CMD__
+No compiled build — this repo is workflows, bash, and docs.
+
+- Build: (none)
+- Test: run the bash harness nearest your change, e.g. `bash .github/scripts/test-publish.sh`, `bash company/scripts/test-collect-memory.sh`
+- Lint: `bash -n <script>` for syntax; `shellcheck <script>` if available
+- Format: (none)
 
 ## Architecture
 
-__ARCHITECTURE_NOTES__
-
-- `CONCEPTS.md` (repo root) — shared domain vocabulary (entities, named processes, status concepts); read when orienting to the codebase or before discussing domain concepts.
+Daily observation loop assesses company state and files GitHub issues; issues flow through an automated pipeline: Issue → Spec (Copilot) → Review Spec → Build (Goose) → Review Code → Merge. Issue labels carry the stage and the business function (fn:dev/ops/gtm/billing/support/legal). See CONCEPTS.md for vocabulary, company/system-prompt.md for the control-loop prompt and funnel stages.
 
 ## Commercial Focus
 
@@ -26,3 +32,4 @@ When the pipeline is idle, prefer the highest-leverage 2–4 hour task that incr
 - Do NOT modify files outside the scope of the specification
 - Run build, test, and lint before considering work complete
 - Keep changes minimal and focused
+- This is a public repo — never commit secrets, PII, or exact revenue figures
