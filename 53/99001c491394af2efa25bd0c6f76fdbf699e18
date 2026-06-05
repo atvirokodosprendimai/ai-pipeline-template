@@ -1,0 +1,29 @@
+.github/scripts/compound-render-docs.sh
+  s_7b31431ad3293f::t_5c7ceb4779b3e7 1-73
+.github/scripts/compound-queue-append.sh
+  s_7b31431ad3293f::t_5c7ceb4779b3e7 1-43
+.github/scripts/test-compound-render-docs.sh
+  s_7b31431ad3293f::t_5c7ceb4779b3e7 1-81
+.github/scripts/test-compound-queue-append.sh
+  s_7b31431ad3293f::t_5c7ceb4779b3e7 1-47
+.github/workflows/compound-capture.yml
+  s_7b31431ad3293f::t_5c7ceb4779b3e7 1-67
+.github/workflows/compound-synthesize.yml
+  s_7b31431ad3293f::t_5c7ceb4779b3e7 1-165
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "5399001c491394af2efa25bd0c6f76fdbf699e18",
+  "prompts": {},
+  "sessions": {
+    "s_7b31431ad3293f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "aee57c09-ec85-4a83-a993-9f74c5b2544e",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
