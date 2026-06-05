@@ -161,7 +161,8 @@ if [ "$DRY_RUN" = "1" ]; then
 else
   issues_json="$tmpdir/issues.json"
   retry_gh issue list --repo "$GH_REPO" \
-    --search "$TITLE in:title is:open" \
+    --state open \
+    --limit 500 \
     --json number,title,url \
     > "$issues_json"
   matches="$(jq --arg title "$TITLE" '[.[] | select(.title == $title)]' "$issues_json")"
@@ -170,13 +171,24 @@ else
   if [ "$match_count" -eq 0 ]; then
     issue_url="$(retry_gh issue create --repo "$GH_REPO" --title "$TITLE" --body-file "$body_file")"
     issue_number="${issue_url##*/}"
-  elif [ "$match_count" -eq 1 ]; then
-    issue_number="$(jq -r '.[0].number' <<< "$matches")"
-    issue_url="$(jq -r '.[0].url' <<< "$matches")"
-    retry_gh issue edit "$issue_number" --repo "$GH_REPO" --body-file "$body_file"
   else
-    echo "error: duplicate supervisor-rank issues open: $(jq -r '.[].number' <<< "$matches" | paste -sd ',')" >&2
-    exit 1
+    canonical_issue="$(jq -c --arg prior "$issue_number" '
+      if ($prior != "" and any(.[]; (.number | tostring) == $prior)) then
+        .[] | select((.number | tostring) == $prior)
+      else
+        min_by(.number)
+      end
+    ' <<< "$matches")"
+    issue_number="$(jq -r '.number' <<< "$canonical_issue")"
+    issue_url="$(jq -r '.url' <<< "$canonical_issue")"
+    retry_gh issue edit "$issue_number" --repo "$GH_REPO" --body-file "$body_file"
+
+    if [ "$match_count" -gt 1 ]; then
+      while IFS= read -r duplicate_issue_number; do
+        retry_gh issue close "$duplicate_issue_number" --repo "$GH_REPO" \
+          --comment "Closing duplicate supervisor-rank issue; canonical tracked in #${issue_number}."
+      done < <(jq -r --arg canonical "$issue_number" '.[] | select((.number | tostring) != $canonical) | .number' <<< "$matches")
+    fi
   fi
 
   if [ "$rank_changed" = "true" ]; then
