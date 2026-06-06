@@ -1,0 +1,19 @@
+.github/workflows/supervisor-rank.yml
+  s_ecd60944b840a1::t_515b7e05b479bf 83-92
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "29c5e698470dc006b876414330b7140638d780a3",
+  "prompts": {},
+  "sessions": {
+    "s_ecd60944b840a1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3e69dcb9-ab7f-4c79-a876-62c36bd43bbd",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
