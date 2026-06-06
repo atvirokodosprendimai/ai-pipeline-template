@@ -1,0 +1,19 @@
+.compound-engineering/config.local.yaml
+  s_ecd60944b840a1::t_8b938a3b6cef3a 60-74
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "fef3b099c0ea1952f95292f7c74dbcd1d2682fe4",
+  "prompts": {},
+  "sessions": {
+    "s_ecd60944b840a1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3e69dcb9-ab7f-4c79-a876-62c36bd43bbd",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
