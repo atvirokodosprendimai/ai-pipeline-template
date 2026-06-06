@@ -18,6 +18,8 @@ jobs:
     if: >-
       startsWith(github.event.pull_request.title, 'loop: ') ||
       startsWith(github.event.pull_request.title, 'heal: ') ||
+      startsWith(github.event.pull_request.title, 'chore: supervisor-rank state ') ||
+      startsWith(github.event.pull_request.title, 'chore(pr-disposition): update state ') ||
       (startsWith(github.event.pull_request.title, 'audit: strategy baseline') &&
        !contains(github.event.pull_request.labels.*.name, 'needs-human'))
     runs-on: ubuntu-latest
@@ -78,6 +80,12 @@ jobs:
             heal:*)
               expected_branch='^pipeline-health/'
               ;;
+            'chore: supervisor-rank state'*)
+              expected_branch='^supervisor-rank/state-'
+              ;;
+            'chore(pr-disposition): update state'*)
+              expected_branch='^pr-disposition/'
+              ;;
             'audit: strategy baseline'*)
               expected_branch='^audit/strategy-baseline-'
               ;;
@@ -94,7 +102,7 @@ jobs:
 
           for path in "${changed_files[@]}"; do
             case "$path" in
-              company/loop-state.json|company/pipeline-health-state.json|company/audit-log.jsonl|company/strategy-audit-baseline.json)
+              company/loop-state.json|company/pipeline-health-state.json|company/audit-log.jsonl|company/strategy-audit-baseline.json|company/supervisor-rank-state.json|company/pr-disposition-state.json)
                 ;;
               company/loop-history/*.md)
                 ;;
@@ -126,7 +134,7 @@ jobs:
 
           for path in "${changed_files[@]}"; do
             case "$path" in
-              company/loop-state.json|company/pipeline-health-state.json|company/strategy-audit-baseline.json)
+              company/loop-state.json|company/pipeline-health-state.json|company/strategy-audit-baseline.json|company/supervisor-rank-state.json|company/pr-disposition-state.json)
                 jq empty "$path"
                 ;;
               company/audit-log.jsonl)
