@@ -102,13 +102,14 @@ jobs:
 
           echo "Cutoff: $cutoff"
 
-          # shellcheck disable=SC2016
-          gh issue list --repo "$TARGET_REPO" --state open \
+          if ! gh issue list --repo "$TARGET_REPO" --state open \
             --label "needs-triage" --limit 50 \
             --json number,title,createdAt,labels \
-            --jq --arg cutoff "$cutoff" \
-            '.[] | select(.createdAt < $cutoff) | @json' \
-            > /tmp/stale_triage.json || true
+            --jq ".[] | select(.createdAt < \"$cutoff\") | @json" \
+            > /tmp/stale_triage.json; then
+            echo "::error::stale needs-triage detection query failed"
+            exit 1
+          fi
 
           while read -r issue; do
             number=$(echo "$issue" | jq -r '.number')
@@ -254,13 +255,14 @@ jobs:
 
           echo "Cutoff: $cutoff"
 
-          # shellcheck disable=SC2016
-          gh issue list --repo "$TARGET_REPO" --state open \
+          if ! gh issue list --repo "$TARGET_REPO" --state open \
             --label "copilot-triaging" --limit 50 \
             --json number,title,createdAt,labels \
-            --jq --arg cutoff "$cutoff" \
-            '.[] | select(.createdAt < $cutoff) | @json' \
-            > /tmp/stale_copilot.json || true
+            --jq ".[] | select(.createdAt < \"$cutoff\") | @json" \
+            > /tmp/stale_copilot.json; then
+            echo "::error::stale copilot-triaging detection query failed"
+            exit 1
+          fi
 
           while read -r issue; do
             number=$(echo "$issue" | jq -r '.number')
@@ -391,13 +393,14 @@ jobs:
 
           echo "Cutoff: $cutoff"
 
-          # shellcheck disable=SC2016
-          gh pr list --repo "$TARGET_REPO" --state open \
+          if ! gh pr list --repo "$TARGET_REPO" --state open \
             --label "approved-for-build" --limit 50 \
             --json number,title,updatedAt,labels \
-            --jq --arg cutoff "$cutoff" \
-            '.[] | select(.updatedAt < $cutoff) | @json' \
-            > /tmp/stale_approved.json || true
+            --jq ".[] | select(.updatedAt < \"$cutoff\") | @json" \
+            > /tmp/stale_approved.json; then
+            echo "::error::stale approved-for-build detection query failed"
+            exit 1
+          fi
 
           while read -r pr; do
             number=$(echo "$pr" | jq -r '.number')

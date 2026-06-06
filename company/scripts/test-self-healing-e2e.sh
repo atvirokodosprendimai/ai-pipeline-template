@@ -309,6 +309,21 @@ if [ -n "$state_pr_num" ] && [ "$state_pr_num" != "null" ]; then
   else
     log "  WARN: Could not read audit log (may not have entries this run)"
   fi
+
+  triage_audit_action=""
+  if [ -n "$audit_content" ]; then
+    triage_audit_action=$(echo "$audit_content" | jq -r --argjson issue "$triage_issue_num" \
+      'select(.action == "retrigger_triage" and .issue_number == $issue) | .action' | head -1)
+  fi
+  triage_retry_entry=$(echo "$state_content" | jq -e --arg issue "$triage_issue_num" \
+    '.retry_tracker[$issue] // empty' >/dev/null 2>&1 && echo "present" || echo "")
+
+  if [ -n "$triage_audit_action" ] || [ -n "$triage_retry_entry" ]; then
+    pass "Stale needs-triage issue #${triage_issue_num} produced a healing action"
+  else
+    log "FAIL: Stale needs-triage issue #${triage_issue_num} did not produce a retrigger_triage audit entry or retry_tracker entry"
+    exit 1
+  fi
 else
   fail "No state-update PR found"
 fi
