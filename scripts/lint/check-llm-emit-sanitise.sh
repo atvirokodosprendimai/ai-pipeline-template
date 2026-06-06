@@ -24,7 +24,7 @@ collect_files() {
   fi
 
   if [[ -d scripts ]]; then
-    find scripts -type f -name '*.sh' -print
+    find scripts -type f -name '*.sh' ! -path './scripts/lint/*' -print
   fi
 }
 
@@ -33,6 +33,61 @@ has_match() {
   local regex="$2"
 
   grep -Eq "${regex}" "${file}"
+}
+
+grep_non_comment_lines() {
+  local file="$1"
+  local regex="$2"
+
+  grep -Ev '^[[:space:]]*#' "${file}" | grep -Eq "${regex}"
+}
+
+sanitise_var_regex() {
+  local file="$1"
+  local line
+  local name
+  local regex=''
+
+  while IFS= read -r line; do
+    name="$(printf '%s\n' "${line}" | sed -E 's/^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*)=.*/\1/')"
+    if [[ -z "${regex}" ]]; then
+      regex='(bash[[:space:]]+)?["'"'"']?\$'"${name}"'["'"'"']?'
+    else
+      regex="${regex}|(bash[[:space:]]+)?[\"']?\\$${name}[\"']?"
+    fi
+  done < <(grep -E '^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*=.*sanitise\.sh' "${file}" || true)
+
+  printf '%s\n' "${regex}"
+}
+
+sanitise_target_regex() {
+  local file="$1"
+  local vars
+  local direct
+
+  direct='(bash[[:space:]]+)?["'"'"']?([^[:space:];|&<>()"'"'"']*/)?sanitise\.sh["'"'"']?'
+  vars="$(sanitise_var_regex "${file}")"
+
+  if [[ -n "${vars}" ]]; then
+    printf '(%s|%s)\n' "${direct}" "${vars}"
+  else
+    printf '(%s)\n' "${direct}"
+  fi
+}
+
+has_sanitise_invocation() {
+  local file="$1"
+  local target
+  local pipe_regex
+  local redirect_regex
+  local command_sub_regex
+
+  target="$(sanitise_target_regex "${file}")"
+  pipe_regex='\|[[:space:]]*'"${target}"'([[:space:]]|$|[;&|)])'
+  redirect_regex='(^|[;&|[:space:]])'"${target}"'([[:space:]]+[^#;&|()]*)?<[[:space:]]*'
+  command_sub_regex='\$\([^)]*'"${target}"'[^)]*\)'
+
+  grep_non_comment_lines "${file}" "${pipe_regex}|${redirect_regex}|${command_sub_regex}"
 }
 
 first_sink_line() {
@@ -88,7 +143,7 @@ main() {
       continue
     fi
 
-    if has_match "${file}" 'sanitise\.sh'; then
+    if has_sanitise_invocation "${file}"; then
       ok=$((ok + 1))
       printf '[OK]      %s\n' "${file}"
       continue

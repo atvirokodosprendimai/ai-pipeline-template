@@ -11,7 +11,7 @@ cleanup() {
 trap cleanup EXIT
 
 pass_count=0
-total_count=4
+total_count=5
 openrouter_signal='Open''Router'
 assessment_file='assessment.''json'
 issue_create_sink='gh issue'' create'
@@ -181,10 +181,42 @@ YAML
   fi
 }
 
+test_flags_comment_only_sanitise_mention() {
+  local name='flags comment-only sanitise mention'
+  local root output status_file status
+
+  root="$(make_tree comment)"
+  output="${tmpdir}/comment.out"
+  status_file="${tmpdir}/comment.status"
+
+  cat > "${root}/.github/workflows/fake.yml" <<YAML
+name: fake
+on: workflow_dispatch
+jobs:
+  fake:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          # This should call company/scripts/sanitise.sh before publishing.
+          echo "${openrouter_signal} generated text" > ${assessment_file}
+          ${issue_create_sink} --title "LLM output" --body-file ${assessment_file}
+YAML
+
+  run_linter "${root}" "${output}" "${status_file}"
+  status="$(cat "${status_file}")"
+
+  if [[ "${status}" -ne 0 ]] && assert_contains "${output}" '[FLAGGED] .github/workflows/fake.yml'; then
+    record_pass "${name}"
+  else
+    record_fail "${name}" "$(cat "${output}")"
+  fi
+}
+
 test_flags_unsanitised_llm_sink
 test_passes_sanitised_llm_sink
 test_ignores_non_llm_sink
 test_exempts_marked_llm_sink
+test_flags_comment_only_sanitise_mention
 
 if [[ "${pass_count}" -eq "${total_count}" ]]; then
   printf 'PASS %s/%s\n' "${pass_count}" "${total_count}"
