@@ -21,7 +21,7 @@ concurrency:
 
 env:
   OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-  HAS_APP_CREDS: ${{ secrets.GITHUB_APP_ID != '' && secrets.GITHUB_APP_PRIVATE_KEY != '' }}
+  HAS_APP_CREDS: ${{ vars.APP_ID != '' && secrets.APP_PRIVATE_KEY != '' }}
 
 jobs:
   disposition:
@@ -37,8 +37,8 @@ jobs:
         if: env.HAS_APP_CREDS == 'true'
         uses: actions/create-github-app-token@v2
         with:
-          app-id: ${{ secrets.GITHUB_APP_ID }}
-          private-key: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
 
       - name: Select GitHub token
         run: |
@@ -208,5 +208,16 @@ jobs:
           git config user.email "pupabobas[bot]@users.noreply.github.com"
           git add company/pr-disposition-state.json
           git diff --cached --quiet && echo "No state changes to commit" && exit 0
-          git commit -m "chore(pr-disposition): update state"
-          git push
+
+          today=$(date -u '+%Y-%m-%d')
+          branch="pr-disposition/${today}-${GITHUB_RUN_ID}"
+          git checkout -b "$branch" origin/main
+          git commit -m "chore(pr-disposition): update state $today"
+          git push -u origin "$branch"
+
+          pr_url=$(gh pr create \
+            --title "chore(pr-disposition): update state $today" \
+            --body "Automated PR-disposition state update." \
+            --base main \
+            --head "$branch")
+          echo "Opened state PR: $pr_url"
