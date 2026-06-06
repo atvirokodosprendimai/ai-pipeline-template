@@ -18,6 +18,8 @@ jobs:
     if: >-
       startsWith(github.event.pull_request.title, 'loop: ') ||
       startsWith(github.event.pull_request.title, 'heal: ') ||
+      startsWith(github.event.pull_request.title, 'chore: supervisor-rank state ') ||
+      startsWith(github.event.pull_request.title, 'chore(pr-disposition): update state ') ||
       (startsWith(github.event.pull_request.title, 'audit: strategy baseline') &&
        !contains(github.event.pull_request.labels.*.name, 'needs-human'))
     runs-on: ubuntu-latest
@@ -61,6 +63,22 @@ jobs:
               ;;
           esac
 
+          # Hard author gate for the supervisor-rank / pr-disposition state lanes:
+          # these are the only producers of those state files, so a non-bot
+          # same-repo PR matching the title+branch+file-scope must NOT ride the
+          # admin-bypass merge. (Copilot review on #1470.)
+          case "$PR_TITLE" in
+            'chore: supervisor-rank state'*|'chore(pr-disposition): update state'*)
+              case "$PR_AUTHOR" in
+                pupabobas[bot]|app/pupabobas) ;;
+                *)
+                  echo "::error::state-PR fast-lane requires pupabobas[bot] author; got '$PR_AUTHOR'"
+                  exit 1
+                  ;;
+              esac
+              ;;
+          esac
+
           changed_files=()
           while IFS= read -r path; do
             [ -n "$path" ] && changed_files+=("$path")
@@ -78,8 +96,18 @@ jobs:
             heal:*)
               expected_branch='^pipeline-health/'
               ;;
+            'chore: supervisor-rank state'*)
+              expected_branch='^supervisor-rank/state-'
+              ;;
+            'chore(pr-disposition): update state'*)
+              expected_branch='^pr-disposition/'
+              ;;
             'audit: strategy baseline'*)
-              expected_branch='^audit/strategy-baseline-'
+              # strategy-audit.yml pushes the rolling telemetry PR to the fixed
+              # branch `audit/baseline-telemetry` (not `audit/strategy-baseline-*`).
+              # The old regex never matched, so the telemetry PR (e.g. #1468) always
+              # failed this scope gate. Match the actual branch name.
+              expected_branch='^audit/baseline-telemetry'
               ;;
             *)
               echo "::error::PR title does not match heartbeat prefixes: $PR_TITLE"
@@ -94,7 +122,7 @@ jobs:
 
           for path in "${changed_files[@]}"; do
             case "$path" in
-              company/loop-state.json|company/pipeline-health-state.json|company/audit-log.jsonl|company/strategy-audit-baseline.json)
+              company/loop-state.json|company/pipeline-health-state.json|company/audit-log.jsonl|company/strategy-audit-baseline.json|company/supervisor-rank-state.json|company/pr-disposition-state.json)
                 ;;
               company/loop-history/*.md)
                 ;;
@@ -126,7 +154,7 @@ jobs:
 
           for path in "${changed_files[@]}"; do
             case "$path" in
-              company/loop-state.json|company/pipeline-health-state.json|company/strategy-audit-baseline.json)
+              company/loop-state.json|company/pipeline-health-state.json|company/strategy-audit-baseline.json|company/supervisor-rank-state.json|company/pr-disposition-state.json)
                 jq empty "$path"
                 ;;
               company/audit-log.jsonl)
