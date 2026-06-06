@@ -799,3 +799,4 @@
 {"timestamp":"2026-06-06T11:53:03Z","run_id":"27061563558","action":"escalate","issue_number":540,"target_repo":"wgmesh","reason":"2 consecutive triage failures","outcome":"success","retry_count":2}
 {"timestamp":"2026-06-06T11:53:04Z","run_id":"27061563558","action":"escalate","issue_number":539,"target_repo":"wgmesh","reason":"2 consecutive triage failures","outcome":"success","retry_count":2}
 {"timestamp":"2026-06-06T11:53:08Z","run_id":"27061563558","action":"check_funnel_signals","issue_number":null,"target_repo":"wgmesh","reason":"periodic signal check","outcome":"success","retry_count":null,"signals":{"dogfood":true,"presence":true}}
+{"timestamp":"2026-06-06T13:42:50Z","run_id":"27063895902","action":"check_funnel_signals","issue_number":null,"target_repo":"wgmesh","reason":"periodic signal check","outcome":"success","retry_count":null,"signals":{"dogfood":true,"presence":true}}
