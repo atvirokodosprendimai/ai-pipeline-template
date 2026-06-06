@@ -1,0 +1,212 @@
+name: PR Disposition
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Print intended dispositions without mutating GitHub or state.
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: pr-disposition
+  cancel-in-progress: false
+
+env:
+  OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+  HAS_APP_CREDS: ${{ secrets.GITHUB_APP_ID != '' && secrets.GITHUB_APP_PRIVATE_KEY != '' }}
+
+jobs:
+  disposition:
+    name: Classify -> Route Open PRs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate GitHub App token
+        id: app-token
+        if: env.HAS_APP_CREDS == 'true'
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.GITHUB_APP_ID }}
+          private-key: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
+
+      - name: Select GitHub token
+        run: |
+          token="${{ steps.app-token.outputs.token }}"
+          if [ -z "$token" ]; then
+            token="${{ secrets.PUSH_TOKEN }}"
+          fi
+          if [ -z "$token" ]; then
+            token="${{ secrets.GITHUB_TOKEN }}"
+          fi
+          if [ -z "$token" ]; then
+            echo "::error::No GitHub App token, PUSH_TOKEN, or GITHUB_TOKEN available"
+            exit 1
+          fi
+          echo "::add-mask::$token"
+          echo "GH_TOKEN=$token" >> "$GITHUB_ENV"
+
+      - name: Run PR disposition
+        env:
+          GH_REPO: ${{ github.repository }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+          PR_DISPOSITION_STATE: company/pr-disposition-state.json
+        run: |
+          set -euo pipefail
+
+          state="${PR_DISPOSITION_STATE}"
+          sentinel="${PR_DISPOSITION_MATERIAL_SENTINEL:-/tmp/pr-disposition-material-changed}"
+          printf 'false' > "$sentinel"
+          mkdir -p "$(dirname "$state")"
+          if [ ! -f "$state" ]; then
+            printf '{"ledger":[],"acted_fingerprints":[]}\n' > "$state"
+          fi
+
+          sanitise() {
+            bash company/scripts/sanitise.sh
+          }
+
+          has_fingerprint() {
+            local fp="$1"
+            jq -e --arg fp "$fp" '(.acted_fingerprints // []) | index($fp) != null' "$state" >/dev/null
+          }
+
+          record_fingerprint() {
+            local fp="$1" tmp
+            tmp="$(mktemp)"
+            jq --arg fp "$fp" \
+              '.acted_fingerprints = ((.acted_fingerprints // []) + [$fp] | unique)' \
+              "$state" > "$tmp"
+            sanitise < "$tmp" >/dev/null
+            if ! cmp -s "$tmp" "$state"; then
+              mv "$tmp" "$state"
+              printf 'true' > "$sentinel"
+            else
+              rm -f "$tmp"
+            fi
+          }
+
+          append_ledger() {
+            local pr="$1" class="$2" risk="$3" reason="$4" tmp ts
+            tmp="$(mktemp)"
+            ts="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+            jq \
+              --arg ts "$ts" \
+              --arg pr "$pr" \
+              --arg class "$class" \
+              --arg risk "$risk" \
+              --arg reason "$reason" \
+              '.ledger = ((.ledger // []) + [{
+                timestamp: $ts,
+                pr_number: ($pr | tonumber),
+                action: $class,
+                class: $class,
+                risk_tier: $risk,
+                reason: $reason
+              }]) | .acted_fingerprints = (.acted_fingerprints // [])' \
+              "$state" > "$tmp"
+            sanitise < "$tmp" >/dev/null
+            mv "$tmp" "$state"
+            printf 'true' > "$sentinel"
+          }
+
+          route_human() {
+            local pr="$1" classification="$2" class risk reason
+            class="$(jq -r '.class' <<< "$classification")"
+            risk="$(jq -r '.risk_tier' <<< "$classification")"
+            reason="$(jq -r '.reasons | join("; ")' <<< "$classification")"
+            reason="PR disposition escalated for human review: ${reason}"
+            sanitise <<< "$reason" >/dev/null
+            gh pr edit "$pr" --repo "$GH_REPO" --add-label needs-human
+            gh pr comment "$pr" --repo "$GH_REPO" --body "$reason"
+            append_ledger "$pr" "$class" "$risk" "$reason"
+          }
+
+          prs="$(gh pr list --repo "$GH_REPO" --state open --json number,headRefOid)"
+          jq -c '.[]' <<< "$prs" | while IFS= read -r row; do
+            pr="$(jq -r '.number' <<< "$row")"
+            classification="$(TARGET_REPO="$GH_REPO" scripts/pr-disposition/classify.sh "$pr")"
+            class="$(jq -r '.class' <<< "$classification")"
+            risk="$(jq -r '.risk_tier' <<< "$classification")"
+            head_sha="$(jq -r '.headRefOid // ""' <<< "$classification")"
+            fingerprint="${pr}:${head_sha}:${class}"
+
+            case "$class" in
+              stale|human)
+                if has_fingerprint "$fingerprint"; then
+                  echo "Skipping PR #${pr}; fingerprint already acted: ${fingerprint}"
+                  continue
+                fi
+                ;;
+            esac
+
+            case "$class" in
+              stale)
+                if [ "$DRY_RUN" = "true" ]; then
+                  echo "DRY_RUN stale PR #${pr}: would close"
+                else
+                  TARGET_REPO="$GH_REPO" scripts/pr-disposition/close-stale.sh "$pr" "$classification"
+                  printf 'true' > "$sentinel"
+                  record_fingerprint "$fingerprint"
+                fi
+                ;;
+              human)
+                if [ "$DRY_RUN" = "true" ]; then
+                  echo "DRY_RUN human PR #${pr}: would label needs-human and comment"
+                else
+                  route_human "$pr" "$classification"
+                  record_fingerprint "$fingerprint"
+                fi
+                ;;
+              merge-low|merge-high|conflict-low|conflict-high)
+                echo "DRY_RUN ${class} PR #${pr}: Phase 2 placeholder; no mutation"
+                ;;
+              leave)
+                :
+                ;;
+              *)
+                echo "::warning::Unknown PR disposition class '${class}' for PR #${pr}; leaving untouched"
+                ;;
+            esac
+          done
+
+          if [ "$DRY_RUN" = "true" ]; then
+            printf 'false' > "$sentinel"
+          fi
+
+      - name: Commit state
+        if: ${{ (github.event.inputs.dry_run || 'false') != 'true' }}
+        run: |
+          set -euo pipefail
+          sentinel="${PR_DISPOSITION_MATERIAL_SENTINEL:-/tmp/pr-disposition-material-changed}"
+          if [ ! -f "$sentinel" ]; then
+            echo "::warning::material-change sentinel missing; skipping commit"
+            exit 0
+          fi
+          if [ "$(cat "$sentinel")" != "true" ]; then
+            echo "No material PR-disposition state change; skipping commit"
+            exit 0
+          fi
+
+          state_content="$(cat company/pr-disposition-state.json)"
+          if ! printf '%s' "$state_content" | bash company/scripts/sanitise.sh > /dev/null; then
+            echo "::error::sanitise.sh rejected company/pr-disposition-state.json"
+            exit 1
+          fi
+
+          git config user.name "pupabobas[bot]"
+          git config user.email "pupabobas[bot]@users.noreply.github.com"
+          git add company/pr-disposition-state.json
+          git diff --cached --quiet && echo "No state changes to commit" && exit 0
+          git commit -m "chore(pr-disposition): update state"
+          git push

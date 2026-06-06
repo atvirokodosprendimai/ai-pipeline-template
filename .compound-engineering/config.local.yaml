@@ -63,3 +63,12 @@ goal_sprint_seed_repo_source: pulse_seed_product_repo
 # goal-sprint step: weekly LLM-driven ideation that emits one spec issue into
 # the autonomous builder chain (atvirokodosprendimai/wgmesh or pulse_seed_product_repo).
 # Triggered every Monday 07:00 UTC. Anti-flood: only emits when fingerprint changes.
+
+# --- Autonomous PR disposition (Phase 1) ---
+# Additional high-risk path regexes, appended to the built-in defaults:
+#   - '^docs/(outreach|customers)/'
+#   - '^company/system-prompt\.md$'
+#   - '(^|/)(auth|authn|oauth|secrets?|payments?|billing|stripe|polar)(/|$)'
+#   - '(^|/)[^/]*(auth|secret|token|credential|payment|billing|stripe|polar)[^/]*'
+# pr_disposition_high_risk_paths:
+#   - '^example/high-risk/path/'
