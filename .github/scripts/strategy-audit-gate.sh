@@ -35,6 +35,14 @@ strategy_audit_metric_values_changed() {
     ' >/dev/null
 }
 
+strategy_audit_reported_fingerprint_baseline() {
+  local baseline_file="${1:?Usage: strategy_audit_reported_fingerprint_baseline <baseline-json> <fingerprint> <output-json>}"
+  local fingerprint="${2:?Usage: strategy_audit_reported_fingerprint_baseline <baseline-json> <fingerprint> <output-json>}"
+  local output_file="${3:?Usage: strategy_audit_reported_fingerprint_baseline <baseline-json> <fingerprint> <output-json>}"
+
+  jq --arg fp "$fingerprint" '.last_reported_drift_fingerprint = $fp' "$baseline_file" > "$output_file"
+}
+
 strategy_audit_decide() {
   local baseline_file="${1:?Usage: strategy_audit_decide <baseline-json> <candidate-json> <any-drift> <fingerprint> <output-json> <decision-env>}"
   local candidate_file="${2:?Usage: strategy_audit_decide <baseline-json> <candidate-json> <any-drift> <fingerprint> <output-json> <decision-env>}"

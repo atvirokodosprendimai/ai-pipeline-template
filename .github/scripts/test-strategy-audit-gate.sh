@@ -95,7 +95,7 @@ source_decision() {
   source "$decision_file"
 }
 
-# Scenario A: same drift fingerprint twice -> first opens, second does not.
+# Scenario A: new drift fingerprint -> marker baseline is persisted and drift PR opens.
 rows_drift="$tmpdir/rows-drift.json"
 milestones_drift="$tmpdir/milestones-drift.json"
 write_metric_rows "$rows_drift" paid_customers
@@ -113,16 +113,22 @@ source_decision "$decision_first"
 [ "$STRATEGY_AUDIT_ACTION" = "open_pr" ] || fail "first drift run should open PR"
 [ "$STRATEGY_AUDIT_OPEN_PR" = "true" ] || fail "first drift run should set open_pr=true"
 
+marker_first="$tmpdir/marker-first.json"
+strategy_audit_reported_fingerprint_baseline "$baseline_first" "$fp_one" "$marker_first"
+[ "$(jq -r '.last_reported_drift_fingerprint' "$marker_first")" = "$fp_one" ] || fail "new drift should persist fingerprint to marker baseline"
+jq -e --slurpfile baseline "$baseline_first" '.audits == $baseline[0].audits' "$marker_first" >/dev/null || fail "marker baseline should only update reported fingerprint"
+
+# Scenario B: same drift fingerprint after marker baseline update -> no PR.
 candidate_second="$tmpdir/candidate-second.json"
 final_second="$tmpdir/final-second.json"
 decision_second="$tmpdir/decision-second.env"
-append_candidate "$final_first" "$candidate_second" 0 "2026-06-03T00:00:00Z"
-strategy_audit_decide "$final_first" "$candidate_second" true "$fp_one" "$final_second" "$decision_second"
+append_candidate "$marker_first" "$candidate_second" 0 "2026-06-03T00:00:00Z"
+strategy_audit_decide "$marker_first" "$candidate_second" true "$fp_one" "$final_second" "$decision_second"
 source_decision "$decision_second"
 [ "$STRATEGY_AUDIT_ACTION" = "skip" ] || fail "second same drift should skip"
 [ "$STRATEGY_AUDIT_OPEN_PR" = "false" ] || fail "second same drift should not open PR"
 
-# Scenario B: changed drift fingerprint -> opens PR.
+# Scenario C: changed drift fingerprint -> opens PR.
 rows_changed="$tmpdir/rows-changed.json"
 write_metric_rows "$rows_changed" active_stuck_issues paid_customers
 fp_changed="$(strategy_audit_drift_fingerprint "$rows_changed" "$milestones_drift" false)"
@@ -137,7 +143,7 @@ source_decision "$decision_changed"
 [ "$STRATEGY_AUDIT_ACTION" = "open_pr" ] || fail "changed drift should open PR"
 [ "$STRATEGY_AUDIT_OPEN_PR" = "true" ] || fail "changed drift should set open_pr=true"
 
-# Scenario C: no drift + timestamp-only change -> no commit and no PR.
+# Scenario D: no drift + timestamp-only change -> no commit and no PR.
 rows_ok="$tmpdir/rows-ok.json"
 milestones_ok="$tmpdir/milestones-ok.json"
 write_ok_rows "$rows_ok"
@@ -156,7 +162,7 @@ source_decision "$decision_timestamp"
 [ "$STRATEGY_AUDIT_OPEN_PR" = "false" ] || fail "timestamp-only no-drift run should not open PR"
 [ "$STRATEGY_AUDIT_COMMIT_MAIN" = "false" ] || fail "timestamp-only no-drift run should not commit"
 
-# Scenario D: no drift + metric-value change -> commit to main, no PR.
+# Scenario E: no drift + metric-value change -> commit to main, no PR.
 candidate_metric="$tmpdir/candidate-metric.json"
 final_metric="$tmpdir/final-metric.json"
 decision_metric="$tmpdir/decision-metric.env"
@@ -167,4 +173,4 @@ source_decision "$decision_metric"
 [ "$STRATEGY_AUDIT_OPEN_PR" = "false" ] || fail "metric-value no-drift run should not open PR"
 [ "$STRATEGY_AUDIT_COMMIT_MAIN" = "true" ] || fail "metric-value no-drift run should set commit_main=true"
 
-echo "PASS test-strategy-audit-gate: 4 scenarios"
+echo "PASS test-strategy-audit-gate: 5 scenarios"
