@@ -10,6 +10,7 @@ mkdir -p "$TMPDIR/bin"
 export PATH="$TMPDIR/bin:$PATH"
 export OPENROUTER_API_KEY="test-key"
 export PR_DISPOSITION_STATE="$TMPDIR/state.json"
+export GH_REPO="owner/repo"
 printf '{"ledger":[],"acted_fingerprints":[]}\n' > "$PR_DISPOSITION_STATE"
 
 cat > "$TMPDIR/bin/gh" <<'SH'
@@ -17,7 +18,7 @@ cat > "$TMPDIR/bin/gh" <<'SH'
 set -euo pipefail
 if [[ "$1" == "pr" && "$2" == "list" ]]; then
   cat <<'JSON'
-[{"number":101,"headRefOid":"sha-merge-low"},{"number":102,"headRefOid":"sha-merge-high"},{"number":103,"headRefOid":"sha-stale"},{"number":104,"headRefOid":"sha-conflict-low"},{"number":105,"headRefOid":"sha-conflict-high"},{"number":106,"headRefOid":"sha-human"},{"number":107,"headRefOid":"sha-leave"},{"number":108,"headRefOid":"sha-current"}]
+[{"number":101,"headRefOid":"sha-merge-low"},{"number":102,"headRefOid":"sha-merge-high"},{"number":103,"headRefOid":"sha-stale"},{"number":104,"headRefOid":"sha-conflict-low"},{"number":105,"headRefOid":"sha-conflict-high"},{"number":106,"headRefOid":"sha-human"},{"number":107,"headRefOid":"sha-leave"},{"number":108,"headRefOid":"sha-current"},{"number":109,"headRefOid":"sha-list-stale"}]
 JSON
   exit 0
 fi
@@ -33,6 +34,7 @@ if [[ "$1" == "pr" && "$2" == "view" ]]; then
       106) echo "sha-human" ;;
       107) echo "sha-leave" ;;
       108) echo "sha-current" ;;
+      109) echo "sha-classified-stale" ;;
       *) exit 1 ;;
     esac
     exit 0
@@ -70,6 +72,10 @@ JSON
 {"number":108,"title":"Stale Copilot SHA","mergeable":"MERGEABLE","headRefOid":"sha-current","labels":[],"author":{"login":"operator"},"files":[{"path":"scripts/old-review.sh"}],"statusCheckRollup":[{"name":"ci","status":"COMPLETED","conclusion":"SUCCESS"}],"reviews":[{"author":{"login":"Copilot"},"state":"COMMENTED","body":"CLEAN","commit":{"oid":"sha-old"}}]}
 JSON
       ;;
+    109) cat <<'JSON'
+{"number":109,"title":"Superseded after list","mergeable":"MERGEABLE","headRefOid":"sha-classified-stale","labels":[],"author":{"login":"operator"},"files":[{"path":"scripts/stale-after-list.sh"}],"statusCheckRollup":[{"name":"ci","status":"COMPLETED","conclusion":"FAILURE"}],"reviews":[]}
+JSON
+      ;;
     *) exit 1 ;;
   esac
   exit 0
@@ -93,7 +99,7 @@ while [[ $# -gt 0 ]]; do
     *) shift ;;
   esac
 done
-if grep -q "Superseded stale" "$request"; then
+if grep -q "Superseded" "$request"; then
   content='{"verdict":"stale","reason":"A newer PR supersedes this work."}'
 else
   content='{"verdict":"leave","reason":"The PR still appears wanted."}'
@@ -121,12 +127,13 @@ has_fingerprint() {
 
 run_queue() {
   local dry_run="$1"
-  while IFS= read -r pr; do
-    [[ -n "$pr" ]] || continue
-    local classification class sha fp comment tmp
+  while IFS= read -r row; do
+    [[ -n "$row" ]] || continue
+    local pr classification class sha fp comment tmp
+    pr="$(jq -r '.number' <<< "$row")"
     classification="$(bash "$ROOT_DIR/scripts/pr-disposition/classify.sh" "$pr")"
     class="$(jq -r '.class' <<< "$classification")"
-    sha="$(gh pr view "$pr" --json headRefOid --jq .headRefOid)"
+    sha="$(jq -r '.headRefOid // ""' <<< "$classification")"
     fp="${pr}:${sha}:${class}"
     if has_fingerprint "$fp"; then
       echo "skip ${fp}"
@@ -148,8 +155,8 @@ run_queue() {
           comment="$(jq -r '.reasons | join("; ")' <<< "$classification")"
           comment="PR disposition escalated for human review: ${comment}"
           bash "$ROOT_DIR/company/scripts/sanitise.sh" <<< "$comment" >/dev/null
-          gh pr edit "$pr" --add-label needs-human
-          gh pr comment "$pr" --body "$comment"
+          gh pr edit "$pr" --repo "$GH_REPO" --add-label needs-human
+          gh pr comment "$pr" --repo "$GH_REPO" --body "$comment"
           record_fingerprint "$fp"
         fi
         ;;
@@ -164,7 +171,7 @@ run_queue() {
         exit 1
         ;;
     esac
-  done < <(gh pr list --state open --json number,headRefOid | jq -r '.[].number')
+  done < <(gh pr list --repo "$GH_REPO" --state open --json number,headRefOid | jq -c '.[]')
 }
 
 pass=0
@@ -221,8 +228,8 @@ assert_jq() {
 export GH_LOG="$TMPDIR/gh.log"
 : > "$GH_LOG"
 run_queue false > "$TMPDIR/run1.out"
-assert_log_contains "stale is closed" "pr close 103 --comment"
-assert_log_contains "human gets needs-human label" "pr edit 106 --add-label needs-human"
+assert_log_contains "stale is closed" "pr close 103 --repo owner/repo --comment"
+assert_log_contains "human gets needs-human label" "pr edit 106 --repo owner/repo --add-label needs-human"
 assert_log_not_contains "no merge command" "pr merge"
 assert_log_not_contains "no edit merge command" "--merge"
 assert_output_contains "merge-low print only" "DRY_RUN merge-low 101" "$TMPDIR/run1.out"
@@ -239,6 +246,8 @@ else
 fi
 assert_jq "stale fingerprint recorded" '(.acted_fingerprints // []) | index("103:sha-stale:stale") != null'
 assert_jq "human fingerprint recorded" '(.acted_fingerprints // []) | index("106:sha-human:human") != null'
+assert_jq "fingerprint uses classified SHA" '(.acted_fingerprints // []) | index("109:sha-classified-stale:stale") != null'
+assert_jq "fingerprint ignores list SHA" '(.acted_fingerprints // []) | index("109:sha-list-stale:stale") == null'
 
 before="$(wc -l < "$GH_LOG" | tr -d ' ')"
 run_queue false > "$TMPDIR/run2.out"

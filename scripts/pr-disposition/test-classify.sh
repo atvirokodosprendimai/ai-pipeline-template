@@ -48,6 +48,22 @@ JSON
 {"number":8,"title":"Still wanted","mergeable":"MERGEABLE","headRefOid":"sha-leave","author":{"login":"operator"},"labels":[],"files":[{"path":"scripts/tool.sh"}],"statusCheckRollup":[{"name":"ci","status":"COMPLETED","conclusion":"FAILURE"}],"reviews":[]}
 JSON
       ;;
+    9) cat <<'JSON'
+{"number":9,"title":"Not clean body","mergeable":"MERGEABLE","headRefOid":"sha-not-clean","author":{"login":"operator"},"labels":[],"files":[{"path":"scripts/tool.sh"}],"statusCheckRollup":[{"name":"ci","status":"COMPLETED","conclusion":"SUCCESS"}],"reviews":[{"author":{"login":"Copilot"},"state":"COMMENTED","body":"NOT CLEAN","commit":{"oid":"sha-not-clean"}}]}
+JSON
+      ;;
+    10) cat <<'JSON'
+{"number":10,"title":"First line clean","mergeable":"MERGEABLE","headRefOid":"sha-first-line-clean","author":{"login":"operator"},"labels":[],"files":[{"path":"scripts/tool.sh"}],"statusCheckRollup":[{"name":"ci","status":"COMPLETED","conclusion":"SUCCESS"}],"reviews":[{"author":{"login":"Copilot"},"state":"COMMENTED","body":"  CLEAN  \nfollow-up text","commit":{"oid":"sha-first-line-clean"}}]}
+JSON
+      ;;
+    11) cat <<'JSON'
+{"number":11,"title":"Approved clean","mergeable":"MERGEABLE","headRefOid":"sha-approved","author":{"login":"operator"},"labels":[],"files":[{"path":"scripts/tool.sh"}],"statusCheckRollup":[{"name":"ci","status":"COMPLETED","conclusion":"SUCCESS"}],"reviews":[{"author":{"login":"Copilot"},"state":"APPROVED","body":"NOT CLEAN","commit":{"oid":"sha-approved"}}]}
+JSON
+      ;;
+    12) cat <<'JSON'
+{"number":12,"title":"Stale approved clean","mergeable":"MERGEABLE","headRefOid":"sha-current-approved","author":{"login":"operator"},"labels":[],"files":[{"path":"scripts/tool.sh"}],"statusCheckRollup":[{"name":"ci","status":"COMPLETED","conclusion":"SUCCESS"}],"reviews":[{"author":{"login":"Copilot"},"state":"APPROVED","body":"  CLEAN  ","commit":{"oid":"sha-old-approved"}}]}
+JSON
+      ;;
     *) exit 1 ;;
   esac
   exit 0
@@ -71,6 +87,11 @@ while [[ $# -gt 0 ]]; do
     *) shift ;;
   esac
 done
+user_content="$(jq -r '.messages[] | select(.role == "user").content' "$request")"
+if grep -Eq 'statusCheckRollup|reviews|"body"|"commit"' <<< "$user_content"; then
+  echo "LLM request leaked full PR details" >&2
+  exit 1
+fi
 if grep -q "Superseded" "$request"; then
   content='{"verdict":"stale","reason":"A newer PR supersedes this implementation."}'
 else
@@ -111,5 +132,9 @@ assert_class 5 "human" "low" "needs-human"
 assert_class 6 "leave" "low" "stale-copilot-sha"
 assert_class 7 "conflict-high" "high"
 assert_class 8 "leave" "low" "still appears wanted"
+assert_class 9 "leave" "low" "still appears wanted"
+assert_class 10 "merge-low" "low"
+assert_class 11 "merge-low" "low"
+assert_class 12 "leave" "low" "stale-copilot-sha"
 
 echo "PASS ${pass}/${total}"

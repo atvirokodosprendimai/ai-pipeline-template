@@ -6,12 +6,20 @@ SANITISE="${PR_DISPOSITION_SANITISE:-${ROOT_DIR}/company/scripts/sanitise.sh}"
 STATE_PATH="${PR_DISPOSITION_STATE:-${ROOT_DIR}/company/pr-disposition-state.json}"
 PR_NUMBER="${1:?usage: close-stale.sh PR_NUMBER CLASSIFICATION_JSON}"
 CLASSIFICATION_JSON="${2:?usage: close-stale.sh PR_NUMBER CLASSIFICATION_JSON}"
+TARGET_REPO="${TARGET_REPO:-${GH_REPO:-}}"
+
+if [[ -z "$TARGET_REPO" ]]; then
+  echo "close-stale.sh requires TARGET_REPO or GH_REPO to be set; refusing unscoped gh calls" >&2
+  exit 1
+fi
+
+repo_args=(--repo "$TARGET_REPO")
 
 escalate() {
   local pr="$1"
   local reason="Stale-close reason failed sanitise; human review required."
-  gh pr edit "$pr" --add-label needs-human || true
-  gh pr comment "$pr" --body "$reason" || true
+  gh pr edit "$pr" "${repo_args[@]}" --add-label needs-human || true
+  gh pr comment "$pr" "${repo_args[@]}" --body "$reason" || true
   echo "Escalated PR #${pr}: ${reason}"
 }
 
@@ -63,5 +71,5 @@ if ! "$SANITISE" < "$tmp_state" >/dev/null; then
   exit 0
 fi
 
-gh pr close "$PR_NUMBER" --comment "$safe_reason" --delete-branch
+gh pr close "$PR_NUMBER" "${repo_args[@]}" --comment "$safe_reason" --delete-branch
 mv "$tmp_state" "$STATE_PATH"

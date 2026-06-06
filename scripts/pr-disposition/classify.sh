@@ -6,6 +6,7 @@ SANITISE="${PR_DISPOSITION_SANITISE:-${ROOT_DIR}/company/scripts/sanitise.sh}"
 SYSTEM_PROMPT="${ROOT_DIR}/company/pr-disposition-system-prompt.md"
 PR_NUMBER="${1:?usage: classify.sh PR_NUMBER}"
 TARGET_REPO="${TARGET_REPO:-${GH_REPO:-}}"
+head_sha=""
 
 repo_args=()
 if [[ -n "$TARGET_REPO" ]]; then
@@ -15,13 +16,13 @@ fi
 emit() {
   local class="$1" risk="$2"
   shift 2
-  jq -nc --arg class "$class" --arg risk "$risk" --args \
-    '{"class": $class, "risk_tier": $risk, "reasons": $ARGS.positional}' "$@"
+  jq -nc --arg class "$class" --arg risk "$risk" --arg head "$head_sha" --args \
+    '{"class": $class, "risk_tier": $risk, "headRefOid": $head, "reasons": $ARGS.positional}' "$@"
 }
 
 pr_json=""
 if ! pr_json="$(gh pr view "$PR_NUMBER" "${repo_args[@]}" \
-  --json number,title,mergeable,statusCheckRollup,reviews,labels,author,files,headRefOid 2>/dev/null)"; then
+  --json number,title,mergeable,statusCheckRollup,reviews,labels,author,files,headRefOid,baseRefName,headRefName,createdAt,updatedAt 2>/dev/null)"; then
   emit "leave" "low" "gh-pr-view-failed"
   exit 0
 fi
@@ -61,9 +62,10 @@ copilot_state="$(jq -nc --argjson pr "$pr_json" --arg head "$head_sha" '
   def login: (.author.login // .user.login // "");
   def commit_oid: (.commit.oid // .commitOID // .commitId // .commit_id // "");
   def is_copilot: (login | test("copilot"; "i"));
+  def first_line_trimmed: ((.body // "") | split("\n")[0] | gsub("^[[:space:]]+|[[:space:]]+$"; ""));
   def is_clean:
-    (((.body // "") | test("\\bCLEAN\\b"; "i"))
-     or (((.state // "") | ascii_upcase) == "APPROVED"));
+    ((((.state // "") | ascii_upcase) == "APPROVED")
+     or (first_line_trimmed == "CLEAN"));
   ($pr.reviews // []) as $reviews
   | {
       current_clean: any($reviews[]?; is_copilot and is_clean and commit_oid == $head),
@@ -93,17 +95,32 @@ response="$(mktemp)"
 content_file="$(mktemp)"
 trap 'rm -f "$request" "$response" "$content_file"' EXIT
 
+pr_summary="$(jq -c '
+  {
+    number: .number,
+    title: (.title // ""),
+    changedFilePaths: [.files[]?.path // empty],
+    baseRefName: (.baseRefName // ""),
+    headRefName: (.headRefName // ""),
+    age: {
+      createdAt: (.createdAt // ""),
+      updatedAt: (.updatedAt // "")
+    },
+    labels: [.labels[]?.name // empty]
+  }
+' <<< "$pr_json")"
+
 jq -n \
   --rawfile system "$SYSTEM_PROMPT" \
   --arg pr_number "$PR_NUMBER" \
-  --argjson pr "$pr_json" \
+  --argjson pr "$pr_summary" \
   --arg risk "$risk_tier" \
   '{
     model: "anthropic/claude-sonnet-4",
     max_tokens: 1024,
     messages: [
       {role: "system", content: $system},
-      {role: "user", content: ("Classify PR #" + $pr_number + " for stale-vs-leave only. Risk tier: " + $risk + "\nPR JSON:\n" + ($pr | tostring))}
+      {role: "user", content: ("Classify PR #" + $pr_number + " for stale-vs-leave only. Risk tier: " + $risk + "\nPR summary:\n" + ($pr | tostring))}
     ]
   }' > "$request"
 
