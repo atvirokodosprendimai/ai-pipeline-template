@@ -80,7 +80,16 @@ jobs:
       - name: Publish supervisor rank
         if: steps.script-guard.outputs.present == 'true'
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          # Use the default GITHUB_TOKEN (issues: write granted via the permissions
+          # block above), NOT the GitHub App token. The app installation has
+          # contents:write but lost issues:write (~2026-06-05 20:00Z), so
+          # `gh issue edit` of the anchor issue fails with "Resource not accessible
+          # by integration (updateIssue)". publish-rank.sh does only issue ops
+          # (list/create/edit/close/comment) on this repo, all covered by
+          # GITHUB_TOKEN. Keeps the supervisor self-publishing regardless of
+          # app-permission drift. Snapshot (cross-repo wgmesh read) and Commit
+          # (app identity for protected main) intentionally stay on the app token.
+          GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
