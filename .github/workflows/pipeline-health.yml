@@ -74,6 +74,8 @@ jobs:
 
       # ── Phase 2 healing checks ───────────────────────────────
       - name: "Check stale needs-triage issues"
+        id: stale_triage
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.PUSH_TOKEN }}
           CUTOFF_OVERRIDE: ${{ inputs.cutoff_override_minutes }}
@@ -102,13 +104,14 @@ jobs:
 
           echo "Cutoff: $cutoff"
 
-          # shellcheck disable=SC2016
-          gh issue list --repo "$TARGET_REPO" --state open \
+          if ! gh issue list --repo "$TARGET_REPO" --state open \
             --label "needs-triage" --limit 50 \
             --json number,title,createdAt,labels \
-            --jq --arg cutoff "$cutoff" \
-            '.[] | select(.createdAt < $cutoff) | @json' \
-            > /tmp/stale_triage.json || true
+            --jq ".[] | select(.createdAt < \"$cutoff\") | @json" \
+            > /tmp/stale_triage.json; then
+            echo "::error::stale needs-triage detection query failed"
+            exit 1
+          fi
 
           while read -r issue; do
             number=$(echo "$issue" | jq -r '.number')
@@ -225,6 +228,8 @@ jobs:
           fi
 
       - name: "Check stale copilot-triaging issues"
+        id: stale_copilot
+        continue-on-error: true
         if: env.CIRCUIT_BREAKER_TRIPPED != 'true'
         env:
           GH_TOKEN: ${{ secrets.PUSH_TOKEN }}
@@ -254,13 +259,14 @@ jobs:
 
           echo "Cutoff: $cutoff"
 
-          # shellcheck disable=SC2016
-          gh issue list --repo "$TARGET_REPO" --state open \
+          if ! gh issue list --repo "$TARGET_REPO" --state open \
             --label "copilot-triaging" --limit 50 \
             --json number,title,createdAt,labels \
-            --jq --arg cutoff "$cutoff" \
-            '.[] | select(.createdAt < $cutoff) | @json' \
-            > /tmp/stale_copilot.json || true
+            --jq ".[] | select(.createdAt < \"$cutoff\") | @json" \
+            > /tmp/stale_copilot.json; then
+            echo "::error::stale copilot-triaging detection query failed"
+            exit 1
+          fi
 
           while read -r issue; do
             number=$(echo "$issue" | jq -r '.number')
@@ -362,6 +368,8 @@ jobs:
           fi
 
       - name: "Check stale approved-for-build PRs"
+        id: stale_approved
+        continue-on-error: true
         if: env.CIRCUIT_BREAKER_TRIPPED != 'true'
         env:
           GH_TOKEN: ${{ secrets.PUSH_TOKEN }}
@@ -391,13 +399,14 @@ jobs:
 
           echo "Cutoff: $cutoff"
 
-          # shellcheck disable=SC2016
-          gh pr list --repo "$TARGET_REPO" --state open \
+          if ! gh pr list --repo "$TARGET_REPO" --state open \
             --label "approved-for-build" --limit 50 \
             --json number,title,updatedAt,labels \
-            --jq --arg cutoff "$cutoff" \
-            '.[] | select(.updatedAt < $cutoff) | @json' \
-            > /tmp/stale_approved.json || true
+            --jq ".[] | select(.updatedAt < \"$cutoff\") | @json" \
+            > /tmp/stale_approved.json; then
+            echo "::error::stale approved-for-build detection query failed"
+            exit 1
+          fi
 
           while read -r pr; do
             number=$(echo "$pr" | jq -r '.number')
@@ -860,6 +869,12 @@ jobs:
         if: always() && steps.assert_mutation.outcome == 'failure'
         run: |
           echo "::error::State mutation assertion failed — supervisor may be clogged"
+          exit 1
+
+      - name: Fail if any stale-detection query failed
+        if: always() && (steps.stale_triage.outcome == 'failure' || steps.stale_copilot.outcome == 'failure' || steps.stale_approved.outcome == 'failure')
+        run: |
+          echo "::error::one or more stale-detection queries failed — heal incomplete this run"
           exit 1
 
       - name: Append pipeline-health outcome to MentisDB

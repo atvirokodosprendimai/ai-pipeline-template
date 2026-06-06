@@ -178,10 +178,10 @@ CREATED_ISSUES+=("$manual_issue_num")
 log "  Created manual-only issue #${manual_issue_num}"
 
 # ── Trigger the workflow ─────────────────────────────────────────────
-log "Triggering pipeline-health.yml via workflow_dispatch (cutoff_override_minutes=1)..."
+log "Triggering pipeline-health.yml via workflow_dispatch (cutoff_override_minutes=0)..."
 
-gh workflow run pipeline-health.yml --repo "$SELF_REPO" -f cutoff_override_minutes=1 2>/dev/null || \
-  gh workflow run "Pipeline Health (Self-Healing)" --repo "$SELF_REPO" -f cutoff_override_minutes=1 2>/dev/null || {
+gh workflow run pipeline-health.yml --repo "$SELF_REPO" -f cutoff_override_minutes=0 2>/dev/null || \
+  gh workflow run "Pipeline Health (Self-Healing)" --repo "$SELF_REPO" -f cutoff_override_minutes=0 2>/dev/null || {
     fail "Could not trigger pipeline-health workflow"
     echo "============================================================"
     echo "Results: ${PASS_COUNT} passed, ${FAIL_COUNT} failed"
@@ -308,6 +308,21 @@ if [ -n "$state_pr_num" ] && [ "$state_pr_num" != "null" ]; then
     fi
   else
     log "  WARN: Could not read audit log (may not have entries this run)"
+  fi
+
+  triage_audit_action=""
+  if [ -n "$audit_content" ]; then
+    triage_audit_action=$(echo "$audit_content" | jq -r --argjson issue "$triage_issue_num" \
+      'select(.action == "retrigger_triage" and .issue_number == $issue) | .action' | head -1)
+  fi
+  triage_retry_entry=$(echo "$state_content" | jq -e --arg issue "$triage_issue_num" \
+    '.retry_tracker[$issue] // empty' >/dev/null 2>&1 && echo "present" || echo "")
+
+  if [ -n "$triage_audit_action" ] || [ -n "$triage_retry_entry" ]; then
+    pass "Stale needs-triage issue #${triage_issue_num} produced a healing action"
+  else
+    log "FAIL: Stale needs-triage issue #${triage_issue_num} did not produce a retrigger_triage audit entry or retry_tracker entry"
+    exit 1
   fi
 else
   fail "No state-update PR found"
