@@ -1,0 +1,21 @@
+company/scripts/test-self-healing-e2e.sh
+  s_6a3d107144a21a::t_184e86e2f132e6 181,183-184
+.github/workflows/pipeline-health.yml
+  s_6a3d107144a21a::t_184e86e2f132e6 77-78,231-232,371-372,874-877
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "085fd5b47e8f19043d4d822426db76ecb2f03c19",
+  "prompts": {},
+  "sessions": {
+    "s_6a3d107144a21a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1afa8f14-6c3b-4431-836f-acb5a871fb21",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
