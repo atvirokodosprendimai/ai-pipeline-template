@@ -1,0 +1,19 @@
+.github/workflows/heartbeat-pr-automerge.yml
+  s_ecd60944b840a1::t_cfa4f9c5fa02d0 21-22,83-88,105,137
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "cca1f9be4b55d86c2cbf43c4b5de89d78a8de985",
+  "prompts": {},
+  "sessions": {
+    "s_ecd60944b840a1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3e69dcb9-ab7f-4c79-a876-62c36bd43bbd",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
