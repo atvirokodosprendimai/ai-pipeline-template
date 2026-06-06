@@ -69,8 +69,17 @@ pulse_pr_processing_sla_days: 7
 # or TRANSIENT (succeeded on retry, root cause confirmed non-recurring). A window
 # is only KPI-clean when every failed action is FIXED or TRANSIENT with proof;
 # any OPEN failed action fails the KPI.
+#
+# SCOPE = BOTH repos. The KPI covers workflow runs in the meta-repo AND in the
+# seed repo (pulse_seed_product_repo / TARGET_REPO = atvirokodosprendimai/wgmesh).
+# Querying only the meta-repo hid a 2-week wgmesh outage: `Copilot Issue Triage`
+# failed `Bad credentials` on every run from ~2026-05-21, stalling the entire
+# seed pipeline at triage while the meta-repo read "healthy". A pulse MUST run
+# `gh run list --repo <seed>` and disposition seed-repo failures too. See
+# docs/pulse-reports + memory project_wgmesh_triage_bad_credentials.
 pulse_action_success_kpi: enabled
 pulse_action_success_target: 1.0
+pulse_action_success_scope: meta-repo,seed-repo
 
 goal_sprint_enabled: true
 goal_sprint_cadence: weekly
