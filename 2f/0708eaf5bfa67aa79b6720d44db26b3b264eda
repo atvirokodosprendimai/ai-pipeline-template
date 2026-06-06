@@ -1,0 +1,13 @@
+scripts/lint/test-check-llm-emit-sanitise.sh
+  ai_agent 14,184-214,219
+scripts/lint/check-llm-emit-sanitise.sh
+  ai_agent 27,38-92,146
+.github/workflows/sanitise-wall.yml
+  ai_agent 7-9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "2f0708eaf5bfa67aa79b6720d44db26b3b264eda",
+  "prompts": {}
+}
