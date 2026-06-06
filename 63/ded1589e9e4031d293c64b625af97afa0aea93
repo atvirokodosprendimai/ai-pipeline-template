@@ -1,0 +1,23 @@
+.github/workflows/sanitise-wall.yml
+  s_6b0c072090ebfb::t_74cc8c8fde5c3f 1-16
+scripts/lint/check-llm-emit-sanitise.sh
+  s_6b0c072090ebfb::t_74cc8c8fde5c3f 1-112
+scripts/lint/test-check-llm-emit-sanitise.sh
+  s_6b0c072090ebfb::t_74cc8c8fde5c3f 1-195
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "63ded1589e9e4031d293c64b625af97afa0aea93",
+  "prompts": {},
+  "sessions": {
+    "s_6b0c072090ebfb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eb59164c-be8a-43f6-8ed4-1ce4d852ddaf",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
