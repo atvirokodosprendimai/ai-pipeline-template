@@ -1,0 +1,23 @@
+.github/workflows/pipeline-health.yml
+  s_6a3d107144a21a::t_60afbf4bcd5ff0 105,108-112,258,261-265,396,399-403
+docs/plans/2026-06-06-001-fix-self-healing-stale-detection-plan.md
+  s_6a3d107144a21a::t_ba0d27d8e0129f 1-267
+company/scripts/test-self-healing-e2e.sh
+  s_6a3d107144a21a::t_60afbf4bcd5ff0 312-326
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "49ba739a586087d0099752ec94b1974d73185b7e",
+  "prompts": {},
+  "sessions": {
+    "s_6a3d107144a21a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1afa8f14-6c3b-4431-836f-acb5a871fb21",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
