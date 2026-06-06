@@ -1,0 +1,19 @@
+.github/workflows/pr-disposition.yml
+  s_6a3d107144a21a::t_b2a67b8325c8cb 24,40-41,211-223
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "7bace3e87edf64cdc9df3fe2d39fa48341aa1983",
+  "prompts": {},
+  "sessions": {
+    "s_6a3d107144a21a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1afa8f14-6c3b-4431-836f-acb5a871fb21",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
