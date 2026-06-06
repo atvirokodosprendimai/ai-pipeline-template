@@ -63,6 +63,22 @@ jobs:
               ;;
           esac
 
+          # Hard author gate for the supervisor-rank / pr-disposition state lanes:
+          # these are the only producers of those state files, so a non-bot
+          # same-repo PR matching the title+branch+file-scope must NOT ride the
+          # admin-bypass merge. (Copilot review on #1470.)
+          case "$PR_TITLE" in
+            'chore: supervisor-rank state'*|'chore(pr-disposition): update state'*)
+              case "$PR_AUTHOR" in
+                pupabobas[bot]|app/pupabobas) ;;
+                *)
+                  echo "::error::state-PR fast-lane requires pupabobas[bot] author; got '$PR_AUTHOR'"
+                  exit 1
+                  ;;
+              esac
+              ;;
+          esac
+
           changed_files=()
           while IFS= read -r path; do
             [ -n "$path" ] && changed_files+=("$path")
