@@ -65,6 +65,39 @@ Before any script change is "done": `bash -n <script>` (syntax), run its `test-*
 and `shellcheck` if available. **Every input-producing script needs a test that exercises
 its real (non-dry-run) path** — dry-run-only coverage has shipped bugs here before.
 
+## Behavioral Rules
+
+Bias toward correctness, small diffs, and verified changes.
+
+### Think Before Coding
+
+- State assumptions. If requirements are ambiguous, ask before editing.
+- If multiple interpretations exist, present them instead of choosing silently.
+- Push back on overcomplicated or speculative work.
+- For non-trivial changes, define success criteria and a short plan before implementation.
+
+### Simplicity First
+
+- Implement only what was requested.
+- Do not add abstractions for single-use code.
+- Do not add configurability, fallback paths, or defensive handling for impossible states.
+- If a change grows large, stop and simplify before continuing.
+
+### Surgical Changes
+
+- Touch only files needed for the request.
+- Do not refactor, reformat, or clean adjacent code unless required.
+- Match existing style, even when a different style would be preferable.
+- Remove only unused imports, variables, or functions created by your own change.
+- Mention unrelated dead code or issues; do not fix them unless asked.
+
+### Verified Execution
+
+- Convert tasks into verifiable goals: reproduce bugs, add focused tests when useful, then make checks pass.
+- For multi-step work, use: `step -> verify: check`.
+- Do not claim completion without evidence from tests, lint, type-check, build, runtime output, or source tracing.
+- See [Stop the line on defects](#conventions) below — fix a failing check before continuing.
+
 ## Conventions
 
 - **Public repo.** Loop assessments are committed and world-readable. Never write secrets,
