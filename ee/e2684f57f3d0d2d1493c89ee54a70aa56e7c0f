@@ -1,0 +1,39 @@
+.github/workflows/pr-disposition.yml
+  s_6b0c072090ebfb::t_fce417834c42a9 1-212
+scripts/pr-disposition/test-risk-tier.sh
+  s_6b0c072090ebfb::t_fce417834c42a9 1-43
+scripts/pr-disposition/risk-tier.sh
+  s_6b0c072090ebfb::t_fce417834c42a9 1-79
+scripts/pr-disposition/test-classify.sh
+  s_6b0c072090ebfb::t_fce417834c42a9 1-115
+scripts/pr-disposition/test-disposition-e2e.sh
+  s_6b0c072090ebfb::t_fce417834c42a9 1-262
+scripts/pr-disposition/classify.sh
+  s_6b0c072090ebfb::t_fce417834c42a9 1-146
+scripts/pr-disposition/test-close-stale.sh
+  s_6b0c072090ebfb::t_fce417834c42a9 1-90
+.compound-engineering/config.local.yaml
+  ai_agent 66-74
+scripts/pr-disposition/close-stale.sh
+  s_6b0c072090ebfb::t_fce417834c42a9 1-67
+company/pr-disposition-state.json
+  s_6b0c072090ebfb::t_fce417834c42a9 1
+company/pr-disposition-system-prompt.md
+  s_6b0c072090ebfb::t_fce417834c42a9 1-12
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "eee2684f57f3d0d2d1493c89ee54a70aa56e7c0f",
+  "prompts": {},
+  "sessions": {
+    "s_6b0c072090ebfb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eb59164c-be8a-43f6-8ed4-1ce4d852ddaf",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
