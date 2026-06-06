@@ -1,22 +1,23 @@
 # Assessment: 2026-06-06
 
-**Stage**: Revenue | **Run**: 229
+**Stage**: Revenue | **Run**: 230
 
-Stage 5, day 80. Revenue milestone maintained with 5 active subscribers generating €0.04 MRR from all-org products (note: seed products remain pre-revenue at 0 subscribers). Pipeline is healthy but nearly idle with only 5 fn:dev issues active and 0 open PRs. Given idle state, prioritizing customer acquisition work per Commercial Idle Policy.
+Stage 5, day 80. Revenue confirmed with 5 active subscribers generating €4+ MRR, but critical attribution gap: all seed product subscribers remain 0, indicating revenue comes from other Polar org products, not wgmesh/cloudroof. Product remains stable (v0.2.1, 18 stars) with healthy pipeline (5 fn:dev issues progressing, CI failure needs attention). Pipeline is actively working, not idle.
 
 ## Blockers
-- Stage 5 exit criteria still undefined — no clear growth milestone beyond initial revenue
-- Seed products (cloudroof tier) have 0 subscribers despite revenue from other org products
+- Revenue attribution mismatch: Stage 5 status from other Polar products while seed products (wgmesh/cloudroof) have 0 paying customers
+- CI failure blocking merge pipeline and deployment confidence
 
 ## Top Actions
-- **fn:dev**: Create targeted pilot evaluation framework for network administrators to trial wgmesh in production environments (zero)
-- **fn:dev**: Add Polar checkout CTAs to wgmesh.dev and cloudroof.eu landing pages to convert traffic to subscribers (zero)
-- **fn:dev**: Define Stage 6 growth criteria and milestones beyond initial revenue to maintain funnel progression (zero)
+- **fn:dev**: Investigate CI failure and restore merge pipeline health (zero)
+- **fn:dev**: Implement revenue attribution tracking to separate seed product revenue from other Polar org revenue (zero)
+- **fn:gtm**: Create wgmesh-specific customer acquisition documentation analyzing why seed products have 0 adoption (zero)
 
 ## Contributions
-- **Marty**: Recent git commits maintaining product stability through revenue milestone
-- **pupabobas[bot]**: 60 bot commits in past 7 days maintaining pipeline operations and assessment generation
-- **paying-customers**: 5 active subscribers maintaining €0.04 MRR with consistent monthly orders
+- **Marty**: Recent git commits maintaining project stability
+- **pupabobas[bot]**: 60 bot commits in past 7 days maintaining pipeline operations
+- **polar-customers**: 5 active subscribers maintaining €4+ MRR with recent orders
+- **github-community**: 18 stars and 2 forks indicating growing project interest
 
 ## Needs Human
 _Nothing this cycle._
