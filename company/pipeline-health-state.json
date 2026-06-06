@@ -1,47 +1,52 @@
 {
-  "last_check": "2026-06-06T10:04:26Z",
+  "last_check": "2026-06-06T11:53:09Z",
   "check_interval_hours": 0.5,
-  "checks_run": 784,
-  "issues_healed_total": 10,
+  "checks_run": 785,
+  "issues_healed_total": 15,
   "consecutive_no_mutation_runs": 0,
   "retry_tracker": {
     "651": {
       "retries": 2,
       "last_retry": "2026-06-06T10:04:04Z",
-      "action": "retrigger_triage"
+      "action": "retrigger_triage",
+      "cooldown_until": "2026-06-07T11:53:00Z"
     },
     "584": {
       "retries": 2,
       "last_retry": "2026-06-06T10:04:08Z",
-      "action": "retrigger_triage"
+      "action": "retrigger_triage",
+      "cooldown_until": "2026-06-07T11:53:01Z"
     },
     "573": {
       "retries": 2,
       "last_retry": "2026-06-06T10:04:13Z",
-      "action": "retrigger_triage"
+      "action": "retrigger_triage",
+      "cooldown_until": "2026-06-07T11:53:02Z"
     },
     "540": {
       "retries": 2,
       "last_retry": "2026-06-06T10:04:17Z",
-      "action": "retrigger_triage"
+      "action": "retrigger_triage",
+      "cooldown_until": "2026-06-07T11:53:03Z"
     },
     "539": {
       "retries": 2,
       "last_retry": "2026-06-06T10:04:22Z",
-      "action": "retrigger_triage"
+      "action": "retrigger_triage",
+      "cooldown_until": "2026-06-07T11:53:04Z"
     }
   },
   "funnel_signals": {
     "dogfood": true,
     "presence": true,
     "endpoint_details": "chimney:ok,cloudroof:ok,coroot:ok,tvcentras:ok",
-    "checked_at": "2026-06-06T10:04:26Z"
+    "checked_at": "2026-06-06T11:53:08Z"
   },
   "idle_signal": {
     "idle": false,
     "open_prs": 0,
     "active_pipeline_issues": 6,
-    "checked_at": "2026-06-06T10:04:26Z"
+    "checked_at": "2026-06-06T11:53:08Z"
   },
   "last_run_summary": {
     "stale_triage_found": 5,
@@ -51,9 +56,9 @@
     "actions_taken": 5,
     "errors": 0
   },
-  "last_mutation_asserted_at": "2026-06-06T10:04:26Z",
+  "last_mutation_asserted_at": "2026-06-06T11:53:09Z",
   "last_mutation_assertion": {
     "status": "passed",
-    "checked_at": "2026-06-06T10:04:26Z"
+    "checked_at": "2026-06-06T11:53:09Z"
   }
 }

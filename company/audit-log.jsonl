@@ -793,3 +793,9 @@
 {"timestamp":"2026-06-06T10:04:17Z","run_id":"27059358350","action":"retrigger_triage","issue_number":540,"target_repo":"wgmesh","reason":"stale >24h at needs-triage","outcome":"success","retry_count":2}
 {"timestamp":"2026-06-06T10:04:22Z","run_id":"27059358350","action":"retrigger_triage","issue_number":539,"target_repo":"wgmesh","reason":"stale >24h at needs-triage","outcome":"success","retry_count":2}
 {"timestamp":"2026-06-06T10:04:26Z","run_id":"27059358350","action":"check_funnel_signals","issue_number":null,"target_repo":"wgmesh","reason":"periodic signal check","outcome":"success","retry_count":null,"signals":{"dogfood":true,"presence":true}}
+{"timestamp":"2026-06-06T11:53:00Z","run_id":"27061563558","action":"escalate","issue_number":651,"target_repo":"wgmesh","reason":"2 consecutive triage failures","outcome":"success","retry_count":2}
+{"timestamp":"2026-06-06T11:53:01Z","run_id":"27061563558","action":"escalate","issue_number":584,"target_repo":"wgmesh","reason":"2 consecutive triage failures","outcome":"success","retry_count":2}
+{"timestamp":"2026-06-06T11:53:02Z","run_id":"27061563558","action":"escalate","issue_number":573,"target_repo":"wgmesh","reason":"2 consecutive triage failures","outcome":"success","retry_count":2}
+{"timestamp":"2026-06-06T11:53:03Z","run_id":"27061563558","action":"escalate","issue_number":540,"target_repo":"wgmesh","reason":"2 consecutive triage failures","outcome":"success","retry_count":2}
+{"timestamp":"2026-06-06T11:53:04Z","run_id":"27061563558","action":"escalate","issue_number":539,"target_repo":"wgmesh","reason":"2 consecutive triage failures","outcome":"success","retry_count":2}
+{"timestamp":"2026-06-06T11:53:08Z","run_id":"27061563558","action":"check_funnel_signals","issue_number":null,"target_repo":"wgmesh","reason":"periodic signal check","outcome":"success","retry_count":null,"signals":{"dogfood":true,"presence":true}}
