@@ -1,0 +1,27 @@
+scripts/goal-sprint/test-goal-sprint.sh
+  s_6b0c072090ebfb::t_520616715722fe 5,38-40,53-54,56,95-102,285-348,358-359
+company/goal-sprint-system-prompt.md
+  s_6b0c072090ebfb::t_520616715722fe 26
+scripts/goal-sprint/build-context.sh
+  s_6b0c072090ebfb::t_520616715722fe 2,16,26,35,37,50
+scripts/goal-sprint/emit.sh
+  s_6b0c072090ebfb::t_520616715722fe 2-3,14-29,74-75,126-130,133-137,147,149,152-172
+scripts/goal-sprint/fingerprint.sh
+  s_6b0c072090ebfb::t_520616715722fe 2-3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "c6225cb8487d7f8e597d25835245449184f4b8a0",
+  "prompts": {},
+  "sessions": {
+    "s_6b0c072090ebfb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eb59164c-be8a-43f6-8ed4-1ce4d852ddaf",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
