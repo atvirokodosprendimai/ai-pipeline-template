@@ -1,8 +1,8 @@
 # AGENTS.md
 
 Canonical entry point for any agent (Codex, Claude, Goose) or human working in this
-repo. Other tool-specific files (`CLAUDE.md`, `.goosehints`) point here — edit this
-file, not those.
+repo. `CLAUDE.md` points here; `.goosehints` is being updated to defer here too (PR #1443).
+Edit this file, not those.
 
 ## What this repo is
 
@@ -58,7 +58,7 @@ bash .github/scripts/test-classify.sh       # clog classification
 bash .github/scripts/test-assert-state-mutation.sh
 bash company/scripts/test-collect-memory.sh
 bash company/scripts/test-pr-review-merge.sh
-bash company/scripts/test-self-healing-e2e.sh
+bash company/scripts/test-self-healing-e2e.sh   # needs GH_TOKEN + gh auth + jq; hits live gh API and creates artifacts in the wgmesh repo — not a pure local unit test
 ```
 
 Before any script change is "done": `bash -n <script>` (syntax), run its `test-*.sh`,
