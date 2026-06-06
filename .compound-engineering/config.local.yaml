@@ -57,6 +57,21 @@ pulse_pending_metrics: cycle_time_to_revenue,spec_coverage
 pulse_pr_processing_kpi: enabled
 pulse_pr_processing_sla_days: 7
 
+# --- Action-success KPI (added 2026-06-06) ---
+# Andon/jidoka: EVERY autonomous action the pipeline attempts must succeed.
+# A failed action = a tracked breach to drive to zero, never normalised as noise.
+# "Action" = a workflow run that attempts a mutation/decision: heal, escalate,
+# merge (heartbeat/bot-review), pr-disposition, supervisor-rank publish,
+# observation-loop, goal-sprint emit, strategy-audit. NOT actions: `skipped`
+# (conditional no-op) and `action_required` (awaiting input) — exclude from the rate.
+# Each pulse asserts: failed_actions == 0. If >0, list every failed action with a
+# disposition tag — FIXED (root cause + merged fix PR), OPEN (defect still live),
+# or TRANSIENT (succeeded on retry, root cause confirmed non-recurring). A window
+# is only KPI-clean when every failed action is FIXED or TRANSIENT with proof;
+# any OPEN failed action fails the KPI.
+pulse_action_success_kpi: enabled
+pulse_action_success_target: 1.0
+
 goal_sprint_enabled: true
 goal_sprint_cadence: weekly
 goal_sprint_seed_repo_source: pulse_seed_product_repo
