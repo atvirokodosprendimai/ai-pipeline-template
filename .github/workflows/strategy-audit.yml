@@ -169,6 +169,7 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           set -euo pipefail
+          source .github/scripts/strategy-audit-gate.sh
           baseline_file="company/strategy-audit-baseline.json"
           previous=$(jq -c '.audits[-1] // null' "$baseline_file")
           first_run=$(jq -r 'if (.audits // [] | length) == 0 then "true" else "false" end' "$baseline_file")
@@ -226,6 +227,7 @@ jobs:
             fi
             milestones=$(jq -c --arg date "$date_part" --arg target "$target" --arg current "$current" --arg status "$status" '. + [{date:$date,target:$target,current:$current,status:$status}]' <<< "$milestones")
           done < <(awk '/^## Milestones/{flag=1; next} /^## /{flag=0} flag && /^- /{print}' STRATEGY.md)
+          printf '%s\n' "$milestones" > /tmp/milestones.json
           metric_drift_count=$(jq '[.[] | select(.drift)] | length' /tmp/metric-rows.json)
           overdue_count=$(jq '[.[] | select(.status == "overdue")] | length' <<< "$milestones")
           if [ "$first_run" = "true" ]; then
@@ -244,19 +246,25 @@ jobs:
           if [ "$metric_drift_count" -gt 0 ] || [ "$overdue_count" -gt 0 ]; then
             any_drift="true"
           fi
-          echo "DRIFT_DETECTED=$any_drift" >> "$GITHUB_ENV"
-          # Daily cron requires per-day idempotency keys, not per-month: monthly
-          # keys collide with the merged-and-deleted branch from earlier in the
-          # month, leaving subsequent baselines stranded on a dead branch.
-          day=$(date -u '+%Y-%m-%d')
-          if [ "$any_drift" = "true" ]; then
-            branch="audit/strategy-drift-$day"
-            title="audit: strategy drift detected $day"
-          else
-            branch="audit/strategy-baseline-$day"
-            title="audit: strategy baseline $day"
+          drift_fingerprint="$(strategy_audit_drift_fingerprint /tmp/metric-rows.json /tmp/milestones.json "$first_run")"
+          strategy_audit_decide "$baseline_file" /tmp/strategy-audit-baseline.clean.json "$any_drift" "$drift_fingerprint" /tmp/strategy-audit-baseline.final.json /tmp/strategy-audit-decision.env
+          # shellcheck disable=SC1091
+          source /tmp/strategy-audit-decision.env
+          if ! bash company/scripts/sanitise.sh < /tmp/strategy-audit-baseline.final.json > /tmp/strategy-audit-baseline.final.clean.json; then
+            echo "::warning::strategy audit final baseline failed sanitisation; skipping commit and PR"
+            echo "STRATEGY_AUDIT_MISTAKE=true" >> "$GITHUB_ENV"
+            exit 0
           fi
+          mv /tmp/strategy-audit-baseline.final.clean.json /tmp/strategy-audit-baseline.final.json
+          echo "DRIFT_DETECTED=$any_drift" >> "$GITHUB_ENV"
+          echo "STRATEGY_AUDIT_ACTION=$STRATEGY_AUDIT_ACTION" >> "$GITHUB_ENV"
+          day=$(date -u '+%Y-%m-%d')
+          drift_fingerprint_hash="$(printf '%s' "$STRATEGY_AUDIT_DRIFT_FINGERPRINT" | sha256sum | awk '{print substr($1,1,12)}')"
+          branch="audit/strategy-drift-$drift_fingerprint_hash"
+          title="audit: strategy drift detected $drift_fingerprint_hash"
           {
+            echo "Drift fingerprint: \`$STRATEGY_AUDIT_DRIFT_FINGERPRINT\`"
+            echo
             echo "## Metric drift"
             echo "| Metric | Baseline | Current | Delta | Verdict |"
             echo "|---|---:|---:|---:|---|"
@@ -278,19 +286,114 @@ jobs:
               esac
             done
             jq -r '.[] | select(.status == "overdue") | "- Milestone \(.date) target (\(.target)) not met (current: \(.current)). Reaffirm in STRATEGY.md or revise the date/target."' <<< "$milestones"
-            if [ "$any_drift" != "true" ]; then
-              echo "- No STRATEGY.md edits suggested; this PR records the daily strategy baseline."
+            if [ "$STRATEGY_AUDIT_OPEN_PR" != "true" ]; then
+              echo "- No new strategy drift fingerprint detected."
             fi
           } > /tmp/audit-body.md
           git config user.name "pupabobas[bot]"
           git config user.email "pupabobas[bot]@users.noreply.github.com"
+          {
+            echo "Direct push to main was blocked, so this rolling PR carries the latest sanitized strategy audit baseline telemetry."
+            echo
+            echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo
+            echo "- Action: $STRATEGY_AUDIT_ACTION"
+            echo "- Drift detected: $any_drift"
+            echo "- Drift fingerprint: \`$STRATEGY_AUDIT_DRIFT_FINGERPRINT\`"
+          } > /tmp/audit-telemetry-body.md
+
+          push_strategy_audit_telemetry_pr() {
+            local source_file="${1:?Usage: push_strategy_audit_telemetry_pr <baseline-json> <body-file>}"
+            local body_file="${2:?Usage: push_strategy_audit_telemetry_pr <baseline-json> <body-file>}"
+            local telemetry_branch="audit/baseline-telemetry"
+            local telemetry_title="audit: strategy baseline telemetry"
+
+            git fetch origin "+refs/heads/$telemetry_branch:refs/remotes/origin/$telemetry_branch" || true
+            if git show-ref --verify --quiet "refs/remotes/origin/$telemetry_branch"; then
+              git checkout -B "$telemetry_branch" "origin/$telemetry_branch"
+            else
+              git checkout -B "$telemetry_branch" origin/main
+            fi
+            cp "$source_file" "$baseline_file"
+            if ! bash company/scripts/sanitise.sh < "$baseline_file" > /tmp/strategy-audit-baseline.telemetry.clean.json; then
+              echo "::warning::strategy audit baseline failed sanitisation before telemetry PR commit; skipping fallback PR"
+              echo "STRATEGY_AUDIT_MISTAKE=true" >> "$GITHUB_ENV"
+              return 1
+            fi
+            mv /tmp/strategy-audit-baseline.telemetry.clean.json "$baseline_file"
+            if git diff --quiet -- "$baseline_file"; then
+              echo "::notice::strategy audit telemetry branch already contains this baseline"
+            else
+              git commit -m "audit: strategy baseline telemetry $day" -- "$baseline_file"
+              git push -u origin "$telemetry_branch"
+            fi
+            existing=$(gh pr list --repo "$GITHUB_REPOSITORY" --search "$telemetry_title in:title" --state open --json number,title --jq '[.[] | select(.title == "audit: strategy baseline telemetry")] | .[0].number // empty')
+            if [ -n "$existing" ]; then
+              gh pr edit "$existing" --repo "$GITHUB_REPOSITORY" --body-file "$body_file"
+            else
+              gh pr create --repo "$GITHUB_REPOSITORY" --title "$telemetry_title" --body-file "$body_file" --base main --head "$telemetry_branch"
+            fi
+          }
+
+          if [ "$STRATEGY_AUDIT_ACTION" = "skip" ]; then
+            echo "::notice::strategy audit has no new drift and no metric-value change; skipping commit and PR"
+            exit 0
+          fi
+
+          if [ "$STRATEGY_AUDIT_OPEN_PR" = "true" ]; then
+            strategy_audit_reported_fingerprint_baseline "$baseline_file" "$STRATEGY_AUDIT_DRIFT_FINGERPRINT" /tmp/strategy-audit-baseline.marker.json
+            if ! bash company/scripts/sanitise.sh < /tmp/strategy-audit-baseline.marker.json > /tmp/strategy-audit-baseline.marker.clean.json; then
+              echo "::warning::strategy audit fingerprint marker failed sanitisation before main commit; skipping commit and PR"
+              echo "STRATEGY_AUDIT_MISTAKE=true" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            git checkout -B main origin/main
+            cp /tmp/strategy-audit-baseline.marker.clean.json "$baseline_file"
+            if git diff --quiet -- "$baseline_file"; then
+              echo "::notice::strategy audit drift fingerprint already persisted on main"
+            else
+              git commit -m "audit: strategy drift fingerprint $day" -- "$baseline_file"
+              if git push origin HEAD:main; then
+                echo "::notice::committed strategy audit drift fingerprint directly to main"
+                git fetch origin main:refs/remotes/origin/main
+              else
+                echo "::warning::direct main commit blocked; falling back to rolling strategy audit telemetry PR"
+                push_strategy_audit_telemetry_pr /tmp/strategy-audit-baseline.marker.clean.json /tmp/audit-telemetry-body.md
+              fi
+            fi
+          fi
+
+          if [ "$STRATEGY_AUDIT_COMMIT_MAIN" = "true" ]; then
+            git checkout -B main origin/main
+            mv /tmp/strategy-audit-baseline.final.json "$baseline_file"
+            if git diff --quiet -- "$baseline_file"; then
+              echo "::notice::strategy audit baseline unchanged after metric gate"
+              exit 0
+            fi
+            if ! bash company/scripts/sanitise.sh < "$baseline_file" > /tmp/strategy-audit-baseline.main.clean.json; then
+              echo "::warning::strategy audit baseline failed sanitisation before main commit; skipping commit"
+              echo "STRATEGY_AUDIT_MISTAKE=true" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            mv /tmp/strategy-audit-baseline.main.clean.json "$baseline_file"
+            git commit -m "audit: strategy baseline $day" -- "$baseline_file"
+            cp "$baseline_file" /tmp/strategy-audit-baseline.commit-main.json
+            if git push origin HEAD:main; then
+              echo "::notice::committed strategy audit baseline telemetry directly to main"
+            else
+              echo "::warning::direct main commit blocked; falling back to rolling strategy audit telemetry PR"
+              push_strategy_audit_telemetry_pr /tmp/strategy-audit-baseline.commit-main.json /tmp/audit-telemetry-body.md
+            fi
+            exit 0
+          fi
+
           git fetch origin "+refs/heads/$branch:refs/remotes/origin/$branch" || true
           if git show-ref --verify --quiet "refs/remotes/origin/$branch"; then
             git checkout -B "$branch" "origin/$branch"
           else
             git checkout -B "$branch" origin/main
           fi
-          mv /tmp/strategy-audit-baseline.clean.json "$baseline_file"
+          mv /tmp/strategy-audit-baseline.final.json "$baseline_file"
           if git diff --quiet -- "$baseline_file"; then
             echo "::notice::strategy audit baseline unchanged"
           else
@@ -300,14 +403,12 @@ jobs:
           existing=$(gh pr list --repo "$GITHUB_REPOSITORY" --search "$title in:title" --state all --json number,state --jq '[.[] | select(.state == "OPEN" or .state == "MERGED")] | .[0].number // empty')
           if [ -n "$existing" ]; then
             gh pr edit "$existing" --repo "$GITHUB_REPOSITORY" --body-file /tmp/audit-body.md
-          elif [ "$any_drift" = "true" ]; then
+          elif [ "$STRATEGY_AUDIT_OPEN_PR" = "true" ]; then
             gh pr create --repo "$GITHUB_REPOSITORY" --title "$title" --body-file /tmp/audit-body.md --base main --head "$branch" --label needs-human
-          else
-            gh pr create --repo "$GITHUB_REPOSITORY" --title "$title" --body-file /tmp/audit-body.md --base main --head "$branch"
           fi
 
       - name: Append audit outcome to MentisDB
-        if: always() && steps.skip-guard.outputs.skip != 'true'
+        if: "always() && steps.skip-guard.outputs.skip != 'true'"
         env:
           MENTISDB_URL: ${{ secrets.MENTISDB_URL }}
           MENTISDB_USER: ${{ secrets.MENTISDB_USER }}
@@ -340,7 +441,7 @@ jobs:
             || { code=$?; echo "::warning::mentisdb append failed (curl exit $code, non-fatal)"; }
 
       - name: Emit strategy_audit_run to PostHog
-        if: always() && steps.skip-guard.outputs.skip != 'true'
+        if: "always() && steps.skip-guard.outputs.skip != 'true'"
         env:
           POSTHOG_PROJECT_KEY: ${{ secrets.POSTHOG_PROJECT_KEY }}
           POSTHOG_HOST: ${{ vars.POSTHOG_HOST }}
