@@ -1,0 +1,219 @@
+name: Goal Sprint
+
+on:
+  schedule:
+    - cron: '0 7 * * 1'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Print the generated sprint JSON without emitting issues or state PRs.
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: goal-sprint
+  cancel-in-progress: false
+
+env:
+  OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+  OBSERVER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+  HAS_APP_CREDS: ${{ secrets.APP_ID != '' && secrets.APP_PRIVATE_KEY != '' }}
+
+jobs:
+  sprint:
+    name: Ideate -> Plan -> Emit Spec
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate GitHub App token
+        id: app-token
+        if: env.HAS_APP_CREDS == 'true'
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Select GitHub token
+        run: |
+          token="${{ steps.app-token.outputs.token }}"
+          if [ -z "$token" ]; then
+            token="${{ secrets.PUSH_TOKEN }}"
+          fi
+          if [ -z "$token" ]; then
+            echo "::error::No GitHub App token or PUSH_TOKEN available"
+            exit 1
+          fi
+          echo "::add-mask::$token"
+          echo "GH_TOKEN=$token" >> "$GITHUB_ENV"
+
+      - name: Read seed repository
+        run: |
+          seed_repo=$(python3 - <<'PY'
+          from pathlib import Path
+          path = Path(".compound-engineering/config.local.yaml")
+          value = ""
+          if path.exists():
+              for line in path.read_text().splitlines():
+                  stripped = line.strip()
+                  if stripped.startswith("pulse_seed_product_repo:"):
+                      value = stripped.split(":", 1)[1].strip().strip('"').strip("'")
+          print(value)
+          PY
+          )
+          if [ -z "$seed_repo" ]; then
+            echo "::error::pulse_seed_product_repo missing from .compound-engineering/config.local.yaml"
+            exit 1
+          fi
+          echo "SEED_REPO=$seed_repo" >> "$GITHUB_ENV"
+          echo "Using seed repo: $seed_repo"
+
+      - name: Build goal sprint context
+        run: scripts/goal-sprint/build-context.sh
+
+      - name: Call LLM (or generate stub)
+        env:
+          OBSERVER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          if [ -z "$OBSERVER_API_KEY" ]; then
+            echo "::warning::Observer API key not set — generating stub goal sprint."
+            today=$(date -u '+%Y-%m-%d')
+            cat > /tmp/goal_sprint.json <<STUBEOF
+          {
+            "ideas": [
+              {"title": "Set OpenRouter API key for weekly goal sprint", "rationale": "The sprint loop cannot produce grounded weekly specs until the model key is configured.", "impact": "Unblocks recurring goal-directed spec generation.", "effort": "small", "metric": "autonomous_ship_rate"},
+              {"title": "Validate seed repo goal-sprint labels", "rationale": "Issue emission depends on stable downstream labels.", "impact": "Reduces stuck issues from label routing failures.", "effort": "small", "metric": "active_stuck_issues"},
+              {"title": "Dry-run the goal-sprint workflow", "rationale": "Confirms the weekly context and JSON contract before live emission.", "impact": "Improves spec_coverage without flooding the issue board.", "effort": "small", "metric": "spec_coverage"},
+              {"title": "Review first generated sprint issue", "rationale": "Human calibration prevents the first autonomous issue from drifting from STRATEGY.md.", "impact": "Improves pr_processing_rate by starting from a clear spec.", "effort": "small", "metric": "pr_processing_rate"},
+              {"title": "Connect emitted specs to builder chain", "rationale": "The sprint has value only when the emitted issue enters the autonomous builder path.", "impact": "Improves autonomous_ship_rate.", "effort": "medium", "metric": "autonomous_ship_rate"}
+            ],
+            "top": {
+              "title": "Set OpenRouter API key for weekly goal sprint",
+              "problem": "The goal-sprint workflow is installed but cannot call the LLM until OPENROUTER_API_KEY is configured.",
+              "acceptance_criteria": ["OPENROUTER_API_KEY is present in repository secrets", "A dry-run emits valid goal sprint JSON", "No seed repo issue is created during dry-run"],
+              "build_sequence": ["Add OPENROUTER_API_KEY to repository secrets", "Run workflow_dispatch with dry_run=true", "Inspect /tmp/goal_sprint.json in logs"],
+              "class": "needs-human",
+              "labels": ["goal-sprint", "needs-human"]
+            },
+            "fingerprint": "set-openrouter-api-key-weekly-goal-sprint"
+          }
+          STUBEOF
+          else
+            # Call LLM via OpenAI-compatible API
+            jq -n \
+              --rawfile system company/goal-sprint-system-prompt.md \
+              --rawfile user /tmp/goal_sprint_user.txt \
+              '{
+                model: "anthropic/claude-sonnet-4",
+                max_tokens: 4096,
+                messages: [{role: "system", content: $system}, {role: "user", content: $user}]
+              }' > /tmp/request.json
+
+            # NOTE: Expects OpenAI-compatible chat/completions endpoint.
+            # Use OpenRouter or similar proxy for non-OpenAI providers.
+            http_code=$(curl -s -w '%{http_code}' -o /tmp/llm_response.json \
+              -H "Authorization: Bearer $OBSERVER_API_KEY" \
+              -H "content-type: application/json" \
+              -d @/tmp/request.json \
+              https://openrouter.ai/api/v1/chat/completions)
+
+            if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+              content=$(jq -r '.choices[0].message.content' /tmp/llm_response.json)
+              echo "$content" | sed -n '/^```json/,/^```$/p' | sed '1d;$d' > /tmp/goal_sprint.json
+              if [ ! -s /tmp/goal_sprint.json ]; then
+                echo "$content" | jq . > /tmp/goal_sprint.json 2>/dev/null || echo "$content" > /tmp/goal_sprint.json
+              fi
+            else
+              api_error=$(jq -r '.error.message // "unknown error"' /tmp/llm_response.json 2>/dev/null || echo "HTTP $http_code")
+              echo "::warning::Observer LLM returned HTTP $http_code: $api_error — falling back to stub."
+              today=$(date -u '+%Y-%m-%d')
+              jq -n --arg title "Fix goal sprint LLM access" --arg err "$api_error" '{
+                ideas: [
+                  {title: $title, rationale: ("LLM call failed: " + $err), impact: "Unblocks weekly goal-sprint specs", effort: "small", metric: "autonomous_ship_rate"},
+                  {title: "Run goal sprint dry-run after access fix", rationale: "Validates the JSON contract before issue emission", impact: "Protects spec_coverage quality", effort: "small", metric: "spec_coverage"},
+                  {title: "Inspect seed repo label routing", rationale: "Confirms emitted specs enter the right queue", impact: "Reduces active_stuck_issues", effort: "small", metric: "active_stuck_issues"},
+                  {title: "Review current sprint state file", rationale: "Ensures the fingerprint gate is not blocking real changes", impact: "Improves pr_processing_rate", effort: "small", metric: "pr_processing_rate"},
+                  {title: "Check latest pulse report freshness", rationale: "The model needs current metrics for useful ranking", impact: "Improves autonomous_ship_rate", effort: "small", metric: "autonomous_ship_rate"}
+                ],
+                top: {
+                  title: $title,
+                  problem: ("Goal sprint could not call the LLM: " + $err),
+                  acceptance_criteria: ["OPENROUTER_API_KEY works for OpenRouter chat completions", "goal-sprint dry-run produces valid strict JSON", "No issue is emitted while dry_run=true"],
+                  build_sequence: ["Verify OPENROUTER_API_KEY", "Run goal-sprint workflow with dry_run=true", "Confirm JSON extraction succeeds"],
+                  class: "needs-human",
+                  labels: ["goal-sprint", "needs-human"]
+                },
+                fingerprint: "fix-goal-sprint-llm-access"
+              }' > /tmp/goal_sprint.json
+            fi
+          fi
+          jq empty /tmp/goal_sprint.json || { echo "::error::Invalid /tmp/goal_sprint.json"; exit 1; }
+          goal_sprint_content="$(cat /tmp/goal_sprint.json)"
+          if ! printf '%s' "$goal_sprint_content" | bash company/scripts/sanitise.sh > /dev/null; then
+            echo "::error::sanitise.sh rejected /tmp/goal_sprint.json"
+            exit 1
+          fi
+
+      - name: Fingerprint goal sprint
+        run: scripts/goal-sprint/fingerprint.sh
+
+      - name: Dry-run output
+        if: ${{ (github.event.inputs.dry_run || 'false') == 'true' }}
+        run: |
+          cat /tmp/goal_sprint.json
+          exit 0
+
+      - name: Emit goal sprint issue
+        if: ${{ (github.event.inputs.dry_run || 'false') != 'true' }}
+        run: |
+          if [ ! -f /tmp/goal-sprint-material-changed ]; then
+            echo "::error::goal-sprint material-change sentinel missing"
+            exit 1
+          fi
+          if [ "$(cat /tmp/goal-sprint-material-changed)" = "true" ]; then
+            scripts/goal-sprint/emit.sh
+          else
+            echo "No material goal-sprint change; skipping issue emission"
+          fi
+
+      - name: Commit state
+        if: ${{ (github.event.inputs.dry_run || 'false') != 'true' }}
+        run: |
+          if [ ! -f /tmp/goal-sprint-material-changed ]; then
+            echo "::warning::material-change sentinel missing; skipping commit"
+            exit 0
+          fi
+          if [ "$(cat /tmp/goal-sprint-material-changed)" != "true" ]; then
+            echo "No material change in goal-sprint state; skipping commit + PR"
+            exit 0
+          fi
+
+          git config user.name "pupabobas[bot]"
+          git config user.email "pupabobas[bot]@users.noreply.github.com"
+          state_content="$(cat company/goal-sprint-state.json)"
+          if ! printf '%s' "$state_content" | bash company/scripts/sanitise.sh > /dev/null; then
+            echo "::error::sanitise.sh rejected company/goal-sprint-state.json"
+            exit 1
+          fi
+          git add company/goal-sprint-state.json
+          git diff --cached --quiet && echo "No state changes to commit" && exit 0
+
+          today=$(date -u '+%Y-%m-%d')
+          branch="goal-sprint/${today}-${GITHUB_RUN_ID}"
+          top_title=$(jq -r '.top.title // "weekly goal sprint"' /tmp/goal_sprint.json)
+          git checkout -b "$branch"
+          git commit -m "chore(goal-sprint): update state $today"
+          git push -u origin "$branch"
+
+          gh pr create \
+            --title "goal-sprint: ${top_title} ${today}" \
+            --body "Automated weekly goal-sprint state update." \
+            --base main \
+            --head "$branch"
