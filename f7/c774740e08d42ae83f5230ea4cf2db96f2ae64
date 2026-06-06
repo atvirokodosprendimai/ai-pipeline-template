@@ -1,0 +1,23 @@
+.github/scripts/test-strategy-audit-gate.sh
+  s_6b0c072090ebfb::t_240152c7ca04b4 1-170
+.github/scripts/strategy-audit-gate.sh
+  s_6b0c072090ebfb::t_240152c7ca04b4 1-78
+.github/workflows/strategy-audit.yml
+  s_6b0c072090ebfb::t_240152c7ca04b4 172,230,249-258,260,262-264,266-267,289-290,295-322,329,339
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "f7c774740e08d42ae83f5230ea4cf2db96f2ae64",
+  "prompts": {},
+  "sessions": {
+    "s_6b0c072090ebfb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eb59164c-be8a-43f6-8ed4-1ce4d852ddaf",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
