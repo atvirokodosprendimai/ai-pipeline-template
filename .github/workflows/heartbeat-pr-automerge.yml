@@ -87,7 +87,11 @@ jobs:
               expected_branch='^pr-disposition/'
               ;;
             'audit: strategy baseline'*)
-              expected_branch='^audit/strategy-baseline-'
+              # strategy-audit.yml pushes the rolling telemetry PR to the fixed
+              # branch `audit/baseline-telemetry` (not `audit/strategy-baseline-*`).
+              # The old regex never matched, so the telemetry PR (e.g. #1468) always
+              # failed this scope gate. Match the actual branch name.
+              expected_branch='^audit/baseline-telemetry'
               ;;
             *)
               echo "::error::PR title does not match heartbeat prefixes: $PR_TITLE"
