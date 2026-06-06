@@ -178,10 +178,10 @@ CREATED_ISSUES+=("$manual_issue_num")
 log "  Created manual-only issue #${manual_issue_num}"
 
 # ── Trigger the workflow ─────────────────────────────────────────────
-log "Triggering pipeline-health.yml via workflow_dispatch (cutoff_override_minutes=1)..."
+log "Triggering pipeline-health.yml via workflow_dispatch (cutoff_override_minutes=0)..."
 
-gh workflow run pipeline-health.yml --repo "$SELF_REPO" -f cutoff_override_minutes=1 2>/dev/null || \
-  gh workflow run "Pipeline Health (Self-Healing)" --repo "$SELF_REPO" -f cutoff_override_minutes=1 2>/dev/null || {
+gh workflow run pipeline-health.yml --repo "$SELF_REPO" -f cutoff_override_minutes=0 2>/dev/null || \
+  gh workflow run "Pipeline Health (Self-Healing)" --repo "$SELF_REPO" -f cutoff_override_minutes=0 2>/dev/null || {
     fail "Could not trigger pipeline-health workflow"
     echo "============================================================"
     echo "Results: ${PASS_COUNT} passed, ${FAIL_COUNT} failed"
