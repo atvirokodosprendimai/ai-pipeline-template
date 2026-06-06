@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-set -uo pipefail
-trap 'status=$?; echo "WARN: fingerprint command failed near line $LINENO (status $status)" >&2; true' ERR
+set -euo pipefail
+trap 'status=$?; echo "ERROR: fingerprint command failed near line $LINENO (status $status)" >&2; exit "$status"' ERR
 
 json="/tmp/goal_sprint.json"
 sentinel="/tmp/goal-sprint-material-changed"

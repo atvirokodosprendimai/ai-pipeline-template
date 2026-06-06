@@ -2,7 +2,7 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TOTAL=9
+TOTAL=11
 PASSED=0
 
 pass() {
@@ -35,6 +35,9 @@ write_goal_json() {
   local class="$2"
   local title="$3"
   local fingerprint="$4"
+  local labels_json="${5:-[\"goal-sprint\"]}"
+  local acceptance_criteria_json="${6:-[\"First criterion\", \"Second criterion\"]}"
+  local build_sequence_json="${7:-[\"First step\", \"Second step\"]}"
   cat > "$path" <<EOF_JSON
 {
   "ideas": [
@@ -47,10 +50,10 @@ write_goal_json() {
   "top": {
     "title": "$title",
     "problem": "A concrete test problem.",
-    "acceptance_criteria": ["First criterion", "Second criterion"],
-    "build_sequence": ["First step", "Second step"],
+    "acceptance_criteria": $acceptance_criteria_json,
+    "build_sequence": $build_sequence_json,
     "class": "$class",
-    "labels": ["goal-sprint"]
+    "labels": $labels_json
   },
   "fingerprint": "$fingerprint"
 }
@@ -87,6 +90,14 @@ if [ "${1:-}" = "issue" ] && [ "${2:-}" = "create" ]; then
     i=$((i + 1))
   done
   printf 'https://github.com/example/repo/issues/123\n'
+  exit 0
+fi
+if [ "${1:-}" = "label" ] && [ "${2:-}" = "list" ]; then
+  if [ -n "${GH_MOCK_LABELS:-}" ]; then
+    printf '%s\n' "$GH_MOCK_LABELS"
+  else
+    printf '%s\n' goal-sprint needs-triage needs-human
+  fi
   exit 0
 fi
 exit 0
@@ -271,6 +282,70 @@ scenario_9() {
   fi
 }
 
+scenario_10() {
+  local desc="emit.sh missing or empty top arrays fail without issue creation"
+  local variant work mock rc creates failures
+  failures=0
+  for variant in missing_acceptance empty_acceptance missing_build empty_build; do
+    work="$(make_workspace)"
+    mock="$work/mock-bin"
+    install_gh_mock "$mock"
+    printf '{ "last_fingerprint": "", "last_week": "", "ledger": [], "last_issue": null }\n' > "$work/company/goal-sprint-state.json"
+    case "$variant" in
+      missing_acceptance)
+        write_goal_json /tmp/goal_sprint.json automatable "Ship Real Metric" "ship-real-metric"
+        jq 'del(.top.acceptance_criteria)' /tmp/goal_sprint.json > /tmp/goal_sprint_variant.json
+        mv /tmp/goal_sprint_variant.json /tmp/goal_sprint.json
+        ;;
+      empty_acceptance)
+        write_goal_json /tmp/goal_sprint.json automatable "Ship Real Metric" "ship-real-metric" '["goal-sprint"]' '[]'
+        ;;
+      missing_build)
+        write_goal_json /tmp/goal_sprint.json automatable "Ship Real Metric" "ship-real-metric"
+        jq 'del(.top.build_sequence)' /tmp/goal_sprint.json > /tmp/goal_sprint_variant.json
+        mv /tmp/goal_sprint_variant.json /tmp/goal_sprint.json
+        ;;
+      empty_build)
+        write_goal_json /tmp/goal_sprint.json automatable "Ship Real Metric" "ship-real-metric" '["goal-sprint"]' '["First criterion"]' '[]'
+        ;;
+    esac
+    echo true > /tmp/goal-sprint-material-changed
+    reset_mock_log
+    (cd "$work" && PATH="$mock:$PATH" GITHUB_WORKSPACE="$work" SEED_REPO=example/repo scripts/goal-sprint/emit.sh >"/tmp/scenario10-$variant.out" 2>&1)
+    rc=$?
+    creates="$(grep -c '^issue create ' /tmp/gh-mock-calls.log || true)"
+    if [ "$rc" -eq 0 ] || [ "$creates" != "0" ] || ! grep -q '::error:: top\.' "/tmp/scenario10-$variant.out"; then
+      failures=$((failures + 1))
+    fi
+  done
+  if [ "$failures" -eq 0 ]; then
+    pass "$desc"
+  else
+    fail "$desc" "$failures invalid variants did not fail as expected"
+  fi
+}
+
+scenario_11() {
+  local desc="emit.sh applies only existing top.labels plus base labels"
+  local work mock creates rc create_line
+  work="$(make_workspace)"
+  mock="$work/mock-bin"
+  install_gh_mock "$mock"
+  printf '{ "last_fingerprint": "", "last_week": "", "ledger": [], "last_issue": null }\n' > "$work/company/goal-sprint-state.json"
+  write_goal_json /tmp/goal_sprint.json automatable "Ship Real Metric" "ship-real-metric" '["priority-high", "missing-label"]'
+  echo true > /tmp/goal-sprint-material-changed
+  reset_mock_log
+  (cd "$work" && PATH="$mock:$PATH" GITHUB_WORKSPACE="$work" SEED_REPO=example/repo GH_MOCK_LABELS="$(printf '%s\n' goal-sprint needs-triage priority-high)" scripts/goal-sprint/emit.sh >/tmp/scenario11.out 2>&1)
+  rc=$?
+  creates="$(grep -c '^issue create ' /tmp/gh-mock-calls.log || true)"
+  create_line="$(grep '^issue create ' /tmp/gh-mock-calls.log || true)"
+  if [ "$rc" -eq 0 ] && [ "$creates" = "1" ] && printf '%s\n' "$create_line" | grep -q -- '--label goal-sprint,needs-triage,priority-high' && ! printf '%s\n' "$create_line" | grep -q 'missing-label'; then
+    pass "$desc"
+  else
+    fail "$desc" "$(cat /tmp/scenario11.out) $(cat /tmp/gh-mock-calls.log)"
+  fi
+}
+
 scenario_1
 scenario_2
 scenario_3
@@ -280,6 +355,8 @@ scenario_6
 scenario_7
 scenario_8
 scenario_9
+scenario_10
+scenario_11
 
 if [ "$PASSED" -eq "$TOTAL" ]; then
   echo "PASS $PASSED/$TOTAL"

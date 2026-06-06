@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-set -uo pipefail
-trap 'status=$?; echo "WARN: emit command failed near line $LINENO (status $status)" >&2; true' ERR
+set -euo pipefail
+trap 'status=$?; echo "ERROR: emit command failed near line $LINENO (status $status)" >&2; exit "$status"' ERR
 
 json="/tmp/goal_sprint.json"
 sentinel="/tmp/goal-sprint-material-changed"
@@ -9,6 +9,22 @@ state_file="company/goal-sprint-state.json"
 fail() {
   echo "ERROR: $*" >&2
   exit 1
+}
+
+fail_contract() {
+  echo "::error:: $*" >&2
+  exit 1
+}
+
+validate_top_array() {
+  field="$1"
+  if ! jq -e --arg field "$field" \
+    '(.top[$field] | type) == "array"
+     and (.top[$field]
+       | map(select(type == "string") | gsub("^\\s+|\\s+$"; "") | select(length > 0))
+       | length > 0)' "$json" >/dev/null; then
+    fail_contract "top.$field must be an array with at least 1 non-empty item"
+  fi
 }
 
 keywords_from_title() {
@@ -55,6 +71,8 @@ class="$(jq -r '.top.class // ""' "$json")" || fail "failed to read top.class"
 [ -n "$fingerprint" ] && [ "$fingerprint" != "null" ] || fail "fingerprint missing"
 [ -n "$title" ] && [ "$title" != "null" ] || fail "top.title missing"
 [ "$class" = "automatable" ] || [ "$class" = "needs-human" ] || fail "top.class must be automatable or needs-human"
+validate_top_array "acceptance_criteria"
+validate_top_array "build_sequence"
 
 last=""
 if [ -f "$state_file" ]; then
@@ -105,10 +123,18 @@ body_file="/tmp/goal-sprint-issue-body.md"
   echo "$problem"
   echo ""
   echo "## Acceptance Criteria"
-  jq -r '.top.acceptance_criteria[]? | "- " + .' "$json" || fail "failed to read acceptance criteria"
+  jq -r '.top.acceptance_criteria[]
+    | strings
+    | gsub("^\\s+|\\s+$"; "")
+    | select(length > 0)
+    | "- " + .' "$json" || fail "failed to read acceptance criteria"
   echo ""
   echo "## Build Sequence"
-  jq -r '.top.build_sequence[]? | "- " + .' "$json" || fail "failed to read build sequence"
+  jq -r '.top.build_sequence[]
+    | strings
+    | gsub("^\\s+|\\s+$"; "")
+    | select(length > 0)
+    | "- " + .' "$json" || fail "failed to read build sequence"
   if [ "$class" = "needs-human" ]; then
     echo ""
     echo "## Escalation"
@@ -117,12 +143,33 @@ body_file="/tmp/goal-sprint-issue-body.md"
   fi
 } > "$body_file"
 
-labels="goal-sprint"
 if [ "$class" = "automatable" ]; then
-  labels="${labels},needs-triage"
+  class_label="needs-triage"
 else
-  labels="${labels},needs-human"
+  class_label="needs-human"
 fi
+
+existing_labels_file="/tmp/goal-sprint-existing-labels.txt"
+gh label list --repo "$seed_repo" --limit 200 --json name -q '.[].name' > "$existing_labels_file" || fail "failed to list seed repo labels"
+
+base_labels_file="/tmp/goal-sprint-base-labels.txt"
+contract_labels_file="/tmp/goal-sprint-contract-labels.txt"
+labels_file="/tmp/goal-sprint-labels.txt"
+printf '%s\n%s\n' "goal-sprint" "$class_label" > "$base_labels_file"
+cp "$base_labels_file" "$labels_file"
+jq -r '.top.labels[]? | strings | gsub("^\\s+|\\s+$"; "") | select(length > 0)' "$json" > "$contract_labels_file" || fail "failed to read top.labels"
+while IFS= read -r label; do
+  [ -n "$label" ] || continue
+  if grep -Fxq "$label" "$labels_file"; then
+    continue
+  fi
+  if grep -Fxq "$label" "$existing_labels_file"; then
+    printf '%s\n' "$label" >> "$labels_file"
+  else
+    echo "::warning:: dropping unknown top.labels entry: $label" >&2
+  fi
+done < "$contract_labels_file"
+labels="$(paste -sd, "$labels_file")" || fail "failed to assemble labels"
 
 BODY="$(cat "$body_file")"
 if ! printf '%s' "$title $BODY" | bash "$SANITISE" > /dev/null 2>&1; then

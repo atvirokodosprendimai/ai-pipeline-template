@@ -23,7 +23,7 @@ Process:
    - acceptance_criteria: testable list.
    - build_sequence: ordered implementation steps.
    - class: exactly "needs-human" only for things that cannot be contracted via the internet (physical presence, wet signatures, irreversible decisions with no undo path), or exactly "automatable" for everything else, including GTM/outreach/CTA/sales/account-setup that can be contracted via the internet and should be automated or posted as a RAH bounty instead of marked needs-human.
-   - labels: issue labels relevant to routing.
+   - labels: optional downstream routing labels; only labels that already exist in the seed repo are applied.
 
 Emit strict JSON inside one triple-backtick json fence. Do not include prose before or after the fence.
 
