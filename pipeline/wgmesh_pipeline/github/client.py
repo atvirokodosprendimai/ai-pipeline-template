@@ -121,7 +121,7 @@ class GitHubClient:
             "POST",
             f"/repos/{self.config.owner}/{self.config.repo}/pulls",
             payload={"title": title, "head": head, "base": base, "body": body},
-            spec_pr=spec_pr or title.startswith("spec: Issue #"),
+            spec_pr=spec_pr,
         )
 
     def merge_pr(self, pr_number: int, *, commit_title: str | None = None) -> Any:
@@ -134,7 +134,10 @@ class GitHubClient:
 
     def push_branch(self, clone_path: str, branch: str, *, spec_pr: bool = False) -> Any:
         payload = {"clone_path": clone_path, "branch": branch}
-        self._sanitise_spec_files(Path(clone_path))
+        if spec_pr or branch.startswith("bot/spec-"):
+            self._sanitise_spec_branch_files(Path(clone_path), branch)
+        else:
+            self._sanitise_spec_files(Path(clone_path))
         if self.config.mode == "shadow":
             return self._write("push_branch", "GIT", "git push", payload=payload, spec_pr=spec_pr)
         if self.config.mode == "spec-only" and not spec_pr:
@@ -172,7 +175,9 @@ class GitHubClient:
             result = DryRunResult(dry_run=True, operation=operation, payload=dry_payload)
             self.dry_run_records.append(result)
             return result
-        if mode == "spec-only" and not (spec_pr and operation in {"push_branch", "create_pr", "remove_label", "add_label"}):
+        allowed_spec_pr_write = spec_pr and operation in {"push_branch", "create_pr", "remove_label", "add_label"}
+        allowed_safety_write = operation == "add_label" and "needs-human" in payload.get("labels", [])
+        if mode == "spec-only" and not (allowed_spec_pr_write or allowed_safety_write):
             raise PermissionError(f"{operation} is not allowed when PIPELINE_MODE=spec-only")
         return self._request(method, path, json=payload)
 
@@ -206,6 +211,81 @@ class GitHubClient:
             return
         for spec in sorted(specs_dir.glob("issue-*-spec.md")):
             self._require_clean(str(spec.relative_to(clone_path)), spec.read_text())
+
+    def _sanitise_spec_branch_files(self, clone_path: Path, branch: str) -> None:
+        expected_spec = _expected_spec_path(branch)
+        if expected_spec is None:
+            raise SanitiseError(f"cannot infer expected spec file from branch: {branch}")
+        if not (clone_path / expected_spec).is_file():
+            if self.config.mode == "shadow":
+                self._sanitise_spec_files(clone_path)
+                return
+            raise SanitiseError(f"expected spec file missing: {expected_spec}")
+
+        changed_files = self._changed_files(clone_path)
+        if not changed_files:
+            raise SanitiseError(f"no changed files found for spec branch: {branch}")
+        if expected_spec not in changed_files:
+            raise SanitiseError(f"expected spec file not changed: {expected_spec}")
+
+        for relative_path in sorted(changed_files):
+            path = clone_path / relative_path
+            if not path.is_file():
+                continue
+            try:
+                text = path.read_text()
+            except UnicodeDecodeError as exc:
+                raise SanitiseError(f"cannot sanitise non-text file: {relative_path}") from exc
+            self._require_clean(relative_path, text)
+
+    def _changed_files(self, clone_path: Path) -> set[str]:
+        if not (clone_path / ".git").exists():
+            return {
+                path.relative_to(clone_path).as_posix()
+                for path in clone_path.rglob("*")
+                if path.is_file() and ".git" not in path.relative_to(clone_path).parts
+            }
+
+        changed: set[str] = set()
+        for args in (
+            ("diff", "--cached", "--name-only", "--diff-filter=ACMRT"),
+            ("diff", "--name-only", "--diff-filter=ACMRT"),
+            ("ls-files", "--others", "--exclude-standard"),
+        ):
+            changed.update(self._git_lines(clone_path, *args))
+
+        base = self._merge_base(clone_path)
+        if base is not None:
+            changed.update(self._git_lines(clone_path, "diff", "--name-only", "--diff-filter=ACMRT", f"{base}..HEAD"))
+        else:
+            changed.update(self._git_lines(clone_path, "diff-tree", "--no-commit-id", "--name-only", "--diff-filter=ACMRT", "-r", "HEAD"))
+        return changed
+
+    def _merge_base(self, clone_path: Path) -> str | None:
+        for base in ("origin/main", "main"):
+            completed = self._git(clone_path, "merge-base", base, "HEAD")
+            if completed.returncode == 0 and completed.stdout.strip():
+                return completed.stdout.strip()
+        return None
+
+    def _git_lines(self, clone_path: Path, *args: str) -> set[str]:
+        completed = self._git(clone_path, *args)
+        if completed.returncode != 0:
+            return set()
+        return {line.strip() for line in completed.stdout.splitlines() if line.strip()}
+
+    def _git(self, clone_path: Path, *args: str) -> subprocess.CompletedProcess[str]:
+        try:
+            return subprocess.run(
+                ["git", *args],
+                cwd=clone_path,
+                check=False,
+                text=True,
+                capture_output=True,
+                timeout=GIT_TIMEOUT_SECONDS,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise RuntimeError(f"git {' '.join(args)} timed out after {GIT_TIMEOUT_SECONDS}s") from exc
 
     def _require_clean(self, label: str, text: str) -> None:
         if self._sanitiser is not None:
@@ -251,3 +331,13 @@ def _synthetic_pr_number(payload: dict[str, Any]) -> int:
         if digits:
             return int(digits)
     return 1
+
+
+def _expected_spec_path(branch: str) -> str | None:
+    prefix = "bot/spec-"
+    if not branch.startswith(prefix):
+        return None
+    issue_number = branch.removeprefix(prefix)
+    if not issue_number.isdecimal():
+        return None
+    return f"specs/issue-{issue_number}-spec.md"

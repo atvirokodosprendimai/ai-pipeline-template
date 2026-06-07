@@ -16,6 +16,28 @@ class EmptyClient(GitHubClient):
         return []
 
 
+class Response:
+    def __init__(self, data):
+        self._data = data
+        self.text = "json"
+
+    def raise_for_status(self) -> None:
+        return None
+
+    def json(self):
+        return self._data
+
+
+class Session:
+    def __init__(self, response):
+        self.response = response
+        self.calls = []
+
+    def request(self, method, url, **kwargs):
+        self.calls.append({"method": method, "url": url, "kwargs": kwargs})
+        return self.response
+
+
 class Graph:
     def __init__(self):
         self.calls: list[str] = []
@@ -63,6 +85,39 @@ def test_tick_advances_queued_issue_to_triaged_and_records_run(tmp_path, cfg: Co
     assert p.store.get_issue(1).classification == "fix"
     assert p.store.list_runs()[0]["node"] == "queued"
     assert p.store.list_runs()[0]["outcome"] == "ok"
+
+
+def test_spec_only_wont_do_issue_escalates_and_is_not_reclaimed(tmp_path, cfg: Config) -> None:
+    class WontDoGraph(Graph):
+        def triage(self, state):
+            self.calls.append("triage")
+            return {**state, "classification": "wont-do"}
+
+    class SpecOnlyClient(GitHubClient):
+        def list_open_issues(self):
+            return []
+
+    spec_only = Config(target_repo=cfg.target_repo, mode="spec-only", max_files=cfg.max_files)
+    session = Session(Response({"ok": True}))
+    store = StateStore(tmp_path / "state.db")
+    store.upsert_issue(1, "Do not build")
+    graph = WontDoGraph()
+    p = Poller(config=spec_only, store=store, client=SpecOnlyClient(spec_only, session=session), graph=graph)
+
+    result = asyncio.run(p.tick())
+    second = asyncio.run(p.tick())
+
+    issue = store.get_issue(1)
+    assert result is not None
+    assert result.stage == "escalated"
+    assert issue.stage == "escalated"
+    assert issue.attempts == 0
+    assert issue.last_error is None
+    assert second is None
+    assert graph.calls == ["triage"]
+    assert len(session.calls) == 1
+    assert session.calls[0]["method"] == "POST"
+    assert session.calls[0]["kwargs"]["json"] == {"labels": ["needs-human"]}
 
 
 def test_tick_no_actionable_issue_is_noop(tmp_path, cfg: Config) -> None:
@@ -156,9 +211,11 @@ def test_specced_issue_opens_spec_pr_then_stops_in_spec_only(tmp_path, cfg: Conf
     p.store.upsert_issue(1, "Already specced", stage="specced")
 
     result = asyncio.run(p.tick())
+    second = asyncio.run(p.tick())
 
     assert result is not None
     assert result.stage == "spec_opened"
+    assert second is None
     assert p.store.get_issue(1).spec_pr == 99
     assert p.graph.calls == ["spec_pr"]
 
