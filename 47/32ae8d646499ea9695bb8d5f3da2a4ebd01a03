@@ -1,0 +1,21 @@
+pipeline/wgmesh_pipeline/state/store.py
+  s_68555e95a0b174::t_cb87f58ba2f297 302,306,308-310
+pipeline/pyproject.toml
+  s_68555e95a0b174::t_5053a357ea1ae0 30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "4732ae8d646499ea9695bb8d5f3da2a4ebd01a03",
+  "prompts": {},
+  "sessions": {
+    "s_68555e95a0b174": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5b2db709-63f0-48df-8394-4d6b66b3d9eb",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
