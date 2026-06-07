@@ -71,12 +71,12 @@ pulse_pr_processing_sla_days: 7
 # any OPEN failed action fails the KPI.
 #
 # SCOPE = BOTH repos. The KPI covers workflow runs in the meta-repo AND in the
-# seed repo (pulse_seed_product_repo / TARGET_REPO = atvirokodosprendimai/wgmesh).
-# Querying only the meta-repo hid a 2-week wgmesh outage: `Copilot Issue Triage`
-# failed `Bad credentials` on every run from ~2026-05-21, stalling the entire
-# seed pipeline at triage while the meta-repo read "healthy". A pulse MUST run
-# `gh run list --repo <seed>` and disposition seed-repo failures too. See
-# docs/pulse-reports + memory project_wgmesh_triage_bad_credentials.
+# seed repo configured via `pulse_seed_product_repo` (resolved to TARGET_REPO at
+# pulse time). Querying only the meta-repo once hid a 2-week seed-repo outage:
+# `Copilot Issue Triage` failed `Bad credentials` on every run from ~2026-05-21,
+# stalling the entire seed pipeline at triage while the meta-repo read "healthy".
+# A pulse MUST run `gh run list --repo <seed>` and disposition seed-repo failures
+# too. See docs/pulse-reports/ for the incident write-up.
 pulse_action_success_kpi: enabled
 pulse_action_success_target: 1.0
 pulse_action_success_scope: meta-repo,seed-repo
