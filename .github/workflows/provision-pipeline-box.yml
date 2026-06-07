@@ -49,14 +49,16 @@ jobs:
         run: |
           set -euo pipefail
           : "${HCLOUD_TOKEN:?HCLOUD_TOKEN secret missing (org)}"
-          : "${ZAI_API_KEY:?ZAI_API_KEY secret missing — add to repo or org}"
+          # ANTHROPIC_API_KEY is the z.ai/GLM key for Goose (the box env var
+          # ZAI_API_KEY is sourced from it).
+          : "${ANTHROPIC_API_KEY:?ANTHROPIC_API_KEY secret missing (the z.ai key)}"
           if [ "${{ github.event.inputs.database_mode }}" = "turso" ]; then
             : "${TURSO_DATABASE_URL:?TURSO_DATABASE_URL missing for database_mode=turso}"
             : "${TURSO_AUTH_TOKEN:?TURSO_AUTH_TOKEN missing for database_mode=turso}"
           fi
         env:
           HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
-          ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
           TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
 
@@ -115,18 +117,20 @@ jobs:
 
       - name: Write env (over SSH — secrets never touch cloud-init/metadata)
         env:
-          ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
           TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
           MODE: ${{ github.event.inputs.pipeline_mode }}
           DBMODE: ${{ github.event.inputs.database_mode }}
         run: |
           set -euo pipefail
+          # The pipeline reads ZAI_API_KEY; source it from the ANTHROPIC_API_KEY
+          # secret (which holds the z.ai key).
           ssh -o StrictHostKeyChecking=no -i "$RUNNER_TEMP/box_key" root@"$BOX_IP" \
             "umask 077; cat > /etc/wgmesh-pipeline/env" <<EOF
           PIPELINE_MODE=$MODE
           TARGET_REPO=atvirokodosprendimai/wgmesh
-          ZAI_API_KEY=$ZAI_API_KEY
+          ZAI_API_KEY=$ANTHROPIC_API_KEY
           ANTHROPIC_HOST=https://api.z.ai/api/anthropic
           DATABASE_MODE=$DBMODE
           PIPELINE_DB_PATH=/opt/wgmesh-pipeline/state.db
