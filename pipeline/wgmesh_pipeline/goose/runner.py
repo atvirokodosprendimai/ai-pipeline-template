@@ -45,11 +45,53 @@ def _is_secret_var(name: str) -> bool:
     return any(marker in upper for marker in _SECRET_MARKERS)
 
 
+# ALLOWLIST (fail-closed): Goose's subprocess env is built from {} by copying
+# ONLY these known-safe vars, then adding the LLM credential. A denylist over an
+# unbounded env namespace is fail-open — a future/ambient credential with no
+# secret-marker in its name would leak to the LLM agent. The allowlist drops
+# anything not explicitly named. Goose needs to find its binary + tools (PATH),
+# its config/keyring (HOME), reach z.ai over TLS (SSL_CERT_*), and basic locale.
+# It does NOT push git — our GitHubClient does that with the PAT — so no GIT_/
+# auth vars are passed.
+_SAFE_ENV_NAMES = frozenset(
+    {
+        "PATH",
+        "HOME",
+        "USER",
+        "LOGNAME",
+        "LANG",
+        "TERM",
+        "SHELL",
+        "TZ",
+        "TMPDIR",
+        "TMP",
+        "TEMP",
+        "PWD",
+        "SSL_CERT_FILE",
+        "SSL_CERT_DIR",
+        "SSH_AUTH_SOCK",
+        "NO_PROXY",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "no_proxy",
+        "http_proxy",
+        "https_proxy",
+    }
+)
+_SAFE_ENV_PREFIXES = ("LC_",)
+
+
+def _is_safe_var(name: str) -> bool:
+    return name in _SAFE_ENV_NAMES or name.startswith(_SAFE_ENV_PREFIXES)
+
+
 def build_goose_env(config: Config, base_env: Mapping[str, str] | None = None) -> dict[str, str]:
-    """Subprocess env for Goose with all secret-shaped vars stripped, then the
-    single LLM credential Goose needs added back explicitly."""
+    """Subprocess env for Goose: fail-closed allowlist of known-safe vars, then
+    the single LLM credential Goose legitimately needs added back explicitly.
+    Anything not on the allowlist (incl. the box's PAT and any unknown secret)
+    is dropped — the LLM agent never sees it."""
     source = os.environ if base_env is None else base_env
-    env = {key: value for key, value in source.items() if not _is_secret_var(key)}
+    env = {key: value for key, value in source.items() if _is_safe_var(key)}
     if config.zai_api_key:
         env["ANTHROPIC_API_KEY"] = config.zai_api_key
     env["ANTHROPIC_HOST"] = config.anthropic_host
