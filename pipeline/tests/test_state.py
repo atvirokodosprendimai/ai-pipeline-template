@@ -64,6 +64,24 @@ def test_injected_connection_adapter_roundtrip() -> None:
     assert versions == ["0001"]
 
 
+def test_reset_queue_clears_issues_and_runs_idempotently(tmp_path) -> None:
+    db = store(tmp_path)
+    db.upsert_issue(1, "queued")
+    db.upsert_issue(2, "specced", stage="specced")
+    db.record_run(issue=1, node="queued", outcome="ok")
+    db.record_run(issue=2, node="specced", outcome="ok")
+
+    cleared = db.reset_queue()
+    cleared_again = db.reset_queue()
+
+    assert cleared == {"issues": 2, "runs": 2}
+    assert cleared_again == {"issues": 0, "runs": 0}
+    assert db.list_issues() == []
+    assert db.list_runs() == []
+    versions = [r["version"] for r in db._conn.execute("SELECT version FROM schema_migrations").fetchall()]
+    assert versions == ["0001"]
+
+
 def test_upsert_and_transition_persist(tmp_path) -> None:
     db = store(tmp_path)
     db.upsert_issue(1, "Fix relay")

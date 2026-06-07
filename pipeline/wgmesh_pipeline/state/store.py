@@ -238,6 +238,15 @@ class StateStore:
         rows = self._conn.execute("SELECT * FROM runs ORDER BY id").fetchall()
         return [dict(row) for row in rows]
 
+    def reset_queue(self) -> dict[str, int]:
+        """Clear durable pipeline work state while leaving migrations intact."""
+        issue_count = int(self._conn.execute("SELECT COUNT(*) AS count FROM issues").fetchone()["count"])
+        run_count = int(self._conn.execute("SELECT COUNT(*) AS count FROM runs").fetchone()["count"])
+        self._conn.execute("DELETE FROM runs")
+        self._conn.execute("DELETE FROM issues")
+        self._conn.commit()
+        return {"issues": issue_count, "runs": run_count}
+
     def bump_attempt(
         self,
         number: int,
