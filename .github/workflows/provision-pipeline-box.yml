@@ -129,6 +129,9 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
           TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+          LANGFUSE_HOST: ${{ secrets.LANGFUSE_HOST }}
+          LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+          LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
           MODE: ${{ github.event.inputs.pipeline_mode }}
           DBMODE: ${{ github.event.inputs.database_mode }}
         run: |
@@ -145,6 +148,9 @@ jobs:
           PIPELINE_DB_PATH=/opt/wgmesh-pipeline/state.db
           TURSO_DATABASE_URL=$TURSO_DATABASE_URL
           TURSO_AUTH_TOKEN=$TURSO_AUTH_TOKEN
+          LANGFUSE_HOST=$LANGFUSE_HOST
+          LANGFUSE_PUBLIC_KEY=$LANGFUSE_PUBLIC_KEY
+          LANGFUSE_SECRET_KEY=$LANGFUSE_SECRET_KEY
           POLL_INTERVAL_SECONDS=300
           MAX_FILES=20
           EOF
@@ -156,7 +162,7 @@ jobs:
           ssh -o StrictHostKeyChecking=no -i "$RUNNER_TEMP/box_key" root@"$BOX_IP" \
             "set -euo pipefail
              git clone --depth 1 '$REPO_URL' /opt/wgmesh-pipeline || (cd /opt/wgmesh-pipeline && git pull)
-             if [ '${{ github.event.inputs.database_mode }}' = 'turso' ]; then EXTRA='[turso]'; else EXTRA=''; fi
+             if [ '${{ github.event.inputs.database_mode }}' = 'turso' ]; then EXTRA='[turso,trace]'; else EXTRA='[trace]'; fi
              python3 -m venv /opt/wgmesh-pipeline/.venv
              /opt/wgmesh-pipeline/.venv/bin/pip install -q --upgrade pip
              /opt/wgmesh-pipeline/.venv/bin/pip install -q -e \"/opt/wgmesh-pipeline/pipeline\${EXTRA}\"

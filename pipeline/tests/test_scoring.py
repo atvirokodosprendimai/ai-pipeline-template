@@ -34,6 +34,9 @@ def _cfg(key: str | None):
     @dataclass(frozen=True)
     class C:
         langsmith_api_key: str | None
+        langfuse_host: str | None = None
+        langfuse_public_key: str | None = None
+        langfuse_secret_key: str | None = None
     return C(langsmith_api_key=key)
 
 

@@ -43,6 +43,45 @@ class LangSmithTracer:
         return NoopSpan()
 
 
+class _LangfuseSpan:
+    """Defensive wrapper — tracing must NEVER raise into the loop, so every
+    Langfuse SDK call is guarded. Falls back to a silent no-op on any error."""
+
+    def __init__(self, lf: Any, name: str, inputs: Any, tags: dict[str, str]):
+        self._lf = lf
+        self._span = None
+        try:
+            self._span = lf.start_span(name=name, input=inputs, metadata=tags)
+        except Exception:
+            self._span = None
+
+    def end(self, *, outputs: Any = None, error: BaseException | None = None, latency_seconds: float = 0.0) -> None:
+        try:
+            if self._span is not None:
+                if error is not None:
+                    self._span.update(level="ERROR", status_message=str(error))
+                else:
+                    self._span.update(output=outputs)
+                self._span.end()
+            self._lf.flush()
+        except Exception:
+            pass
+
+
+class LangfuseTracer:
+    def __init__(self, config: Config):
+        from langfuse import Langfuse  # optional dep ([trace] extra)
+
+        self._lf = Langfuse(
+            public_key=config.langfuse_public_key,
+            secret_key=config.langfuse_secret_key,
+            host=config.langfuse_host,
+        )
+
+    def start_span(self, *, name: str, inputs: Any, tags: dict[str, str]) -> Span:
+        return _LangfuseSpan(self._lf, name, inputs, tags)
+
+
 _tracer: Tracer = NoopTracer()
 
 
@@ -50,6 +89,11 @@ def init_tracing(config: Config, *, tracer: Tracer | None = None) -> Tracer:
     global _tracer
     if tracer is not None:
         _tracer = tracer
+    elif config.langfuse_host and config.langfuse_public_key and config.langfuse_secret_key:
+        try:
+            _tracer = LangfuseTracer(config)
+        except Exception:
+            _tracer = NoopTracer()
     elif config.langsmith_api_key:
         _tracer = LangSmithTracer(config.langsmith_api_key)
     else:
