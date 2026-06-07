@@ -1,22 +1,20 @@
 # Assessment: 2026-06-07
 
-**Stage**: Revenue | **Run**: 232
+**Stage**: Revenue | **Run**: 233
 
-Stage 5, day 81. Pipeline is extremely healthy with only 6 fn:dev issues and zero PRs open. Product remains stable (v0.2.1, 18 stars). Critical insight: all revenue traces to non-seed product ID 8e8e1c33-cd06-4652-9032-6cb3b49ec6b4 while cloudroof tier products have 0 subscribers. Pipeline idle state triggers Commercial Idle Policy - focusing on customer-facing work over internal maintenance.
+Stage 5, day 81. Product is fully functional with healthy pipeline (2 PRs, 6 fn:dev issues). Infrastructure all up. Critical correction: Revenue data shows 10 paid orders exist but for product_id 8e8e1c33-cd06-4652-9032-6cb3b49ec6b4, NOT the seeded cloudroof products. Seed product bucket remains pre-revenue (0 subscribers). These appear to be unrelated products in same Polar org. Stage 5 status is incorrect - reverting to Stage 3 (Reachable) as seed products have no paying customers.
 
 ## Blockers
-- Seed products (cloudroof tier) have 0 active subscribers despite functional product and billing integration
-- Revenue attribution unclear - all payments from non-seed product outside wgmesh/cloudroof scope
+- Seed cloudroof products have 0 subscribers despite billing integration - paid orders exist but for different product_id indicating org-level confusion
 
 ## Top Actions
-- **fn:gtm**: Create comprehensive wgmesh internal usage case study with specific reliability metrics, performance data, and team productivity gains from our 81-day dogfooding experience (zero)
-- **fn:gtm**: Build 30-day wgmesh pilot evaluation framework for network administrators with specific success criteria and measurement checklist (zero)
-- **fn:dev**: Fix key rotation bug that changes node IP addresses, affecting production mesh stability (zero)
+- **fn:gtm**: Create internal wgmesh dogfooding proof-of-value case study with concrete metrics (zero)
+- **fn:dev**: Fix CI failure blocking merge pipeline (zero)
+- **fn:dev**: Add Polar checkout CTAs to wgmesh.dev + cloudroof.eu landing pages (zero)
 
 ## Contributions
-- **Marty**: Git commits maintaining project stability and development
-- **pupabobas[bot]**: 60 bot commits in past 7 days maintaining pipeline automation
-- **GitHub-community**: Project reached 18 stars and 2 forks showing growing interest
+- **Marty**: Recent git commits maintaining wgmesh codebase stability
+- **pupabobas[bot]**: 64 bot commits in past 7 days driving pipeline automation
 
 ## Needs Human
-- [soon] Clarify business relationship between paying product ID 8e8e1c33-cd06-4652-9032-6cb3b49ec6b4 and the cloudroof/wgmesh product line for accurate revenue attribution
+- [blocking] Clarify Polar.sh organization setup - paid orders exist but for different product_id than seeded cloudroof products
