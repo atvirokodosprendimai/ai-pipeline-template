@@ -26,6 +26,9 @@ eval = [
   "agentevals>=0.1",
   "langchain-anthropic>=0.2",
 ]
+turso = [
+  "libsql-experimental>=0.0.30",
+]
 
 [project.scripts]
 wgmesh-pipeline = "wgmesh_pipeline.main:main"
@@ -35,7 +38,7 @@ where = ["."]
 include = ["wgmesh_pipeline*"]
 
 [tool.setuptools.package-data]
-wgmesh_pipeline = ["state/schema.sql"]
+wgmesh_pipeline = ["state/migrations/*.sql"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

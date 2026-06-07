@@ -4,11 +4,44 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from wgmesh_pipeline.state.store import StateStore, TransitionError
+from dataclasses import dataclass
+
+from wgmesh_pipeline.state.store import StateStore, TransitionError, open_state_store
 
 
 def store(tmp_path):
     return StateStore(tmp_path / "state.db")
+
+
+@dataclass
+class _DbCfg:
+    database_mode: str
+    database_path: str = "x.db"
+    turso_url: str | None = None
+    turso_auth_token: str | None = None
+
+
+def test_open_state_store_local(tmp_path) -> None:
+    db = open_state_store(_DbCfg(database_mode="local", database_path=str(tmp_path / "s.db")))
+    db.upsert_issue(1, "ok")
+    assert db.get_issue(1).stage == "queued"
+
+
+def test_open_state_store_turso_fails_loud_never_falls_back_local() -> None:
+    # No silent fallback: turso selected but unreachable/unavailable must raise,
+    # never silently return a local store. (RuntimeError if libsql absent; a
+    # conn/libsql error if present + bogus url — either way, it raises.)
+    import pytest as _pytest
+
+    with _pytest.raises(Exception):
+        open_state_store(_DbCfg(database_mode="turso", turso_url="libsql://nonexistent.invalid"))
+
+
+def test_open_state_store_unknown_mode_raises() -> None:
+    import pytest as _pytest
+
+    with _pytest.raises(ValueError, match="database_mode"):
+        open_state_store(_DbCfg(database_mode="bogus"))
 
 
 def test_upsert_and_transition_persist(tmp_path) -> None:
@@ -23,12 +56,15 @@ def test_upsert_and_transition_persist(tmp_path) -> None:
     assert issue.title == "Fix relay"
 
 
-def test_schema_applies_idempotently(tmp_path) -> None:
+def test_migrations_apply_idempotently(tmp_path) -> None:
     db = store(tmp_path)
-    db.apply_schema()
-    db.apply_schema()
+    # already migrated on open; re-running applies nothing new
+    assert db.migrate() == []
     db.upsert_issue(1, "Still works")
     assert db.get_issue(1).stage == "queued"
+    # schema_migrations records the initial migration exactly once
+    versions = [r["version"] for r in db._conn.execute("SELECT version FROM schema_migrations").fetchall()]
+    assert versions == ["0001"]
 
 
 def test_sqlite_connection_uses_wal_and_busy_timeout(tmp_path) -> None:
