@@ -185,10 +185,10 @@ def test_graph_full_fix_path_reaches_gate_with_diff_and_shadow_has_no_network_wr
         }
     )
 
-    assert result["visited"] == ["triage", "spec", "implement", "review", "gate"]
+    assert result["visited"] == ["triage", "spec", "spec_pr", "implement", "review", "gate"]
     assert result["decision"] == "merge"
     assert result["diff"] == "+docs only\n"
-    assert [record.operation for record in client.dry_run_records] == ["merge_pr"]
+    assert [record.operation for record in client.dry_run_records] == ["push_branch", "create_pr", "remove_label", "add_label", "merge_pr"]
 
 
 class SessionForPr:

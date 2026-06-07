@@ -11,14 +11,16 @@ from typing import Any, Iterable
 ALLOWED_TRANSITIONS: dict[str, set[str]] = {
     "queued": {"triaged", "escalated", "failed"},
     "triaged": {"specced", "escalated", "failed"},
-    "specced": {"implemented", "escalated", "failed"},
+    "specced": {"spec_ready", "spec_opened", "escalated", "failed"},
+    "spec_ready": {"implemented", "escalated", "failed"},
     "implemented": {"reviewed", "escalated", "failed"},
     "reviewed": {"merged", "escalated", "failed"},
+    "spec_opened": set(),
     "merged": set(),
     "escalated": set(),
     "failed": set(),
 }
-ACTIONABLE_STAGES = ("queued", "triaged", "specced", "implemented", "reviewed")
+ACTIONABLE_STAGES = ("queued", "triaged", "specced", "spec_ready", "implemented", "reviewed")
 
 
 class TransitionError(ValueError):
