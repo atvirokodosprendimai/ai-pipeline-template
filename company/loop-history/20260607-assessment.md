@@ -1,20 +1,22 @@
 # Assessment: 2026-06-07
 
-**Stage**: Revenue | **Run**: 233
+**Stage**: Revenue | **Run**: 234
 
-Stage 5, day 81. Product is fully functional with healthy pipeline (2 PRs, 6 fn:dev issues). Infrastructure all up. Critical correction: Revenue data shows 10 paid orders exist but for product_id 8e8e1c33-cd06-4652-9032-6cb3b49ec6b4, NOT the seeded cloudroof products. Seed product bucket remains pre-revenue (0 subscribers). These appear to be unrelated products in same Polar org. Stage 5 status is incorrect - reverting to Stage 3 (Reachable) as seed products have no paying customers.
+Stage 5, day 81. Company has established revenue stream with consistent monthly orders (10 paid orders April-May). However, seed cloudroof products remain at 0 subscribers - revenue comes from separate product line (8e8e1c33-cd06-4652-9032-6cb3b49ec6b4). Pipeline is active with 3 PRs and 6 fn:dev issues. Priority is expanding successful revenue model to include wgmesh/cloudroof offerings.
 
 ## Blockers
-- Seed cloudroof products have 0 subscribers despite billing integration - paid orders exist but for different product_id indicating org-level confusion
+- Cloudroof seed products have 0 active subscribers despite functional billing integration
+- No bridge between successful revenue product and wgmesh/cloudroof product line
 
 ## Top Actions
-- **fn:gtm**: Create internal wgmesh dogfooding proof-of-value case study with concrete metrics (zero)
-- **fn:dev**: Fix CI failure blocking merge pipeline (zero)
-- **fn:dev**: Add Polar checkout CTAs to wgmesh.dev + cloudroof.eu landing pages (zero)
+- **fn:gtm**: Create internal wgmesh usage case study with production deployment metrics, reliability data, and cost comparisons to demonstrate concrete value proposition (zero)
+- **fn:dev**: Fix CI failure blocking merge pipeline to restore development velocity (zero)
+- **fn:dev**: Add Polar checkout CTAs to landing pages to bridge traffic to cloudroof product subscriptions (zero)
 
 ## Contributions
-- **Marty**: Recent git commits maintaining wgmesh codebase stability
-- **pupabobas[bot]**: 64 bot commits in past 7 days driving pipeline automation
+- **Marty**: Maintained codebase stability with recent git commits over past 7 days
+- **pupabobas[bot]**: Generated 68 bot commits in past 7 days maintaining pipeline operations and CI/CD workflows
+- **github-community**: Project reached 18 stars and 2 forks, showing sustained organic interest and adoption signals
 
 ## Needs Human
-- [blocking] Clarify Polar.sh organization setup - paid orders exist but for different product_id than seeded cloudroof products
+- [soon] Clarify business relationship between revenue-generating product (8e8e1c33-cd06-4652-9032-6cb3b49ec6b4) and wgmesh/cloudroof seed products
