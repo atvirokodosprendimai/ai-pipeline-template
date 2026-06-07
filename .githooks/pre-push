@@ -1,0 +1,166 @@
+#!/usr/bin/env bash
+# Last-line local defense before content hits GitHub.
+#
+# Scans the diff being pushed (across all commits in the push range) against
+# the same policy as pre-commit. Catches:
+# - hook-bypassed commits (--no-verify)
+# - commits made before this hook existed
+# - stale local branches with PII that someone forgot about
+#
+# Bypass: git push --no-verify   (do NOT use without operator approval)
+
+set -euo pipefail
+
+remote="$1"
+url="$2"
+
+PATHS_REGEX='^docs/(outreach|customers)/'
+# Patterns via ENVIRON — awk -v strips backslashes (\. → . over-matches)
+export EMAIL_PATTERN='[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
+export ALLOW_PATTERN='^@(example\.com|noreply\.github\.com|users\.noreply\.github\.com)$'
+
+# stdin format per githooks(5): <local_ref> <local_sha> <remote_ref> <remote_sha>
+fail=0
+while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do
+  # Skip branch deletions (local_sha = 0000...)
+  if [[ "$local_sha" =~ ^0+$ ]]; then
+    continue
+  fi
+
+  # Determine the diff range.
+  #
+  # New-branch case (remote_sha all zeros): scan local_sha back to its
+  # nearest VERIFIED ancestor on the remote being pushed to. Resolution
+  # order, picking the first that `git rev-parse --verify` accepts:
+  #   1. ${local_ref}@{upstream} — upstream of the ref being pushed
+  #      (NOT @{u} alone, which resolves to the currently-checked-out
+  #      branch's upstream — wrong when pushing a non-checked-out branch).
+  #   2. <remote>/HEAD — default branch on the remote being pushed to.
+  #   3. <remote>/main — bare fallback if HEAD symref is unset.
+  # If NONE verify (e.g. brand-new repo with no remote), use git's empty-
+  # tree object as the base so the entire history of local_sha is in range.
+  # Skipping straight to ${local_sha}^ would only catch the LAST commit
+  # and miss earlier PII committed-then-removed across the new branch.
+  #
+  # Existing-branch update: range is simply remote_sha..local_sha.
+  if [[ "$remote_sha" =~ ^0+$ ]]; then
+    upstream=""
+    for cand in "${local_ref}@{u}" "${remote}/HEAD" "${remote}/main"; do
+      if git rev-parse --verify --quiet "$cand" >/dev/null 2>&1; then
+        upstream="$cand"
+        break
+      fi
+    done
+
+    if [ -n "$upstream" ]; then
+      base=$(git merge-base "$local_sha" "$upstream" 2>/dev/null || echo "")
+    else
+      base=""
+    fi
+
+    if [ -z "$base" ] || [ "$base" = "$local_sha" ]; then
+      # No verified ancestor on remote: scan from git's well-known empty-
+      # tree object so every commit on local_sha is in range.
+      empty_tree=4b825dc642cb6eb9a060e54bf8d69288fbee4904
+      range="${empty_tree}..${local_sha}"
+    else
+      range="${base}..${local_sha}"
+    fi
+  else
+    range="${remote_sha}..${local_sha}"
+  fi
+
+  # All commits in the push range. We collect restricted-path files
+  # PER-COMMIT (via git diff-tree on each commit) so that files that
+  # existed in a restricted path in an intermediate commit but were
+  # renamed/moved OUT before local_sha are still scanned. The endpoint-
+  # diff approach (git diff base..head) would miss the commit-then-move
+  # bypass.
+  #
+  # Special-case the empty-tree base (no verified ancestor on remote):
+  # rev-list can't take a tree as the left side of `..`, so list ALL
+  # commits reachable from local_sha instead.
+  empty_tree=4b825dc642cb6eb9a060e54bf8d69288fbee4904
+  base_for_revlist="${range%..*}"
+  head_for_revlist="${range##*..}"
+
+  if [ "$base_for_revlist" = "$empty_tree" ]; then
+    mapfile -t commits < <(git rev-list "$head_for_revlist" 2>/dev/null)
+  else
+    mapfile -t commits < <(git rev-list "${base_for_revlist}..${head_for_revlist}" 2>/dev/null)
+  fi
+
+  [ "${#commits[@]}" -eq 0 ] && continue
+
+  for commit in "${commits[@]}"; do
+    # Files this specific commit touched (A/C/M/R/T) under a restricted path.
+    # -M emits both old+new path on rename, so renames-out-of restricted are
+    # also captured for content scan via the source path.
+    # -m makes diff-tree emit a MERGE commit's diff against each parent;
+    # without it a clean merge yields NO paths, so PII pulled in (or resolved
+    # during conflict resolution) at a merge commit would be missed. -m can
+    # list a path once per parent, so dedupe with sort -u.
+    mapfile -t commit_files < <(
+      git diff-tree --no-commit-id --name-only -r -M -m --diff-filter=ACMRT "$commit" 2>/dev/null \
+        | grep -E "$PATHS_REGEX" \
+        | sort -u \
+        || true
+    )
+
+    [ "${#commit_files[@]}" -eq 0 ] && continue
+
+    for f in "${commit_files[@]}"; do
+      # Hard block: ANY content under docs/customers/ at any commit in range.
+      if [[ "$f" =~ ^docs/customers/ ]]; then
+        if git cat-file -e "${commit}:${f}" 2>/dev/null; then
+          printf 'BLOCKED in push %s..%s: commit %s contains %s\n' \
+            "${remote_sha:0:7}" "${local_sha:0:7}" "${commit:0:7}" "$f" >&2
+          printf '  docs/customers/** is a policy-banned subtree.\n\n' >&2
+          fail=1
+        fi
+        continue
+      fi
+
+      # Inspect file content at THIS commit. Skip if file did not exist there
+      # (rename-out cases where source path no longer resolves at this commit).
+      content=$(git cat-file -p "${commit}:${f}" 2>/dev/null) || continue
+      [ -z "$content" ] && continue
+
+      hits=$(printf '%s\n' "$content" \
+             | awk 'BEGIN { pat = ENVIRON["EMAIL_PATTERN"] }
+                    {
+                      line = $0
+                      while (match(line, pat)) {
+                        m = substr(line, RSTART, RLENGTH)
+                        printf "%d:%s\n", NR, m
+                        line = substr(line, RSTART + RLENGTH)
+                      }
+                    }' \
+             | awk -F: 'BEGIN { allow = ENVIRON["ALLOW_PATTERN"] }
+                        {
+                          email = $2
+                          pos = index(email, "@")
+                          domain = substr(email, pos)
+                          if (domain !~ allow) print
+                        }' \
+             || true)
+
+      if [ -n "$hits" ]; then
+        fail=1
+        printf 'BLOCKED in push %s..%s: commit %s, file %s\n' \
+          "${remote_sha:0:7}" "${local_sha:0:7}" "${commit:0:7}" "$f" >&2
+        printf '  Email(s) at this commit:\n' >&2
+        printf '%s\n' "$hits" | sed 's/^/    /' >&2
+        printf '  Even if a later commit removed the file, the bad commit\n' >&2
+        printf '  remains in pushed history. Squash or interactive-rebase\n' >&2
+        printf '  to remove the offending commit before pushing.\n\n' >&2
+      fi
+    done
+  done
+done
+
+if [ "$fail" -ne 0 ]; then
+  printf 'pre-push: PII policy check failed. Push aborted.\n' >&2
+  printf 'Bypass (only with operator approval): git push --no-verify\n' >&2
+  exit 1
+fi

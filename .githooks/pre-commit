@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+# Local pre-commit gate. Same checks as .github/workflows/pii-policy-check.yml
+# but fires BEFORE content reaches GitHub object store.
+#
+# Setup: git config core.hooksPath .githooks  (or run .githooks/setup.sh)
+#
+# Bypass (do not use without operator approval): git commit --no-verify
+#
+# Why both this AND the workflow:
+# - Workflow = required status check on PR; unbypassable but reactive (content
+#   already pushed to a branch on GitHub).
+# - Hook = local; bypassable but stops content from ever leaving the machine.
+# - Agent-dispatched commits (Codex/Aider/etc) need both: hook catches if env
+#   ran setup; workflow catches if hook was bypassed or env wasn't configured.
+
+set -euo pipefail
+
+# Restrict scope to the same path policy as the workflow
+PATHS_REGEX='^docs/(outreach|customers)/'
+
+# Files staged for THIS commit. Include rename/copy/type-change so a file
+# can't sneak into a restricted path via mv (consistent with workflow + pre-push).
+mapfile -t staged < <(
+  git diff --cached --name-only --diff-filter=ACMRT \
+    | grep -E "$PATHS_REGEX" \
+    || true
+)
+
+if [ "${#staged[@]}" -eq 0 ]; then
+  exit 0
+fi
+
+# Patterns via ENVIRON — awk -v strips backslashes (\. → . over-matches)
+export EMAIL_PATTERN='[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
+export ALLOW_PATTERN='^@(example\.com|noreply\.github\.com|users\.noreply\.github\.com)$'
+
+fail=0
+for f in "${staged[@]}"; do
+  [ -f "$f" ] || continue
+
+  # Hard block: ANY content under docs/customers/.
+  # Subtree is reserved policy-banned namespace by THIS hook (on top of
+  # company/system-prompt.md, which only bans customer names/emails/payment
+  # details directly — that part is upstream policy).
+  if [[ "$f" =~ ^docs/customers/ ]]; then
+    printf 'BLOCKED: %s\n' "$f" >&2
+    printf '  docs/customers/** is a policy-banned subtree. Customer/sponsor\n' >&2
+    printf '  exchanges go to private operator notes (1Password / encrypted file).\n\n' >&2
+    fail=1
+    continue
+  fi
+
+  # Email scan against the staged content (not just working tree).
+  # Extract emails individually so per-line allow-list filtering can't
+  # drop a disallowed email sharing a line with an allow-listed one.
+  hits=$(git show ":$f" 2>/dev/null \
+         | awk 'BEGIN { pat = ENVIRON["EMAIL_PATTERN"] }
+                {
+                  line = $0
+                  while (match(line, pat)) {
+                    m = substr(line, RSTART, RLENGTH)
+                    printf "%d:%s\n", NR, m
+                    line = substr(line, RSTART + RLENGTH)
+                  }
+                }' \
+         | awk -F: 'BEGIN { allow = ENVIRON["ALLOW_PATTERN"] }
+                    {
+                      email = $2
+                      pos = index(email, "@")
+                      domain = substr(email, pos)
+                      if (domain !~ allow) print
+                    }' \
+         || true)
+
+  if [ -n "$hits" ]; then
+    fail=1
+    printf 'BLOCKED: %s\n' "$f" >&2
+    printf '  PII boundary violation — email address(es) detected:\n' >&2
+    printf '%s\n' "$hits" | sed 's/^/    /' >&2
+    printf '  Redact, OR move content to a private operator system.\n\n' >&2
+  fi
+done
+
+if [ "$fail" -ne 0 ]; then
+  printf 'pre-commit: PII policy check failed. Commit aborted.\n' >&2
+  printf 'Bypass (only with operator approval): git commit --no-verify\n' >&2
+  exit 1
+fi
