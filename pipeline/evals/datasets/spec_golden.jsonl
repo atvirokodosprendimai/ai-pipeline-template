@@ -1,0 +1,3 @@
+{"id":"good-spec","issue":"Fix retry handling for transient relay failures","spec":"## Problem\nRelay retries mask transient errors.\n\n## Proposed Approach\nAdd bounded retry with jitter and table-driven tests.\n\n## Acceptance Criteria\n- Retries stop after the configured limit.\n- Tests cover transient and permanent failures.\n","expected_ok":true}
+{"id":"missing-proposed-approach","issue":"Fix missing spec section regression from issue 660","spec":"## Problem\nThe generated spec lacks implementation guidance.\n\n## Acceptance Criteria\n- The builder has enough detail to implement safely.\n","expected_ok":false}
+

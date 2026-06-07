@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wgmesh-pipeline"
+version = "0.1.0"
+description = "Shadow-mode autonomous pipeline service for wgmesh."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "pytest>=8.0",
+  "requests>=2.32",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+]
+graph = [
+  "langgraph>=0.2",
+  "langsmith>=0.1",
+]
+eval = [
+  "openevals>=0.1",
+  "agentevals>=0.1",
+  "langchain-anthropic>=0.2",
+]
+
+[project.scripts]
+wgmesh-pipeline = "wgmesh_pipeline.main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["wgmesh_pipeline*"]
+
+[tool.setuptools.package-data]
+wgmesh_pipeline = ["state/schema.sql"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
