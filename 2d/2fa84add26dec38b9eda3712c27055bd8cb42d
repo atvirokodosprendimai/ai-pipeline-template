@@ -1,0 +1,36 @@
+pipeline/deploy/env.example
+  s_68555e95a0b174::t_9666418d81a7d0 1-24
+pipeline/tests/test_goose_env.py
+  s_68555e95a0b174::t_0c1766769af15a 1-15,17-22,24,28-60
+  s_68555e95a0b174::t_5490e6505e24c0 16,23,25-27
+pipeline/deploy/wgmesh-pipeline.service
+  s_68555e95a0b174::t_1f481379a4661e 1-28
+pipeline/deploy/deploy.sh
+  s_68555e95a0b174::t_656a1d8eb075e8 1-48
+pipeline/deploy/Dockerfile
+  s_68555e95a0b174::t_581076224c1c27 1-22
+pipeline/deploy/hetzner-provision.sh
+  s_68555e95a0b174::t_f270fe10e06745 1-43
+pipeline/docs/PHASE4-DEPLOY.md
+  s_68555e95a0b174::t_df52727f306e34 1-66
+pipeline/wgmesh_pipeline/goose/runner.py
+  s_68555e95a0b174::t_186682a807b750 33-38,40,43-44
+  s_68555e95a0b174::t_52addeafce04e8 90
+  s_68555e95a0b174::t_c72c770b5a08ad 16-32,39,41-42,45-57
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "2d2fa84add26dec38b9eda3712c27055bd8cb42d",
+  "prompts": {},
+  "sessions": {
+    "s_68555e95a0b174": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5b2db709-63f0-48df-8394-4d6b66b3d9eb",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
