@@ -8,6 +8,7 @@ from wgmesh_pipeline.config import Config
 from wgmesh_pipeline.github.client import GitHubClient, GitHubIssue
 from wgmesh_pipeline.github.reconcile import reconcile_issues
 from wgmesh_pipeline.graph.nodes.gate import apply_gate_side_effects, gate_node
+from wgmesh_pipeline.scoring import score_run
 from wgmesh_pipeline.state.store import IssueRecord, StateStore
 
 
@@ -46,6 +47,7 @@ class Poller:
         except Exception as exc:
             self.store.bump_attempt(issue.number, str(exc))
             self.store.record_run(issue=issue.number, node=node, started=started, ended=datetime.now(timezone.utc), outcome="error")
+            score_run({**self.scratch.get(issue.number, {}), "issue": issue}, outcome="failed")
             return None
 
         self.store.record_run(issue=issue.number, node=node, started=started, ended=datetime.now(timezone.utc), outcome="ok")
@@ -67,7 +69,9 @@ class Poller:
             classification = result.get("classification")
             if classification in {"wont-do", "needs-info"}:
                 self.client.add_label(issue.number, "needs-human")
-                return self.store.transition(issue.number, "queued", "escalated")
+                advanced = self.store.transition(issue.number, "queued", "escalated")
+                score_run(result, outcome="escalated")
+                return advanced
             self.store.upsert_issue(issue.number, issue.title, classification=classification, stage="queued")
             return self.store.transition(issue.number, "queued", "triaged")
 
@@ -109,8 +113,10 @@ class Poller:
         if issue.stage == "reviewed":
             result = gate_node(state, max_files=self.config.max_files, apply_side_effects=False)
             self.scratch[issue.number] = dict(result)
-            advanced = self.store.transition(issue.number, "reviewed", "merged" if result["decision"] == "merge" else "escalated")
+            outcome = "merged" if result["decision"] == "merge" else "escalated"
+            advanced = self.store.transition(issue.number, "reviewed", outcome)
             apply_gate_side_effects(result)
+            score_run(result, outcome=outcome)
             return advanced
 
         raise ValueError(f"stage is not actionable: {issue.stage}")
