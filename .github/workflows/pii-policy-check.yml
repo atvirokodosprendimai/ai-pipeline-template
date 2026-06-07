@@ -84,16 +84,21 @@ jobs:
           echo "Inspecting ${#commits[@]} commit(s) in range ${BASE_SHA:0:7}..${HEAD_SHA:0:7}"
           echo
 
-          # Encode workflow-command parameter values per
-          # https://docs.github.com/en/actions/reference/workflow-commands-for-github-actions#example-setting-an-error-message
-          # i.e. URL-encode `%`, `\r`, `\n`. Filenames in the repo can come
-          # from any user-controlled diff, so escape before injecting into
-          # `::error file=...,line=...::` annotations.
+          # Encode workflow-command PROPERTY values per the actions/toolkit
+          # `escapeProperty` rules
+          # (https://github.com/actions/toolkit/blob/main/packages/core/src/command.ts):
+          # %->%25, CR->%0D, LF->%0A, AND the property separators :->%3A , ->%2C.
+          # `%` MUST be escaped first so the later replacements aren't re-encoded.
+          # Filenames come from user-controlled diffs, so a name containing `,`
+          # or `:` would otherwise break the annotation or inject extra
+          # `file=`/`line=` properties.
           gh_escape() {
             local s="$1"
             s="${s//%/%25}"
             s="${s//$'\r'/%0D}"
             s="${s//$'\n'/%0A}"
+            s="${s//:/%3A}"
+            s="${s//,/%2C}"
             printf '%s' "$s"
           }
 
@@ -112,9 +117,15 @@ jobs:
             # Files this specific commit added/modified/renamed/copied/type-changed
             # under a restricted path. Captures BOTH renames-into and renames-out-of
             # by emitting both source + dest paths via -M / --name-only.
+            #
+            # -m makes diff-tree emit the diff of a MERGE commit against each
+            # parent; without it a clean merge yields NO paths, so PII pulled in
+            # (or resolved during conflict resolution) at a merge commit would be
+            # invisible. -m can list a path once per parent, so dedupe with sort -u.
             mapfile -t commit_files < <(
-              git diff-tree --no-commit-id --name-only -r -M --diff-filter=ACMRT "$commit" \
+              git diff-tree --no-commit-id --name-only -r -M -m --diff-filter=ACMRT "$commit" \
                 | grep -E '^docs/(outreach|customers)/' \
+                | sort -u \
                 || true
             )
 
@@ -162,13 +173,18 @@ jobs:
               if [ -n "$hits" ]; then
                 fail=1
                 ef="$(gh_escape "$f")"
+                # IMPORTANT: never echo the matched email VALUE. Actions logs
+                # on a public repo are public; printing the address would
+                # re-expose the very PII this gate exists to keep off public
+                # surfaces. Report line numbers + a count only.
                 while IFS= read -r line; do
                   lineno=$(printf '%s' "$line" | cut -d: -f1)
                   # lineno is digits from cut output; no need to escape
                   echo "::error file=${ef},line=${lineno}::commit ${commit:0:7} contains an email address in this path. This workflow's stricter rule (on top of company/system-prompt.md customer-PII ban) forbids ANY email here, since the path historically accumulated third-party recipient PII."
                 done <<< "$hits"
-                echo "    commit ${commit:0:7} matches in $f:"
-                printf '      %s\n' "$hits"
+                hit_count=$(printf '%s\n' "$hits" | grep -c . || true)
+                hit_lines=$(printf '%s\n' "$hits" | cut -d: -f1 | paste -sd, -)
+                echo "    commit ${commit:0:7}: ${hit_count} disallowed email(s) in $f at line(s): ${hit_lines}"
               fi
             done
           done

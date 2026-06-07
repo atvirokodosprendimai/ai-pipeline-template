@@ -96,9 +96,14 @@ while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do
     # Files this specific commit touched (A/C/M/R/T) under a restricted path.
     # -M emits both old+new path on rename, so renames-out-of restricted are
     # also captured for content scan via the source path.
+    # -m makes diff-tree emit a MERGE commit's diff against each parent;
+    # without it a clean merge yields NO paths, so PII pulled in (or resolved
+    # during conflict resolution) at a merge commit would be missed. -m can
+    # list a path once per parent, so dedupe with sort -u.
     mapfile -t commit_files < <(
-      git diff-tree --no-commit-id --name-only -r -M --diff-filter=ACMRT "$commit" 2>/dev/null \
+      git diff-tree --no-commit-id --name-only -r -M -m --diff-filter=ACMRT "$commit" 2>/dev/null \
         | grep -E "$PATHS_REGEX" \
+        | sort -u \
         || true
     )
 
