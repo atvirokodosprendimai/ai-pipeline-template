@@ -49,7 +49,9 @@ class StateStore:
         # OpenTurso, where both paths call migrate().
         if connection is not None:
             self.path = None
-            self._conn = connection
+            # libsql returns plain tuples and rejects row_factory; adapt it to
+            # the sqlite3-Row mapping interface the rest of the store expects.
+            self._conn = _LibsqlConn(connection)
         else:
             self.path = str(path)
             self._conn = sqlite3.connect(self.path)
@@ -57,7 +59,7 @@ class StateStore:
             # server manages its own journaling.
             self._conn.execute("PRAGMA journal_mode=WAL")
             self._conn.execute("PRAGMA busy_timeout=5000")
-        self._conn.row_factory = sqlite3.Row
+            self._conn.row_factory = sqlite3.Row
         self.migrate()
 
     def close(self) -> None:
@@ -257,6 +259,58 @@ class StateStore:
         )
         self._conn.commit()
         return self.get_issue(number)
+
+
+class _MappingCursor:
+    """Wraps a libsql cursor so fetchone/fetchall return name-accessible dict
+    rows (libsql yields plain tuples); column names come from .description."""
+
+    def __init__(self, cursor: Any):
+        self._cur = cursor
+        self._cols = [d[0] for d in (cursor.description or [])]
+
+    def fetchone(self) -> dict[str, Any] | None:
+        row = self._cur.fetchone()
+        return None if row is None else dict(zip(self._cols, row))
+
+    def fetchall(self) -> list[dict[str, Any]]:
+        return [dict(zip(self._cols, row)) for row in self._cur.fetchall()]
+
+    @property
+    def rowcount(self) -> int:
+        return self._cur.rowcount
+
+    @property
+    def lastrowid(self) -> int | None:
+        return self._cur.lastrowid
+
+
+class _LibsqlConn:
+    """Adapts a libsql connection to the sqlite3-with-Row interface StateStore
+    expects: execute() returns mapping rows; executescript() splits statements
+    (libsql has no executescript)."""
+
+    def __init__(self, conn: Any):
+        self._conn = conn
+
+    def execute(self, sql: str, params: Iterable[Any] = ()) -> _MappingCursor:
+        return _MappingCursor(self._conn.execute(sql, tuple(params)))
+
+    def executescript(self, script: str) -> None:
+        native = getattr(self._conn, "executescript", None)
+        if callable(native):
+            native(script)
+            return
+        for statement in script.split(";"):
+            stmt = statement.strip()
+            if stmt:
+                self._conn.execute(stmt)
+
+    def commit(self) -> None:
+        self._conn.commit()
+
+    def close(self) -> None:
+        self._conn.close()
 
 
 def _load_migrations() -> list[tuple[str, str]]:

@@ -44,6 +44,26 @@ def test_open_state_store_unknown_mode_raises() -> None:
         open_state_store(_DbCfg(database_mode="bogus"))
 
 
+def test_injected_connection_adapter_roundtrip() -> None:
+    # libsql returns plain tuples and rejects row_factory; the _LibsqlConn
+    # adapter must present sqlite3-Row-style mapping rows. A tuple-returning
+    # sqlite3 connection (no row_factory) stands in for a libsql connection and
+    # exercises the same adapter path verified live against Turso.
+    import sqlite3
+
+    raw = sqlite3.connect(":memory:")  # returns tuples, has .description + executescript
+    db = StateStore(connection=raw)  # wrapped in _LibsqlConn
+    db.upsert_issue(7, "via adapter")
+    got = db.get_issue(7)
+    assert got.number == 7 and got.stage == "queued" and got.title == "via adapter"
+    assert db.transition(7, "queued", "triaged").stage == "triaged"
+    db.record_run(issue=7, node="queued", outcome="ok")
+    assert len(db.list_runs()) == 1
+    # migrations tracked through the adapter
+    versions = [r["version"] for r in db._conn.execute("SELECT version FROM schema_migrations").fetchall()]
+    assert versions == ["0001"]
+
+
 def test_upsert_and_transition_persist(tmp_path) -> None:
     db = store(tmp_path)
     db.upsert_issue(1, "Fix relay")
