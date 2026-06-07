@@ -89,8 +89,12 @@ jobs:
           package_update: true
           packages: [git, python3, python3-venv, python3-pip, curl, jq]
           runcmd:
-            - curl -fsSL https://github.com/block/goose/releases/latest/download/download_cli.sh | bash
+            # Install Goose SYSTEM-WIDE (/usr/local/bin, on PATH for the wgmesh
+            # service user) — the default ~/.local/bin lands in root's home and
+            # is unreachable by the service + the non-interactive SSH PATH.
+            - curl -fsSL https://github.com/block/goose/releases/latest/download/download_cli.sh | GOOSE_BIN_DIR=/usr/local/bin CONFIGURE=false bash
             - install -d -m 700 /etc/wgmesh-pipeline
+            - touch /etc/wgmesh-pipeline/.cloud-init-done
           CLOUD
           # Reuse an existing server with this name? Delete first for a clean stand-up.
           hcloud server describe "$NAME" >/dev/null 2>&1 && hcloud server delete "$NAME" || true
@@ -110,12 +114,15 @@ jobs:
           set -euo pipefail
           for i in $(seq 1 40); do
             if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i "$RUNNER_TEMP/box_key" \
-                 root@"$BOX_IP" 'cloud-init status --wait >/dev/null 2>&1; command -v goose && test -d /etc/wgmesh-pipeline'; then
+                 root@"$BOX_IP" 'cloud-init status --wait >/dev/null 2>&1; test -x /usr/local/bin/goose && test -f /etc/wgmesh-pipeline/.cloud-init-done'; then
               echo "box ready"; exit 0
             fi
             sleep 15
           done
-          echo "::error::box did not become ready"; exit 1
+          echo "::error::box did not become ready"
+          ssh -o StrictHostKeyChecking=no -i "$RUNNER_TEMP/box_key" root@"$BOX_IP" \
+            'cloud-init status; ls -l /usr/local/bin/goose 2>&1; tail -n 30 /var/log/cloud-init-output.log' || true
+          exit 1
 
       - name: Write env (over SSH — secrets never touch cloud-init/metadata)
         env:
