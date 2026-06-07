@@ -1,0 +1,30 @@
+pipeline/wgmesh_pipeline/scoring.py
+  s_68555e95a0b174::t_bfc30d2b9d2425 67-71,73-80
+pipeline/wgmesh_pipeline/poller.py
+  s_68555e95a0b174::t_2ece81aea8e893 117-118,127
+  s_68555e95a0b174::t_35317e325a1c0a 119-125
+pipeline/tests/test_scoring.py
+  s_68555e95a0b174::t_a7040da276cc92 97-109
+pipeline/tests/test_poller.py
+  s_68555e95a0b174::t_410977c8f70513 165-168,195
+pipeline/docs/PHASE3-CUTOVER.md
+  s_68555e95a0b174::t_a177bfdaa0448f 72-82
+pipeline/tests/test_live_e2e.py
+  s_68555e95a0b174::t_d03cbf712bc035 144-146,148-173
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "5b968a84e9121c9f5923888acaffee86d28ca69e",
+  "prompts": {},
+  "sessions": {
+    "s_68555e95a0b174": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5b2db709-63f0-48df-8394-4d6b66b3d9eb",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
