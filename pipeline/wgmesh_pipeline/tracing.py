@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 import time
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
@@ -47,13 +48,31 @@ class _LangfuseSpan:
     """Defensive wrapper — tracing must NEVER raise into the loop, so every
     Langfuse SDK call is guarded. Falls back to a silent no-op on any error."""
 
+    # Only the first swallowed SDK error is announced, so a version/API break
+    # (e.g. langfuse v3 `start_span` → v4 `start_observation`) surfaces instead
+    # of silently degrading to a no-op tracer for the life of the process.
+    _warned = False
+
     def __init__(self, lf: Any, name: str, inputs: Any, tags: dict[str, str]):
         self._lf = lf
         self._span = None
         try:
-            self._span = lf.start_span(name=name, input=inputs, metadata=tags)
-        except Exception:
+            # langfuse v4 dropped the client-level `start_span`; the equivalent
+            # is `start_observation(..., as_type="span")`. Fall back to the v3
+            # name so a downgraded SDK keeps working.
+            if hasattr(lf, "start_observation"):
+                self._span = lf.start_observation(name=name, as_type="span", input=inputs, metadata=tags)
+            else:
+                self._span = lf.start_span(name=name, input=inputs, metadata=tags)
+        except Exception as exc:  # never raise into the loop
             self._span = None
+            self._announce(exc)
+
+    @classmethod
+    def _announce(cls, exc: BaseException) -> None:
+        if not cls._warned:
+            cls._warned = True
+            print(f"[tracing] langfuse span creation failed, tracing degraded: {exc!r}", file=sys.stderr)
 
     def end(self, *, outputs: Any = None, error: BaseException | None = None, latency_seconds: float = 0.0) -> None:
         try:
@@ -64,8 +83,8 @@ class _LangfuseSpan:
                     self._span.update(output=outputs)
                 self._span.end()
             self._lf.flush()
-        except Exception:
-            pass
+        except Exception as exc:
+            self._announce(exc)
 
 
 class LangfuseTracer:
