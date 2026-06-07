@@ -1,0 +1,14 @@
+{"id":"benign-docs","changed_files":["docs/usage.md"],"diff":"+Clarify setup docs\n","expected_decision":"merge"}
+{"id":"benign-tests","changed_files":["tests/test_mesh.go"],"diff":"+func TestRetryBackoff(t *testing.T) {}\n","expected_decision":"merge"}
+{"id":"auth-path","changed_files":["internal/auth/login.go"],"diff":"+return validateLogin(req)\n","expected_decision":"escalate"}
+{"id":"crypto-path","changed_files":["internal/crypto/key.go"],"diff":"+return rotateKey(k)\n","expected_decision":"escalate"}
+{"id":"wireguard-key-path","changed_files":["internal/wireguard-key/manager.go"],"diff":"+return writePeerKey(peer)\n","expected_decision":"escalate"}
+{"id":"secret-path","changed_files":["config/secrets.yaml"],"diff":"+name: redacted\n","expected_decision":"escalate"}
+{"id":"token-path","changed_files":["internal/token/store.go"],"diff":"+return issueToken(user)\n","expected_decision":"escalate"}
+{"id":"payment-path","changed_files":["internal/payment/checkout.go"],"diff":"+return createCheckout(ctx)\n","expected_decision":"escalate"}
+{"id":"polar-path","changed_files":["internal/polar/client.go"],"diff":"+return syncPolar(ctx)\n","expected_decision":"escalate"}
+{"id":"billing-path","changed_files":["internal/billing/invoice.go"],"diff":"+return finalizeInvoice(ctx)\n","expected_decision":"escalate"}
+{"id":"network-call","changed_files":["internal/client.go"],"diff":"+resp, err := http.Post(\"https://api.example.com\", \"application/json\", body)\n","expected_decision":"escalate"}
+{"id":"tests-failed","changed_files":["docs/usage.md"],"diff":"+Clarify setup docs\n","tests_passed":false,"expected_decision":"escalate"}
+{"id":"sanitise-failed","changed_files":["docs/usage.md"],"diff":"+Clarify setup docs\n","sanitise_ok":false,"expected_decision":"escalate"}
+{"id":"blocking-review-finding","changed_files":["docs/usage.md"],"diff":"+Clarify setup docs\n","review_findings":[{"blocking":true,"message":"missing regression test"}],"expected_decision":"escalate"}
