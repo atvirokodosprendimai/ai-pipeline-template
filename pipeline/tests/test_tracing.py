@@ -2,7 +2,85 @@ from __future__ import annotations
 
 from wgmesh_pipeline.config import Config
 from wgmesh_pipeline.github.client import GitHubIssue
-from wgmesh_pipeline.tracing import init_tracing, trace_node
+from wgmesh_pipeline.tracing import _LangfuseSpan, init_tracing, trace_node
+
+
+class _FakeSdkSpan:
+    def __init__(self, record):
+        self.record = record
+        self.ended = False
+
+    def update(self, **kwargs):
+        self.record.setdefault("updates", []).append(kwargs)
+
+    def end(self):
+        self.ended = True
+        self.record["ended"] = True
+
+
+class _FakeLangfuseV4:
+    """Mirrors langfuse>=4: client exposes start_observation, NOT start_span."""
+
+    def __init__(self):
+        self.record = {}
+        self.flushed = False
+
+    def start_observation(self, *, name, as_type, input, metadata):
+        self.record.update({"name": name, "as_type": as_type, "input": input, "metadata": metadata})
+        return _FakeSdkSpan(self.record)
+
+    def flush(self):
+        self.flushed = True
+
+
+class _FakeLangfuseV3:
+    """Mirrors langfuse 3.x: client exposes start_span only."""
+
+    def __init__(self):
+        self.record = {}
+        self.flushed = False
+
+    def start_span(self, *, name, input, metadata):
+        self.record.update({"name": name, "input": input, "metadata": metadata})
+        return _FakeSdkSpan(self.record)
+
+    def flush(self):
+        self.flushed = True
+
+
+def test_langfuse_span_uses_v4_start_observation() -> None:
+    lf = _FakeLangfuseV4()
+    span = _LangfuseSpan(lf, "triage", {"x": 1}, {"stage": "triage"})
+    span.end(outputs={"classification": "fix"})
+
+    assert lf.record["name"] == "triage"
+    assert lf.record["as_type"] == "span"  # proves v4 path taken, not silent no-op
+    assert lf.record["ended"] is True
+    assert lf.flushed is True
+    assert {"output": {"classification": "fix"}} in lf.record["updates"]
+
+
+def test_langfuse_span_falls_back_to_v3_start_span() -> None:
+    lf = _FakeLangfuseV3()
+    span = _LangfuseSpan(lf, "triage", {"x": 1}, {"stage": "triage"})
+    span.end(outputs={"ok": True})
+
+    assert lf.record["name"] == "triage"
+    assert lf.record["ended"] is True
+    assert lf.flushed is True
+
+
+def test_langfuse_span_swallows_sdk_break_but_warns(capsys) -> None:
+    _LangfuseSpan._warned = False
+
+    class _Broken:
+        def start_observation(self, **kwargs):
+            raise AttributeError("api drift")
+
+    span = _LangfuseSpan(_Broken(), "triage", {}, {})  # must NOT raise into loop
+    span.end(outputs={})
+    err = capsys.readouterr().err
+    assert "tracing degraded" in err
 
 
 class FakeSpan:
