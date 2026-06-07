@@ -69,8 +69,15 @@ after the box has run live cleanly on at least one issue.
 ## Rollback
 
 Fast and clean — the box holds no un-migrated state (sqlite is the box's working
-queue; **GitHub is the source of truth** for issues/PRs):
+queue; **GitHub is the source of truth** for issues/PRs). Order matters to avoid
+a window where both the box and Actions own the loop (double-merge):
 
-1. Stop the box (`systemctl stop wgmesh-pipeline`) or set `PIPELINE_MODE=shadow`.
-2. Remove `if: false` from the three wgmesh workflows → Actions chain resumes.
+1. **Stop the box first and confirm it is down** — `systemctl stop wgmesh-pipeline`,
+   then verify the process is gone (`systemctl status` / no live tick in logs).
+   Do **not** rely on flipping `PIPELINE_MODE=shadow`: config is read once at
+   startup (`main.py` `load_config()`), so an env change without a restart leaves
+   the running process in live mode. A mode change requires a full restart.
+2. **Only after the box is confirmed stopped**, remove `if: false` from the three
+   wgmesh workflows → Actions chain resumes. Re-enabling Actions while the box is
+   still live (or mid-tick) risks both merging the same PR.
 3. No data migration needed; the box re-reconciles from GitHub labels on next start.

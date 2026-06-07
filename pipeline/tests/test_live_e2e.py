@@ -141,4 +141,33 @@ def test_live_high_risk_issue_escalates_no_merge(tmp_path) -> None:
     # needs-human label applied
     assert any(c["kwargs"].get("json") == {"labels": ["needs-human"]} for c in session.calls)
     assert rec.calls[-1]["outcome"] == "escalated"
+    # escalated for the RIGHT reason: the crypto PATH is high-risk (not a
+    # coincidental content match) — pins the high-risk-path contract.
+    assert rec.calls[-1]["scores"]["risk_tier"] == "high"
     init_scoring(Config(target_repo="r", mode="live", max_files=3))
+
+
+class _MergeFailSession(_Session):
+    def request(self, method, url, **kwargs):
+        self.calls.append({"method": method, "url": url, "kwargs": kwargs})
+        if url.endswith("/pulls"):
+            return _Response({"number": 4242})
+        if url.endswith("/merge"):
+            raise RuntimeError("502 from GitHub merge endpoint")
+        return _Response({"ok": True})
+
+
+def test_live_merge_failure_leaves_issue_retriable_not_phantom_merged(tmp_path) -> None:
+    # If the merge network call fails AFTER the gate decides merge, the issue
+    # must NOT be left terminal 'merged' with the PR unmerged. It stays at
+    # 'reviewed' (retriable), never silently dropped.
+    init_scoring(Config(target_repo="r", mode="live", max_files=3))
+    session = _MergeFailSession()
+    p = _live_poller(tmp_path, _LowRiskGraph(), session)
+    p.store.upsert_issue(584, "Add Polar CTAs")
+
+    issue = _drive_to_terminal(p, 584)
+
+    assert issue.stage != "merged"  # no phantom merge
+    # the merge was attempted (and failed), issue is bumped/retriable, not terminal-merged
+    assert any(c["url"].endswith("/4242/merge") for c in session.calls)

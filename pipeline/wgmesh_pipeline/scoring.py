@@ -64,14 +64,22 @@ def score_run(state: dict, *, outcome: str, scorer: Scorer | None = None) -> dic
     was recorded (also useful for assertions/tests). Never raises — scoring must
     not break the loop.
     """
-    sink = scorer if scorer is not None else _scorer
-    issue = _issue_number(state)
-    scores = _scores_from_state(state, outcome)
-    tags = {"outcome": outcome, "decision": str(state.get("decision", "")), "risk_tier": str(state.get("risk_tier", ""))}
+    # The ENTIRE body is guarded — issue/score/tag construction included — so
+    # malformed state can never raise into the poller loop. Scoring is
+    # best-effort observability; on any failure we return a minimal score and
+    # never propagate.
+    scores: dict[str, Any] = {"outcome": outcome}
     try:
+        sink = scorer if scorer is not None else _scorer
+        issue = _issue_number(state)
+        scores = _scores_from_state(state, outcome)
+        tags = {
+            "outcome": outcome,
+            "decision": str(state.get("decision", "")),
+            "risk_tier": str(state.get("risk_tier", "")),
+        }
         sink.record(issue=issue, outcome=outcome, scores=scores, tags=tags)
     except Exception:
-        # Scoring is best-effort observability; never propagate into the loop.
         pass
     return scores
 

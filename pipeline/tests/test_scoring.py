@@ -94,3 +94,16 @@ def test_score_run_handles_missing_issue() -> None:
     rec = _RecordingScorer()
     score_run({}, outcome="failed", scorer=rec)
     assert rec.calls[0]["issue"] == 0
+
+
+def test_score_run_never_raises_on_malformed_state() -> None:
+    # issue.number non-coercible and review_findings non-sized — both would
+    # raise OUTSIDE a naive try. The whole body is guarded, so this returns
+    # a minimal score instead of propagating into the loop.
+    @dataclass
+    class _BadIssue:
+        number: str = "not-an-int"
+
+    bad_state = {"issue": _BadIssue(), "review_findings": 123}
+    scores = score_run(bad_state, outcome="merged", scorer=_RecordingScorer())
+    assert scores["outcome"] == "merged"

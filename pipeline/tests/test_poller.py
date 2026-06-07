@@ -162,7 +162,10 @@ def test_reconcile_exception_does_not_halt_tick(tmp_path, cfg: Config, monkeypat
     assert p.store.get_issue(1).stage == "queued"
 
 
-def test_reviewed_issue_transitions_before_merge_side_effect(tmp_path, cfg: Config) -> None:
+def test_reviewed_issue_not_phantom_merged_when_side_effect_fails(tmp_path, cfg: Config) -> None:
+    # Side effect (merge) runs BEFORE the terminal transition. A failed merge
+    # must NOT leave the issue terminal-'merged' with the PR unmerged — it stays
+    # at 'reviewed', retriable.
     class FailingMergeClient(EmptyClient):
         def __init__(self, config):
             super().__init__(config)
@@ -188,8 +191,8 @@ def test_reviewed_issue_transitions_before_merge_side_effect(tmp_path, cfg: Conf
     result = asyncio.run(p.tick())
 
     assert result is None
-    assert store.get_issue(2).stage == "merged"
     assert client.merged_prs == [321]
+    assert store.get_issue(2).stage != "merged"
 
 
 def test_restart_mid_flight_resumes_persisted_stage_without_double_work(tmp_path, cfg: Config) -> None:

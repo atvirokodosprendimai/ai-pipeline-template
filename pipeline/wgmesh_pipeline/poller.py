@@ -114,8 +114,17 @@ class Poller:
             result = gate_node(state, max_files=self.config.max_files, apply_side_effects=False)
             self.scratch[issue.number] = dict(result)
             outcome = "merged" if result["decision"] == "merge" else "escalated"
-            advanced = self.store.transition(issue.number, "reviewed", outcome)
+            # Side-effect BEFORE the terminal transition: if the merge/label
+            # network call fails it raises here, the issue stays at 'reviewed'
+            # (retried next tick, terminal-failed after max attempts), and we
+            # never record a phantom-merged state with the PR unmerged. Mirrors
+            # the queued branch (label before transition).
+            # NOTE (follow-up): a crash in the tiny window after a *successful*
+            # merge but before the transition would re-attempt the merge on
+            # retry; merge_pr should tolerate an already-merged PR at the API
+            # layer to make that fully idempotent.
             apply_gate_side_effects(result)
+            advanced = self.store.transition(issue.number, "reviewed", outcome)
             score_run(result, outcome=outcome)
             return advanced
 
