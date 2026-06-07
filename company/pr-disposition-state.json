@@ -1,1 +1,132 @@
-{"ledger": [], "acted_fingerprints": []}
+{
+  "ledger": [
+    {
+      "timestamp": "2026-06-07T02:10:36Z",
+      "pr_number": 1485,
+      "action": "human",
+      "class": "human",
+      "risk_tier": "low",
+      "reason": "PR disposition escalated for human review: needs-human-label"
+    },
+    {
+      "timestamp": "2026-06-07T02:10:38Z",
+      "pr_number": 1483,
+      "action": "human",
+      "class": "human",
+      "risk_tier": "low",
+      "reason": "PR disposition escalated for human review: needs-human-label"
+    },
+    {
+      "timestamp": "2026-06-07T02:10:41Z",
+      "pr_number": 1481,
+      "action": "human",
+      "class": "human",
+      "risk_tier": "low",
+      "reason": "PR disposition escalated for human review: needs-human-label"
+    },
+    {
+      "timestamp": "2026-06-07T02:10:47Z",
+      "pr_number": 1474,
+      "action": "human",
+      "class": "human",
+      "risk_tier": "low",
+      "reason": "PR disposition escalated for human review: needs-human-label"
+    },
+    {
+      "timestamp": "2026-06-07T02:10:49Z",
+      "pr_number": 1473,
+      "action": "human",
+      "class": "human",
+      "risk_tier": "low",
+      "reason": "PR disposition escalated for human review: needs-human-label"
+    },
+    {
+      "timestamp": "2026-06-07T02:10:51Z",
+      "pr_number": 1469,
+      "action": "human",
+      "class": "human",
+      "risk_tier": "low",
+      "reason": "PR disposition escalated for human review: needs-human-label"
+    },
+    {
+      "timestamp": "2026-06-07T02:10:53Z",
+      "pr_number": 1468,
+      "action": "human",
+      "class": "human",
+      "risk_tier": "low",
+      "reason": "PR disposition escalated for human review: needs-human-label"
+    },
+    {
+      "timestamp": "2026-06-07T02:11:14Z",
+      "pr_number": 750,
+      "action": "human",
+      "class": "human",
+      "risk_tier": "low",
+      "reason": "PR disposition escalated for human review: needs-human-label"
+    },
+    {
+      "timestamp": "2026-06-07T02:11:16Z",
+      "pr_number": 749,
+      "action": "human",
+      "class": "human",
+      "risk_tier": "low",
+      "reason": "PR disposition escalated for human review: needs-human-label"
+    },
+    {
+      "timestamp": "2026-06-07T02:11:18Z",
+      "pr_number": 747,
+      "action": "human",
+      "class": "human",
+      "risk_tier": "low",
+      "reason": "PR disposition escalated for human review: needs-human-label"
+    },
+    {
+      "timestamp": "2026-06-07T02:11:20Z",
+      "pr_number": 744,
+      "action": "human",
+      "class": "human",
+      "risk_tier": "low",
+      "reason": "PR disposition escalated for human review: needs-human-label"
+    },
+    {
+      "timestamp": "2026-06-07T02:11:23Z",
+      "pr_number": 743,
+      "action": "human",
+      "class": "human",
+      "risk_tier": "low",
+      "reason": "PR disposition escalated for human review: needs-human-label"
+    },
+    {
+      "timestamp": "2026-06-07T02:11:25Z",
+      "pr_number": 741,
+      "action": "human",
+      "class": "human",
+      "risk_tier": "low",
+      "reason": "PR disposition escalated for human review: needs-human-label"
+    },
+    {
+      "timestamp": "2026-06-07T02:11:27Z",
+      "pr_number": 736,
+      "action": "human",
+      "class": "human",
+      "risk_tier": "low",
+      "reason": "PR disposition escalated for human review: needs-human-label"
+    }
+  ],
+  "acted_fingerprints": [
+    "1468:25b8dc60b6a6924931556485d54ad2bfe2b18d95:human",
+    "1469:8bfbed10842992822bf844051049e02eb49855e7:human",
+    "1473:58c58434c11f78588fe4783eb0e0b369e6ab0ae9:human",
+    "1474:bb3fdc4401c1aa29c29bbdcac94632aa560086c9:human",
+    "1481:5a85d00195c49af4b515b51459b3536fe0991293:human",
+    "1483:eeba8a2b893eb341436f8e4aff683a61472d03c5:human",
+    "1485:76053c009e5e7554a8e7a772ba3497207247095b:human",
+    "736:d2b5326adfacf1b2c7034f81a2f6af228e98b94b:human",
+    "741:2ba8a63a6e620a197ddfa2a8edfd12b03338be88:human",
+    "743:2fb8d71977d0fbced39321b9d9446fbb825326a5:human",
+    "744:91215c39cc41320b606931d9275f9b4db2bd80e6:human",
+    "747:78cb07d34c01aa2a4eed6414cdd8b5b1193c59e6:human",
+    "749:305233bb337083aed107bde2c302e96c9b29e57d:human",
+    "750:15de57eb93fb468c41b83dac14467ed65540bf4f:human"
+  ]
+}
