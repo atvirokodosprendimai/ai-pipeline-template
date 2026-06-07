@@ -1,0 +1,152 @@
+name: Provision Langfuse
+
+# Self-hosted Langfuse (open-source LLM observability) on a Hetzner box via the
+# official docker compose stack (web + worker + postgres + clickhouse + redis +
+# minio). Headless-initialised with preset project keys (LANGFUSE_PUBLIC_KEY /
+# LANGFUSE_SECRET_KEY secrets) so the pipeline can send traces without any UI
+# click. Infra secrets (db/clickhouse/encryption/etc.) are generated ON the box.
+#
+# Required secrets: HCLOUD_TOKEN (org), LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY.
+# Open the UI at http://<ip>:3000 (login with the admin email/password printed
+# in the run output).
+
+on:
+  workflow_dispatch:
+    inputs:
+      server_name:
+        default: 'langfuse'
+      server_type:
+        default: 'cpx32'   # 4 vCPU / 8 GB — v3 + clickhouse need memory
+      location:
+        default: 'hel1'
+
+permissions:
+  contents: read
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    env:
+      NAME: ${{ github.event.inputs.server_name }}
+    steps:
+      - name: Validate secrets
+        run: |
+          set -euo pipefail
+          : "${HCLOUD_TOKEN:?}"; : "${LANGFUSE_PUBLIC_KEY:?}"; : "${LANGFUSE_SECRET_KEY:?}"
+        env:
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+          LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+          LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+
+      - name: Install hcloud CLI
+        run: |
+          set -euo pipefail
+          curl -fsSL https://github.com/hetznercloud/cli/releases/latest/download/hcloud-linux-amd64.tar.gz | tar xz hcloud
+          sudo mv hcloud /usr/local/bin/
+
+      - name: Ephemeral SSH key
+        run: ssh-keygen -t ed25519 -N '' -f "$RUNNER_TEMP/k" -C "lf-${{ github.run_id }}"
+
+      - name: Create server
+        env:
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+        run: |
+          set -euo pipefail
+          KEYNAME="lf-${{ github.run_id }}"
+          hcloud ssh-key create --name "$KEYNAME" --public-key-from-file "$RUNNER_TEMP/k.pub"
+          cat > "$RUNNER_TEMP/ci.yml" <<'CLOUD'
+          #cloud-config
+          package_update: true
+          runcmd:
+            - curl -fsSL https://get.docker.com | sh
+            - install -d -m 700 /opt/langfuse
+            - touch /opt/langfuse/.ci-done
+          CLOUD
+          hcloud server describe "$NAME" >/dev/null 2>&1 && hcloud server delete "$NAME" || true
+          hcloud server create --name "$NAME" --type "${{ github.event.inputs.server_type }}" \
+            --image ubuntu-24.04 --location "${{ github.event.inputs.location }}" \
+            --ssh-key "$KEYNAME" --user-data-from-file "$RUNNER_TEMP/ci.yml"
+          echo "BOX_IP=$(hcloud server ip "$NAME")" >> "$GITHUB_ENV"
+          echo "KEYNAME=$KEYNAME" >> "$GITHUB_ENV"
+
+      - name: Wait for Docker
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 40); do
+            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i "$RUNNER_TEMP/k" root@"$BOX_IP" \
+                 'cloud-init status --wait >/dev/null 2>&1; command -v docker && test -f /opt/langfuse/.ci-done'; then
+              echo ok; exit 0
+            fi
+            sleep 15
+          done
+          echo "::error::docker not ready"; exit 1
+
+      - name: Deploy Langfuse stack
+        env:
+          LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+          LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+        run: |
+          set -euo pipefail
+          # Generate infra secrets + admin password ONCE on the box (idempotent:
+          # keep an existing .env so SALT/ENCRYPTION_KEY stay stable across redeploys).
+          ssh -o StrictHostKeyChecking=no -i "$RUNNER_TEMP/k" root@"$BOX_IP" bash -s -- \
+            "$BOX_IP" "$LANGFUSE_PUBLIC_KEY" "$LANGFUSE_SECRET_KEY" <<'REMOTE'
+          set -euo pipefail
+          IP="$1"; LF_PUB="$2"; LF_SEC="$3"
+          cd /opt/langfuse
+          curl -fsSL https://raw.githubusercontent.com/langfuse/langfuse/main/docker-compose.yml -o docker-compose.yml
+          if [ ! -f .env ]; then
+            gen() { openssl rand -hex 32; }
+            PG=$(gen); CH=$(gen); MN=$(gen); RD=$(gen); ADMINPW=$(openssl rand -hex 12)
+            cat > .env <<EOF
+          NEXTAUTH_URL=http://$IP:3000
+          NEXTAUTH_SECRET=$(gen)
+          SALT=$(gen)
+          ENCRYPTION_KEY=$(gen)
+          DATABASE_URL=postgresql://postgres:$PG@postgres:5432/postgres
+          POSTGRES_PASSWORD=$PG
+          CLICKHOUSE_PASSWORD=$CH
+          REDIS_AUTH=$RD
+          LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY=$MN
+          LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY=$MN
+          MINIO_ROOT_PASSWORD=$MN
+          LANGFUSE_INIT_ORG_ID=wgmesh
+          LANGFUSE_INIT_ORG_NAME=wgmesh
+          LANGFUSE_INIT_PROJECT_ID=pipeline
+          LANGFUSE_INIT_PROJECT_NAME=pipeline
+          LANGFUSE_INIT_PROJECT_PUBLIC_KEY=$LF_PUB
+          LANGFUSE_INIT_PROJECT_SECRET_KEY=$LF_SEC
+          LANGFUSE_INIT_USER_EMAIL=admin@wgmesh.local
+          LANGFUSE_INIT_USER_NAME=admin
+          LANGFUSE_INIT_USER_PASSWORD=$ADMINPW
+          TELEMETRY_ENABLED=false
+          EOF
+            echo "ADMIN_PASSWORD=$ADMINPW" > .admin
+          fi
+          # postgres password also needs to reach the postgres + clickhouse services:
+          set -a; . ./.env; set +a
+          POSTGRES_PASSWORD="$POSTGRES_PASSWORD" CLICKHOUSE_PASSWORD="$CLICKHOUSE_PASSWORD" \
+            REDIS_AUTH="$REDIS_AUTH" MINIO_ROOT_PASSWORD="$MINIO_ROOT_PASSWORD" \
+            docker compose --env-file .env up -d
+          REMOTE
+
+      - name: Wait for Langfuse web
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 40); do
+            if curl -fsS -o /dev/null "http://$BOX_IP:3000/api/public/health"; then echo "langfuse up"; exit 0; fi
+            sleep 15
+          done
+          echo "::warning::health endpoint not green yet — stack may still be migrating clickhouse"
+          ssh -o StrictHostKeyChecking=no -i "$RUNNER_TEMP/k" root@"$BOX_IP" 'cd /opt/langfuse && docker compose ps' || true
+
+      - name: Cleanup ephemeral key
+        if: always()
+        env:
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+        run: hcloud ssh-key delete "${KEYNAME:-lf-${{ github.run_id }}}" || true
+
+      - name: Report
+        run: |
+          echo "Langfuse at http://$BOX_IP:3000  (admin@wgmesh.local / see /opt/langfuse/.admin on box)"
+          echo "Set LANGFUSE_HOST=http://$BOX_IP:3000 as a repo secret, then re-provision the pipeline box."
