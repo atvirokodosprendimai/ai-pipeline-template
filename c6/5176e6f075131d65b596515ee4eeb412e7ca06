@@ -1,0 +1,69 @@
+pipeline/tests/conftest.py
+  s_68555e95a0b174::t_9367ca33c50c5a 1-10
+pipeline/tests/test_reconcile.py
+  s_68555e95a0b174::t_9367ca33c50c5a 1-72
+pipeline/tests/test_state.py
+  s_68555e95a0b174::t_9367ca33c50c5a 1-76
+pipeline/wgmesh_pipeline/__init__.py
+  s_68555e95a0b174::t_9367ca33c50c5a 1-4
+pipeline/wgmesh_pipeline/graph/nodes/implement.py
+  s_68555e95a0b174::t_9367ca33c50c5a 1-36
+pipeline/wgmesh_pipeline/graph/nodes/review.py
+  s_68555e95a0b174::t_9367ca33c50c5a 1-34
+pipeline/tests/test_gate.py
+  s_68555e95a0b174::t_9367ca33c50c5a 1-106
+pipeline/tests/test_github_client.py
+  s_68555e95a0b174::t_9367ca33c50c5a 1-110
+pipeline/tests/test_goose_runner.py
+  s_68555e95a0b174::t_9367ca33c50c5a 1-99
+pipeline/wgmesh_pipeline/graph/nodes/triage.py
+  s_68555e95a0b174::t_9367ca33c50c5a 1-29
+pipeline/wgmesh_pipeline/risk.py
+  s_68555e95a0b174::t_9367ca33c50c5a 1-54
+pipeline/wgmesh_pipeline/github/client.py
+  s_68555e95a0b174::t_9367ca33c50c5a 1-177
+pipeline/wgmesh_pipeline/github/reconcile.py
+  s_68555e95a0b174::t_9367ca33c50c5a 1-49
+pipeline/wgmesh_pipeline/goose/runner.py
+  s_68555e95a0b174::t_9367ca33c50c5a 1-92
+pipeline/wgmesh_pipeline/graph/state.py
+  s_68555e95a0b174::t_9367ca33c50c5a 1-31
+pipeline/wgmesh_pipeline/graph/nodes/spec.py
+  s_68555e95a0b174::t_9367ca33c50c5a 1-36
+pipeline/tests/test_risk.py
+  s_68555e95a0b174::t_9367ca33c50c5a 1-42
+pipeline/README.md
+  s_68555e95a0b174::t_9367ca33c50c5a 1-20
+pipeline/wgmesh_pipeline/config.py
+  s_68555e95a0b174::t_9367ca33c50c5a 1-91
+pipeline/wgmesh_pipeline/graph/build.py
+  s_68555e95a0b174::t_9367ca33c50c5a 1-41,47-48
+pipeline/wgmesh_pipeline/graph/nodes/gate.py
+  s_68555e95a0b174::t_9367ca33c50c5a 1-65
+pipeline/pyproject.toml
+  s_68555e95a0b174::t_9367ca33c50c5a 1-42
+pipeline/wgmesh_pipeline/state/schema.sql
+  s_68555e95a0b174::t_9367ca33c50c5a 1-32
+pipeline/.gitignore
+  s_68555e95a0b174::t_9367ca33c50c5a 1-5
+pipeline/wgmesh_pipeline/state/store.py
+  s_68555e95a0b174::t_9367ca33c50c5a 1-269
+pipeline/tests/test_config.py
+  s_68555e95a0b174::t_9367ca33c50c5a 1-49
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "c65176e6f075131d65b596515ee4eeb412e7ca06",
+  "prompts": {},
+  "sessions": {
+    "s_68555e95a0b174": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5b2db709-63f0-48df-8394-4d6b66b3d9eb",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
