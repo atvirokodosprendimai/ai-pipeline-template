@@ -55,7 +55,7 @@ jobs:
           fi
 
           case "$PR_AUTHOR" in
-            github-actions[bot]|copilot-swe-agent[bot]|goose[bot])
+            'github-actions[bot]'|'copilot-swe-agent[bot]'|'goose[bot]')
               echo "Heartbeat PR author allowed explicitly: $PR_AUTHOR"
               ;;
             *)
@@ -70,7 +70,7 @@ jobs:
           case "$PR_TITLE" in
             'chore: supervisor-rank state'*|'chore(pr-disposition): update state'*)
               case "$PR_AUTHOR" in
-                pupabobas[bot]|app/pupabobas) ;;
+                'pupabobas[bot]'|app/pupabobas) ;;
                 *)
                   echo "::error::state-PR fast-lane requires pupabobas[bot] author; got '$PR_AUTHOR'"
                   exit 1
