@@ -50,10 +50,18 @@ jobs:
       - name: Create server
         env:
           HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+          SSH_PUBKEY: ${{ secrets.SSH_PUBKEY }}
         run: |
           set -euo pipefail
           KEYNAME="lf-${{ github.run_id }}"
           hcloud ssh-key create --name "$KEYNAME" --public-key-from-file "$RUNNER_TEMP/k.pub"
+          SSHKEYS="$KEYNAME"
+          if [ -n "${SSH_PUBKEY:-}" ]; then
+            printf '%s\n' "$SSH_PUBKEY" > "$RUNNER_TEMP/op.pub"
+            hcloud ssh-key describe op-persistent >/dev/null 2>&1 || \
+              hcloud ssh-key create --name op-persistent --public-key-from-file "$RUNNER_TEMP/op.pub"
+            SSHKEYS="$KEYNAME,op-persistent"
+          fi
           cat > "$RUNNER_TEMP/ci.yml" <<'CLOUD'
           #cloud-config
           package_update: true
@@ -65,7 +73,7 @@ jobs:
           hcloud server describe "$NAME" >/dev/null 2>&1 && hcloud server delete "$NAME" || true
           hcloud server create --name "$NAME" --type "${{ github.event.inputs.server_type }}" \
             --image ubuntu-24.04 --location "${{ github.event.inputs.location }}" \
-            --ssh-key "$KEYNAME" --user-data-from-file "$RUNNER_TEMP/ci.yml"
+            --ssh-key "$SSHKEYS" --user-data-from-file "$RUNNER_TEMP/ci.yml"
           echo "BOX_IP=$(hcloud server ip "$NAME")" >> "$GITHUB_ENV"
           echo "KEYNAME=$KEYNAME" >> "$GITHUB_ENV"
 
@@ -85,19 +93,21 @@ jobs:
         env:
           LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
           LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+          LANGFUSE_ADMIN_PASSWORD: ${{ secrets.LANGFUSE_ADMIN_PASSWORD }}
         run: |
           set -euo pipefail
-          # Generate infra secrets + admin password ONCE on the box (idempotent:
-          # keep an existing .env so SALT/ENCRYPTION_KEY stay stable across redeploys).
+          # Generate infra secrets ONCE on the box (idempotent: keep an existing
+          # .env so SALT/ENCRYPTION_KEY stay stable across redeploys). Admin
+          # password is the known LANGFUSE_ADMIN_PASSWORD secret so login works.
           ssh -o StrictHostKeyChecking=no -i "$RUNNER_TEMP/k" root@"$BOX_IP" bash -s -- \
-            "$BOX_IP" "$LANGFUSE_PUBLIC_KEY" "$LANGFUSE_SECRET_KEY" <<'REMOTE'
+            "$BOX_IP" "$LANGFUSE_PUBLIC_KEY" "$LANGFUSE_SECRET_KEY" "$LANGFUSE_ADMIN_PASSWORD" <<'REMOTE'
           set -euo pipefail
-          IP="$1"; LF_PUB="$2"; LF_SEC="$3"
+          IP="$1"; LF_PUB="$2"; LF_SEC="$3"; ADMINPW="$4"
           cd /opt/langfuse
           curl -fsSL https://raw.githubusercontent.com/langfuse/langfuse/main/docker-compose.yml -o docker-compose.yml
           if [ ! -f .env ]; then
             gen() { openssl rand -hex 32; }
-            PG=$(gen); CH=$(gen); MN=$(gen); RD=$(gen); ADMINPW=$(openssl rand -hex 12)
+            PG=$(gen); CH=$(gen); MN=$(gen); RD=$(gen)
             cat > .env <<EOF
           NEXTAUTH_URL=http://$IP:3000
           NEXTAUTH_SECRET=$(gen)
