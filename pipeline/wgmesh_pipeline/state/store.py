@@ -299,12 +299,15 @@ def _open_turso(config: Any) -> Any:
     if not url:
         raise ValueError("DATABASE_MODE=turso requires TURSO_DATABASE_URL")
     try:
-        import libsql_experimental as libsql  # type: ignore
+        import libsql  # type: ignore
     except ImportError as exc:  # fail-loud, never silently fall back to local
         raise RuntimeError(
             "DATABASE_MODE=turso but the libsql client is not installed "
-            "(pip install libsql-experimental)"
+            "(pip install 'wgmesh-pipeline[turso]'  # installs libsql)"
         ) from exc
+    # Pure remote over-the-wire: database is the libsql:// URL, every query hits
+    # the cloud primary — durable state that survives a box rebuild (no local
+    # file to lose). auth_token is the Turso database/group token.
     return libsql.connect(database=url, auth_token=token or "")
 
 

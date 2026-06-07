@@ -27,7 +27,7 @@ eval = [
   "langchain-anthropic>=0.2",
 ]
 turso = [
-  "libsql-experimental>=0.0.30",
+  "libsql>=0.1",
 ]
 
 [project.scripts]
