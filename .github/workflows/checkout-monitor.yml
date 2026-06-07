@@ -1,0 +1,204 @@
+name: Checkout Monitor (synthetic)
+
+# Synthetic monitor for the customer-facing Polar checkout CTAs on
+# cloudroof.eu and wgmesh.dev. Catches the failure mode documented in
+# `docs/solutions/integration-issues/polar-checkout-404s-from-stale-config-2026-05-08.md`
+# — broken Polar URLs 302-redirect to the marketing homepage which
+# returns 200 to a naive HEAD check, masking the failure.
+#
+# Run policy:
+#   - schedule: every 6 hours (~120 runs/month — negligible cost)
+#   - workflow_dispatch: manual smoke test after CTA edits
+#
+# Failure surface: opens a `needs-human` issue with the dead URL + the
+# response shape so the operator can fix without re-running discovery.
+# Does NOT auto-revert or auto-page; visibility-first.
+
+on:
+  schedule:
+    - cron: '13 */6 * * *'  # 13 past every 6th hour, off the top so cron storms don't pile
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve canonical checkout URLs from Polar API
+        id: discover
+        env:
+          POLAR_TOKEN: ${{ secrets.POLAR_TOKEN }}
+        run: |
+          set -uo pipefail
+          if [ -z "$POLAR_TOKEN" ]; then
+            echo "::warning::POLAR_TOKEN not configured — cannot discover canonical URLs"
+            echo "missing=token-unconfigured" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          API="https://api.polar.sh"
+          AUTH="Authorization: Bearer $POLAR_TOKEN"
+
+          # Sponsor product UUIDs — the 3 cloudroof tiers. If these change in
+          # Polar, update this list. (We could resolve dynamically by tag/name
+          # but hardcoding the 3 product IDs we actually advertise is more
+          # explicit + easier to audit.)
+          PRODUCT_IDS=(
+            3f5d75de-936b-49d8-a21b-4b79d9fd22c1  # Founding $5
+            1927e637-4cfd-4c94-8bee-c5518803bc89  # Edge Node $20
+            eb20683e-55ea-4354-9d8c-070e55a4eff5  # Mesh Operator $100
+          )
+
+          : > /tmp/canonical_urls.txt
+          missing=0
+          for product_id in "${PRODUCT_IDS[@]}"; do
+            link_url=$(curl -s -H "$AUTH" -H "Accept: application/json" \
+              "$API/v1/checkout-links/?product_id=$product_id&limit=1" \
+              | jq -r '.items[0].url // empty')
+            if [ -z "$link_url" ]; then
+              echo "::warning::No checkout-link for product $product_id"
+              missing=$((missing + 1))
+            else
+              echo "$product_id $link_url" >> /tmp/canonical_urls.txt
+            fi
+          done
+
+          echo "Canonical URLs:"
+          cat /tmp/canonical_urls.txt
+
+          if [ "$missing" -gt 0 ]; then
+            echo "missing=$missing" >> "$GITHUB_OUTPUT"
+          else
+            echo "missing=0" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Verify each surface contains the canonical URLs
+        id: verify
+        run: |
+          set -uo pipefail
+          surfaces=(
+            "https://cloudroof.eu/"
+            "https://wgmesh.dev/"
+          )
+
+          : > /tmp/failures.txt
+          for surface in "${surfaces[@]}"; do
+            body=$(curl -sSL --max-time 15 "$surface")
+            while IFS=' ' read -r product_id canonical_url; do
+              if ! echo "$body" | grep -qF "$canonical_url"; then
+                echo "MISSING surface=$surface product=$product_id expected_url=$canonical_url" \
+                  >> /tmp/failures.txt
+              fi
+            done < /tmp/canonical_urls.txt
+          done
+
+          if [ -s /tmp/failures.txt ]; then
+            cat /tmp/failures.txt
+            echo "failed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "failed=false" >> "$GITHUB_OUTPUT"
+            echo "All surfaces contain canonical checkout URLs."
+          fi
+
+      - name: Probe each canonical URL renders a real checkout page
+        id: probe
+        run: |
+          set -uo pipefail
+          : > /tmp/probe_failures.txt
+          while IFS=' ' read -r product_id url; do
+            # Follow redirects + look for hallmark Polar checkout markup.
+            # The broken-URL failure mode: 302 → polar.sh/ marketing homepage
+            # which is 200 but does NOT contain the product name or "Subscribe"
+            # button, so a 200-only check passes while the click fails.
+            page=$(curl -sSL --max-time 15 "$url")
+            # `-L` follows redirects so the final status reflects the rendered
+            # checkout page, not an intermediate 302/301. Without `-L`, valid
+            # canonicalization redirects (e.g., http→https) get flagged as
+            # BAD_STATUS even though the page renders fine.
+            status=$(curl -sIL -o /dev/null -w "%{http_code}" --max-time 15 "$url")
+
+            # Minimal shape assertion: page contains the word "Subscribe" or
+            # "Sponsor" or "checkout" (Polar's checkout page reliably has at
+            # least one) AND status is 200.
+            if [ "$status" != "200" ]; then
+              echo "BAD_STATUS url=$url status=$status product=$product_id" \
+                >> /tmp/probe_failures.txt
+            elif ! echo "$page" | grep -qiE "subscribe|sponsor|checkout"; then
+              echo "BAD_BODY url=$url product=$product_id (no subscribe/sponsor/checkout markup)" \
+                >> /tmp/probe_failures.txt
+            fi
+          done < /tmp/canonical_urls.txt
+
+          if [ -s /tmp/probe_failures.txt ]; then
+            cat /tmp/probe_failures.txt
+            echo "failed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "failed=false" >> "$GITHUB_OUTPUT"
+            echo "All canonical URLs render real checkout pages."
+          fi
+
+      - name: Open issue on failure
+        if: steps.verify.outputs.failed == 'true' || steps.probe.outputs.failed == 'true' || (steps.discover.outputs.missing != '0' && steps.discover.outputs.missing != '')
+        env:
+          # Built-in GITHUB_TOKEN is sufficient: the workflow already declares
+          # `permissions: issues: write`. Avoids the long-lived PAT exposure
+          # surface flagged by reviewer.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          # Idempotency: if there's already an open `checkout-monitor-failure`
+          # issue, comment on it instead of opening a duplicate. Operators will
+          # close once fixed; the next failure after that opens a fresh one.
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" \
+            --label checkout-monitor-failure --state open \
+            --json number --jq '.[0].number // empty')
+
+          {
+            echo "## Checkout monitor failure"
+            echo ""
+            echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo ""
+            if [ "${{ steps.discover.outputs.missing }}" != "0" ]; then
+              echo "### Polar API: missing checkout-links for ${{ steps.discover.outputs.missing }} product(s)"
+              echo "Some sponsor products no longer have a public checkout-link. Either Polar archived them or the link was deleted. Re-create via the Polar dashboard or via \`POST /v1/checkout-links/\`."
+              echo ""
+            fi
+            if [ "${{ steps.verify.outputs.failed }}" = "true" ]; then
+              echo "### Surface mismatches (canonical URL not present in landing page HTML)"
+              echo '```'
+              cat /tmp/failures.txt
+              echo '```'
+              echo ""
+            fi
+            if [ "${{ steps.probe.outputs.failed }}" = "true" ]; then
+              echo "### Probe failures (URL doesn't render a checkout page)"
+              echo '```'
+              cat /tmp/probe_failures.txt
+              echo '```'
+              echo ""
+            fi
+            echo "See: docs/solutions/integration-issues/polar-checkout-404s-from-stale-config-2026-05-08.md"
+          } > /tmp/issue-body.md
+
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" \
+              --body-file /tmp/issue-body.md
+          else
+            gh label create checkout-monitor-failure --repo "$GITHUB_REPOSITORY" \
+              --color "B60205" \
+              --description "Synthetic checkout monitor caught a broken CTA — see issue body" \
+              --force >/dev/null 2>&1 || true
+            gh issue create --repo "$GITHUB_REPOSITORY" \
+              --title "Checkout monitor: dead Polar CTA(s) detected" \
+              --label checkout-monitor-failure \
+              --label needs-human \
+              --body-file /tmp/issue-body.md
+          fi
+
+          # Fail the workflow so the run shows red in the Actions UI even
+          # though the issue creation step is `gh` based.
+          exit 1
