@@ -13,6 +13,90 @@ from wgmesh_pipeline.config import Config
 SubprocessRunner = Callable[..., subprocess.CompletedProcess[str]]
 GOOSE_TIMEOUT_SECONDS = 1800
 
+# Substrings that mark an env var as secret. Goose is an LLM agent — it must NOT
+# inherit the box's PAT, LangSmith key, or any other credential (it could echo
+# them into output or logs). We strip every secret-shaped var and then add back
+# ONLY the LLM credential Goose legitimately needs. (Borrowed from the Attractor
+# coding-agent spec: exclude sensitive env vars from the agent by default.)
+_SECRET_MARKERS = (
+    "SECRET",
+    "TOKEN",
+    "PASSWORD",
+    "PASSWD",
+    "CREDENTIAL",
+    "PRIVATE_KEY",
+    "API_KEY",
+    "ACCESS_KEY",
+    "APP_KEY",
+)
+
+# Known sensitive var names that the substring markers miss — notably
+# WGMESH_BOT_PAT (the box's GitHub token; "PAT" can't be a marker because it
+# would also strip PATH).
+_KNOWN_SECRET_NAMES = frozenset(
+    {"WGMESH_BOT_PAT", "BOT_PAT", "GH_PAT", "HCLOUD_TOKEN", "OPENROUTER_API_KEY"}
+)
+
+
+def _is_secret_var(name: str) -> bool:
+    upper = name.upper()
+    if upper in _KNOWN_SECRET_NAMES:
+        return True
+    return any(marker in upper for marker in _SECRET_MARKERS)
+
+
+# ALLOWLIST (fail-closed): Goose's subprocess env is built from {} by copying
+# ONLY these known-safe vars, then adding the LLM credential. A denylist over an
+# unbounded env namespace is fail-open — a future/ambient credential with no
+# secret-marker in its name would leak to the LLM agent. The allowlist drops
+# anything not explicitly named. Goose needs to find its binary + tools (PATH),
+# its config/keyring (HOME), reach z.ai over TLS (SSL_CERT_*), and basic locale.
+# It does NOT push git — our GitHubClient does that with the PAT — so no GIT_/
+# auth vars are passed.
+_SAFE_ENV_NAMES = frozenset(
+    {
+        "PATH",
+        "HOME",
+        "USER",
+        "LOGNAME",
+        "LANG",
+        "TERM",
+        "SHELL",
+        "TZ",
+        "TMPDIR",
+        "TMP",
+        "TEMP",
+        "PWD",
+        "SSL_CERT_FILE",
+        "SSL_CERT_DIR",
+        "SSH_AUTH_SOCK",
+        "NO_PROXY",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "no_proxy",
+        "http_proxy",
+        "https_proxy",
+    }
+)
+_SAFE_ENV_PREFIXES = ("LC_",)
+
+
+def _is_safe_var(name: str) -> bool:
+    return name in _SAFE_ENV_NAMES or name.startswith(_SAFE_ENV_PREFIXES)
+
+
+def build_goose_env(config: Config, base_env: Mapping[str, str] | None = None) -> dict[str, str]:
+    """Subprocess env for Goose: fail-closed allowlist of known-safe vars, then
+    the single LLM credential Goose legitimately needs added back explicitly.
+    Anything not on the allowlist (incl. the box's PAT and any unknown secret)
+    is dropped — the LLM agent never sees it."""
+    source = os.environ if base_env is None else base_env
+    env = {key: value for key, value in source.items() if _is_safe_var(key)}
+    if config.zai_api_key:
+        env["ANTHROPIC_API_KEY"] = config.zai_api_key
+    env["ANTHROPIC_HOST"] = config.anthropic_host
+    return env
+
 
 @dataclass(frozen=True)
 class GooseResult:
@@ -45,10 +129,7 @@ class GooseRunner:
         for key, value in params.items():
             command.extend(["--params", f"{key}={value}"])
 
-        env = os.environ.copy()
-        if self.config.zai_api_key:
-            env["ANTHROPIC_API_KEY"] = self.config.zai_api_key
-        env["ANTHROPIC_HOST"] = self.config.anthropic_host
+        env = build_goose_env(self.config)
 
         started = time.monotonic()
         try:

@@ -1,0 +1,28 @@
+[Unit]
+Description=wgmesh autonomous LangGraph pipeline
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=wgmesh
+Group=wgmesh
+WorkingDirectory=/opt/wgmesh-pipeline
+# Secrets + config live here, root-owned chmod 600 (see .env.example).
+EnvironmentFile=/etc/wgmesh-pipeline/env
+ExecStart=/opt/wgmesh-pipeline/.venv/bin/python -m wgmesh_pipeline.main
+# main.py installs SIGTERM/SIGINT handlers and shuts down the poll loop
+# gracefully, so a normal stop drains the in-flight tick.
+KillSignal=SIGTERM
+TimeoutStopSec=120
+Restart=on-failure
+RestartSec=10
+# Hardening: the service holds the bot PAT — keep its blast radius small.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/wgmesh-pipeline
+
+[Install]
+WantedBy=multi-user.target
