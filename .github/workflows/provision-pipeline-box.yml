@@ -78,12 +78,21 @@ jobs:
       - name: Create server
         env:
           HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+          SSH_PUBKEY: ${{ secrets.SSH_PUBKEY }}
         run: |
           set -euo pipefail
           echo "::group::available server types"; hcloud server-type list || true; echo "::endgroup::"
           echo "::group::available locations"; hcloud location list || true; echo "::endgroup::"
           KEYNAME="prov-${{ github.run_id }}"
           hcloud ssh-key create --name "$KEYNAME" --public-key-from-file "$RUNNER_TEMP/box_key.pub"
+          # Persistent operator key so the box stays reachable after the run.
+          SSHKEYS="$KEYNAME"
+          if [ -n "${SSH_PUBKEY:-}" ]; then
+            printf '%s\n' "$SSH_PUBKEY" > "$RUNNER_TEMP/op.pub"
+            hcloud ssh-key describe op-persistent >/dev/null 2>&1 || \
+              hcloud ssh-key create --name op-persistent --public-key-from-file "$RUNNER_TEMP/op.pub"
+            SSHKEYS="$KEYNAME,op-persistent"
+          fi
           cat > "$RUNNER_TEMP/cloud-init.yml" <<'CLOUD'
           #cloud-config
           package_update: true
@@ -103,7 +112,7 @@ jobs:
             --type "${{ github.event.inputs.server_type }}" \
             --image ubuntu-24.04 \
             --location "${{ github.event.inputs.location }}" \
-            --ssh-key "$KEYNAME" \
+            --ssh-key "$SSHKEYS" \
             --user-data-from-file "$RUNNER_TEMP/cloud-init.yml"
           IP=$(hcloud server ip "$NAME")
           echo "BOX_IP=$IP" >> "$GITHUB_ENV"
