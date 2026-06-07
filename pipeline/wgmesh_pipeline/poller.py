@@ -56,6 +56,10 @@ class Poller:
         state = {**self.scratch.get(issue.number, {}), "issue": graph_issue, "github": self.client}
         if issue.impl_pr is not None:
             state["impl_pr"] = issue.impl_pr
+        if issue.spec_pr is not None:
+            state["spec_pr"] = issue.spec_pr
+        if issue.stage in {"specced", "spec_ready"}:
+            state.setdefault("spec_path", f"specs/issue-{issue.number}-spec.md")
 
         if issue.stage == "queued":
             result = self.graph.triage(state)
@@ -72,17 +76,31 @@ class Poller:
             return self.store.transition(issue.number, "triaged", "specced")
 
         if issue.stage == "specced":
-            self.scratch[issue.number] = dict(self.graph.implement(state))
-            if self.scratch[issue.number].get("impl_pr") is not None:
+            self.scratch[issue.number] = dict(self.graph.spec_pr(state))
+            if self.scratch[issue.number].get("spec_pr") is not None:
                 self.store.upsert_issue(
                     issue.number,
                     issue.title,
                     classification=issue.classification,
                     stage="specced",
                     status=issue.status,
+                    spec_pr=int(self.scratch[issue.number]["spec_pr"]),
+                )
+            next_stage = "spec_opened" if self.config.mode == "spec-only" else "spec_ready"
+            return self.store.transition(issue.number, "specced", next_stage)
+
+        if issue.stage == "spec_ready":
+            self.scratch[issue.number] = dict(self.graph.implement(state))
+            if self.scratch[issue.number].get("impl_pr") is not None:
+                self.store.upsert_issue(
+                    issue.number,
+                    issue.title,
+                    classification=issue.classification,
+                    stage="spec_ready",
+                    status=issue.status,
                     impl_pr=int(self.scratch[issue.number]["impl_pr"]),
                 )
-            return self.store.transition(issue.number, "specced", "implemented")
+            return self.store.transition(issue.number, "spec_ready", "implemented")
 
         if issue.stage == "implemented":
             self.scratch[issue.number] = dict(self.graph.review(state))

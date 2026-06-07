@@ -28,6 +28,10 @@ class Graph:
         self.calls.append("spec")
         return {**state, "spec_path": "specs/issue.md"}
 
+    def spec_pr(self, state):
+        self.calls.append("spec_pr")
+        return {**state, "spec_pr": 99}
+
     def implement(self, state):
         self.calls.append("implement")
         return {**state, "diff": "+diff\n", "changed_files": ["docs/readme.md"]}
@@ -146,6 +150,30 @@ def test_restart_mid_flight_resumes_persisted_stage_without_double_work(tmp_path
     assert graph.calls == ["spec"]
 
 
+def test_specced_issue_opens_spec_pr_then_stops_in_spec_only(tmp_path, cfg: Config) -> None:
+    spec_only = Config(target_repo=cfg.target_repo, mode="spec-only", max_files=cfg.max_files)
+    p = poller(tmp_path, spec_only)
+    p.store.upsert_issue(1, "Already specced", stage="specced")
+
+    result = asyncio.run(p.tick())
+
+    assert result is not None
+    assert result.stage == "spec_opened"
+    assert p.store.get_issue(1).spec_pr == 99
+    assert p.graph.calls == ["spec_pr"]
+
+
+def test_spec_ready_issue_continues_to_implementation(tmp_path, cfg: Config) -> None:
+    p = poller(tmp_path, cfg)
+    p.store.upsert_issue(1, "Spec PR opened", stage="spec_ready", spec_pr=99)
+
+    result = asyncio.run(p.tick())
+
+    assert result is not None
+    assert result.stage == "implemented"
+    assert p.graph.calls == ["implement"]
+
+
 def test_main_graph_shadow_fixture_can_complete_full_cycle_without_writes(tmp_path, cfg: Config, monkeypatch) -> None:
     monkeypatch.setattr("wgmesh_pipeline.graph.nodes.review.run_sanitise", lambda text: True)
     client = EmptyClient(cfg)
@@ -154,8 +182,15 @@ def test_main_graph_shadow_fixture_can_complete_full_cycle_without_writes(tmp_pa
     p = Poller(config=cfg, store=store, client=client, graph=build_graph(cfg))
     p.scratch[1] = {"verification": {"tests_passed": True}}
 
-    for _ in range(5):
+    for _ in range(6):
         asyncio.run(p.tick())
 
     assert store.get_issue(1).stage == "merged"
-    assert [record.operation for record in client.dry_run_records] == ["create_pr", "merge_pr"]
+    assert [record.operation for record in client.dry_run_records] == [
+        "push_branch",
+        "create_pr",
+        "remove_label",
+        "add_label",
+        "create_pr",
+        "merge_pr",
+    ]

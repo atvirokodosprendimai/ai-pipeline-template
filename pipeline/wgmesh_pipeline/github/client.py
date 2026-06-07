@@ -81,20 +81,22 @@ class GitHubClient:
             raw_text=True,
         )
 
-    def add_label(self, issue_number: int, label: str) -> Any:
+    def add_label(self, issue_number: int, label: str, *, spec_pr: bool = False) -> Any:
         return self._write(
             "add_label",
             "POST",
             f"/repos/{self.config.owner}/{self.config.repo}/issues/{issue_number}/labels",
             payload={"labels": [label]},
+            spec_pr=spec_pr,
         )
 
-    def remove_label(self, issue_number: int, label: str) -> Any:
+    def remove_label(self, issue_number: int, label: str, *, spec_pr: bool = False) -> Any:
         return self._write(
             "remove_label",
             "DELETE",
             f"/repos/{self.config.owner}/{self.config.repo}/issues/{issue_number}/labels/{label}",
             payload={},
+            spec_pr=spec_pr,
         )
 
     def comment(self, issue_number: int, body: str) -> Any:
@@ -130,11 +132,13 @@ class GitHubClient:
             payload={"commit_title": commit_title} if commit_title else {},
         )
 
-    def push_branch(self, clone_path: str, branch: str) -> Any:
+    def push_branch(self, clone_path: str, branch: str, *, spec_pr: bool = False) -> Any:
         payload = {"clone_path": clone_path, "branch": branch}
         self._sanitise_spec_files(Path(clone_path))
-        if self.config.mode != "live":
-            return self._write("push_branch", "GIT", "git push", payload=payload)
+        if self.config.mode == "shadow":
+            return self._write("push_branch", "GIT", "git push", payload=payload, spec_pr=spec_pr)
+        if self.config.mode == "spec-only" and not spec_pr:
+            return self._write("push_branch", "GIT", "git push", payload=payload, spec_pr=spec_pr)
         try:
             completed = subprocess.run(
                 ["git", "push", "origin", branch],
@@ -168,7 +172,7 @@ class GitHubClient:
             result = DryRunResult(dry_run=True, operation=operation, payload=dry_payload)
             self.dry_run_records.append(result)
             return result
-        if mode == "spec-only" and not (operation == "create_pr" and spec_pr):
+        if mode == "spec-only" and not (spec_pr and operation in {"push_branch", "create_pr", "remove_label", "add_label"}):
             raise PermissionError(f"{operation} is not allowed when PIPELINE_MODE=spec-only")
         return self._request(method, path, json=payload)
 

@@ -15,6 +15,8 @@ class GraphState(TypedDict, total=False):
     classification: Classification
     classification_override: Classification
     spec_path: str
+    spec_branch: str
+    spec_pr: int
     diff: str
     changed_files: list[str]
     risk_tier: str
@@ -28,4 +30,3 @@ class GraphState(TypedDict, total=False):
     repo_path: str | Path
     goose_runner: Any
     impl_pr: int
-

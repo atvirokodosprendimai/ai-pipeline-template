@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 from dataclasses import replace
 from typing import Any
 
@@ -116,6 +117,13 @@ def test_spec_only_refuses_non_spec_write(cfg: Config) -> None:
         client.comment(17, "not allowed")
 
 
+def test_spec_only_refuses_merge_write(cfg: Config) -> None:
+    client = GitHubClient(replace(cfg, mode="spec-only"), session=Session(Response({"merged": True})))
+
+    with pytest.raises(PermissionError, match="merge_pr.*spec-only"):
+        client.merge_pr(17)
+
+
 def test_spec_only_allows_spec_pr_create_with_mocked_network(cfg: Config) -> None:
     session = Session(Response({"number": 99}))
     client = GitHubClient(replace(cfg, mode="spec-only"), session=session)
@@ -130,3 +138,25 @@ def test_spec_only_allows_spec_pr_create_with_mocked_network(cfg: Config) -> Non
     assert result == {"number": 99}
     assert len(session.calls) == 1
     assert session.calls[0]["method"] == "POST"
+
+
+def test_spec_only_allows_spec_branch_push_and_label_swap(cfg: Config, tmp_path, monkeypatch) -> None:
+    spec = tmp_path / "specs" / "issue-17-spec.md"
+    spec.parent.mkdir()
+    spec.write_text("## Classification\nfix\n\n## Problem Analysis\nbug\n\n## Proposed Approach\nfix it\n")
+    session = Session(Response({"ok": True}))
+    client = GitHubClient(replace(cfg, mode="spec-only"), session=session, sanitiser=lambda text: True)
+    pushes: list[tuple[list[str], str]] = []
+
+    def fake_run(command, *, cwd, check, text, capture_output, timeout):
+        pushes.append((command, cwd))
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    monkeypatch.setattr("wgmesh_pipeline.github.client.subprocess.run", fake_run)
+
+    client.push_branch(str(tmp_path), "bot/spec-17", spec_pr=True)
+    client.remove_label(17, "needs-triage", spec_pr=True)
+    client.add_label(17, "copilot-triaging", spec_pr=True)
+
+    assert pushes == [(["git", "push", "origin", "bot/spec-17"], str(tmp_path))]
+    assert [call["method"] for call in session.calls] == ["DELETE", "POST"]
