@@ -1,3 +1,5 @@
+-- +migrate Up
+-- Initial schema: owned-queue issues + run log.
 CREATE TABLE IF NOT EXISTS issues (
   number INTEGER PRIMARY KEY,
   title TEXT NOT NULL,
@@ -29,4 +31,3 @@ CREATE INDEX IF NOT EXISTS idx_issues_claim
 
 CREATE INDEX IF NOT EXISTS idx_runs_issue
   ON runs(issue, started);
-

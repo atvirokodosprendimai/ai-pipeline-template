@@ -6,6 +6,7 @@ from typing import Mapping
 
 
 VALID_MODES = frozenset({"shadow", "spec-only", "live"})
+VALID_DB_MODES = frozenset({"local", "turso"})
 DEFAULT_ANTHROPIC_HOST = "https://api.z.ai/api/anthropic"
 DEFAULT_TARGET_REPO = "atvirokodosprendimai/wgmesh"
 DEFAULT_POLL_INTERVAL_SECONDS = 300
@@ -22,7 +23,10 @@ class Config:
     langsmith_api_key: str | None = None
     poll_interval_seconds: int = DEFAULT_POLL_INTERVAL_SECONDS
     max_files: int = DEFAULT_MAX_FILES
+    database_mode: str = "local"
     database_path: str = "pipeline/state.db"
+    turso_url: str | None = None
+    turso_auth_token: str | None = None
 
     @property
     def owner(self) -> str:
@@ -49,6 +53,17 @@ def load_config(env: Mapping[str, str] | None = None) -> Config:
     if mode == "live" and not pat:
         raise ValueError("WGMESH_BOT_PAT is required when PIPELINE_MODE=live")
 
+    # Explicit database selection — no silent fallback (mailservice lesson: a
+    # misconfigured deploy must fail, not silently write to a local file).
+    db_mode = _required(source, "DATABASE_MODE").lower()
+    if db_mode not in VALID_DB_MODES:
+        valid = ", ".join(sorted(VALID_DB_MODES))
+        raise ValueError(f"DATABASE_MODE must be one of: {valid}; got {db_mode!r}")
+    turso_url = _get_nonempty(source, "TURSO_DATABASE_URL")
+    turso_token = _get_nonempty(source, "TURSO_AUTH_TOKEN")
+    if db_mode == "turso" and not turso_url:
+        raise ValueError("DATABASE_MODE=turso requires TURSO_DATABASE_URL")
+
     return Config(
         target_repo=target_repo,
         mode=mode,
@@ -58,7 +73,10 @@ def load_config(env: Mapping[str, str] | None = None) -> Config:
         langsmith_api_key=_get_nonempty(source, "LANGSMITH_API_KEY"),
         poll_interval_seconds=_get_int(source, "POLL_INTERVAL_SECONDS", DEFAULT_POLL_INTERVAL_SECONDS),
         max_files=_get_int(source, "MAX_FILES", DEFAULT_MAX_FILES),
+        database_mode=db_mode,
         database_path=_get_nonempty(source, "PIPELINE_DB_PATH") or "pipeline/state.db",
+        turso_url=turso_url,
+        turso_auth_token=turso_token,
     )
 
 

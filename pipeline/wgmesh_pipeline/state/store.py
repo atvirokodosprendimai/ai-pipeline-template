@@ -43,21 +43,52 @@ class IssueRecord:
 
 
 class StateStore:
-    def __init__(self, path: str | Path):
-        self.path = str(path)
-        self._conn = sqlite3.connect(self.path)
+    def __init__(self, path: str | Path | None = None, *, connection: Any = None):
+        # Local SQLite (path) or an injected libsql/Turso connection. Both run
+        # the same versioned migrations — mirrors mailservice's OpenAndMigrate /
+        # OpenTurso, where both paths call migrate().
+        if connection is not None:
+            self.path = None
+            self._conn = connection
+        else:
+            self.path = str(path)
+            self._conn = sqlite3.connect(self.path)
+            # WAL + busy_timeout only apply to a local file db; a Turso/libsql
+            # server manages its own journaling.
+            self._conn.execute("PRAGMA journal_mode=WAL")
+            self._conn.execute("PRAGMA busy_timeout=5000")
         self._conn.row_factory = sqlite3.Row
-        self._conn.execute("PRAGMA journal_mode=WAL")
-        self._conn.execute("PRAGMA busy_timeout=5000")
-        self.apply_schema()
+        self.migrate()
 
     def close(self) -> None:
         self._conn.close()
 
-    def apply_schema(self) -> None:
-        schema = resources.files("wgmesh_pipeline.state").joinpath("schema.sql").read_text()
-        self._conn.executescript(schema)
+    def migrate(self) -> list[str]:
+        """Apply pending versioned migrations in order; return versions applied
+        this call. Tracked in schema_migrations so each runs exactly once."""
+        self._conn.execute(
+            "CREATE TABLE IF NOT EXISTS schema_migrations ("
+            "  version TEXT PRIMARY KEY,"
+            "  applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP"
+            ")"
+        )
         self._conn.commit()
+        applied = {
+            str(row["version"])
+            for row in self._conn.execute("SELECT version FROM schema_migrations").fetchall()
+        }
+        newly: list[str] = []
+        for version, sql in _load_migrations():
+            if version in applied:
+                continue
+            self._conn.executescript(sql)
+            self._conn.execute(
+                "INSERT INTO schema_migrations(version, applied_at) VALUES (?, ?)",
+                (version, _iso(_now())),
+            )
+            self._conn.commit()
+            newly.append(version)
+        return newly
 
     def upsert_issue(
         self,
@@ -226,6 +257,58 @@ class StateStore:
         )
         self._conn.commit()
         return self.get_issue(number)
+
+
+def _load_migrations() -> list[tuple[str, str]]:
+    """Return (version, sql) for every migration, sorted by filename. version is
+    the leading numeric prefix; sql is the `-- +migrate Up` body (or whole file
+    if no marker)."""
+    out: list[tuple[str, str]] = []
+    mig_dir = resources.files("wgmesh_pipeline.state").joinpath("migrations")
+    names = sorted(p.name for p in mig_dir.iterdir() if p.name.endswith(".sql"))
+    for name in names:
+        version = name.split("_", 1)[0]
+        text = mig_dir.joinpath(name).read_text()
+        out.append((version, _up_section(text)))
+    return out
+
+
+def _up_section(text: str) -> str:
+    if "-- +migrate Up" not in text:
+        return text
+    body = text.split("-- +migrate Up", 1)[1]
+    # Stop at a Down marker if present (forward-only runner ignores Down).
+    return body.split("-- +migrate Down", 1)[0]
+
+
+def open_state_store(config: Any) -> "StateStore":
+    """Factory honoring an EXPLICIT database mode — no silent fallback (the
+    mailservice lesson). local -> file SQLite; turso -> remote libsql. Both run
+    the same migrations."""
+    mode = getattr(config, "database_mode", "local")
+    if mode == "turso":
+        return StateStore(connection=_open_turso(config))
+    if mode == "local":
+        return StateStore(config.database_path)
+    raise ValueError(f"unknown database_mode: {mode!r} (expected 'local' or 'turso')")
+
+
+def _open_turso(config: Any) -> Any:
+    url = getattr(config, "turso_url", None)
+    token = getattr(config, "turso_auth_token", None)
+    if not url:
+        raise ValueError("DATABASE_MODE=turso requires TURSO_DATABASE_URL")
+    try:
+        import libsql  # type: ignore
+    except ImportError as exc:  # fail-loud, never silently fall back to local
+        raise RuntimeError(
+            "DATABASE_MODE=turso but the libsql client is not installed "
+            "(pip install 'wgmesh-pipeline[turso]'  # installs libsql)"
+        ) from exc
+    # Pure remote over-the-wire: database is the libsql:// URL, every query hits
+    # the cloud primary — durable state that survives a box rebuild (no local
+    # file to lose). auth_token is the Turso database/group token.
+    return libsql.connect(database=url, auth_token=token or "")
 
 
 def _cooldown(attempts: int) -> timedelta:
