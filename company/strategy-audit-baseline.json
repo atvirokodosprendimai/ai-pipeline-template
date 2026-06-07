@@ -222,5 +222,6 @@
         }
       ]
     }
-  ]
+  ],
+  "last_reported_drift_fingerprint": "metrics=lead_time_hours;overdue_milestones=2026-05-31"
 }
