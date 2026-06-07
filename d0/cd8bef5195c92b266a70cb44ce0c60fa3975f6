@@ -1,0 +1,21 @@
+pipeline/wgmesh_pipeline/goose/runner.py
+  s_68555e95a0b174::t_f5cb83a83c967d 48-87,89-92,94
+pipeline/tests/test_goose_env.py
+  s_68555e95a0b174::t_1b40de33418737 31,35-37,43-46,50,53-61,67-76
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "d0cd8bef5195c92b266a70cb44ce0c60fa3975f6",
+  "prompts": {},
+  "sessions": {
+    "s_68555e95a0b174": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5b2db709-63f0-48df-8394-4d6b66b3d9eb",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
