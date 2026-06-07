@@ -1,0 +1,31 @@
+pipeline/wgmesh_pipeline/config.py
+  s_68555e95a0b174::t_5c5d01c5ea3b7d 30-32
+  s_68555e95a0b174::t_a0077cd29ac7c0 83-85
+pipeline/pyproject.toml
+  s_68555e95a0b174::t_d8ff7cb13df27e 32-34
+pipeline/wgmesh_pipeline/tracing.py
+  s_68555e95a0b174::t_b674c69785428f 46-84,92-96
+pipeline/tests/test_scoring.py
+  s_68555e95a0b174::t_ec9aa82d79166b 37-39
+.github/workflows/provision-pipeline-box.yml
+  s_68555e95a0b174::t_0a8bb6d3f25970 165
+  s_68555e95a0b174::t_f430cf4e71f7c2 132-134,151-153
+pipeline/wgmesh_pipeline/scoring.py
+  s_68555e95a0b174::t_865bb20c1d11ca 46-75,83-87
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "545a3da53a7ae1fd1ff298d857f8373c73f3af93",
+  "prompts": {},
+  "sessions": {
+    "s_68555e95a0b174": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5b2db709-63f0-48df-8394-4d6b66b3d9eb",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
