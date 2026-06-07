@@ -27,6 +27,9 @@ class Config:
     database_path: str = "pipeline/state.db"
     turso_url: str | None = None
     turso_auth_token: str | None = None
+    langfuse_host: str | None = None
+    langfuse_public_key: str | None = None
+    langfuse_secret_key: str | None = None
 
     @property
     def owner(self) -> str:
@@ -77,6 +80,9 @@ def load_config(env: Mapping[str, str] | None = None) -> Config:
         database_path=_get_nonempty(source, "PIPELINE_DB_PATH") or "pipeline/state.db",
         turso_url=turso_url,
         turso_auth_token=turso_token,
+        langfuse_host=_get_nonempty(source, "LANGFUSE_HOST"),
+        langfuse_public_key=_get_nonempty(source, "LANGFUSE_PUBLIC_KEY"),
+        langfuse_secret_key=_get_nonempty(source, "LANGFUSE_SECRET_KEY"),
     )
 
 

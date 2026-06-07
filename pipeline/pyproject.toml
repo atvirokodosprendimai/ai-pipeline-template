@@ -29,6 +29,9 @@ eval = [
 turso = [
   "libsql>=0.1",
 ]
+trace = [
+  "langfuse>=3",
+]
 
 [project.scripts]
 wgmesh-pipeline = "wgmesh_pipeline.main:main"

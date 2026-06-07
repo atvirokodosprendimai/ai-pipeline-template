@@ -43,6 +43,36 @@ class LangSmithScorer:
         return None
 
 
+class LangfuseScorer:
+    """Online scores into self-hosted Langfuse. Defensive — never raises into
+    the loop (score_run also guards, but keep the SDK calls safe here too)."""
+
+    def __init__(self, config: Config):
+        from langfuse import Langfuse  # optional dep ([trace] extra)
+
+        self._lf = Langfuse(
+            public_key=config.langfuse_public_key,
+            secret_key=config.langfuse_secret_key,
+            host=config.langfuse_host,
+        )
+
+    def record(
+        self, *, issue: int, outcome: str, scores: dict[str, Any], tags: dict[str, str]
+    ) -> None:
+        try:
+            # outcome as a categorical score + the numeric auto-merge signal,
+            # tagged by issue. Visible in the Langfuse Scores view.
+            self._lf.create_score(
+                name="pipeline_outcome",
+                value=outcome,
+                data_type="CATEGORICAL",
+                metadata={"issue": issue, **scores, **tags},
+            )
+            self._lf.flush()
+        except Exception:
+            pass
+
+
 _scorer: Scorer = NoopScorer()
 
 
@@ -50,6 +80,11 @@ def init_scoring(config: Config, *, scorer: Scorer | None = None) -> Scorer:
     global _scorer
     if scorer is not None:
         _scorer = scorer
+    elif config.langfuse_host and config.langfuse_public_key and config.langfuse_secret_key:
+        try:
+            _scorer = LangfuseScorer(config)
+        except Exception:
+            _scorer = NoopScorer()
     elif config.langsmith_api_key:
         _scorer = LangSmithScorer(config.langsmith_api_key)
     else:
