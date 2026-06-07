@@ -1,0 +1,35 @@
+pipeline/wgmesh_pipeline/scoring.py
+  s_68555e95a0b174::t_800b0640ff29e1 1-96
+pipeline/tests/test_live_e2e.py
+  s_68555e95a0b174::t_d9b46230a054c3 1-144
+pipeline/wgmesh_pipeline/poller.py
+  s_68555e95a0b174::t_9d09a98c8feabf 72-74
+  s_68555e95a0b174::t_c8eb6476ba877c 116-117,119
+  s_68555e95a0b174::t_ab8153b5d23084 50
+  s_68555e95a0b174::t_4e32d3ba4814f0 11
+.github/workflows/pipeline-ci.yml
+  s_68555e95a0b174::t_85f861d7a0659c 1-43
+pipeline/tests/test_scoring.py
+  s_68555e95a0b174::t_07f4635c5cdc47 1-96
+pipeline/docs/PHASE3-CUTOVER.md
+  s_68555e95a0b174::t_93c9c57feded75 1-76
+pipeline/wgmesh_pipeline/main.py
+  s_68555e95a0b174::t_68c3bf170dab52 11
+  s_68555e95a0b174::t_855c6d4d9fb090 19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "1cea21198f42e498fe7822f5f9a861fa40ec4ab0",
+  "prompts": {},
+  "sessions": {
+    "s_68555e95a0b174": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5b2db709-63f0-48df-8394-4d6b66b3d9eb",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
