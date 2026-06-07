@@ -1,0 +1,40 @@
+pipeline/wgmesh_pipeline/main.py
+  s_68555e95a0b174::t_9070cab8063dec 12
+  s_68555e95a0b174::t_f0760b6b464bbd 20-23
+pipeline/tests/test_state.py
+  s_68555e95a0b174::t_d6a6074bde9990 7-9,16-29,34-35,38-44
+  s_68555e95a0b174::t_effd6494b1ecb4 30-33,36-37
+  s_68555e95a0b174::t_c27d9dae3e877a 59,61-62,65-67
+pipeline/deploy/env.example
+  s_68555e95a0b174::t_af7e2f8186eeac 21-29
+pipeline/wgmesh_pipeline/state/migrations/0001_initial.sql
+  s_68555e95a0b174::t_851b31a425fc3a 1-33
+pipeline/wgmesh_pipeline/state/store.py
+  s_68555e95a0b174::t_a95a3e2aa74692 46-59,61,66-74,76-91
+  s_68555e95a0b174::t_8a23bda321cb70 262-310
+pipeline/wgmesh_pipeline/config.py
+  s_68555e95a0b174::t_089ecb81ac12fd 9,26,28-29
+  s_68555e95a0b174::t_05f49fe76e08bf 56-66,76,78-79
+pipeline/pyproject.toml
+  s_68555e95a0b174::t_db446dce2b417d 41
+  s_68555e95a0b174::t_68cc5a575d8341 29-31
+pipeline/tests/test_config.py
+  s_68555e95a0b174::t_72ae38f8d775e8 14,29
+  s_68555e95a0b174::t_848d474a885b09 46-48,52-84
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "43abbb54ad39d64225d20815830b99ca3d1ab5ed",
+  "prompts": {},
+  "sessions": {
+    "s_68555e95a0b174": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5b2db709-63f0-48df-8394-4d6b66b3d9eb",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
