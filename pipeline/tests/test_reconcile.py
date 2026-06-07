@@ -13,9 +13,14 @@ class Client(GitHubClient):
     def __init__(self, issues: Iterable[GitHubIssue]):
         super().__init__(Config(target_repo="atvirokodosprendimai/wgmesh"))
         self._issues = list(issues)
+        self.removed_labels: list[tuple[int, str]] = []
 
     def list_open_issues(self) -> list[GitHubIssue]:
         return self._issues
+
+    def remove_label(self, issue_number: int, label: str):
+        self.removed_labels.append((issue_number, label))
+        return {"ok": True}
 
 
 def issue(number: int, labels: tuple[str, ...], *, title: str = "title", state: str = "open") -> GitHubIssue:
@@ -30,6 +35,17 @@ def test_new_needs_triage_issue_inserted_as_queued(tmp_path) -> None:
     assert result.queued == 1
     assert store.get_issue(1).stage == "queued"
     assert store.get_issue(1).title == "Fix"
+
+
+def test_in_flight_needs_triage_issue_is_not_reset_to_queued(tmp_path) -> None:
+    store = StateStore(tmp_path / "state.db")
+    store.upsert_issue(17, "in flight", stage="specced")
+    client = Client([issue(17, ("needs-triage",), title="Updated")])
+
+    reconcile_issues(client, store)
+
+    assert store.get_issue(17).stage == "specced"
+    assert client.removed_labels == [(17, "needs-triage")]
 
 
 def test_merged_upstream_issue_advances_and_is_not_requeued(tmp_path) -> None:
@@ -69,4 +85,3 @@ def test_reconcile_then_claim_returns_only_actionable_issue(tmp_path) -> None:
 
     assert claimed is not None
     assert claimed.number == 2
-

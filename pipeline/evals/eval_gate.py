@@ -48,9 +48,9 @@ def evaluate_gate(
             changed_files=case["changed_files"],
             diff=case["diff"],
             max_files=max_files,
-            tests_passed=True,
-            sanitise_ok=True,
-            review_findings=[],
+            tests_passed=case.get("tests_passed", True),
+            sanitise_ok=case.get("sanitise_ok", True),
+            review_findings=case.get("review_findings", []),
         ).decision
         if expected == "merge":
             actual_auto += 1
@@ -80,3 +80,13 @@ def evaluate_gate(
 def broken_gate_always_merge(**kwargs) -> GateDecision:
     return GateDecision(decision="merge", risk_tier="low", reasons=())
 
+
+def broken_gate_ignores_non_risk_guards(**kwargs) -> GateDecision:
+    return decide_gate(
+        changed_files=kwargs["changed_files"],
+        diff=kwargs["diff"],
+        max_files=kwargs["max_files"],
+        tests_passed=True,
+        sanitise_ok=True,
+        review_findings=[],
+    )

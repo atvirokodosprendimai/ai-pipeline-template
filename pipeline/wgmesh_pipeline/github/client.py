@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import subprocess
 from dataclasses import dataclass
-from typing import Any
+from pathlib import Path
+from typing import Any, Callable
 
 import requests
 
@@ -10,6 +11,15 @@ from wgmesh_pipeline.config import Config
 
 
 API_ROOT = "https://api.github.com"
+SANITISE_SCRIPT = Path(__file__).resolve().parents[3] / "company" / "scripts" / "sanitise.sh"
+GIT_TIMEOUT_SECONDS = 120
+HTTP_TIMEOUT_SECONDS = 30
+SANITISE_TIMEOUT_SECONDS = 120
+Sanitiser = Callable[[str], bool]
+
+
+class SanitiseError(RuntimeError):
+    pass
 
 
 @dataclass(frozen=True)
@@ -36,11 +46,13 @@ class GitHubClient:
         session: requests.Session | None = None,
         api_root: str = API_ROOT,
         dry_run_records: list[DryRunResult] | None = None,
+        sanitiser: Sanitiser | None = None,
     ):
         self.config = config
         self.session = session or requests.Session()
         self.api_root = api_root.rstrip("/")
         self.dry_run_records = dry_run_records if dry_run_records is not None else []
+        self._sanitiser = sanitiser
 
     def list_needs_triage(self) -> list[GitHubIssue]:
         data = self._request(
@@ -120,15 +132,20 @@ class GitHubClient:
 
     def push_branch(self, clone_path: str, branch: str) -> Any:
         payload = {"clone_path": clone_path, "branch": branch}
+        self._sanitise_spec_files(Path(clone_path))
         if self.config.mode != "live":
             return self._write("push_branch", "GIT", "git push", payload=payload)
-        completed = subprocess.run(
-            ["git", "push", "origin", branch],
-            cwd=clone_path,
-            check=False,
-            text=True,
-            capture_output=True,
-        )
+        try:
+            completed = subprocess.run(
+                ["git", "push", "origin", branch],
+                cwd=clone_path,
+                check=False,
+                text=True,
+                capture_output=True,
+                timeout=GIT_TIMEOUT_SECONDS,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise RuntimeError(f"git push timed out after {GIT_TIMEOUT_SECONDS}s")
         if completed.returncode != 0:
             raise RuntimeError(completed.stderr.strip() or f"git push failed for {branch}")
         return {"ok": True, "stdout": completed.stdout}
@@ -142,9 +159,13 @@ class GitHubClient:
         payload: dict[str, Any],
         spec_pr: bool = False,
     ) -> Any:
+        self._sanitise_write(operation, payload)
         mode = self.config.mode
         if mode == "shadow":
-            result = DryRunResult(dry_run=True, operation=operation, payload={"path": path, **payload})
+            dry_payload = {"path": path, **payload}
+            if operation == "create_pr":
+                dry_payload["number"] = _synthetic_pr_number(payload)
+            result = DryRunResult(dry_run=True, operation=operation, payload=dry_payload)
             self.dry_run_records.append(result)
             return result
         if mode == "spec-only" and not (operation == "create_pr" and spec_pr):
@@ -156,13 +177,57 @@ class GitHubClient:
         headers.setdefault("Accept", "application/vnd.github+json")
         if self.config.wgmesh_bot_pat:
             headers["Authorization"] = f"Bearer {self.config.wgmesh_bot_pat}"
-        response = self.session.request(method, f"{self.api_root}{path}", headers=headers, **kwargs)
+        kwargs.setdefault("timeout", HTTP_TIMEOUT_SECONDS)
+        try:
+            response = self.session.request(method, f"{self.api_root}{path}", headers=headers, **kwargs)
+        except requests.Timeout as exc:
+            raise RuntimeError(f"GitHub request timed out after {kwargs['timeout']}s") from exc
         response.raise_for_status()
         if raw_text:
             return response.text
         if response.text:
             return response.json()
         return {}
+
+    def _sanitise_write(self, operation: str, payload: dict[str, Any]) -> None:
+        if operation == "comment":
+            self._require_clean("comment body", str(payload.get("body", "")))
+        elif operation == "create_pr":
+            self._require_clean("create_pr title", str(payload.get("title", "")))
+            self._require_clean("create_pr body", str(payload.get("body", "")))
+
+    def _sanitise_spec_files(self, clone_path: Path) -> None:
+        specs_dir = clone_path / "specs"
+        if not specs_dir.exists():
+            return
+        for spec in sorted(specs_dir.glob("issue-*-spec.md")):
+            self._require_clean(str(spec.relative_to(clone_path)), spec.read_text())
+
+    def _require_clean(self, label: str, text: str) -> None:
+        if self._sanitiser is not None:
+            clean = self._sanitiser(text)
+        else:
+            clean = self._run_sanitise(text)
+        if not clean:
+            raise SanitiseError(f"sanitise failed for {label}")
+
+    def _run_sanitise(self, text: str) -> bool:
+        if not SANITISE_SCRIPT.exists():
+            if self.config.mode == "shadow":
+                return True
+            raise SanitiseError(f"sanitise script missing: {SANITISE_SCRIPT}")
+        try:
+            completed = subprocess.run(
+                [str(SANITISE_SCRIPT)],
+                input=text,
+                text=True,
+                capture_output=True,
+                check=False,
+                timeout=SANITISE_TIMEOUT_SECONDS,
+            )
+        except subprocess.TimeoutExpired:
+            return False
+        return completed.returncode == 0
 
 
 def _parse_issue(item: dict[str, Any]) -> GitHubIssue:
@@ -175,3 +240,10 @@ def _parse_issue(item: dict[str, Any]) -> GitHubIssue:
         pull_request=item.get("pull_request"),
     )
 
+
+def _synthetic_pr_number(payload: dict[str, Any]) -> int:
+    for field in ("head", "title"):
+        digits = "".join(ch for ch in str(payload.get(field, "")) if ch.isdigit())
+        if digits:
+            return int(digits)
+    return 1

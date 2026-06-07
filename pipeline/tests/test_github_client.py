@@ -72,6 +72,29 @@ def test_shadow_create_pr_dry_runs_with_no_network_write(cfg: Config) -> None:
     assert client.dry_run_records == [result]
 
 
+def test_create_pr_refuses_unsanitisable_body_even_in_shadow(cfg: Config) -> None:
+    session = Session(Response({"number": 1}))
+    client = GitHubClient(cfg, session=session, sanitiser=lambda text: "SECRET" not in text)
+
+    with pytest.raises(RuntimeError, match="create_pr body"):
+        client.create_pr(title="spec: Issue #17 - Fix", head="bot/spec-17", base="main", body="SECRET_KEY=abc123")
+
+    assert session.calls == []
+    assert client.dry_run_records == []
+
+
+def test_push_branch_refuses_unsanitisable_spec_even_in_shadow(tmp_path, cfg: Config) -> None:
+    spec = tmp_path / "specs" / "issue-17-spec.md"
+    spec.parent.mkdir()
+    spec.write_text("SECRET_KEY=abc123")
+    client = GitHubClient(cfg, sanitiser=lambda text: "SECRET" not in text)
+
+    with pytest.raises(RuntimeError, match="specs/issue-17-spec.md"):
+        client.push_branch(str(tmp_path), "bot/spec-17")
+
+    assert client.dry_run_records == []
+
+
 def test_merge_pr_shadow_dry_runs_live_calls_endpoint_once(cfg: Config) -> None:
     shadow_session = Session(Response({"merged": True}))
     shadow = GitHubClient(cfg, session=shadow_session)
@@ -107,4 +130,3 @@ def test_spec_only_allows_spec_pr_create_with_mocked_network(cfg: Config) -> Non
     assert result == {"number": 99}
     assert len(session.calls) == 1
     assert session.calls[0]["method"] == "POST"
-

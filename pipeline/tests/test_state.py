@@ -31,6 +31,16 @@ def test_schema_applies_idempotently(tmp_path) -> None:
     assert db.get_issue(1).stage == "queued"
 
 
+def test_sqlite_connection_uses_wal_and_busy_timeout(tmp_path) -> None:
+    db = store(tmp_path)
+
+    busy_timeout = db._conn.execute("PRAGMA busy_timeout").fetchone()[0]
+    journal_mode = db._conn.execute("PRAGMA journal_mode").fetchone()[0]
+
+    assert busy_timeout == 5000
+    assert journal_mode == "wal"
+
+
 def test_illegal_transition_rejected(tmp_path) -> None:
     db = store(tmp_path)
     db.upsert_issue(1, "Done", stage="merged")

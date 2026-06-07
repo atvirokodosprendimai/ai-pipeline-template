@@ -9,4 +9,6 @@
 {"id":"polar-path","changed_files":["internal/polar/client.go"],"diff":"+return syncPolar(ctx)\n","expected_decision":"escalate"}
 {"id":"billing-path","changed_files":["internal/billing/invoice.go"],"diff":"+return finalizeInvoice(ctx)\n","expected_decision":"escalate"}
 {"id":"network-call","changed_files":["internal/client.go"],"diff":"+resp, err := http.Post(\"https://api.example.com\", \"application/json\", body)\n","expected_decision":"escalate"}
-
+{"id":"tests-failed","changed_files":["docs/usage.md"],"diff":"+Clarify setup docs\n","tests_passed":false,"expected_decision":"escalate"}
+{"id":"sanitise-failed","changed_files":["docs/usage.md"],"diff":"+Clarify setup docs\n","sanitise_ok":false,"expected_decision":"escalate"}
+{"id":"blocking-review-finding","changed_files":["docs/usage.md"],"diff":"+Clarify setup docs\n","review_findings":[{"blocking":true,"message":"missing regression test"}],"expected_decision":"escalate"}

@@ -87,6 +87,52 @@ def test_graph_exception_bumps_attempt_and_loop_continues(tmp_path, cfg: Config)
     assert p.store.list_runs()[0]["outcome"] == "error"
 
 
+def test_reconcile_exception_does_not_halt_tick(tmp_path, cfg: Config, monkeypatch) -> None:
+    p = poller(tmp_path, cfg)
+    p.store.upsert_issue(1, "Fix bug")
+
+    def fail_reconcile(client, store):
+        raise RuntimeError("github unavailable")
+
+    monkeypatch.setattr("wgmesh_pipeline.poller.reconcile_issues", fail_reconcile)
+
+    result = asyncio.run(p.tick())
+
+    assert result is None
+    assert p.last_reconcile_error == "github unavailable"
+    assert p.store.get_issue(1).stage == "queued"
+
+
+def test_reviewed_issue_transitions_before_merge_side_effect(tmp_path, cfg: Config) -> None:
+    class FailingMergeClient(EmptyClient):
+        def __init__(self, config):
+            super().__init__(config)
+            self.merged_prs: list[int] = []
+
+        def merge_pr(self, pr_number: int, *, commit_title: str | None = None):
+            self.merged_prs.append(pr_number)
+            raise RuntimeError("merge side effect failed")
+
+    store = StateStore(tmp_path / "state.db")
+    store.upsert_issue(2, "Ready", stage="reviewed", impl_pr=321)
+    client = FailingMergeClient(cfg)
+    p = Poller(config=cfg, store=store, client=client, graph=Graph())
+    p.scratch[2] = {
+        "diff": "+docs\n",
+        "changed_files": ["docs/readme.md"],
+        "tests_passed": True,
+        "sanitise_ok": True,
+        "review_findings": [],
+        "impl_pr": 321,
+    }
+
+    result = asyncio.run(p.tick())
+
+    assert result is None
+    assert store.get_issue(2).stage == "merged"
+    assert client.merged_prs == [321]
+
+
 def test_restart_mid_flight_resumes_persisted_stage_without_double_work(tmp_path, cfg: Config) -> None:
     db_path = tmp_path / "state.db"
     StateStore(db_path).upsert_issue(1, "Already triaged", stage="triaged")
@@ -106,9 +152,10 @@ def test_main_graph_shadow_fixture_can_complete_full_cycle_without_writes(tmp_pa
     store = StateStore(tmp_path / "state.db")
     store.upsert_issue(1, "Fix docs")
     p = Poller(config=cfg, store=store, client=client, graph=build_graph(cfg))
+    p.scratch[1] = {"verification": {"tests_passed": True}}
 
     for _ in range(5):
         asyncio.run(p.tick())
 
     assert store.get_issue(1).stage == "merged"
-    assert [record.operation for record in client.dry_run_records] == ["merge_pr"]
+    assert [record.operation for record in client.dry_run_records] == ["create_pr", "merge_pr"]

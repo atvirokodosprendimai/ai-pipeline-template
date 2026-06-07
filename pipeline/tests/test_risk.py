@@ -17,6 +17,18 @@ def test_crypto_path_is_high_risk() -> None:
     assert "high-risk path" in result.reasons[0]
 
 
+def test_secret_key_added_in_benign_path_is_high_risk() -> None:
+    diff = """diff --git a/config/example.env b/config/example.env
+++ b/config/example.env
++SECRET_KEY=abc123
+"""
+
+    result = classify_risk(["config/example.env"], diff, max_files=3)
+
+    assert result.tier == "high"
+    assert "high-risk diff content" in result.reasons[0]
+
+
 def test_more_than_max_files_is_high_risk() -> None:
     result = classify_risk(["a", "b", "c", "d"], "+small\n", max_files=3)
 
@@ -39,4 +51,3 @@ def test_exactly_max_files_boundary_is_low_risk() -> None:
     result = classify_risk(["a", "b", "c"], "+small\n", max_files=3)
 
     assert result.tier == "low"
-

@@ -34,8 +34,11 @@ def reconcile_issues(client: GitHubClient, store: StateStore) -> ReconcileResult
             store.upsert_issue(issue.number, issue.title, stage="escalated", status="open")
             escalated += 1
         elif "needs-triage" in labels or "copilot-triaging" in labels:
-            store.upsert_issue(issue.number, issue.title, stage="queued", status="open")
-            queued += 1
+            if current_stage is None:
+                store.upsert_issue(issue.number, issue.title, stage="queued", status="open")
+                queued += 1
+            elif current_stage != "queued" and "needs-triage" in labels:
+                client.remove_label(issue.number, "needs-triage")
         else:
             store.upsert_issue(issue.number, issue.title, stage=current_stage or "queued", status="open")
     return ReconcileResult(seen=seen, queued=queued, escalated=escalated, merged=merged)
@@ -46,4 +49,3 @@ def _current_stage(store: StateStore, number: int) -> str | None:
         return store.get_issue(number).stage
     except KeyError:
         return None
-

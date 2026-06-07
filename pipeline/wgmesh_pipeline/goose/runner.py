@@ -11,6 +11,7 @@ from wgmesh_pipeline.config import Config
 
 
 SubprocessRunner = Callable[..., subprocess.CompletedProcess[str]]
+GOOSE_TIMEOUT_SECONDS = 1800
 
 
 @dataclass(frozen=True)
@@ -50,14 +51,25 @@ class GooseRunner:
         env["ANTHROPIC_HOST"] = self.config.anthropic_host
 
         started = time.monotonic()
-        completed = self._runner(
-            command,
-            cwd=str(workdir_path),
-            env=env,
-            text=True,
-            capture_output=True,
-            check=False,
-        )
+        try:
+            completed = self._runner(
+                command,
+                cwd=str(workdir_path),
+                env=env,
+                text=True,
+                capture_output=True,
+                check=False,
+                timeout=GOOSE_TIMEOUT_SECONDS,
+            )
+        except subprocess.TimeoutExpired as exc:
+            duration = time.monotonic() - started
+            return GooseResult(
+                ok=False,
+                output_path=None,
+                duration_seconds=duration,
+                raw_log=_join_log(_decode_timeout_output(exc.output), _decode_timeout_output(exc.stderr)),
+                error=f"goose timed out after {GOOSE_TIMEOUT_SECONDS}s",
+            )
         duration = time.monotonic() - started
         raw_log = _join_log(completed.stdout, completed.stderr)
 
@@ -90,3 +102,8 @@ class GooseRunner:
 def _join_log(*parts: str | None) -> str:
     return "\n".join(part for part in parts if part)
 
+
+def _decode_timeout_output(value: str | bytes | None) -> str | None:
+    if isinstance(value, bytes):
+        return value.decode(errors="replace")
+    return value

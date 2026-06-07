@@ -26,12 +26,21 @@ class RiskResult:
 
 
 def classify_risk(changed_files: Iterable[str], diff_text: str, *, max_files: int) -> RiskResult:
+    """Classify implementation risk.
+
+    `max_files` is inclusive: exactly MAX_FILES changed files is allowed;
+    exceeding it escalates.
+    """
     files = tuple(changed_files)
     reasons: list[str] = []
 
     risky_paths = [path for path in files if HIGH_RISK_RE.search(path)]
     if risky_paths:
         reasons.append(f"high-risk path: {risky_paths[0]}")
+
+    risky_added_line = _high_risk_added_line(diff_text)
+    if risky_added_line:
+        reasons.append(f"high-risk diff content: {risky_added_line}")
 
     if len(files) > max_files:
         reasons.append(f"changed file count {len(files)} exceeds MAX_FILES={max_files}")
@@ -52,3 +61,18 @@ def _adds_network_call(diff_text: str) -> bool:
             return True
     return False
 
+
+def _high_risk_added_line(diff_text: str) -> str | None:
+    for line in diff_text.splitlines():
+        if not line.startswith("+") or line.startswith("+++"):
+            continue
+        if HIGH_RISK_RE.search(line[1:]):
+            return _summarise_added_line(line[1:])
+    return None
+
+
+def _summarise_added_line(line: str) -> str:
+    stripped = line.strip()
+    if len(stripped) <= 80:
+        return stripped
+    return f"{stripped[:77]}..."

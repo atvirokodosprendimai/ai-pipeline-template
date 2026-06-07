@@ -61,6 +61,21 @@ def test_goose_nonzero_returns_not_ok_with_raw_log(tmp_path) -> None:
     assert "bad recipe" in result.raw_log
 
 
+def test_goose_timeout_returns_not_ok_without_propagating(tmp_path) -> None:
+    def run(command, **kwargs):
+        raise subprocess.TimeoutExpired(cmd=command, timeout=kwargs["timeout"])
+
+    result = GooseRunner(cfg(), runner=run).run_recipe(
+        recipe="wgmesh-implementation.yaml",
+        workdir=tmp_path,
+        params={"spec_file": "spec.md"},
+        expected_output="diff.patch",
+    )
+
+    assert result.ok is False
+    assert result.error == "goose timed out after 1800s"
+
+
 def test_goose_zero_exit_empty_output_fails_loudly(tmp_path) -> None:
     def run(command, **kwargs):
         return completed(0, stdout="done but no file")
@@ -96,4 +111,3 @@ def test_near_zero_duration_is_surfaced(tmp_path, monkeypatch) -> None:
 
     assert result.ok is True
     assert 0 < result.duration_seconds < 0.001
-
