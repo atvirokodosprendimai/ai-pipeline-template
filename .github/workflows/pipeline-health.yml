@@ -131,6 +131,23 @@ jobs:
               continue
             fi
 
+            # Skip completed issues: a merged spec/impl PR for this issue already
+            # exists. Reopened or stale-labelled done work must NOT be re-triaged
+            # or escalated as "stuck" (false positives like #540, whose impl PR
+            # #544 merged with "Closes #540" yet was reopened). The issue number
+            # is encoded in spec/impl PR titles ("... Issue #N ..."). Uses the
+            # List API (--state merged) + jq title match, NOT the Search API —
+            # deterministic, no eventual-consistency flakiness (cf. PR #1441).
+            # closedByPullRequestsReferences was tried first but returns empty
+            # once an issue is reopened, so it cannot be used.
+            merged_pr=$(gh pr list --repo "$TARGET_REPO" --state merged --limit 300 \
+              --json title \
+              --jq "[.[] | select(.title | test(\"Issue #${number}\\\\b\"))] | length" 2>/dev/null || echo 0)
+            if [ "${merged_pr:-0}" -gt 0 ]; then
+              echo "Skipping #${number} — completed (merged spec/impl PR exists), not stuck"
+              continue
+            fi
+
             local_stale=$((local_stale + 1))
 
             # Read retry tracker
