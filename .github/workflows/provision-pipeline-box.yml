@@ -1,0 +1,166 @@
+name: Provision Pipeline Box
+
+# One-shot: provision a dedicated Hetzner VM and bring the wgmesh-pipeline up in
+# shadow mode. Runs here because HCLOUD_TOKEN is an org secret (GitHub secrets
+# are write-only — they can't be read locally). Runtime secrets are written to
+# the box OVER SSH, never via cloud-init user-data (which lands in Hetzner
+# metadata/logs).
+#
+# Required secrets (org or this repo):
+#   HCLOUD_TOKEN          (org)  — Hetzner project to bill/host
+#   ZAI_API_KEY                  — Goose LLM (z.ai)
+#   TURSO_DATABASE_URL          — durable state (when database_mode=turso)
+#   TURSO_AUTH_TOKEN
+# wgmesh is PUBLIC, so shadow needs no GitHub token (reads only). Live (later)
+# needs WGMESH_BOT_PAT.
+
+on:
+  workflow_dispatch:
+    inputs:
+      server_name:
+        description: 'Hetzner server name'
+        default: 'wgmesh-pipeline'
+      server_type:
+        description: 'Hetzner server type'
+        default: 'cx22'
+      location:
+        description: 'Hetzner location'
+        default: 'hel1'
+      pipeline_mode:
+        description: 'PIPELINE_MODE (start in shadow)'
+        default: 'shadow'
+      database_mode:
+        description: 'DATABASE_MODE (local|turso)'
+        default: 'turso'
+
+permissions:
+  contents: read
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    env:
+      NAME: ${{ github.event.inputs.server_name }}
+    steps:
+      - name: Checkout (repo URL used by deploy on the box)
+        uses: actions/checkout@v4
+
+      - name: Validate required secrets
+        run: |
+          set -euo pipefail
+          : "${HCLOUD_TOKEN:?HCLOUD_TOKEN secret missing (org)}"
+          : "${ZAI_API_KEY:?ZAI_API_KEY secret missing — add to repo or org}"
+          if [ "${{ github.event.inputs.database_mode }}" = "turso" ]; then
+            : "${TURSO_DATABASE_URL:?TURSO_DATABASE_URL missing for database_mode=turso}"
+            : "${TURSO_AUTH_TOKEN:?TURSO_AUTH_TOKEN missing for database_mode=turso}"
+          fi
+        env:
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+          ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+
+      - name: Install hcloud CLI
+        run: |
+          set -euo pipefail
+          curl -fsSL https://github.com/hetznercloud/cli/releases/latest/download/hcloud-linux-amd64.tar.gz \
+            | tar xz hcloud
+          sudo mv hcloud /usr/local/bin/
+
+      - name: Generate ephemeral SSH key (per run)
+        run: |
+          set -euo pipefail
+          ssh-keygen -t ed25519 -N '' -f "$RUNNER_TEMP/box_key" -C "provision-${{ github.run_id }}"
+          chmod 600 "$RUNNER_TEMP/box_key"
+
+      - name: Create server
+        env:
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+        run: |
+          set -euo pipefail
+          KEYNAME="prov-${{ github.run_id }}"
+          hcloud ssh-key create --name "$KEYNAME" --public-key-from-file "$RUNNER_TEMP/box_key.pub"
+          cat > "$RUNNER_TEMP/cloud-init.yml" <<'CLOUD'
+          #cloud-config
+          package_update: true
+          packages: [git, python3, python3-venv, python3-pip, curl, jq]
+          runcmd:
+            - curl -fsSL https://github.com/block/goose/releases/latest/download/download_cli.sh | bash
+            - install -d -m 700 /etc/wgmesh-pipeline
+          CLOUD
+          # Reuse an existing server with this name? Delete first for a clean stand-up.
+          hcloud server describe "$NAME" >/dev/null 2>&1 && hcloud server delete "$NAME" || true
+          hcloud server create \
+            --name "$NAME" \
+            --type "${{ github.event.inputs.server_type }}" \
+            --image ubuntu-24.04 \
+            --location "${{ github.event.inputs.location }}" \
+            --ssh-key "$KEYNAME" \
+            --user-data-from-file "$RUNNER_TEMP/cloud-init.yml"
+          IP=$(hcloud server ip "$NAME")
+          echo "BOX_IP=$IP" >> "$GITHUB_ENV"
+          echo "KEYNAME=$KEYNAME" >> "$GITHUB_ENV"
+
+      - name: Wait for SSH + cloud-init
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 40); do
+            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i "$RUNNER_TEMP/box_key" \
+                 root@"$BOX_IP" 'cloud-init status --wait >/dev/null 2>&1; command -v goose && test -d /etc/wgmesh-pipeline'; then
+              echo "box ready"; exit 0
+            fi
+            sleep 15
+          done
+          echo "::error::box did not become ready"; exit 1
+
+      - name: Write env (over SSH — secrets never touch cloud-init/metadata)
+        env:
+          ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+          MODE: ${{ github.event.inputs.pipeline_mode }}
+          DBMODE: ${{ github.event.inputs.database_mode }}
+        run: |
+          set -euo pipefail
+          ssh -o StrictHostKeyChecking=no -i "$RUNNER_TEMP/box_key" root@"$BOX_IP" \
+            "umask 077; cat > /etc/wgmesh-pipeline/env" <<EOF
+          PIPELINE_MODE=$MODE
+          TARGET_REPO=atvirokodosprendimai/wgmesh
+          ZAI_API_KEY=$ZAI_API_KEY
+          ANTHROPIC_HOST=https://api.z.ai/api/anthropic
+          DATABASE_MODE=$DBMODE
+          PIPELINE_DB_PATH=/opt/wgmesh-pipeline/state.db
+          TURSO_DATABASE_URL=$TURSO_DATABASE_URL
+          TURSO_AUTH_TOKEN=$TURSO_AUTH_TOKEN
+          POLL_INTERVAL_SECONDS=300
+          MAX_FILES=20
+          EOF
+
+      - name: Deploy + start (shadow)
+        run: |
+          set -euo pipefail
+          REPO_URL="https://github.com/${{ github.repository }}.git"
+          ssh -o StrictHostKeyChecking=no -i "$RUNNER_TEMP/box_key" root@"$BOX_IP" \
+            "set -euo pipefail
+             git clone --depth 1 '$REPO_URL' /opt/wgmesh-pipeline || (cd /opt/wgmesh-pipeline && git pull)
+             if [ '${{ github.event.inputs.database_mode }}' = 'turso' ]; then EXTRA='[turso]'; else EXTRA=''; fi
+             python3 -m venv /opt/wgmesh-pipeline/.venv
+             /opt/wgmesh-pipeline/.venv/bin/pip install -q --upgrade pip
+             /opt/wgmesh-pipeline/.venv/bin/pip install -q -e \"/opt/wgmesh-pipeline/pipeline\${EXTRA}\"
+             install -m 0644 /opt/wgmesh-pipeline/pipeline/deploy/wgmesh-pipeline.service /etc/systemd/system/
+             id wgmesh >/dev/null 2>&1 || useradd --system --home /opt/wgmesh-pipeline --shell /usr/sbin/nologin wgmesh
+             chown -R wgmesh:wgmesh /opt/wgmesh-pipeline
+             systemctl daemon-reload
+             systemctl enable --now wgmesh-pipeline
+             sleep 5
+             systemctl --no-pager status wgmesh-pipeline | head -n 12
+             journalctl -u wgmesh-pipeline --no-pager | tail -n 20"
+
+      - name: Cleanup ephemeral hcloud ssh key
+        if: always()
+        env:
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+        run: hcloud ssh-key delete "${KEYNAME:-prov-${{ github.run_id }}}" || true
+
+      - name: Report
+        run: echo "Box '$NAME' at $BOX_IP — wgmesh-pipeline started in '${{ github.event.inputs.pipeline_mode }}' mode."
