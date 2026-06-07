@@ -80,6 +80,8 @@ jobs:
           HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
         run: |
           set -euo pipefail
+          echo "::group::available server types"; hcloud server-type list || true; echo "::endgroup::"
+          echo "::group::available locations"; hcloud location list || true; echo "::endgroup::"
           KEYNAME="prov-${{ github.run_id }}"
           hcloud ssh-key create --name "$KEYNAME" --public-key-from-file "$RUNNER_TEMP/box_key.pub"
           cat > "$RUNNER_TEMP/cloud-init.yml" <<'CLOUD'
