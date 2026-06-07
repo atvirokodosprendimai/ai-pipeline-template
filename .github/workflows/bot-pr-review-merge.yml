@@ -135,6 +135,25 @@ jobs:
                 || echo "::warning::gh pr ready failed for PR #$PR_NUMBER (non-fatal, attempting review-merge anyway)"
             fi
 
+            # Request fresh Copilot review. pr-review-merge.sh only POLLS
+            # for an existing review and times out after ~360s if none
+            # arrives — for older PRs where Copilot already gave up, the
+            # poll always times out. Explicitly re-add the reviewer so
+            # Copilot enqueues a fresh review request.
+            #
+            # Already-pending reviews are idempotent (no duplicate). Errors
+            # here are non-fatal — pr-review-merge.sh still runs and may
+            # find an older review.
+            # Use the `@copilot` special value — gh resolves this to the
+            # Copilot reviewer bot. Passing the display login
+            # (`copilot-pull-request-reviewer`, with or without `[bot]`) is
+            # NOT accepted by `--add-reviewer` and silently fails to enqueue
+            # a review, leaving pr-review-merge.sh to time out and escalate.
+            echo "Requesting Copilot review..."
+            gh pr edit "$PR_NUMBER" --repo "$TARGET_REPO" \
+              --add-reviewer "@copilot" \
+              || echo "::warning::add-reviewer failed for PR #$PR_NUMBER (non-fatal)"
+
             (
               bash company/scripts/pr-review-merge.sh
             )
