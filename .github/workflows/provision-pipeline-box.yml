@@ -203,6 +203,18 @@ jobs:
                sed -i 's/^RESET_QUEUE=.*/RESET_QUEUE=0/' /etc/wgmesh-pipeline/env
              fi"
 
+      - name: Capture journal after ticks (diagnostic)
+        run: |
+          set -euo pipefail
+          echo "Waiting ~11min for several poll ticks (interval 300s) to surface any hang/crash..."
+          sleep 660
+          ssh -o StrictHostKeyChecking=no -i "$RUNNER_TEMP/box_key" root@"$BOX_IP" \
+            "set +e
+             echo '===== systemctl status ====='
+             systemctl --no-pager status wgmesh-pipeline | head -n 15
+             echo '===== journalctl (last 120) ====='
+             journalctl -u wgmesh-pipeline --no-pager | tail -n 120"
+
       - name: Cleanup ephemeral hcloud ssh key
         if: always()
         env:
