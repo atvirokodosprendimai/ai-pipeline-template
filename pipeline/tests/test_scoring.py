@@ -122,6 +122,7 @@ def test_langfuse_record_creates_pipeline_outcome_score_and_flushes(monkeypatch)
             "name": "pipeline_outcome",
             "value": "merged",
             "data_type": "CATEGORICAL",
+            "session_id": "issue-584",
             "metadata": {
                 "issue": 584,
                 "auto_merged": 1,
@@ -132,6 +133,16 @@ def test_langfuse_record_creates_pipeline_outcome_score_and_flushes(monkeypatch)
         }
     ]
     assert client.flushed is True
+
+
+def test_langfuse_record_attaches_session_id_link(monkeypatch) -> None:
+    """create_score needs a link (trace_id/session_id) or langfuse returns 400.
+    session_id=issue-<N> is the link AND groups the issue's scores+traces into
+    one session. This is the fix for the dormant langfuse-400."""
+    client = _FakeLangfuse()
+    scorer = _install_fake_langfuse(monkeypatch, client)
+    scorer.record(issue=652, outcome="escalated", scores={}, tags={})
+    assert client.scores[0]["session_id"] == "issue-652"
 
 
 def test_score_run_passes_trace_id_to_langfuse_when_present(monkeypatch) -> None:

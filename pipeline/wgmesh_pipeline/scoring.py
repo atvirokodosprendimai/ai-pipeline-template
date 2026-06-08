@@ -89,10 +89,15 @@ class LangfuseScorer:
         try:
             # outcome as a categorical score + the numeric auto-merge signal,
             # tagged by issue. Visible in the Langfuse Scores view.
+            # session_id groups every score (and trace) for one issue's pipeline
+            # lifecycle into a single Langfuse session, AND is the required link:
+            # create_score rejects a score with no trace_id/session_id/etc as a
+            # 400 Bad request. issue-keyed session is the natural per-workflow id.
             kwargs: dict[str, Any] = {
                 "name": "pipeline_outcome",
                 "value": outcome,
                 "data_type": "CATEGORICAL",
+                "session_id": f"issue-{issue}",
                 "metadata": {"issue": issue, **scores, **tags},
             }
             if trace_id:
