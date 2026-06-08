@@ -1,0 +1,37 @@
+version: "1.0.0"
+title: "wgmesh Triage Spec"
+description: "Write a structured implementation spec for a wgmesh GitHub issue."
+parameters:
+  - key: issue_number
+    input_type: string
+    requirement: required
+    description: "GitHub issue number."
+  - key: issue_title
+    input_type: string
+    requirement: required
+    description: "GitHub issue title."
+  - key: spec_file
+    input_type: string
+    requirement: required
+    description: "Repository-relative markdown path where the spec must be written."
+prompt: |
+  You are writing an implementation specification for wgmesh, a decentralized
+  WireGuard mesh networking product with managed ingress.
+
+  Issue: #{{ issue_number }} - {{ issue_title }}
+
+  Write a markdown implementation spec to this exact repository-relative path:
+  {{ spec_file }}
+
+  Requirements:
+  - Create parent directories if needed.
+  - Write the file; do not only print the spec.
+  - Keep the content public-repo safe: no secrets, no customer PII, no exact revenue figures.
+  - Use this exact section structure:
+    - Summary
+    - Context
+    - Requirements
+    - Acceptance Criteria
+    - Out of scope
+  - Keep the spec concrete enough for an implementation agent to build from it.
+  - Do not modify unrelated files.
