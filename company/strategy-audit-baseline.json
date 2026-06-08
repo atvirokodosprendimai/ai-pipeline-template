@@ -223,12 +223,12 @@
       ]
     },
     {
-      "ran_at": "2026-06-06T10:52:26Z",
+      "ran_at": "2026-06-08T13:04:57Z",
       "metrics": {
         "paid_customers": 0,
         "autonomous_ship_rate": null,
-        "lead_time_hours": 45.09,
-        "self_heal_rate": 1,
+        "lead_time_hours": 154.58,
+        "self_heal_rate": 0,
         "active_stuck_issues": 0,
         "cycle_time_to_revenue": null,
         "fetch_status": {
