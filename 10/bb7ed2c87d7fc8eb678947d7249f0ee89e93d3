@@ -1,0 +1,19 @@
+pipeline/tests/test_tracing.py
+  s_403b655a6daaae::t_b23d97d77cc7b9 139-140,157-158
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "10bb7ed2c87d7fc8eb678947d7249f0ee89e93d3",
+  "prompts": {},
+  "sessions": {
+    "s_403b655a6daaae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d88b5efe-79e0-419a-9f1b-6e46c07d8d55",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
