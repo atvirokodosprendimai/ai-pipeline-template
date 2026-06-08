@@ -1,0 +1,21 @@
+pipeline/wgmesh_pipeline/github/client.py
+  s_403b655a6daaae::t_6670a95b79ae5e 71-75
+pipeline/tests/test_github_client.py
+  s_403b655a6daaae::t_eef34169ce1414 212-235
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "2c3a6bd2d864140d6017cbcbc585e5c0a80f1a53",
+  "prompts": {},
+  "sessions": {
+    "s_403b655a6daaae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d88b5efe-79e0-419a-9f1b-6e46c07d8d55",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
