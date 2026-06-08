@@ -32,6 +32,10 @@ on:
       database_mode:
         description: 'DATABASE_MODE (local|turso)'
         default: 'turso'
+      reset_queue:
+        description: 'Clear durable pipeline queue/runs before polling'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -150,8 +154,11 @@ jobs:
           WGMESH_BOT_PAT: ${{ secrets.WGMESH_BOT_PAT }}
           MODE: ${{ github.event.inputs.pipeline_mode }}
           DBMODE: ${{ github.event.inputs.database_mode }}
+          RESET_QUEUE_INPUT: ${{ github.event.inputs.reset_queue }}
         run: |
           set -euo pipefail
+          RESET_QUEUE=0
+          if [ "${RESET_QUEUE_INPUT:-false}" = "true" ]; then RESET_QUEUE=1; fi
           # The pipeline reads ZAI_API_KEY; source it from the ANTHROPIC_API_KEY
           # secret (which holds the z.ai key).
           ssh -o StrictHostKeyChecking=no -i "$RUNNER_TEMP/box_key" root@"$BOX_IP" \
@@ -170,6 +177,7 @@ jobs:
           LANGFUSE_SECRET_KEY=$LANGFUSE_SECRET_KEY
           POLL_INTERVAL_SECONDS=300
           MAX_FILES=20
+          RESET_QUEUE=$RESET_QUEUE
           EOF
 
       - name: Deploy + start (shadow)
@@ -190,7 +198,10 @@ jobs:
              systemctl enable --now wgmesh-pipeline
              sleep 5
              systemctl --no-pager status wgmesh-pipeline | head -n 12
-             journalctl -u wgmesh-pipeline --no-pager | tail -n 20"
+             journalctl -u wgmesh-pipeline --no-pager | tail -n 20
+             if [ '${{ github.event.inputs.reset_queue }}' = 'true' ]; then
+               sed -i 's/^RESET_QUEUE=.*/RESET_QUEUE=0/' /etc/wgmesh-pipeline/env
+             fi"
 
       - name: Cleanup ephemeral hcloud ssh key
         if: always()

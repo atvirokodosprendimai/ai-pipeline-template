@@ -175,10 +175,11 @@ def test_reviewed_issue_not_phantom_merged_when_side_effect_fails(tmp_path, cfg:
             self.merged_prs.append(pr_number)
             raise RuntimeError("merge side effect failed")
 
+    live = Config(target_repo=cfg.target_repo, mode="live", max_files=cfg.max_files)
     store = StateStore(tmp_path / "state.db")
     store.upsert_issue(2, "Ready", stage="reviewed", impl_pr=321)
-    client = FailingMergeClient(cfg)
-    p = Poller(config=cfg, store=store, client=client, graph=Graph())
+    client = FailingMergeClient(live)
+    p = Poller(config=live, store=store, client=client, graph=Graph())
     p.scratch[2] = {
         "diff": "+docs\n",
         "changed_files": ["docs/readme.md"],
@@ -223,8 +224,22 @@ def test_specced_issue_opens_spec_pr_then_stops_in_spec_only(tmp_path, cfg: Conf
     assert p.graph.calls == ["spec_pr"]
 
 
-def test_spec_ready_issue_continues_to_implementation(tmp_path, cfg: Config) -> None:
+def test_specced_issue_in_shadow_does_not_open_spec_pr_or_advance(tmp_path, cfg: Config) -> None:
     p = poller(tmp_path, cfg)
+    p.store.upsert_issue(1, "Already specced", stage="specced")
+
+    result = asyncio.run(p.tick())
+
+    assert result is not None
+    assert result.stage == "specced"
+    assert p.store.get_issue(1).stage == "specced"
+    assert p.store.get_issue(1).spec_pr is None
+    assert p.graph.calls == []
+
+
+def test_spec_ready_issue_continues_to_implementation(tmp_path, cfg: Config) -> None:
+    live = Config(target_repo=cfg.target_repo, mode="live", max_files=cfg.max_files)
+    p = poller(tmp_path, live)
     p.store.upsert_issue(1, "Spec PR opened", stage="spec_ready", spec_pr=99)
 
     result = asyncio.run(p.tick())
@@ -234,7 +249,7 @@ def test_spec_ready_issue_continues_to_implementation(tmp_path, cfg: Config) -> 
     assert p.graph.calls == ["implement"]
 
 
-def test_main_graph_shadow_fixture_can_complete_full_cycle_without_writes(tmp_path, cfg: Config, monkeypatch) -> None:
+def test_main_graph_shadow_fixture_halts_at_specced_without_writes(tmp_path, cfg: Config, monkeypatch) -> None:
     monkeypatch.setattr("wgmesh_pipeline.graph.nodes.review.run_sanitise", lambda text: True)
     client = EmptyClient(cfg)
     store = StateStore(tmp_path / "state.db")
@@ -242,15 +257,8 @@ def test_main_graph_shadow_fixture_can_complete_full_cycle_without_writes(tmp_pa
     p = Poller(config=cfg, store=store, client=client, graph=build_graph(cfg))
     p.scratch[1] = {"verification": {"tests_passed": True}}
 
-    for _ in range(6):
+    for _ in range(3):
         asyncio.run(p.tick())
 
-    assert store.get_issue(1).stage == "merged"
-    assert [record.operation for record in client.dry_run_records] == [
-        "push_branch",
-        "create_pr",
-        "remove_label",
-        "add_label",
-        "create_pr",
-        "merge_pr",
-    ]
+    assert store.get_issue(1).stage == "specced"
+    assert client.dry_run_records == []

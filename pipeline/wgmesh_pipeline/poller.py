@@ -79,6 +79,9 @@ class Poller:
             self.scratch[issue.number] = dict(self.graph.spec(state))
             return self.store.transition(issue.number, "triaged", "specced")
 
+        if issue.stage in {"specced", "spec_ready", "implemented", "reviewed"} and self.config.mode == "shadow":
+            return issue
+
         if issue.stage == "specced":
             self.scratch[issue.number] = dict(self.graph.spec_pr(state))
             if self.scratch[issue.number].get("spec_pr") is not None:
