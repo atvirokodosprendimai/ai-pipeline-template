@@ -1,0 +1,19 @@
+pipeline/recipes/wgmesh-triage-spec.yaml
+  s_403b655a6daaae::t_39a9f78a595e33 38-48
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "1575e8ba2b1da40c3e53c378699f4d38a209a832",
+  "prompts": {},
+  "sessions": {
+    "s_403b655a6daaae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d88b5efe-79e0-419a-9f1b-6e46c07d8d55",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
