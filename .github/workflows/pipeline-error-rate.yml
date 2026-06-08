@@ -1,0 +1,153 @@
+name: Pipeline Error Rate
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    env:
+      ERROR_WINDOW_MINUTES: "15"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate secrets
+        env:
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+          : "${TURSO_DATABASE_URL:?}"; : "${TURSO_AUTH_TOKEN:?}"
+
+      - name: Compute pipeline error rate
+        id: stats
+        env:
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+          python -m pip install -q -e 'pipeline[turso]'
+          python - <<'PY'
+          import json
+          import os
+          from datetime import timedelta
+          from pathlib import Path
+
+          import libsql
+          from wgmesh_pipeline.state.store import StateStore
+
+          conn = libsql.connect(
+              database=os.environ["TURSO_DATABASE_URL"],
+              auth_token=os.environ["TURSO_AUTH_TOKEN"],
+          )
+          store = StateStore(connection=conn)
+          stats = store.error_stats(timedelta(minutes=int(os.environ["ERROR_WINDOW_MINUTES"])))
+          Path("/tmp/pipeline-error-stats.json").write_text(json.dumps(stats, indent=2, sort_keys=True))
+
+          print("=== PIPELINE ERROR RATE ===")
+          for node, values in stats["nodes"].items():
+              print(
+                  f"{node}: error_rate={values['error_rate']:.3f} "
+                  f"error={values['error']} ok={values['ok']} total={values['total']}"
+              )
+          print(f"failed_issues={stats['failed_issues']}")
+          print(f"issues_with_last_error={stats['issues_with_last_error']}")
+          for item in stats["last_errors"]:
+              print(f"last_error issue=#{item['issue']} stage={item['stage']}: {item['last_error']}")
+
+          has_error_rate = any(values["error_rate"] > 0 for values in stats["nodes"].values())
+          should_alert = has_error_rate or stats["failed_issues"] > 0
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              print(f"alert={str(should_alert).lower()}", file=out)
+          PY
+
+      - name: Open or update tracking issue
+        if: steps.stats.outputs.alert == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TITLE: "pipeline: box error-rate > 0"
+        run: |
+          set -euo pipefail
+          python - <<'PY' > /tmp/pipeline-error-rate-body.raw.md
+          import json
+          import os
+          from pathlib import Path
+
+          stats = json.loads(Path("/tmp/pipeline-error-stats.json").read_text())
+          print("## Pipeline error-rate alert")
+          print()
+          print(f"Run: {os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}")
+          print(f"Window: last {os.environ.get('ERROR_WINDOW_MINUTES', '15')} minutes")
+          print()
+          print("### Node error rates")
+          print()
+          print("| node | error_rate | error | ok | total |")
+          print("| --- | ---: | ---: | ---: | ---: |")
+          for node, values in stats["nodes"].items():
+              print(
+                  f"| {node} | {values['error_rate']:.3f} | "
+                  f"{values['error']} | {values['ok']} | {values['total']} |"
+              )
+          print()
+          print(f"Failed-stage issues: {stats['failed_issues']}")
+          print(f"Issues with last_error: {stats['issues_with_last_error']}")
+          print()
+          print("### Recent last_error values")
+          print()
+          if stats["last_errors"]:
+              for item in stats["last_errors"]:
+                  print(f"- issue #{item['issue']} stage `{item['stage']}`: `{item['last_error']}`")
+          else:
+              print("- none")
+          PY
+
+          if ! bash company/scripts/sanitise.sh < /tmp/pipeline-error-rate-body.raw.md > /tmp/pipeline-error-rate-body.md; then
+            echo "::error::sanitise.sh rejected pipeline error-rate issue body"
+            exit 1
+          fi
+
+          # List API (strongly consistent) + exact-title jq, NOT --search: the
+          # Search API is eventually-consistent and mis-tokenizes colon/symbol
+          # titles like this one, returning 0 and creating a new issue every run.
+          existing="$(gh issue list --repo "$GITHUB_REPOSITORY" \
+            --state open --limit 200 \
+            --json number,title \
+            --jq ".[] | select(.title == \"$TITLE\") | .number" \
+            | head -n 1)"
+
+          if [ -n "$existing" ]; then
+            gh issue edit "$existing" --repo "$GITHUB_REPOSITORY" --body-file /tmp/pipeline-error-rate-body.md
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" \
+              --title "$TITLE" \
+              --body-file /tmp/pipeline-error-rate-body.md
+          fi
+
+          exit 1
+
+      - name: Auto-close tracking issue when recovered
+        if: steps.stats.outputs.alert == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TITLE: "pipeline: box error-rate > 0"
+        run: |
+          set -euo pipefail
+          # The windowed stats are clean -> if a tracking issue is open, the box
+          # has recovered; close it so the alert self-resolves (List API exact
+          # title, same dedup discipline as the open path).
+          existing="$(gh issue list --repo "$GITHUB_REPOSITORY" \
+            --state open --limit 200 \
+            --json number,title \
+            --jq ".[] | select(.title == \"$TITLE\") | .number" \
+            | head -n 1)"
+          if [ -n "$existing" ]; then
+            gh issue close "$existing" --repo "$GITHUB_REPOSITORY" \
+              --comment "Pipeline error-rate back to 0 over the window — auto-resolved."
+          fi

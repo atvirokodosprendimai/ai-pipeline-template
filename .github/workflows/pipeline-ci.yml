@@ -41,3 +41,10 @@ jobs:
         run: |
           set -euo pipefail
           python -m pytest pipeline/tests/ -q
+
+      - name: Run gate eval check
+        env:
+          PYTHONPATH: pipeline
+        run: |
+          set -euo pipefail
+          python -m evals.run_evals --check

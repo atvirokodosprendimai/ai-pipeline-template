@@ -4,8 +4,10 @@ from pathlib import Path
 
 import pytest
 
+from evals import run_evals
 from evals.eval_gate import (
     EvalFailure,
+    GateMetrics,
     broken_gate_always_merge,
     broken_gate_ignores_non_risk_guards,
     evaluate_gate,
@@ -51,3 +53,42 @@ def test_spec_eval_flags_missing_proposed_approach() -> None:
 def test_trajectory_eval_fails_trace_that_skips_review() -> None:
     with pytest.raises(TrajectoryEvalFailure, match="without review"):
         assert_never_skips_review(["triage", "spec", "implement", "gate", "merge"])
+
+
+def write_eval_dataset(tmp_path: Path, gate_lines: list[str]) -> Path:
+    data_dir = tmp_path / "datasets"
+    data_dir.mkdir()
+    (data_dir / "gate_golden.jsonl").write_text("\n".join(gate_lines) + "\n")
+    (data_dir / "spec_golden.jsonl").write_text(
+        '{"id":"ok","spec":"## Problem\\nP\\n\\n## Proposed Approach\\nA\\n\\n## Acceptance Criteria\\n- C\\n","expected_ok":true}\n'
+    )
+    return data_dir
+
+
+def test_run_evals_check_exits_nonzero_for_mis_gated_case(tmp_path) -> None:
+    data_dir = write_eval_dataset(
+        tmp_path,
+        [
+            '{"id":"unsafe-docs","changed_files":["docs/usage.md"],"diff":"+ok\\n","expected_decision":"escalate"}',
+        ],
+    )
+
+    assert run_evals.main(["--check", "--data-dir", str(data_dir)]) == 1
+
+
+def test_run_evals_check_exits_zero_for_clean_set(tmp_path) -> None:
+    data_dir = write_eval_dataset(
+        tmp_path,
+        [
+            '{"id":"safe-docs","changed_files":["docs/usage.md"],"diff":"+ok\\n","expected_decision":"merge"}',
+            '{"id":"auth-change","changed_files":["internal/auth/login.go"],"diff":"+return x\\n","expected_decision":"escalate"}',
+        ],
+    )
+
+    assert run_evals.main(["--check", "--data-dir", str(data_dir)]) == 0
+
+
+def test_eval_threshold_boundary_exact_passes_just_below_fails() -> None:
+    assert run_evals.gate_check_passes(GateMetrics(10, 0.9, 1.0, 1.0, ())) is True
+    assert run_evals.gate_check_passes(GateMetrics(10, 0.899, 1.0, 1.0, ())) is False
+    assert run_evals.gate_check_passes(GateMetrics(10, 1.0, 1.0, 0.999, ())) is False

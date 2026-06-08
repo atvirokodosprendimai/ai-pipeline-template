@@ -238,6 +238,73 @@ class StateStore:
         rows = self._conn.execute("SELECT * FROM runs ORDER BY id").fetchall()
         return [dict(row) for row in rows]
 
+    def error_stats(self, window: timedelta, *, now: datetime | None = None) -> dict[str, Any]:
+        """Return recent per-node error rates and issue error counts."""
+        cutoff = _iso(_dt(now) - window)
+        rows = self._conn.execute(
+            """
+            SELECT
+              node,
+              SUM(CASE WHEN outcome = 'ok' THEN 1 ELSE 0 END) AS ok_count,
+              SUM(CASE WHEN outcome = 'error' THEN 1 ELSE 0 END) AS error_count
+            FROM runs
+            WHERE started >= ?
+              AND outcome IN ('ok', 'error')
+            GROUP BY node
+            ORDER BY node
+            """,
+            (cutoff,),
+        ).fetchall()
+        nodes: dict[str, dict[str, Any]] = {}
+        for row in rows:
+            ok = int(row["ok_count"] or 0)
+            error = int(row["error_count"] or 0)
+            total = ok + error
+            nodes[str(row["node"])] = {
+                "ok": ok,
+                "error": error,
+                "total": total,
+                "error_rate": error / total if total else 0.0,
+            }
+
+        # Window the issue-level counts by updated_at the same way as run rates.
+        # Without the window these counts are monotonic ('failed' is terminal and
+        # last_error is never cleared), so the alert would latch permanently red
+        # and never self-recover once any issue ever failed.
+        failed_issues = int(
+            self._conn.execute(
+                "SELECT COUNT(*) AS count FROM issues WHERE stage = 'failed' AND updated_at >= ?",
+                (cutoff,),
+            ).fetchone()["count"]
+        )
+        issues_with_last_error = int(
+            self._conn.execute(
+                "SELECT COUNT(*) AS count FROM issues "
+                "WHERE last_error IS NOT NULL AND last_error != '' AND updated_at >= ?",
+                (cutoff,),
+            ).fetchone()["count"]
+        )
+        last_error_rows = self._conn.execute(
+            """
+            SELECT number, stage, substr(last_error, 1, 400) AS last_error
+            FROM issues
+            WHERE last_error IS NOT NULL AND last_error != ''
+              AND updated_at >= ?
+            ORDER BY updated_at DESC, number ASC
+            LIMIT 20
+            """,
+            (cutoff,),
+        ).fetchall()
+        return {
+            "nodes": nodes,
+            "failed_issues": failed_issues,
+            "issues_with_last_error": issues_with_last_error,
+            "last_errors": [
+                {"issue": int(row["number"]), "stage": str(row["stage"]), "last_error": str(row["last_error"])}
+                for row in last_error_rows
+            ],
+        }
+
     def reset_queue(self) -> dict[str, int]:
         """Clear durable pipeline work state while leaving migrations intact."""
         issue_count = int(self._conn.execute("SELECT COUNT(*) AS count FROM issues").fetchone()["count"])
