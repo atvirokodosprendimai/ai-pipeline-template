@@ -1,0 +1,19 @@
+docs/plans/2026-06-08-001-feat-langfuse-correctness-layer-plan.md
+  s_403b655a6daaae::t_0ed8d72ad6b2cc 1-214
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "4f0483a2494e0a941a1a2d4822ceeccd5ef5452d",
+  "prompts": {},
+  "sessions": {
+    "s_403b655a6daaae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d88b5efe-79e0-419a-9f1b-6e46c07d8d55",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
