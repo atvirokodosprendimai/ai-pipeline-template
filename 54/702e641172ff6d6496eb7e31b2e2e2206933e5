@@ -1,0 +1,26 @@
+pipeline/tests/test_tracing.py
+  s_403b655a6daaae::t_18960db93f6ada 132-169
+pipeline/wgmesh_pipeline/scoring.py
+  s_403b655a6daaae::t_22244978bd619f 92-95,100
+pipeline/wgmesh_pipeline/tracing.py
+  s_403b655a6daaae::t_b0bb4e452ae844 77-83
+  s_403b655a6daaae::t_c6965d50c77887 5,15-27
+pipeline/tests/test_scoring.py
+  s_403b655a6daaae::t_234b08055306e4 125,138-145
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "54702e641172ff6d6496eb7e31b2e2e2206933e5",
+  "prompts": {},
+  "sessions": {
+    "s_403b655a6daaae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d88b5efe-79e0-419a-9f1b-6e46c07d8d55",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
