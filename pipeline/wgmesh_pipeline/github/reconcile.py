@@ -38,7 +38,11 @@ def reconcile_issues(client: GitHubClient, store: StateStore) -> ReconcileResult
                 store.upsert_issue(issue.number, issue.title, stage="queued", status="open")
                 queued += 1
             elif current_stage != "queued" and "needs-triage" in labels:
-                client.remove_label(issue.number, "needs-triage")
+                # spec_pr=True: this needs-triage cleanup is a legitimate
+                # spec-lane label write (same as spec_pr_node). Without the flag
+                # the spec-only write-gate raises PermissionError, which crashed
+                # reconcile every tick and stalled the whole loop.
+                client.remove_label(issue.number, "needs-triage", spec_pr=True)
         else:
             store.upsert_issue(issue.number, issue.title, stage=current_stage or "queued", status="open")
     return ReconcileResult(seen=seen, queued=queued, escalated=escalated, merged=merged)
