@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Mapping
 
 
@@ -11,6 +12,10 @@ DEFAULT_ANTHROPIC_HOST = "https://api.z.ai/api/anthropic"
 DEFAULT_TARGET_REPO = "atvirokodosprendimai/wgmesh"
 DEFAULT_POLL_INTERVAL_SECONDS = 300
 DEFAULT_MAX_FILES = 20
+DEFAULT_REPO_PATH = "/opt/wgmesh-checkout"
+DEFAULT_RECIPES_DIR = str(Path(__file__).resolve().parents[1] / "recipes")
+DEFAULT_GOOSE_PROVIDER = "anthropic"
+DEFAULT_GOOSE_MODEL = "GLM-4.7"
 
 
 @dataclass(frozen=True)
@@ -23,6 +28,10 @@ class Config:
     langsmith_api_key: str | None = None
     poll_interval_seconds: int = DEFAULT_POLL_INTERVAL_SECONDS
     max_files: int = DEFAULT_MAX_FILES
+    repo_path: str = DEFAULT_REPO_PATH
+    recipes_dir: str = DEFAULT_RECIPES_DIR
+    goose_provider: str = DEFAULT_GOOSE_PROVIDER
+    goose_model: str = DEFAULT_GOOSE_MODEL
     database_mode: str = "local"
     database_path: str = "pipeline/state.db"
     turso_url: str | None = None
@@ -76,6 +85,10 @@ def load_config(env: Mapping[str, str] | None = None) -> Config:
         langsmith_api_key=_get_nonempty(source, "LANGSMITH_API_KEY"),
         poll_interval_seconds=_get_int(source, "POLL_INTERVAL_SECONDS", DEFAULT_POLL_INTERVAL_SECONDS),
         max_files=_get_int(source, "MAX_FILES", DEFAULT_MAX_FILES),
+        repo_path=_get_nonempty(source, "WGMESH_CHECKOUT_PATH") or DEFAULT_REPO_PATH,
+        recipes_dir=_get_nonempty(source, "RECIPES_DIR") or DEFAULT_RECIPES_DIR,
+        goose_provider=_get_nonempty(source, "GOOSE_PROVIDER") or DEFAULT_GOOSE_PROVIDER,
+        goose_model=_get_nonempty(source, "GOOSE_MODEL") or DEFAULT_GOOSE_MODEL,
         database_mode=db_mode,
         database_path=_get_nonempty(source, "PIPELINE_DB_PATH") or "pipeline/state.db",
         turso_url=turso_url,
@@ -112,4 +125,3 @@ def _get_int(env: Mapping[str, str], name: str, default: int) -> int:
     if value <= 0:
         raise ValueError(f"{name} must be positive")
     return value
-

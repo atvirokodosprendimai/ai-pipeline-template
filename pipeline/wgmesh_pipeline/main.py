@@ -10,6 +10,7 @@ from pathlib import Path
 
 from wgmesh_pipeline.config import load_config
 from wgmesh_pipeline.github.client import GitHubClient
+from wgmesh_pipeline.goose.runner import GooseRunner
 from wgmesh_pipeline.graph.build import build_graph
 from wgmesh_pipeline.poller import Poller
 from wgmesh_pipeline.scoring import init_scoring
@@ -45,7 +46,13 @@ async def async_main(*, reset_queue: bool = False) -> None:
             f"[pipeline] reset_queue cleared issues={cleared['issues']} runs={cleared['runs']}",
             file=sys.stderr,
         )
-    poller = Poller(config=config, store=store, client=GitHubClient(config), graph=build_graph(config))
+    poller = Poller(
+        config=config,
+        store=store,
+        client=GitHubClient(config),
+        graph=build_graph(config),
+        goose_runner=GooseRunner(config),
+    )
 
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()

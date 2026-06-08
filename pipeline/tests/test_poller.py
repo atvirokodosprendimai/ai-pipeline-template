@@ -209,6 +209,33 @@ def test_restart_mid_flight_resumes_persisted_stage_without_double_work(tmp_path
     assert graph.calls == ["spec"]
 
 
+def test_advance_one_stage_injects_goose_runner_and_repo_path(tmp_path, cfg: Config) -> None:
+    class InspectingGraph(Graph):
+        def __init__(self) -> None:
+            super().__init__()
+            self.seen_state = None
+
+        def spec(self, state):
+            self.calls.append("spec")
+            self.seen_state = dict(state)
+            return {**state, "spec_path": "specs/issue-17-spec.md"}
+
+    graph = InspectingGraph()
+    repo_path = tmp_path / "wgmesh"
+    runner = object()
+    spec_only = Config(target_repo=cfg.target_repo, mode="spec-only", repo_path=str(repo_path))
+    store = StateStore(tmp_path / "state.db")
+    store.upsert_issue(17, "Already triaged", stage="triaged")
+    p = Poller(config=spec_only, store=store, client=EmptyClient(spec_only), graph=graph, goose_runner=runner)
+
+    p._advance_one_stage(store.get_issue(17))
+
+    assert graph.seen_state is not None
+    assert graph.seen_state["goose_runner"] is runner
+    assert graph.seen_state["repo_path"] == repo_path
+    assert graph.seen_state["config"] is spec_only
+
+
 def test_specced_issue_opens_spec_pr_then_stops_in_spec_only(tmp_path, cfg: Config) -> None:
     spec_only = Config(target_repo=cfg.target_repo, mode="spec-only", max_files=cfg.max_files)
     p = poller(tmp_path, spec_only)
