@@ -1,0 +1,29 @@
+pipeline/wgmesh_pipeline/state/store.py
+  s_403b655a6daaae::t_04cb453dc29fee 270-273,275-278,282-284,292,295-296
+pipeline/wgmesh_pipeline/scoring.py
+  s_403b655a6daaae::t_e4523bfa6bb4c3 104-106,112-114
+.github/workflows/pipeline-error-rate.yml
+  s_403b655a6daaae::t_28b4f09fc11e2c 116-118,120,122
+  s_403b655a6daaae::t_38a90101a42bd0 134-153
+pipeline/tests/test_scoring.py
+  s_403b655a6daaae::t_9abb919d0bfc31 218-245
+pipeline/tests/test_state.py
+  s_403b655a6daaae::t_9abb919d0bfc31 206-207,209-210,212-218
+  s_403b655a6daaae::t_67a432885ee938 208,211
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "ae21d9c15fa659e9c03b5e5ded9ebdc4418ba3cd",
+  "prompts": {},
+  "sessions": {
+    "s_403b655a6daaae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d88b5efe-79e0-419a-9f1b-6e46c07d8d55",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
