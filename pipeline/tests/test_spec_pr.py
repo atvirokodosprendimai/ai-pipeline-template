@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -9,7 +10,9 @@ import pytest
 from wgmesh_pipeline.config import Config
 from wgmesh_pipeline.github.client import GitHubIssue
 from wgmesh_pipeline.graph.build import CompiledGraph
+from wgmesh_pipeline.graph.nodes.spec import spec_node
 from wgmesh_pipeline.graph.nodes.spec_pr import spec_pr_node
+from wgmesh_pipeline.goose.runner import GooseResult
 
 
 class RecordingClient:
@@ -19,6 +22,7 @@ class RecordingClient:
         self.prs: list[dict[str, Any]] = []
         self.added: list[tuple[int, str]] = []
         self.removed: list[tuple[int, str]] = []
+        self.create_pr_targets: list[str] = []
 
     def push_branch(self, clone_path: str, branch: str, *, spec_pr: bool = False) -> dict[str, Any]:
         self.pushed.append((clone_path, branch))
@@ -26,6 +30,7 @@ class RecordingClient:
 
     def create_pr(self, **kwargs: Any) -> dict[str, Any]:
         self.prs.append(kwargs)
+        self.create_pr_targets.append(self.config.target_repo)
         return {"number": 42}
 
     def remove_label(self, issue_number: int, label: str, *, spec_pr: bool = False) -> dict[str, Any]:
@@ -76,6 +81,60 @@ def test_spec_pr_node_creates_exact_spec_title_and_swaps_labels(tmp_path: Path, 
     assert client.removed == [(17, "needs-triage")]
     assert client.added == [(17, "copilot-triaging")]
     assert result["visited"] == ["spec_pr"]
+
+
+class WritingRunner:
+    def run_recipe(self, *, recipe, workdir, params, expected_output):
+        output = Path(workdir) / expected_output
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(
+            "# Issue 17 Spec\n\n"
+            "## Summary\nFix mesh discovery.\n\n"
+            "## Context\nThe issue needs a structured implementation spec.\n\n"
+            "## Requirements\n- Preserve existing discovery behavior.\n\n"
+            "## Acceptance Criteria\n- The discovery fix is covered.\n\n"
+            "## Out of scope\n- Unrelated networking changes.\n"
+        )
+        return GooseResult(ok=True, output_path=output, duration_seconds=0.01, raw_log="ok")
+
+
+def test_spec_to_spec_pr_commits_spec_file_and_targets_wgmesh(tmp_path: Path) -> None:
+    cfg = Config(target_repo="atvirokodosprendimai/wgmesh", mode="spec-only", repo_path=str(tmp_path))
+    _git(tmp_path, "init")
+    _git(tmp_path, "config", "user.email", "bot@example.invalid")
+    _git(tmp_path, "config", "user.name", "wgmesh bot")
+    _git(tmp_path, "remote", "add", "origin", "https://github.com/atvirokodosprendimai/wgmesh.git")
+
+    client = RecordingClient(cfg)
+    issue_17 = issue()
+    spec_state = spec_node(
+        {
+            "issue": issue_17,
+            "repo_path": tmp_path,
+            "goose_runner": WritingRunner(),
+            "config": cfg,
+        }
+    )
+    result = spec_pr_node({**spec_state, "github": client})
+
+    assert result["spec_pr"] == 42
+    assert result["spec_branch"] == "bot/spec-17"
+    assert client.create_pr_targets == ["atvirokodosprendimai/wgmesh"]
+    assert client.prs[0]["head"] == "bot/spec-17"
+    assert client.pushed == [(str(tmp_path), "bot/spec-17")]
+    assert (tmp_path / "specs/issue-17-spec.md").exists()
+    assert _git(tmp_path, "branch", "--show-current").stdout.strip() == "bot/spec-17"
+    assert _git(tmp_path, "log", "--format=%s", "-1").stdout.strip() == "spec: Issue #17 - Fix mesh discovery"
+
+
+def _git(repo_path: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["git", *args],
+        cwd=repo_path,
+        check=True,
+        text=True,
+        capture_output=True,
+    )
 
 
 def test_spec_only_graph_halts_after_spec_pr_before_implementation(cfg: Config) -> None:

@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Literal, TypedDict
 
+from wgmesh_pipeline.config import Config
 from wgmesh_pipeline.github.client import GitHubClient, GitHubIssue
 
 
@@ -30,3 +31,4 @@ class GraphState(TypedDict, total=False):
     repo_path: str | Path
     goose_runner: Any
     impl_pr: int
+    config: Config

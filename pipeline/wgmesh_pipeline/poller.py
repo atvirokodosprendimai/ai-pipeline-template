@@ -4,6 +4,7 @@ import asyncio
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from pathlib import Path
 
 from wgmesh_pipeline.config import Config
 from wgmesh_pipeline.github.client import GitHubClient, GitHubIssue
@@ -21,6 +22,7 @@ class Poller:
     store: StateStore
     client: GitHubClient
     graph: object
+    goose_runner: object | None = None
     scratch: dict[int, dict] = field(default_factory=dict)
     last_reconcile_error: str | None = None
 
@@ -69,7 +71,15 @@ class Poller:
 
     def _advance_one_stage(self, issue: IssueRecord) -> IssueRecord:
         graph_issue = GitHubIssue(number=issue.number, title=issue.title, labels=(), state=issue.status)
-        state = {**self.scratch.get(issue.number, {}), "issue": graph_issue, "github": self.client}
+        state = {
+            **self.scratch.get(issue.number, {}),
+            "issue": graph_issue,
+            "github": self.client,
+            "config": self.config,
+            "repo_path": Path(self.config.repo_path),
+        }
+        if self.goose_runner is not None:
+            state["goose_runner"] = self.goose_runner
         if issue.impl_pr is not None:
             state["impl_pr"] = issue.impl_pr
         if issue.spec_pr is not None:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
+from pathlib import Path
 
 import pytest
 
@@ -27,6 +28,9 @@ def test_full_env_loads_frozen_config_with_shadow_default() -> None:
     assert cfg.poll_interval_seconds == 60
     assert cfg.max_files == 5
     assert cfg.database_mode == "local"
+    assert cfg.repo_path == "/opt/wgmesh-checkout"
+    assert Path(cfg.recipes_dir).name == "recipes"
+    assert Path(cfg.recipes_dir).parent.name == "pipeline"
 
     with pytest.raises(FrozenInstanceError):
         cfg.mode = "live"  # type: ignore[misc]
@@ -83,3 +87,18 @@ def test_database_mode_explicit_no_silent_fallback() -> None:
     assert cfg.database_mode == "turso"
     assert cfg.turso_url == "libsql://db.turso.io"
 
+
+def test_wgmesh_checkout_path_env_and_recipes_dir_override() -> None:
+    cfg = load_config(
+        {
+            "TARGET_REPO": "atvirokodosprendimai/wgmesh",
+            "PIPELINE_MODE": "spec-only",
+            "DATABASE_MODE": "local",
+            "WGMESH_BOT_PAT": "token",
+            "WGMESH_CHECKOUT_PATH": "/tmp/wgmesh",
+            "RECIPES_DIR": "/tmp/recipes",
+        }
+    )
+
+    assert cfg.repo_path == "/tmp/wgmesh"
+    assert cfg.recipes_dir == "/tmp/recipes"

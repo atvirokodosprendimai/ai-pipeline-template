@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from wgmesh_pipeline.config import DEFAULT_RECIPES_DIR
 from wgmesh_pipeline.graph.state import GraphState
 
 
@@ -19,10 +20,17 @@ def spec_node(state: GraphState) -> GraphState:
         next_state["spec_path"] = str(spec_rel)
         return next_state
 
+    config = next_state.get("config")
+    recipes_dir = Path(getattr(config, "recipes_dir", DEFAULT_RECIPES_DIR))
+    recipe_path = recipes_dir / "wgmesh-triage-spec.yaml"
     result = runner.run_recipe(
-        recipe="wgmesh-triage-spec.yaml",
+        recipe=recipe_path,
         workdir=repo_path,
-        params={"spec_file": str(spec_rel)},
+        params={
+            "issue_number": str(issue.number),
+            "issue_title": issue.title,
+            "spec_file": str(spec_rel),
+        },
         expected_output=spec_rel,
     )
     if not result.ok:
@@ -33,4 +41,3 @@ def spec_node(state: GraphState) -> GraphState:
 
 def _visit(state: dict, node: str) -> None:
     state.setdefault("visited", []).append(node)
-

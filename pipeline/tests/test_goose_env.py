@@ -62,6 +62,8 @@ def test_build_goose_env_allowlist_drops_secrets_keeps_safe_and_llm_cred() -> No
     # the single LLM credential Goose needs is added back explicitly
     assert env["ANTHROPIC_API_KEY"] == "zai-secret"
     assert env["ANTHROPIC_HOST"].endswith("/anthropic")
+    assert env["GOOSE_PROVIDER"] == "anthropic"
+    assert env["GOOSE_MODEL"]
 
 
 def test_build_goose_env_only_anthropic_key_is_secret_shaped() -> None:
@@ -80,3 +82,17 @@ def test_build_goose_env_without_zai_key_omits_anthropic_key() -> None:
     env = build_goose_env(_Cfg(zai_api_key=None), base_env={"PATH": "/usr/bin"})
     assert "ANTHROPIC_API_KEY" not in env
     assert env["ANTHROPIC_HOST"]
+
+
+def test_build_goose_env_prefers_explicit_goose_provider_model_from_base_env() -> None:
+    env = build_goose_env(
+        _Cfg(),
+        base_env={
+            "PATH": "/usr/bin",
+            "GOOSE_PROVIDER": "anthropic",
+            "GOOSE_MODEL": "custom-zai-model",
+        },
+    )
+
+    assert env["GOOSE_PROVIDER"] == "anthropic"
+    assert env["GOOSE_MODEL"] == "custom-zai-model"
