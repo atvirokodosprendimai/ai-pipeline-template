@@ -1,0 +1,21 @@
+pipeline/tests/test_spec_node.py
+  s_403b655a6daaae::t_8434eb94edfa6c 77-103
+pipeline/wgmesh_pipeline/graph/nodes/spec.py
+  s_403b655a6daaae::t_91b45877ba37e2 54-58,62-69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "42990ac96cc13f7651bdd6f2d0f92a5ad36f591d",
+  "prompts": {},
+  "sessions": {
+    "s_403b655a6daaae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d88b5efe-79e0-419a-9f1b-6e46c07d8d55",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
