@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from wgmesh_pipeline.config import DEFAULT_RECIPES_DIR
 from wgmesh_pipeline.graph.state import GraphState
+
+log = logging.getLogger("wgmesh_pipeline.spec")
 
 
 def spec_node(state: GraphState) -> GraphState:
@@ -34,6 +37,13 @@ def spec_node(state: GraphState) -> GraphState:
         expected_output=spec_rel,
     )
     if not result.ok:
+        # Surface goose's actual output so a write-tool/model/recipe failure is
+        # diagnosable from the journal instead of just "empty output guard".
+        raw = (getattr(result, "raw_log", "") or "")[-2000:]
+        log.error(
+            "goose spec failed for #%s: error=%s recipe=%s workdir=%s\n--- goose raw_log (tail) ---\n%s",
+            issue.number, result.error, recipe_path, repo_path, raw,
+        )
         raise RuntimeError(result.error or "goose spec failed")
     next_state["spec_path"] = str(result.output_path)
     return next_state
