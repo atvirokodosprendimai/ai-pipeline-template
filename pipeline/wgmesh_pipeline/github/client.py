@@ -68,7 +68,11 @@ class GitHubClient:
             f"/repos/{self.config.owner}/{self.config.repo}/issues",
             params={"state": "open"},
         )
-        return [_parse_issue(item) for item in data]
+        # GitHub's issues endpoint returns pull requests too (they carry a
+        # "pull_request" key). Skip them — reconciling the box's own spec PRs
+        # as issues caused a runaway: spec-of-spec PRs with exploding chained
+        # titles (bug #11).
+        return [_parse_issue(item) for item in data if "pull_request" not in item]
 
     def get_pr(self, number: int) -> dict[str, Any]:
         return self._request("GET", f"/repos/{self.config.owner}/{self.config.repo}/pulls/{number}")

@@ -209,3 +209,27 @@ def test_spec_only_allows_spec_branch_push_and_label_swap(cfg: Config, tmp_path,
 
     assert pushes == [(["git", "push", "origin", "bot/spec-17"], str(tmp_path))]
     assert [call["method"] for call in session.calls] == ["DELETE", "POST"]
+
+
+def test_list_open_issues_filters_out_pull_requests(cfg: Config) -> None:
+    """GitHub's issues endpoint returns PRs too (they carry a pull_request
+    key). They must be filtered, else the box reconciles its own spec PRs as
+    issues and recurses into spec-of-spec PRs (bug #11)."""
+    session = Session(
+        Response(
+            [
+                {"number": 10, "title": "Real issue", "labels": [], "state": "open"},
+                {
+                    "number": 667,
+                    "title": "spec: Issue #652 - ...",
+                    "labels": [],
+                    "state": "open",
+                    "pull_request": {"url": "https://api.github.com/.../pulls/667"},
+                },
+            ]
+        )
+    )
+
+    issues = GitHubClient(cfg, session=session).list_open_issues()
+
+    assert [i.number for i in issues] == [10]
