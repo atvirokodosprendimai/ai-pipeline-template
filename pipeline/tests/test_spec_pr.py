@@ -238,3 +238,38 @@ def test_live_graph_continues_past_spec_pr_to_gate(cfg: Config) -> None:
 
     assert result["decision"] == "merge"
     assert calls == ["triage", "spec", "spec_pr", "implement", "review", "gate"]
+
+
+def _resp(code: int):
+    import requests
+    r = requests.Response()
+    r.status_code = code
+    return r
+
+
+def test_spec_pr_idempotent_reuses_existing_pr_on_422(tmp_path: Path) -> None:
+    """Retry after a partial run: create_pr 422 -> reuse the existing PR
+    instead of failing the node forever (bug #10)."""
+    from requests import HTTPError
+
+    cfg = Config(target_repo="atvirokodosprendimai/wgmesh", mode="spec-only")
+
+    class Reraiser(RecordingClient):
+        def create_pr(self, **kwargs):
+            raise HTTPError(response=_resp(422))
+
+        def find_open_pr_number(self, head_branch: str):
+            return 667
+
+        def remove_label(self, issue_number, label, *, spec_pr=False):
+            raise HTTPError(response=_resp(404))  # label already gone -> tolerated
+
+    client = Reraiser(cfg)
+    state = {
+        "issue": GitHubIssue(number=652, title="Fix CI", labels=(), state="open"),
+        "github": client,
+        "repo_path": str(tmp_path),
+        "spec_path": "specs/issue-652-spec.md",
+    }
+    result = spec_pr_node(state)  # must not raise
+    assert result["spec_pr"] == 667

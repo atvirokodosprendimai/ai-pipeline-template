@@ -4,7 +4,14 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from requests import HTTPError
+
 from wgmesh_pipeline.graph.state import GraphState
+
+
+def _status(exc: HTTPError) -> int | None:
+    resp = getattr(exc, "response", None)
+    return getattr(resp, "status_code", None) if resp is not None else None
 
 
 GIT_TIMEOUT_SECONDS = 120
@@ -35,18 +42,32 @@ def spec_pr_node(state: GraphState) -> GraphState:
         _prepare_spec_branch(repo_path, branch, spec_rel, title)
 
     client.push_branch(str(repo_path), branch, spec_pr=True)
-    result = client.create_pr(
-        title=title,
-        head=branch,
-        base="main",
-        body=_spec_pr_body(issue.number, spec_rel),
-        spec_pr=True,
-    )
-    pr_number = _pr_number(result)
+    # Idempotent create: a retry after a partial run (PR already opened, then a
+    # later step failed) hits 422 "a pull request already exists"; reuse it
+    # instead of failing the node forever.
+    try:
+        result = client.create_pr(
+            title=title,
+            head=branch,
+            base="main",
+            body=_spec_pr_body(issue.number, spec_rel),
+            spec_pr=True,
+        )
+        pr_number = _pr_number(result)
+    except HTTPError as exc:
+        if _status(exc) == 422:
+            pr_number = client.find_open_pr_number(branch)
+        else:
+            raise
     if pr_number is None:
         raise RuntimeError("spec PR creation did not return a PR number")
 
-    client.remove_label(issue.number, "needs-triage", spec_pr=True)
+    # needs-triage may already be gone from a prior partial run -> tolerate 404.
+    try:
+        client.remove_label(issue.number, "needs-triage", spec_pr=True)
+    except HTTPError as exc:
+        if _status(exc) != 404:
+            raise
     client.add_label(issue.number, "copilot-triaging", spec_pr=True)
     next_state["spec_branch"] = branch
     next_state["spec_pr"] = pr_number

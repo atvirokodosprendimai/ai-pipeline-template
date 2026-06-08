@@ -73,6 +73,19 @@ class GitHubClient:
     def get_pr(self, number: int) -> dict[str, Any]:
         return self._request("GET", f"/repos/{self.config.owner}/{self.config.repo}/pulls/{number}")
 
+    def find_open_pr_number(self, head_branch: str) -> int | None:
+        """Open PR number for a head branch, or None. Used to make spec PR
+        creation idempotent: a retry after a partial run hits create_pr 422
+        ('a pull request already exists') and reuses the existing PR."""
+        owner = self.config.owner
+        resp = self._request(
+            "GET",
+            f"/repos/{owner}/{self.config.repo}/pulls?head={owner}:{head_branch}&state=open",
+        )
+        if isinstance(resp, list) and resp and resp[0].get("number") is not None:
+            return int(resp[0]["number"])
+        return None
+
     def get_diff(self, pr_number: int) -> str:
         return self._request(
             "GET",
