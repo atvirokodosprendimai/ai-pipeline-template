@@ -1,25 +1,25 @@
 {
-  "last_run_at": "2026-06-08T08:59:51Z",
+  "last_run_at": "2026-06-08T15:51:46Z",
   "last_run_top_ids": [
     "atvirokodosprendimai/ai-pipeline-template#740",
     "atvirokodosprendimai/ai-pipeline-template#742",
     "atvirokodosprendimai/ai-pipeline-template#745"
   ],
   "rank_changed": false,
-  "run_number": 7,
+  "run_number": 8,
   "issue_number": 934,
   "issue_url": "https://github.com/atvirokodosprendimai/ai-pipeline-template/issues/934",
   "stage_summary": {
-    "triage": 13,
-    "spec": 3,
+    "triage": 9,
+    "spec": 11,
     "build": 0,
-    "review": 6,
+    "review": 7,
     "merge": 0,
     "verify": 0,
     "revenue": 0,
-    "unknown": 3
+    "unknown": 7
   },
-  "unknown_count": 3,
+  "unknown_count": 7,
   "top_actions": [
     {
       "id": "atvirokodosprendimai/ai-pipeline-template#740",
@@ -42,5 +42,5 @@
       "action": "bounce-label"
     }
   ],
-  "material_fingerprint": "c8741e10da5f76d95a346ab0dc5c35744888a03e0c204739844905c457b6f7c7"
+  "material_fingerprint": "912f54c68ee79a0652e38421f4f8c621d2825ffdd8202b27b5cf177b0004f087"
 }
