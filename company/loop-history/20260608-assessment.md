@@ -1,24 +1,23 @@
 # Assessment: 2026-06-08
 
-**Stage**: Revenue | **Run**: 235
+**Stage**: Revenue | **Run**: 236
 
-Stage 5, day 82. Company maintains revenue stream with consistent orders, but critical gap persists: all seed cloudroof products have 0 subscribers while revenue flows from separate product line. Product stable (v0.2.1, 18 stars) but CI failure blocking merge pipeline needs immediate resolution.
+Stage 5, day 82. wgmesh remains technically excellent (v0.2.1, 18 stars, functional mesh architecture) with healthy pipeline (3 PRs, 6 issues). Critical clarification: org-level revenue exists from non-seed products, but the actual wgmesh/cloudroof products have 0 subscribers despite functional Polar integration. Pipeline is moderately active, not idle.
 
 ## Blockers
-- CI failure blocking merge pipeline and development velocity
-- Revenue attribution gap: seed wgmesh/cloudroof products have 0 subscribers despite functional product and billing integration
-- No bridge between successful revenue product and wgmesh/cloudroof offering
+- Seed products (cloudroof tier) have 0 subscribers despite functional billing - no external customer adoption yet
+- Revenue attribution unclear - need to distinguish wgmesh product revenue from other business line revenue
 
 ## Top Actions
-- **fn:dev**: Investigate and fix CI failure blocking merge pipeline (zero)
-- **fn:gtm**: Create internal wgmesh production deployment case study with concrete metrics (zero)
-- **fn:dev**: Add Polar checkout CTAs to wgmesh.dev and cloudroof.eu landing pages (zero)
+- **fn:gtm**: Create comprehensive wgmesh pilot evaluation framework with concrete network administrator checklist and success criteria (zero)
+- **fn:dev**: Fix key rotation bug that changes node IP addresses affecting production reliability (zero)
+- **fn:gtm**: Document internal wgmesh usage with specific metrics and concrete networking benefits achieved (zero)
 
 ## Contributions
-- **Marty**: Recent git commits maintaining codebase stability over past 7 days
-- **pupabobas[bot]**: 70 bot commits in past 7 days maintaining pipeline operations and CI/CD workflows
-- **github-community**: Project reached 18 stars and 2 forks, showing sustained organic interest
-- **polar-customers**: 5 active subscribers maintaining revenue stream with recent orders
+- **Marty**: Git commits maintaining codebase stability over past week
+- **pupabobas[bot]**: 71 bot commits in past 7 days driving high development velocity
+- **GitHub community**: Project grew to 18 stars and 2 forks showing increasing interest
+- **external-customers**: 5 active subscribers maintaining revenue stream for organization
 
 ## Needs Human
-- [soon] Clarify business relationship between revenue-generating product (8e8e1c33-cd06-4652-9032-6cb3b49ec6b4) and wgmesh/cloudroof seed products
+- [soon] Clarify business relationship between paying product ID 8e8e1c33-cd06-4652-9032-6cb3b49ec6b4 and the wgmesh/cloudroof product line for accurate funnel stage assessment
