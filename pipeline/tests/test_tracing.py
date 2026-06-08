@@ -129,3 +129,41 @@ def test_key_unset_noop_still_runs_node_normally() -> None:
 
     assert result["classification"] == "feature"
 
+
+
+def test_langfuse_span_groups_into_issue_session(monkeypatch) -> None:
+    """All of an issue's stage spans are created inside
+    propagate_attributes(session_id=issue-<N>) so they group into one Langfuse
+    session (the issue's pipeline lifecycle)."""
+    import contextlib
+    import langfuse as lf_mod
+
+    calls = {}
+
+    @contextlib.contextmanager
+    def fake_propagate(*, session_id=None, **kw):
+        calls["session_id"] = session_id
+        yield
+
+    monkeypatch.setattr(lf_mod, "propagate_attributes", fake_propagate, raising=False)
+
+    _LangfuseSpan(_FakeLangfuseV4(), "triage", {"x": 1}, {"stage": "triage", "issue": "584"})
+    assert calls.get("session_id") == "issue-584"
+
+
+def test_langfuse_span_no_issue_uses_no_session(monkeypatch) -> None:
+    import contextlib
+    import langfuse as lf_mod
+
+    calls = {"used": False}
+
+    @contextlib.contextmanager
+    def fake_propagate(*, session_id=None, **kw):
+        calls["used"] = True
+        yield
+
+    monkeypatch.setattr(lf_mod, "propagate_attributes", fake_propagate, raising=False)
+    lf = _FakeLangfuseV4()
+    _LangfuseSpan(lf, "triage", {}, {"stage": "triage"})  # no issue tag
+    assert calls["used"] is False
+    assert lf.record["name"] == "triage"  # span still created

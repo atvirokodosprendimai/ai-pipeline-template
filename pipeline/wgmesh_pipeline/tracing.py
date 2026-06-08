@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 import time
-from contextlib import AbstractContextManager
+from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass
 from typing import Any, Callable, Protocol, TypeVar
 
@@ -10,6 +10,21 @@ from wgmesh_pipeline.config import Config
 
 
 T = TypeVar("T")
+
+
+def _session_ctx(issue: str | None):
+    """Group all of an issue's stage spans under one Langfuse session.
+    propagate_attributes(session_id=...) tags every span created within the
+    context; one session per issue = that issue's full pipeline lifecycle.
+    Guarded: a missing/changed SDK symbol must never break tracing."""
+    if not issue:
+        return nullcontext()
+    try:
+        from langfuse import propagate_attributes  # public v4 API
+
+        return propagate_attributes(session_id=f"issue-{issue}")
+    except Exception:
+        return nullcontext()
 
 
 class Span(Protocol):
@@ -59,11 +74,13 @@ class _LangfuseSpan:
         try:
             # langfuse v4 dropped the client-level `start_span`; the equivalent
             # is `start_observation(..., as_type="span")`. Fall back to the v3
-            # name so a downgraded SDK keeps working.
-            if hasattr(lf, "start_observation"):
-                self._span = lf.start_observation(name=name, as_type="span", input=inputs, metadata=tags)
-            else:
-                self._span = lf.start_span(name=name, input=inputs, metadata=tags)
+            # name so a downgraded SDK keeps working. Create the span inside the
+            # issue's session context so all its stage spans group together.
+            with _session_ctx(tags.get("issue")):
+                if hasattr(lf, "start_observation"):
+                    self._span = lf.start_observation(name=name, as_type="span", input=inputs, metadata=tags)
+                else:
+                    self._span = lf.start_span(name=name, input=inputs, metadata=tags)
         except Exception as exc:  # never raise into the loop
             self._span = None
             self._announce(exc)
