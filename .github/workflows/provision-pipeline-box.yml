@@ -173,7 +173,7 @@ jobs:
           ZAI_API_KEY=$ANTHROPIC_API_KEY
           ANTHROPIC_HOST=https://api.z.ai/api/anthropic
           GOOSE_PROVIDER=anthropic
-          GOOSE_MODEL=GLM-4.7
+          GOOSE_MODEL=glm-4.6
           WGMESH_CHECKOUT_PATH=/opt/wgmesh-checkout
           DATABASE_MODE=$DBMODE
           PIPELINE_DB_PATH=/opt/wgmesh-pipeline/state.db
