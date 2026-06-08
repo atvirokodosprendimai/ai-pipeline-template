@@ -1,0 +1,60 @@
+name: Diagnose Pipeline
+
+# Read-only gitops probe of the pipeline box's durable Turso state. Surfaces
+# where issues are stuck (stage/attempts/last_error) and recent run outcomes,
+# so the autonomous box can be diagnosed without SSH access to the host.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate secrets
+        env:
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+          : "${TURSO_DATABASE_URL:?}"; : "${TURSO_AUTH_TOKEN:?}"
+
+      - name: Query Turso state
+        env:
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+          python -m pip install -q 'libsql>=0.1'
+          python - <<'PY'
+          import os, libsql
+          conn = libsql.connect(database=os.environ["TURSO_DATABASE_URL"],
+                                auth_token=os.environ["TURSO_AUTH_TOKEN"])
+
+          def rows(sql):
+              cur = conn.execute(sql)
+              return cur.fetchall()
+
+          print("=== ISSUES (queue) ===")
+          print("number | stage | classification | attempts | spec_pr | impl_pr | updated_at | last_error")
+          for r in rows("SELECT number, stage, classification, attempts, spec_pr, impl_pr, "
+                        "updated_at, substr(coalesce(last_error,''),1,400) "
+                        "FROM issues ORDER BY updated_at DESC"):
+              print(r)
+
+          print("\n=== STAGE HISTOGRAM ===")
+          for r in rows("SELECT stage, count(*) FROM issues GROUP BY stage ORDER BY 2 DESC"):
+              print(r)
+
+          print("\n=== RECENT RUNS (last 40) ===")
+          print("issue | node | outcome | started")
+          for r in rows("SELECT issue, node, outcome, started FROM runs ORDER BY id DESC LIMIT 40"):
+              print(r)
+
+          print("\n=== RUN OUTCOME HISTOGRAM ===")
+          for r in rows("SELECT node, outcome, count(*) FROM runs GROUP BY node, outcome ORDER BY 3 DESC"):
+              print(r)
+          PY
