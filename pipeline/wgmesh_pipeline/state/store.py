@@ -267,12 +267,21 @@ class StateStore:
                 "error_rate": error / total if total else 0.0,
             }
 
+        # Window the issue-level counts by updated_at the same way as run rates.
+        # Without the window these counts are monotonic ('failed' is terminal and
+        # last_error is never cleared), so the alert would latch permanently red
+        # and never self-recover once any issue ever failed.
         failed_issues = int(
-            self._conn.execute("SELECT COUNT(*) AS count FROM issues WHERE stage = 'failed'").fetchone()["count"]
+            self._conn.execute(
+                "SELECT COUNT(*) AS count FROM issues WHERE stage = 'failed' AND updated_at >= ?",
+                (cutoff,),
+            ).fetchone()["count"]
         )
         issues_with_last_error = int(
             self._conn.execute(
-                "SELECT COUNT(*) AS count FROM issues WHERE last_error IS NOT NULL AND last_error != ''"
+                "SELECT COUNT(*) AS count FROM issues "
+                "WHERE last_error IS NOT NULL AND last_error != '' AND updated_at >= ?",
+                (cutoff,),
             ).fetchone()["count"]
         )
         last_error_rows = self._conn.execute(
@@ -280,9 +289,11 @@ class StateStore:
             SELECT number, stage, substr(last_error, 1, 400) AS last_error
             FROM issues
             WHERE last_error IS NOT NULL AND last_error != ''
+              AND updated_at >= ?
             ORDER BY updated_at DESC, number ASC
             LIMIT 20
-            """
+            """,
+            (cutoff,),
         ).fetchall()
         return {
             "nodes": nodes,

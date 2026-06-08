@@ -113,11 +113,13 @@ jobs:
             exit 1
           fi
 
+          # List API (strongly consistent) + exact-title jq, NOT --search: the
+          # Search API is eventually-consistent and mis-tokenizes colon/symbol
+          # titles like this one, returning 0 and creating a new issue every run.
           existing="$(gh issue list --repo "$GITHUB_REPOSITORY" \
-            --state open \
-            --search "$TITLE in:title" \
+            --state open --limit 200 \
             --json number,title \
-            --jq '.[] | select(.title == "pipeline: box error-rate > 0") | .number' \
+            --jq ".[] | select(.title == \"$TITLE\") | .number" \
             | head -n 1)"
 
           if [ -n "$existing" ]; then
@@ -129,3 +131,23 @@ jobs:
           fi
 
           exit 1
+
+      - name: Auto-close tracking issue when recovered
+        if: steps.stats.outputs.alert == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TITLE: "pipeline: box error-rate > 0"
+        run: |
+          set -euo pipefail
+          # The windowed stats are clean -> if a tracking issue is open, the box
+          # has recovered; close it so the alert self-resolves (List API exact
+          # title, same dedup discipline as the open path).
+          existing="$(gh issue list --repo "$GITHUB_REPOSITORY" \
+            --state open --limit 200 \
+            --json number,title \
+            --jq ".[] | select(.title == \"$TITLE\") | .number" \
+            | head -n 1)"
+          if [ -n "$existing" ]; then
+            gh issue close "$existing" --repo "$GITHUB_REPOSITORY" \
+              --comment "Pipeline error-rate back to 0 over the window — auto-resolved."
+          fi

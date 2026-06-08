@@ -101,11 +101,17 @@ class LangfuseScorer:
                 **kwargs,
             )
             self._lf.flush()
+            # Recovered: reset the latch so a *later* failure re-announces
+            # instead of being masked by a single early transient blip.
+            type(self)._warned = False
         except Exception as exc:
             self._announce(exc)
 
     @classmethod
     def _announce(cls, exc: BaseException) -> None:
+        # Announce on the healthy->degraded transition (reset to False on a
+        # successful score), not once-ever — a one-shot latch tripped by a
+        # startup blip would silence a genuine sustained outage afterward.
         if not cls._warned:
             cls._warned = True
             print(f"[scoring] langfuse score failed, scoring degraded: {exc!r}", file=sys.stderr)

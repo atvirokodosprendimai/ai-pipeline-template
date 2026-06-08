@@ -215,3 +215,31 @@ def test_score_run_never_raises_on_malformed_state() -> None:
     bad_state = {"issue": _BadIssue(), "review_findings": 123}
     scores = score_run(bad_state, outcome="merged", scorer=_RecordingScorer())
     assert scores["outcome"] == "merged"
+
+
+def test_langfuse_record_reannounces_after_recovery(monkeypatch, capsys) -> None:
+    """Announce on healthy->degraded transition, not once-ever: a success
+    resets the latch so a later failure re-announces (sustained outage stays
+    visible after an early transient blip)."""
+    LangfuseScorer._warned = False
+
+    class _Toggle(_FakeLangfuse):
+        def __init__(self) -> None:
+            super().__init__()
+            self.fail = True
+
+        def create_score(self, **kwargs) -> None:
+            if self.fail:
+                raise RuntimeError("langfuse down")
+            super().create_score(**kwargs)
+
+    client = _Toggle()
+    scorer = _install_fake_langfuse(monkeypatch, client)
+    scorer.record(issue=1, outcome="failed", scores={}, tags={})   # fail -> announce #1
+    client.fail = False
+    scorer.record(issue=1, outcome="merged", scores={}, tags={})   # success -> reset latch
+    client.fail = True
+    scorer.record(issue=1, outcome="failed", scores={}, tags={})   # fail -> announce #2
+    err = capsys.readouterr().err
+    assert err.count("scoring degraded") == 2
+    LangfuseScorer._warned = False

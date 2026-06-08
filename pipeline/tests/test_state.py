@@ -203,3 +203,16 @@ def test_error_stats_zero_error_store_returns_zero_rates(tmp_path) -> None:
     assert stats["issues_with_last_error"] == 0
     assert stats["nodes"]["queued"]["error_rate"] == 0.0
     assert stats["last_errors"] == []
+
+
+def test_error_stats_failed_issue_outside_window_self_clears(tmp_path) -> None:
+    """Windowed issue counts so the error-rate alert self-recovers: a failed
+    issue last touched before the window must not keep the alert latched red."""
+    db = store(tmp_path)
+    now = datetime(2026, 6, 8, 12, 0, 0, tzinfo=timezone.utc)
+    db.upsert_issue(1, "old failure", stage="failed", updated_at=now - timedelta(minutes=30))
+    stats = db.error_stats(timedelta(minutes=15), now=now)
+    assert stats["failed_issues"] == 0
+    db.upsert_issue(2, "recent failure", stage="failed", updated_at=now - timedelta(minutes=5))
+    stats2 = db.error_stats(timedelta(minutes=15), now=now)
+    assert stats2["failed_issues"] == 1
