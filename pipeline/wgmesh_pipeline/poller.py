@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
@@ -10,6 +11,8 @@ from wgmesh_pipeline.github.reconcile import reconcile_issues
 from wgmesh_pipeline.graph.nodes.gate import apply_gate_side_effects, gate_node
 from wgmesh_pipeline.scoring import score_run
 from wgmesh_pipeline.state.store import IssueRecord, StateStore
+
+log = logging.getLogger("wgmesh_pipeline.poller")
 
 
 @dataclass
@@ -32,11 +35,20 @@ class Poller:
 
     async def tick(self) -> IssueRecord | None:
         try:
-            reconcile_issues(self.client, self.store)
+            result = reconcile_issues(self.client, self.store)
             issue = self.store.claim_next(now=datetime.now(timezone.utc))
         except Exception as exc:
+            # Never silently swallow: a reconcile/claim failure here previously
+            # left the loop reconciling-but-never-advancing with the cause
+            # hidden in last_reconcile_error. Surface it loudly every tick.
             self.last_reconcile_error = str(exc)
+            log.exception("tick: reconcile/claim failed: %s", exc)
             return None
+        log.info(
+            "tick: reconcile seen=%s queued=%s; claimed=%s",
+            getattr(result, "seen", "?"), getattr(result, "queued", "?"),
+            f"#{issue.number}@{issue.stage}" if issue else "none",
+        )
         if issue is None:
             return None
 
@@ -48,9 +60,11 @@ class Poller:
             self.store.bump_attempt(issue.number, str(exc))
             self.store.record_run(issue=issue.number, node=node, started=started, ended=datetime.now(timezone.utc), outcome="error")
             score_run({**self.scratch.get(issue.number, {}), "issue": issue}, outcome="failed")
+            log.exception("tick: advance #%s@%s failed: %s", issue.number, node, exc)
             return None
 
         self.store.record_run(issue=issue.number, node=node, started=started, ended=datetime.now(timezone.utc), outcome="ok")
+        log.info("tick: advanced #%s %s -> %s", issue.number, node, getattr(advanced, "stage", "?"))
         return advanced
 
     def _advance_one_stage(self, issue: IssueRecord) -> IssueRecord:
