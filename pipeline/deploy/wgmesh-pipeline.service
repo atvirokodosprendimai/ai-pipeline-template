@@ -25,7 +25,11 @@ NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
-ReadWritePaths=/opt/wgmesh-pipeline
+# /opt/wgmesh-checkout is the wgmesh working tree goose writes specs into and
+# spec_pr commits/pushes from. ProtectSystem=strict makes everything outside
+# ReadWritePaths read-only, so goose hit "Read-only file system (os error 30)"
+# and fell back to /tmp, tripping the empty-output guard. Whitelist it.
+ReadWritePaths=/opt/wgmesh-pipeline /opt/wgmesh-checkout
 
 [Install]
 WantedBy=multi-user.target
