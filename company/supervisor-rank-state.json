@@ -1,46 +1,46 @@
 {
-  "last_run_at": "2026-06-08T18:25:28Z",
+  "last_run_at": "2026-06-08T21:49:39Z",
   "last_run_top_ids": [
-    "atvirokodosprendimai/ai-pipeline-template#740",
-    "atvirokodosprendimai/ai-pipeline-template#742",
-    "atvirokodosprendimai/ai-pipeline-template#745"
+    "atvirokodosprendimai/ai-pipeline-template#752",
+    "atvirokodosprendimai/ai-pipeline-template#934",
+    "atvirokodosprendimai/ai-pipeline-template#736"
   ],
-  "rank_changed": false,
-  "run_number": 9,
+  "rank_changed": true,
+  "run_number": 10,
   "issue_number": 934,
   "issue_url": "https://github.com/atvirokodosprendimai/ai-pipeline-template/issues/934",
   "stage_summary": {
-    "triage": 14,
-    "spec": 17,
+    "triage": 10,
+    "spec": 8,
     "build": 0,
-    "review": 7,
+    "review": 1,
     "merge": 0,
     "verify": 0,
     "revenue": 0,
-    "unknown": 2
+    "unknown": 1
   },
-  "unknown_count": 2,
+  "unknown_count": 1,
   "top_actions": [
     {
-      "id": "atvirokodosprendimai/ai-pipeline-template#740",
+      "id": "atvirokodosprendimai/ai-pipeline-template#752",
       "action": "bounce-label"
     },
     {
-      "id": "atvirokodosprendimai/ai-pipeline-template#742",
+      "id": "atvirokodosprendimai/ai-pipeline-template#934",
       "action": "bounce-label"
     },
     {
-      "id": "atvirokodosprendimai/ai-pipeline-template#745",
-      "action": "bounce-label"
+      "id": "atvirokodosprendimai/ai-pipeline-template#736",
+      "action": "escalate-needs-human"
     },
     {
-      "id": "atvirokodosprendimai/ai-pipeline-template#746",
-      "action": "bounce-label"
+      "id": "atvirokodosprendimai/ai-pipeline-template#753",
+      "action": "manual-merge"
     },
     {
-      "id": "atvirokodosprendimai/ai-pipeline-template#748",
+      "id": "atvirokodosprendimai/wgmesh#584",
       "action": "bounce-label"
     }
   ],
-  "material_fingerprint": "1a0a6eb462d470a87d07b889458b14931ae3013768d8d0460efa4100f1827092"
+  "material_fingerprint": "4557fe5d0b3b81c2dac3b7625882d35ac1d33c58ae5aa3e6a0eff3d7936ec631"
 }
