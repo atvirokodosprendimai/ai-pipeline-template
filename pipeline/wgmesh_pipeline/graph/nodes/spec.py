@@ -39,10 +39,15 @@ def spec_node(state: GraphState) -> GraphState:
     if not result.ok:
         # Surface goose's actual output so a write-tool/model/recipe failure is
         # diagnosable from the journal instead of just "empty output guard".
-        raw = (getattr(result, "raw_log", "") or "")[-2000:]
+        raw = getattr(result, "raw_log", "") or ""
+        # Log head AND tail: the provider/API error appears at the START of
+        # goose's output; the tail-only view missed it last cycle.
+        head = raw[:6000]
+        tail = raw[-2000:] if len(raw) > 8000 else ""
         log.error(
-            "goose spec failed for #%s: error=%s recipe=%s workdir=%s\n--- goose raw_log (tail) ---\n%s",
-            issue.number, result.error, recipe_path, repo_path, raw,
+            "goose spec failed for #%s: error=%s recipe=%s workdir=%s len(raw)=%d\n"
+            "--- goose raw_log (head) ---\n%s\n--- goose raw_log (tail) ---\n%s",
+            issue.number, result.error, recipe_path, repo_path, len(raw), head, tail,
         )
         raise RuntimeError(result.error or "goose spec failed")
     next_state["spec_path"] = str(result.output_path)

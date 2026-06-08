@@ -46,3 +46,11 @@ extensions:
     display_name: Developer
     timeout: 300
     bundled: true
+
+# Pin provider/model in the recipe (goose honors recipe settings even when env
+# GOOSE_PROVIDER/GOOSE_MODEL don't take in headless --no-session runs). z.ai is
+# Anthropic-compatible via ANTHROPIC_HOST; glm-4.6 is the current valid model id
+# (GLM-4.7 did not exist — goose loaded the recipe then no-opped).
+settings:
+  goose_provider: anthropic
+  goose_model: glm-4.6
