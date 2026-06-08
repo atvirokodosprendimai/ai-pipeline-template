@@ -8,6 +8,9 @@ Type=simple
 User=wgmesh
 Group=wgmesh
 WorkingDirectory=/opt/wgmesh-pipeline
+# Unbuffered stdout so journald captures poller logs in real time (Python
+# block-buffers stdout when it is not a tty, hiding logs until exit).
+Environment=PYTHONUNBUFFERED=1
 # Secrets + config live here, root-owned chmod 600 (see .env.example).
 EnvironmentFile=/etc/wgmesh-pipeline/env
 ExecStart=/opt/wgmesh-pipeline/.venv/bin/python -m wgmesh_pipeline.main

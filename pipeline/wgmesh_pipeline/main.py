@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import logging
 import os
 import signal
 import sys
@@ -21,7 +22,17 @@ def _truthy(value: str | None) -> bool:
 
 
 async def async_main(*, reset_queue: bool = False) -> None:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s %(message)s",
+        stream=sys.stdout,
+        force=True,
+    )
     config = load_config()
+    logging.getLogger("wgmesh_pipeline").info(
+        "starting: mode=%s database_mode=%s poll_interval=%ss",
+        config.mode, config.database_mode, config.poll_interval_seconds,
+    )
     init_tracing(config)
     init_scoring(config)
     if config.database_mode == "local":
