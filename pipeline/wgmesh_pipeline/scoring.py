@@ -8,6 +8,7 @@ unset, mirroring tracing.py — scoring never crashes or blocks the loop.
 
 from __future__ import annotations
 
+import sys
 from typing import Any, Protocol
 
 from wgmesh_pipeline.config import Config
@@ -15,14 +16,26 @@ from wgmesh_pipeline.config import Config
 
 class Scorer(Protocol):
     def record(
-        self, *, issue: int, outcome: str, scores: dict[str, Any], tags: dict[str, str]
+        self,
+        *,
+        issue: int,
+        outcome: str,
+        scores: dict[str, Any],
+        tags: dict[str, str],
+        trace_id: str | None = None,
     ) -> None:
         ...
 
 
 class NoopScorer:
     def record(
-        self, *, issue: int, outcome: str, scores: dict[str, Any], tags: dict[str, str]
+        self,
+        *,
+        issue: int,
+        outcome: str,
+        scores: dict[str, Any],
+        tags: dict[str, str],
+        trace_id: str | None = None,
     ) -> None:
         return None
 
@@ -38,7 +51,13 @@ class LangSmithScorer:
         self.api_key = api_key
 
     def record(
-        self, *, issue: int, outcome: str, scores: dict[str, Any], tags: dict[str, str]
+        self,
+        *,
+        issue: int,
+        outcome: str,
+        scores: dict[str, Any],
+        tags: dict[str, str],
+        trace_id: str | None = None,
     ) -> None:
         return None
 
@@ -46,6 +65,8 @@ class LangSmithScorer:
 class LangfuseScorer:
     """Online scores into self-hosted Langfuse. Defensive — never raises into
     the loop (score_run also guards, but keep the SDK calls safe here too)."""
+
+    _warned = False
 
     def __init__(self, config: Config):
         from langfuse import Langfuse  # optional dep ([trace] extra)
@@ -57,20 +78,37 @@ class LangfuseScorer:
         )
 
     def record(
-        self, *, issue: int, outcome: str, scores: dict[str, Any], tags: dict[str, str]
+        self,
+        *,
+        issue: int,
+        outcome: str,
+        scores: dict[str, Any],
+        tags: dict[str, str],
+        trace_id: str | None = None,
     ) -> None:
         try:
             # outcome as a categorical score + the numeric auto-merge signal,
             # tagged by issue. Visible in the Langfuse Scores view.
+            kwargs: dict[str, Any] = {
+                "name": "pipeline_outcome",
+                "value": outcome,
+                "data_type": "CATEGORICAL",
+                "metadata": {"issue": issue, **scores, **tags},
+            }
+            if trace_id:
+                kwargs["trace_id"] = trace_id
             self._lf.create_score(
-                name="pipeline_outcome",
-                value=outcome,
-                data_type="CATEGORICAL",
-                metadata={"issue": issue, **scores, **tags},
+                **kwargs,
             )
             self._lf.flush()
-        except Exception:
-            pass
+        except Exception as exc:
+            self._announce(exc)
+
+    @classmethod
+    def _announce(cls, exc: BaseException) -> None:
+        if not cls._warned:
+            cls._warned = True
+            print(f"[scoring] langfuse score failed, scoring degraded: {exc!r}", file=sys.stderr)
 
 
 _scorer: Scorer = NoopScorer()
@@ -108,12 +146,8 @@ def score_run(state: dict, *, outcome: str, scorer: Scorer | None = None) -> dic
         sink = scorer if scorer is not None else _scorer
         issue = _issue_number(state)
         scores = _scores_from_state(state, outcome)
-        tags = {
-            "outcome": outcome,
-            "decision": str(state.get("decision", "")),
-            "risk_tier": str(state.get("risk_tier", "")),
-        }
-        sink.record(issue=issue, outcome=outcome, scores=scores, tags=tags)
+        tags = _tags_from_state(state, outcome)
+        sink.record(issue=issue, outcome=outcome, scores=scores, tags=tags, trace_id=_trace_id_from_state(state))
     except Exception:
         pass
     return scores
@@ -137,3 +171,27 @@ def _issue_number(state: dict) -> int:
     issue = state.get("issue")
     number = getattr(issue, "number", None)
     return int(number) if number is not None else 0
+
+
+def _tags_from_state(state: dict, outcome: str) -> dict[str, str]:
+    tags = {
+        "outcome": outcome,
+        "decision": str(state.get("decision", "")),
+        "risk_tier": str(state.get("risk_tier", "")),
+    }
+    for key in ("node", "stage", "error"):
+        value = state.get(key)
+        if value is not None:
+            tags[key] = str(value)[:200]
+    return tags
+
+
+def _trace_id_from_state(state: dict) -> str | None:
+    for key in ("trace_id", "langfuse_trace_id"):
+        value = state.get(key)
+        if value:
+            return str(value)
+    trace = state.get("trace")
+    if isinstance(trace, dict) and trace.get("id"):
+        return str(trace["id"])
+    return None

@@ -44,6 +44,7 @@ class Poller:
             # left the loop reconciling-but-never-advancing with the cause
             # hidden in last_reconcile_error. Surface it loudly every tick.
             self.last_reconcile_error = str(exc)
+            score_run(_failure_score_state("reconcile", exc), outcome="failed")
             log.exception("tick: reconcile/claim failed: %s", exc)
             return None
         log.info(
@@ -61,7 +62,7 @@ class Poller:
         except Exception as exc:
             self.store.bump_attempt(issue.number, str(exc))
             self.store.record_run(issue=issue.number, node=node, started=started, ended=datetime.now(timezone.utc), outcome="error")
-            score_run({**self.scratch.get(issue.number, {}), "issue": issue}, outcome="failed")
+            score_run({**self.scratch.get(issue.number, {}), **_failure_score_state(node, exc), "issue": issue}, outcome="failed")
             log.exception("tick: advance #%s@%s failed: %s", issue.number, node, exc)
             return None
 
@@ -156,3 +157,8 @@ class Poller:
             return advanced
 
         raise ValueError(f"stage is not actionable: {issue.stage}")
+
+
+def _failure_score_state(node: str, exc: BaseException) -> dict:
+    error = str(exc)[:200]
+    return {"node": node, "stage": node, "error": error}

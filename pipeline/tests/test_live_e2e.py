@@ -87,8 +87,8 @@ class _Recorder:
     def __init__(self):
         self.calls = []
 
-    def record(self, *, issue, outcome, scores, tags):
-        self.calls.append({"issue": issue, "outcome": outcome, "scores": scores})
+    def record(self, *, issue, outcome, scores, tags, trace_id=None):
+        self.calls.append({"issue": issue, "outcome": outcome, "scores": scores, "trace_id": trace_id})
 
 
 def _drive_to_terminal(p: Poller, issue_number: int, max_ticks: int = 12):

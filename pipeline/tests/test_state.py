@@ -158,3 +158,48 @@ def test_bump_attempt_records_error_and_fails_after_limit(tmp_path) -> None:
     assert second.attempts == 2
     assert second.stage == "failed"
     assert second.last_error == "second"
+
+
+def test_error_stats_reports_per_node_rates_and_failed_issue_counts(tmp_path) -> None:
+    db = store(tmp_path)
+    now = datetime(2026, 6, 8, 12, tzinfo=timezone.utc)
+    db.upsert_issue(1, "failed", stage="failed", last_error="boom", updated_at=now)
+    db.upsert_issue(2, "errored", stage="queued", last_error="temporary", updated_at=now)
+    db.record_run(issue=1, node="queued", outcome="ok", started=now - timedelta(minutes=5))
+    db.record_run(issue=1, node="queued", outcome="error", started=now - timedelta(minutes=4))
+    db.record_run(issue=2, node="reviewed", outcome="error", started=now - timedelta(minutes=3))
+
+    stats = db.error_stats(timedelta(minutes=15), now=now)
+
+    assert stats["failed_issues"] == 1
+    assert stats["issues_with_last_error"] == 2
+    assert stats["nodes"]["queued"] == {"ok": 1, "error": 1, "total": 2, "error_rate": 0.5}
+    assert stats["nodes"]["reviewed"] == {"ok": 0, "error": 1, "total": 1, "error_rate": 1.0}
+    assert stats["last_errors"][0]["stage"] == "failed"
+    assert stats["last_errors"][0]["last_error"] == "boom"
+
+
+def test_error_stats_excludes_runs_older_than_window(tmp_path) -> None:
+    db = store(tmp_path)
+    now = datetime(2026, 6, 8, 12, tzinfo=timezone.utc)
+    db.upsert_issue(1, "old")
+    db.record_run(issue=1, node="queued", outcome="error", started=now - timedelta(minutes=16))
+    db.record_run(issue=1, node="queued", outcome="ok", started=now - timedelta(minutes=2))
+
+    stats = db.error_stats(timedelta(minutes=15), now=now)
+
+    assert stats["nodes"]["queued"] == {"ok": 1, "error": 0, "total": 1, "error_rate": 0.0}
+
+
+def test_error_stats_zero_error_store_returns_zero_rates(tmp_path) -> None:
+    db = store(tmp_path)
+    now = datetime(2026, 6, 8, 12, tzinfo=timezone.utc)
+    db.upsert_issue(1, "clean")
+    db.record_run(issue=1, node="queued", outcome="ok", started=now - timedelta(minutes=1))
+
+    stats = db.error_stats(timedelta(minutes=15), now=now)
+
+    assert stats["failed_issues"] == 0
+    assert stats["issues_with_last_error"] == 0
+    assert stats["nodes"]["queued"]["error_rate"] == 0.0
+    assert stats["last_errors"] == []

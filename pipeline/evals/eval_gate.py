@@ -35,6 +35,7 @@ def evaluate_gate(
     max_files: int = 20,
     min_auto_merge_precision: float = 1.0,
     min_escalate_recall: float = 1.0,
+    raise_on_failure: bool = True,
 ) -> GateMetrics:
     failures: list[str] = []
     actual_auto = predicted_auto = true_auto = 0
@@ -69,7 +70,7 @@ def evaluate_gate(
     auto_recall = true_auto / actual_auto if actual_auto else 1.0
     escalate_recall = true_escalate / actual_escalate if actual_escalate else 1.0
     metrics = GateMetrics(total, precision, auto_recall, escalate_recall, tuple(failures))
-    if precision < min_auto_merge_precision or escalate_recall < min_escalate_recall or failures:
+    if raise_on_failure and (precision < min_auto_merge_precision or escalate_recall < min_escalate_recall or failures):
         raise EvalFailure(
             "gate eval failed: "
             f"auto_merge_precision={precision:.3f}, escalate_recall={escalate_recall:.3f}, failures={failures}"

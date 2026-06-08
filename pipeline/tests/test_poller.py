@@ -8,6 +8,7 @@ from wgmesh_pipeline.config import Config
 from wgmesh_pipeline.github.client import GitHubClient
 from wgmesh_pipeline.graph.build import build_graph
 from wgmesh_pipeline.poller import Poller
+from wgmesh_pipeline.scoring import init_scoring
 from wgmesh_pipeline.state.store import StateStore
 
 
@@ -61,6 +62,14 @@ class Graph:
     def review(self, state):
         self.calls.append("review")
         return {**state, "tests_passed": True, "sanitise_ok": True, "review_findings": []}
+
+
+class RecordingScorer:
+    def __init__(self):
+        self.calls: list[dict] = []
+
+    def record(self, *, issue, outcome, scores, tags, trace_id=None):
+        self.calls.append({"issue": issue, "outcome": outcome, "scores": scores, "tags": tags, "trace_id": trace_id})
 
 
 @pytest.fixture
@@ -160,6 +169,59 @@ def test_reconcile_exception_does_not_halt_tick(tmp_path, cfg: Config, monkeypat
     assert result is None
     assert p.last_reconcile_error == "github unavailable"
     assert p.store.get_issue(1).stage == "queued"
+
+
+def test_reconcile_exception_records_failed_score_with_stage_and_truncated_error(
+    tmp_path, cfg: Config, monkeypatch
+) -> None:
+    scorer = RecordingScorer()
+    init_scoring(cfg, scorer=scorer)
+    p = poller(tmp_path, cfg)
+    p.store.upsert_issue(1, "Fix bug")
+
+    def fail_reconcile(client, store):
+        raise RuntimeError("x" * 250)
+
+    monkeypatch.setattr("wgmesh_pipeline.poller.reconcile_issues", fail_reconcile)
+
+    result = asyncio.run(p.tick())
+
+    assert result is None
+    assert scorer.calls[0]["outcome"] == "failed"
+    assert scorer.calls[0]["tags"]["stage"] == "reconcile"
+    assert scorer.calls[0]["tags"]["node"] == "reconcile"
+    assert len(scorer.calls[0]["tags"]["error"]) == 200
+
+
+def test_advance_exception_records_failed_score_with_node_tag(tmp_path, cfg: Config) -> None:
+    class FailingGraph(Graph):
+        def triage(self, state):
+            raise RuntimeError("bad issue")
+
+    scorer = RecordingScorer()
+    init_scoring(cfg, scorer=scorer)
+    p = poller(tmp_path, cfg, FailingGraph())
+    p.store.upsert_issue(1, "Fix bug")
+
+    result = asyncio.run(p.tick())
+
+    assert result is None
+    assert scorer.calls[0]["outcome"] == "failed"
+    assert scorer.calls[0]["tags"]["node"] == "queued"
+    assert scorer.calls[0]["tags"]["stage"] == "queued"
+    assert scorer.calls[0]["tags"]["error"] == "bad issue"
+
+
+def test_success_tick_does_not_record_failure_score(tmp_path, cfg: Config) -> None:
+    scorer = RecordingScorer()
+    init_scoring(cfg, scorer=scorer)
+    p = poller(tmp_path, cfg)
+    p.store.upsert_issue(1, "Fix bug")
+
+    result = asyncio.run(p.tick())
+
+    assert result is not None
+    assert [call for call in scorer.calls if call["outcome"] == "failed"] == []
 
 
 def test_reviewed_issue_not_phantom_merged_when_side_effect_fails(tmp_path, cfg: Config) -> None:
