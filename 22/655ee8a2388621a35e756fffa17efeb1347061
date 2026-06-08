@@ -1,0 +1,22 @@
+pipeline/tests/test_reconcile.py
+  s_403b655a6daaae::t_329270793d93a1 21,26-40
+  s_403b655a6daaae::t_6bb37869914af2 90-103
+pipeline/wgmesh_pipeline/github/reconcile.py
+  s_403b655a6daaae::t_0572096ab7c01f 41-45
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "22655ee8a2388621a35e756fffa17efeb1347061",
+  "prompts": {},
+  "sessions": {
+    "s_403b655a6daaae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d88b5efe-79e0-419a-9f1b-6e46c07d8d55",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
