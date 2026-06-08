@@ -36,6 +36,9 @@ on:
         description: 'Clear durable pipeline queue/runs before polling'
         type: boolean
         default: false
+      poll_interval:
+        description: 'POLL_INTERVAL_SECONDS (seconds between ticks)'
+        default: '300'
 
 permissions:
   contents: read
@@ -155,6 +158,7 @@ jobs:
           MODE: ${{ github.event.inputs.pipeline_mode }}
           DBMODE: ${{ github.event.inputs.database_mode }}
           RESET_QUEUE_INPUT: ${{ github.event.inputs.reset_queue }}
+          PINT: ${{ github.event.inputs.poll_interval }}
         run: |
           set -euo pipefail
           RESET_QUEUE=0
@@ -178,7 +182,7 @@ jobs:
           LANGFUSE_HOST=$LANGFUSE_HOST
           LANGFUSE_PUBLIC_KEY=$LANGFUSE_PUBLIC_KEY
           LANGFUSE_SECRET_KEY=$LANGFUSE_SECRET_KEY
-          POLL_INTERVAL_SECONDS=300
+          POLL_INTERVAL_SECONDS=${PINT:-300}
           MAX_FILES=20
           RESET_QUEUE=$RESET_QUEUE
           EOF
