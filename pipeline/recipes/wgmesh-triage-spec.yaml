@@ -35,3 +35,14 @@ prompt: |
     - Out of scope
   - Keep the spec concrete enough for an implementation agent to build from it.
   - Do not modify unrelated files.
+
+# The developer extension provides the filesystem write tool goose needs to
+# actually create the spec file. Without it goose only prints text and the
+# empty-output guard fires (the box is installed CONFIGURE=false, so no
+# extensions are enabled unless the recipe declares them).
+extensions:
+  - type: builtin
+    name: developer
+    display_name: Developer
+    timeout: 300
+    bundled: true
