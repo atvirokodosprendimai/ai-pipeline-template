@@ -1,23 +1,23 @@
 # Assessment: 2026-06-08
 
-**Stage**: Revenue | **Run**: 236
+**Stage**: Revenue | **Run**: 237
 
-Stage 5, day 82. wgmesh remains technically excellent (v0.2.1, 18 stars, functional mesh architecture) with healthy pipeline (3 PRs, 6 issues). Critical clarification: org-level revenue exists from non-seed products, but the actual wgmesh/cloudroof products have 0 subscribers despite functional Polar integration. Pipeline is moderately active, not idle.
+Stage 5, day 82. Critical pipeline malfunction: 23 recursive spec PRs indicate runaway automation. Revenue confirmed (5 subscribers, €4+ MRR) but all payments are for product ID 8e8e1c33 while seed products (cloudroof tier) have 0 subscribers. Pipeline corruption requires immediate attention before normal operations can resume.
 
 ## Blockers
-- Seed products (cloudroof tier) have 0 subscribers despite functional billing - no external customer adoption yet
-- Revenue attribution unclear - need to distinguish wgmesh product revenue from other business line revenue
+- Pipeline automation generated 23 recursive spec PRs indicating serious malfunction
+- Revenue attribution unclear: payments for product 8e8e1c33 but seed products have 0 subscribers
+- CI failure (#652) blocking merge pipeline amid PR pollution
 
 ## Top Actions
-- **fn:gtm**: Create comprehensive wgmesh pilot evaluation framework with concrete network administrator checklist and success criteria (zero)
-- **fn:dev**: Fix key rotation bug that changes node IP addresses affecting production reliability (zero)
-- **fn:gtm**: Document internal wgmesh usage with specific metrics and concrete networking benefits achieved (zero)
+- **fn:ops**: Emergency pipeline cleanup: close all recursive spec PRs and investigate automation malfunction (zero)
+- **fn:ops**: Map Polar product ID 8e8e1c33 to actual business line to clarify revenue attribution vs seed products (zero)
+- **fn:dev**: Fix CI failure blocking merge pipeline after PR cleanup (zero)
 
 ## Contributions
-- **Marty**: Git commits maintaining codebase stability over past week
-- **pupabobas[bot]**: 71 bot commits in past 7 days driving high development velocity
-- **GitHub community**: Project grew to 18 stars and 2 forks showing increasing interest
-- **external-customers**: 5 active subscribers maintaining revenue stream for organization
+- **Marty**: Recent git commits maintaining project stability amid pipeline issues
+- **pupabobas[bot]**: 75 bot commits in past 7 days, though automation appears to have malfunctioned generating recursive PRs
+- **paying-customers**: 5 active subscribers generating €4+ MRR with recent orders on May 17, 14, 10
 
 ## Needs Human
-- [soon] Clarify business relationship between paying product ID 8e8e1c33-cd06-4652-9032-6cb3b49ec6b4 and the wgmesh/cloudroof product line for accurate funnel stage assessment
+- [soon] Clarify which Polar product corresponds to ID 8e8e1c33-cd06-4652-9032-6cb3b49ec6b4 and whether it represents wgmesh/cloudroof revenue
