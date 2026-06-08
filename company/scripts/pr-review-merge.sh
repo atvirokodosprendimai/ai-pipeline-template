@@ -207,6 +207,7 @@ check_unresolved_threads() {
   owner="${TARGET_REPO%%/*}"
   repo="${TARGET_REPO##*/}"
   local count
+  # shellcheck disable=SC2016  # GraphQL variables are bound by gh -F flags.
   if ! count=$(gh api graphql \
     -F owner="$owner" \
     -F repo="$repo" \
@@ -468,24 +469,53 @@ merge_pr() {
 # ---------------------------------------------------------------------------
 check_manual_push() {
   local pr="$1"
-  local latest_author
-  if ! latest_author=$(gh api "repos/${TARGET_REPO}/pulls/${pr}/commits" --jq '.[-1].author.login // empty' 2>/dev/null); then
-    echo "::warning::Failed to check latest commit author for PR #${pr}"
+  local latest_commit latest_sha latest_author
+  if ! latest_commit=$(gh api "repos/${TARGET_REPO}/pulls/${pr}/commits" --jq '.[-1] | [.sha, (.author.login // "")] | @tsv' 2>/dev/null); then
+    echo "::warning::Failed to check latest commit for PR #${pr}"
     ERRORS=$((ERRORS + 1))
     check_circuit_breaker
     return 1  # can't determine, continue normally
   fi
 
-  # If author is empty/null, can't determine — skip reset
+  IFS=$'\t' read -r latest_sha latest_author <<< "$latest_commit"
+
+  # If SHA is empty/null, can't track distinct pushes — skip reset.
+  if [[ -z "$latest_sha" ]]; then
+    return 1
+  fi
+
+  local last_var="LAST_MANUAL_PUSH_SHA_${pr//[^A-Za-z0-9_]/_}"
+  local last_sha="${!last_var-}"
+  if [[ "$latest_sha" == "$last_sha" ]]; then
+    return 1
+  fi
+  printf -v "$last_var" "%s" "$latest_sha"
+
+  # If author is empty/null, can't determine whether this was manual — skip reset.
   if [[ -z "$latest_author" ]]; then
     return 1
   fi
 
   # Check if author is NOT a known bot
   local is_bot="false"
+  local latest_author_normalized
+  latest_author_normalized=$(printf '%s' "$latest_author" | sed 's/\[bot\]$//' | tr '[:upper:]' '[:lower:]')
+
   IFS=',' read -ra approved_list <<< "$APPROVED_AUTHORS"
   for approved in "${approved_list[@]}"; do
-    if [[ "$latest_author" == "$approved" ]]; then
+    local approved_normalized
+    approved_normalized=$(printf '%s' "$approved" | sed 's/\[bot\]$//' | tr '[:upper:]' '[:lower:]')
+    if [[ "$latest_author_normalized" == "$approved_normalized" ]]; then
+      is_bot="true"
+      break
+    fi
+  done
+
+  local known_bot_commit_authors="copilot,goose"
+  local known_bot
+  IFS=',' read -ra known_bot_list <<< "$known_bot_commit_authors"
+  for known_bot in "${known_bot_list[@]}"; do
+    if [[ "$latest_author_normalized" == "$known_bot" ]]; then
       is_bot="true"
       break
     fi
@@ -493,7 +523,7 @@ check_manual_push() {
 
   if [[ "$is_bot" != "true" ]]; then
     echo "Manual push detected by ${latest_author} — resetting retry counter"
-    log_audit "manual_push" "Non-bot commit by ${latest_author}, retry counter reset"
+    log_audit "manual_push" "Non-bot commit by ${latest_author} (${latest_sha}), retry counter reset"
     return 0
   fi
   return 1
