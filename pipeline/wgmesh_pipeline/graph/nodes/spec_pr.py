@@ -8,6 +8,10 @@ from wgmesh_pipeline.graph.state import GraphState
 
 
 GIT_TIMEOUT_SECONDS = 120
+# Commit identity for the bot-authored spec branch. The freshly cloned wgmesh
+# checkout has no git user configured, so commits need an explicit identity.
+GIT_AUTHOR_NAME = "wgmesh-pipeline"
+GIT_AUTHOR_EMAIL = "wgmesh-pipeline@users.noreply.github.com"
 
 
 def spec_pr_node(state: GraphState) -> GraphState:
@@ -57,7 +61,14 @@ def _prepare_spec_branch(repo_path: Path, branch: str, spec_rel: Path, title: st
     diff = _git(repo_path, "diff", "--cached", "--quiet", check=False)
     if diff.returncode == 0:
         return
-    _git(repo_path, "commit", "-m", title)
+    # Per-commit identity: the freshly cloned wgmesh checkout has no user.name/
+    # user.email, so a bare `git commit` fails "Author identity unknown".
+    _git(
+        repo_path,
+        "-c", f"user.name={GIT_AUTHOR_NAME}",
+        "-c", f"user.email={GIT_AUTHOR_EMAIL}",
+        "commit", "-m", title,
+    )
 
 
 def _git(repo_path: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
