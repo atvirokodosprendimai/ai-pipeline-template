@@ -51,7 +51,22 @@ def spec_node(state: GraphState) -> GraphState:
         )
         raise RuntimeError(result.error or "goose spec failed")
     next_state["spec_path"] = str(result.output_path)
+    # Put the authored spec text into state so trace_node includes it in the
+    # "spec" span output — this is what a managed Langfuse LLM-as-a-Judge reads
+    # to score spec quality. Capped + best-effort (a read failure must not break
+    # the loop). Traced to private Langfuse only; never committed from here.
+    next_state["spec_content"] = _read_excerpt(result.output_path)
     return next_state
+
+
+_SPEC_EXCERPT_LIMIT = 6000
+
+
+def _read_excerpt(path) -> str:
+    try:
+        return Path(path).read_text(encoding="utf-8", errors="replace")[:_SPEC_EXCERPT_LIMIT]
+    except Exception:
+        return ""
 
 
 def _visit(state: dict, node: str) -> None:
