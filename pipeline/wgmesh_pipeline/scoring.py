@@ -93,18 +93,36 @@ class LangfuseScorer:
             # lifecycle into a single Langfuse session, AND is the required link:
             # create_score rejects a score with no trace_id/session_id/etc as a
             # 400 Bad request. issue-keyed session is the natural per-workflow id.
-            kwargs: dict[str, Any] = {
-                "name": "pipeline_outcome",
-                "value": outcome,
-                "data_type": "CATEGORICAL",
-                "session_id": f"issue-{issue}",
+            session = f"issue-{issue}"
+            common: dict[str, Any] = {
+                "session_id": session,
                 "metadata": {"issue": issue, **scores, **tags},
             }
             if trace_id:
-                kwargs["trace_id"] = trace_id
+                common["trace_id"] = trace_id
+            # score_id is a stable idempotency key per (issue, score): the box
+            # re-processes issues (retries, resets), so without it every pass
+            # would append a DUPLICATE score. A stable id makes re-scoring an
+            # update-in-place to the latest outcome.
             self._lf.create_score(
-                **kwargs,
+                name="pipeline_outcome",
+                value=outcome,
+                data_type="CATEGORICAL",
+                score_id=f"{session}-pipeline_outcome",
+                **common,
             )
+            # Also emit the auto-merge signal as a BOOLEAN score so Langfuse can
+            # aggregate it into a merge-rate-over-time KPI (a categorical score
+            # only trends with a ScoreConfig; a boolean charts out of the box).
+            auto_merged = scores.get("auto_merged")
+            if auto_merged is not None:
+                self._lf.create_score(
+                    name="auto_merged",
+                    value=float(auto_merged),
+                    data_type="BOOLEAN",
+                    score_id=f"{session}-auto_merged",
+                    **common,
+                )
             self._lf.flush()
             # Recovered: reset the latch so a *later* failure re-announces
             # instead of being masked by a single early transient blip.

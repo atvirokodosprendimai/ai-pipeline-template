@@ -117,22 +117,48 @@ def test_langfuse_record_creates_pipeline_outcome_score_and_flushes(monkeypatch)
         tags={"node": "reviewed", "outcome": "merged"},
     )
 
-    assert client.scores == [
-        {
-            "name": "pipeline_outcome",
-            "value": "merged",
-            "data_type": "CATEGORICAL",
-            "session_id": "issue-584",
-            "metadata": {
-                "issue": 584,
-                "auto_merged": 1,
-                "risk_tier": "low",
-                "node": "reviewed",
-                "outcome": "merged",
-            },
-        }
-    ]
+    by_name = {s["name"]: s for s in client.scores}
+    outcome = by_name["pipeline_outcome"]
+    assert outcome["value"] == "merged"
+    assert outcome["data_type"] == "CATEGORICAL"
+    assert outcome["session_id"] == "issue-584"
+    assert outcome["score_id"] == "issue-584-pipeline_outcome"
+    assert outcome["metadata"]["issue"] == 584
     assert client.flushed is True
+
+
+def test_langfuse_record_emits_boolean_auto_merged_kpi(monkeypatch) -> None:
+    """auto_merged is also emitted as a BOOLEAN score so Langfuse aggregates a
+    merge-rate KPI (categorical only trends with a ScoreConfig)."""
+    client = _FakeLangfuse()
+    scorer = _install_fake_langfuse(monkeypatch, client)
+    scorer.record(issue=584, outcome="merged", scores={"auto_merged": 1}, tags={})
+    am = {s["name"]: s for s in client.scores}["auto_merged"]
+    assert am["value"] == 1.0
+    assert am["data_type"] == "BOOLEAN"
+    assert am["session_id"] == "issue-584"
+    assert am["score_id"] == "issue-584-auto_merged"
+
+
+def test_langfuse_record_score_ids_are_stable_idempotency_keys(monkeypatch) -> None:
+    """Re-scoring the same issue reuses the same score_id (idempotency key), so
+    Langfuse updates in place instead of accumulating duplicate scores on the
+    box's reprocess/retry passes."""
+    client = _FakeLangfuse()
+    scorer = _install_fake_langfuse(monkeypatch, client)
+    scorer.record(issue=700, outcome="failed", scores={"auto_merged": 0}, tags={})
+    scorer.record(issue=700, outcome="merged", scores={"auto_merged": 1}, tags={})
+    ids = [s["score_id"] for s in client.scores]
+    # same ids across both passes -> update-in-place, not duplicate rows
+    assert ids.count("issue-700-pipeline_outcome") == 2
+    assert ids.count("issue-700-auto_merged") == 2
+
+
+def test_langfuse_record_no_auto_merged_emits_only_outcome(monkeypatch) -> None:
+    client = _FakeLangfuse()
+    scorer = _install_fake_langfuse(monkeypatch, client)
+    scorer.record(issue=652, outcome="escalated", scores={}, tags={})
+    assert [s["name"] for s in client.scores] == ["pipeline_outcome"]
 
 
 def test_langfuse_record_attaches_session_id_link(monkeypatch) -> None:
