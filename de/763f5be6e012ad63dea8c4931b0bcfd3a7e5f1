@@ -1,0 +1,21 @@
+pipeline/tests/test_scoring.py
+  s_403b655a6daaae::t_37aefa7f8a0bde 120-126,130-161
+pipeline/wgmesh_pipeline/scoring.py
+  s_403b655a6daaae::t_4b4b13ff5ab26f 96-98,102-106,108-112,114-125
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "de763f5be6e012ad63dea8c4931b0bcfd3a7e5f1",
+  "prompts": {},
+  "sessions": {
+    "s_403b655a6daaae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d88b5efe-79e0-419a-9f1b-6e46c07d8d55",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
