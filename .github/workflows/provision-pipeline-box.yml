@@ -36,9 +36,6 @@ on:
         description: 'Clear durable pipeline queue/runs before polling'
         type: boolean
         default: false
-      poll_interval:
-        description: 'POLL_INTERVAL_SECONDS (seconds between ticks)'
-        default: '300'
 
 permissions:
   contents: read
@@ -158,7 +155,6 @@ jobs:
           MODE: ${{ github.event.inputs.pipeline_mode }}
           DBMODE: ${{ github.event.inputs.database_mode }}
           RESET_QUEUE_INPUT: ${{ github.event.inputs.reset_queue }}
-          PINT: ${{ github.event.inputs.poll_interval }}
         run: |
           set -euo pipefail
           RESET_QUEUE=0
@@ -172,6 +168,9 @@ jobs:
           WGMESH_BOT_PAT=$WGMESH_BOT_PAT
           ZAI_API_KEY=$ANTHROPIC_API_KEY
           ANTHROPIC_HOST=https://api.z.ai/api/anthropic
+          GOOSE_PROVIDER=anthropic
+          GOOSE_MODEL=GLM-4.7
+          WGMESH_CHECKOUT_PATH=/opt/wgmesh-checkout
           DATABASE_MODE=$DBMODE
           PIPELINE_DB_PATH=/opt/wgmesh-pipeline/state.db
           TURSO_DATABASE_URL=$TURSO_DATABASE_URL
@@ -179,7 +178,7 @@ jobs:
           LANGFUSE_HOST=$LANGFUSE_HOST
           LANGFUSE_PUBLIC_KEY=$LANGFUSE_PUBLIC_KEY
           LANGFUSE_SECRET_KEY=$LANGFUSE_SECRET_KEY
-          POLL_INTERVAL_SECONDS=${PINT:-300}
+          POLL_INTERVAL_SECONDS=300
           MAX_FILES=20
           RESET_QUEUE=$RESET_QUEUE
           EOF
@@ -190,6 +189,9 @@ jobs:
           REPO_URL="https://github.com/${{ github.repository }}.git"
           ssh -o StrictHostKeyChecking=no -i "$RUNNER_TEMP/box_key" root@"$BOX_IP" \
             "set -euo pipefail
+             set -a
+             . /etc/wgmesh-pipeline/env
+             set +a
              git clone --depth 1 '$REPO_URL' /opt/wgmesh-pipeline || (cd /opt/wgmesh-pipeline && git pull)
              if [ '${{ github.event.inputs.database_mode }}' = 'turso' ]; then EXTRA='[turso,trace]'; else EXTRA='[trace]'; fi
              python3 -m venv /opt/wgmesh-pipeline/.venv
@@ -197,7 +199,14 @@ jobs:
              /opt/wgmesh-pipeline/.venv/bin/pip install -q -e \"/opt/wgmesh-pipeline/pipeline\${EXTRA}\"
              install -m 0644 /opt/wgmesh-pipeline/pipeline/deploy/wgmesh-pipeline.service /etc/systemd/system/
              id wgmesh >/dev/null 2>&1 || useradd --system --home /opt/wgmesh-pipeline --shell /usr/sbin/nologin wgmesh
+             rm -rf /opt/wgmesh-checkout
+             if [ -n \"\$WGMESH_BOT_PAT\" ]; then
+               git clone \"https://x-access-token:\$WGMESH_BOT_PAT@github.com/atvirokodosprendimai/wgmesh.git\" /opt/wgmesh-checkout
+             else
+               git clone https://github.com/atvirokodosprendimai/wgmesh.git /opt/wgmesh-checkout
+             fi
              chown -R wgmesh:wgmesh /opt/wgmesh-pipeline
+             chown -R wgmesh:wgmesh /opt/wgmesh-checkout
              systemctl daemon-reload
              systemctl enable --now wgmesh-pipeline
              sleep 5
