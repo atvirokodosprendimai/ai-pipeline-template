@@ -136,7 +136,8 @@ def test_langfuse_span_groups_into_issue_session(monkeypatch) -> None:
     propagate_attributes(session_id=issue-<N>) so they group into one Langfuse
     session (the issue's pipeline lifecycle)."""
     import contextlib
-    import langfuse as lf_mod
+    import pytest
+    lf_mod = pytest.importorskip("langfuse")
 
     calls = {}
 
@@ -153,7 +154,8 @@ def test_langfuse_span_groups_into_issue_session(monkeypatch) -> None:
 
 def test_langfuse_span_no_issue_uses_no_session(monkeypatch) -> None:
     import contextlib
-    import langfuse as lf_mod
+    import pytest
+    lf_mod = pytest.importorskip("langfuse")
 
     calls = {"used": False}
 
