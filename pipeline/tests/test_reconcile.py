@@ -18,8 +18,26 @@ class Client(GitHubClient):
     def list_open_issues(self) -> list[GitHubIssue]:
         return self._issues
 
-    def remove_label(self, issue_number: int, label: str):
+    def remove_label(self, issue_number: int, label: str, *, spec_pr: bool = False):
         self.removed_labels.append((issue_number, label))
+        return {"ok": True}
+
+
+class GatedClient(GitHubClient):
+    """Keeps the REAL _write gate (so mode permissions are exercised) and only
+    stubs the HTTP layer. Catches reconcile writes that omit spec_pr in
+    spec-only mode -- the bug the fully-overriding Client above hid."""
+
+    def __init__(self, issues: Iterable[GitHubIssue], *, mode: str):
+        super().__init__(Config(target_repo="atvirokodosprendimai/wgmesh", mode=mode))
+        self._issues = list(issues)
+        self.requests: list[tuple[str, str]] = []
+
+    def list_open_issues(self) -> list[GitHubIssue]:
+        return self._issues
+
+    def _request(self, method: str, path: str, **kwargs):
+        self.requests.append((method, path))
         return {"ok": True}
 
 
@@ -67,6 +85,20 @@ def test_needs_human_label_escalates_and_excludes_from_claim(tmp_path) -> None:
 
     assert store.get_issue(2).stage == "escalated"
     assert store.claim_next(now=datetime.now(timezone.utc)) is None
+
+
+def test_reconcile_removes_needs_triage_without_raising_in_spec_only(tmp_path) -> None:
+    # Regression: in spec-only the write-gate blocks remove_label unless
+    # spec_pr=True. reconcile omitting the flag raised PermissionError every
+    # tick and stalled the whole loop. Exercise the REAL gate here.
+    store = StateStore(tmp_path / "state.db")
+    store.upsert_issue(42, "in flight", stage="triaged")
+    client = GatedClient([issue(42, ("needs-triage",))], mode="spec-only")
+
+    reconcile_issues(client, store)  # must not raise
+
+    assert ("DELETE", "/repos/atvirokodosprendimai/wgmesh/issues/42/labels/needs-triage") in client.requests
+    assert store.get_issue(42).stage == "triaged"
 
 
 def test_reconcile_then_claim_returns_only_actionable_issue(tmp_path) -> None:
