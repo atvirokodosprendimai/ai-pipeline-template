@@ -398,7 +398,7 @@ echo "12. test_check_manual_push_bot"
 setup_test_env
 create_mock_gh '
 if [[ "$1" == "api" && "$*" == *"commits"* ]]; then
-  echo "copilot-swe-agent[bot]"
+  printf "botsha\tcopilot-swe-agent[bot]\n"
   exit 0
 fi
 exit 0
@@ -414,7 +414,7 @@ echo "13. test_check_manual_push_human"
 setup_test_env
 create_mock_gh '
 if [[ "$1" == "api" && "$*" == *"commits"* ]]; then
-  echo "human-dev"
+  printf "humansha\thuman-dev\n"
   exit 0
 fi
 exit 0
@@ -424,6 +424,67 @@ exit_code=0
 check_manual_push 42 || exit_code=$?
 assert_eq "returns 0 for human commit" "0" "$exit_code"
 assert_contains "audit logs manual_push" '"manual_push"' "$(cat "$TEST_AUDIT_LOG")"
+
+# --- Test 14: check_manual_push — same Copilot SHA does not reset repeatedly ---
+echo ""
+echo "14. test_check_manual_push_same_copilot_sha_at_most_once"
+setup_test_env
+create_mock_gh '
+if [[ "$1" == "api" && "$*" == *"commits"* ]]; then
+  printf "copilotsha\tCopilot\n"
+  exit 0
+fi
+exit 0
+'
+eval_functions
+reset_count=0
+if check_manual_push 42; then reset_count=$((reset_count + 1)); fi
+if check_manual_push 42; then reset_count=$((reset_count + 1)); fi
+assert_eq "same Copilot SHA resets at most once" "0" "$reset_count"
+
+# --- Test 15: check_manual_push — bare Copilot commit author is bot ---
+echo ""
+echo "15. test_check_manual_push_bare_copilot_author_is_bot"
+setup_test_env
+create_mock_gh '
+if [[ "$1" == "api" && "$*" == *"commits"* ]]; then
+  printf "copilotsha\tCopilot\n"
+  exit 0
+fi
+exit 0
+'
+eval_functions
+exit_code=0
+check_manual_push 42 || exit_code=$?
+assert_eq "returns 1 for bare Copilot author" "1" "$exit_code"
+assert_not_contains "does not audit Copilot as manual push" '"manual_push"' "$(cat "$TEST_AUDIT_LOG")"
+
+# --- Test 16: check_manual_push — new human SHA resets once ---
+echo ""
+echo "16. test_check_manual_push_new_human_sha_resets_once"
+setup_test_env
+touch "$TMPDIR/manual-push-gh-count"
+create_mock_gh '
+if [[ "$1" == "api" && "$*" == *"commits"* ]]; then
+  count_file="'"$TMPDIR"'/manual-push-gh-count"
+  count=$(cat "$count_file")
+  count=$((count + 1))
+  echo "$count" > "$count_file"
+  if [[ "$count" -eq 1 ]]; then
+    printf "oldbotsha\tgoose[bot]\n"
+  else
+    printf "newhumansha\thuman-dev\n"
+  fi
+  exit 0
+fi
+exit 0
+'
+eval_functions
+reset_count=0
+if check_manual_push 42; then reset_count=$((reset_count + 1)); fi
+if check_manual_push 42; then reset_count=$((reset_count + 1)); fi
+if check_manual_push 42; then reset_count=$((reset_count + 1)); fi
+assert_eq "new human SHA resets once" "1" "$reset_count"
 
 # ── Summary (TEST-2) ─────────────────────────────────────────────
 
