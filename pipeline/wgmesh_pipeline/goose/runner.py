@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Mapping, Sequence
 
-from wgmesh_pipeline.config import Config
+from wgmesh_pipeline.config import Config, DEFAULT_GOOSE_MODEL, DEFAULT_GOOSE_PROVIDER
 
 
 SubprocessRunner = Callable[..., subprocess.CompletedProcess[str]]
@@ -95,6 +95,8 @@ def build_goose_env(config: Config, base_env: Mapping[str, str] | None = None) -
     if config.zai_api_key:
         env["ANTHROPIC_API_KEY"] = config.zai_api_key
     env["ANTHROPIC_HOST"] = config.anthropic_host
+    env["GOOSE_PROVIDER"] = source.get("GOOSE_PROVIDER") or getattr(config, "goose_provider", DEFAULT_GOOSE_PROVIDER)
+    env["GOOSE_MODEL"] = source.get("GOOSE_MODEL") or getattr(config, "goose_model", DEFAULT_GOOSE_MODEL)
     return env
 
 
