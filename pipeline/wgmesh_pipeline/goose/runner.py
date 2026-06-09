@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 import time
 from dataclasses import dataclass
@@ -13,6 +14,12 @@ from wgmesh_pipeline.models import ModelProfile, credential_for, resolve_profile
 
 SubprocessRunner = Callable[..., subprocess.CompletedProcess[str]]
 GOOSE_TIMEOUT_SECONDS = 1800
+
+# Minimum stripped-stdout length to treat a printed-only goose run as a real
+# deliverable worth salvaging to the output file. A genuine spec/diff is KB-scale;
+# a stray "done"/acknowledgement line is not — below this we still fire the
+# empty-output guard so a true no-op fails loudly instead of writing junk.
+_MIN_SALVAGE_CHARS = 200
 
 # Substrings that mark an env var as secret. Goose is an LLM agent — it must NOT
 # inherit the box's PAT, LangSmith key, or any other credential (it could echo
@@ -286,6 +293,29 @@ class GooseRunner:
             )
 
         if not output_path.exists() or output_path.stat().st_size == 0:
+            # Weaker models (glm-4.6 on z.ai) frequently PRINT the deliverable as
+            # their assistant text instead of invoking the developer write tool,
+            # even when the recipe says "write the file; do not only print".
+            # goose `run --no-session` emits assistant text to stdout (diagnostics
+            # go to stderr), so salvage it: persist stdout to the expected path.
+            # This keeps the write-tool happy-path intact (file already present →
+            # we never reach here) AND makes printed-only runs succeed.
+            salvaged = _strip_ansi(completed.stdout or "")
+            if len(salvaged.strip()) >= _MIN_SALVAGE_CHARS:
+                try:
+                    output_path.parent.mkdir(parents=True, exist_ok=True)
+                    output_path.write_text(salvaged, encoding="utf-8")
+                except OSError as exc:
+                    return GooseResult(
+                        ok=False,
+                        output_path=output_path,
+                        duration_seconds=duration,
+                        raw_log=raw_log,
+                        error=f"empty output + salvage write failed for {output_path}: {exc}",
+                        model_key=model_key,
+                    )
+
+        if not output_path.exists() or output_path.stat().st_size == 0:
             return GooseResult(
                 ok=False,
                 output_path=output_path,
@@ -302,6 +332,15 @@ class GooseRunner:
             raw_log=raw_log,
             model_key=model_key,
         )
+
+
+_ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
+
+
+def _strip_ansi(text: str) -> str:
+    """Drop terminal escape sequences goose may emit so the salvaged file is
+    clean markdown, not color-coded console output."""
+    return _ANSI_RE.sub("", text)
 
 
 def _join_log(*parts: str | None) -> str:

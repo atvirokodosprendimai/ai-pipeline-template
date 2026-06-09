@@ -92,6 +92,49 @@ def test_goose_zero_exit_empty_output_fails_loudly(tmp_path) -> None:
     assert "empty output guard" in result.error
 
 
+def test_printed_only_spec_is_salvaged_from_stdout(tmp_path) -> None:
+    # glm-4.6 often PRINTS the spec instead of calling the developer write tool.
+    # goose exits 0, stdout carries the markdown, file is never written. The
+    # runner must salvage stdout to the expected path rather than fail.
+    spec_text = "# Summary\n\n" + ("Concrete spec body line.\n" * 40)
+    assert len(spec_text) >= 200
+
+    def run(command, **kwargs):
+        # Note: does NOT write the file — model printed instead.
+        return completed(0, stdout="\x1b[32m" + spec_text + "\x1b[0m")
+
+    result = GooseRunner(cfg(), runner=run).run_recipe(
+        recipe="wgmesh-triage-spec.yaml",
+        workdir=tmp_path,
+        params={"spec_file": "specs/issue-651-spec.md"},
+        expected_output="specs/issue-651-spec.md",
+    )
+
+    assert result.ok is True
+    written = tmp_path / "specs/issue-651-spec.md"
+    assert written.exists()
+    body = written.read_text()
+    assert "# Summary" in body
+    assert "\x1b[" not in body  # ANSI stripped
+
+
+def test_trivial_stdout_still_fails_guard_no_junk_salvage(tmp_path) -> None:
+    # A short acknowledgement line is NOT a spec — must not be salvaged.
+    def run(command, **kwargs):
+        return completed(0, stdout="done, no file written")
+
+    result = GooseRunner(cfg(), runner=run).run_recipe(
+        recipe="wgmesh-triage-spec.yaml",
+        workdir=tmp_path,
+        params={"spec_file": "specs/issue-17-spec.md"},
+        expected_output="specs/issue-17-spec.md",
+    )
+
+    assert result.ok is False
+    assert "empty output guard" in (result.error or "")
+    assert not (tmp_path / "specs/issue-17-spec.md").exists()
+
+
 def test_near_zero_duration_is_surfaced(tmp_path, monkeypatch) -> None:
     output = tmp_path / "specs/issue-18-spec.md"
     times = iter([10.0, 10.0001])
