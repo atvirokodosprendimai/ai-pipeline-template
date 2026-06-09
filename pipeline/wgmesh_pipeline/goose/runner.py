@@ -97,6 +97,18 @@ def build_goose_env(config: Config, base_env: Mapping[str, str] | None = None) -
     env["ANTHROPIC_HOST"] = config.anthropic_host
     env["GOOSE_PROVIDER"] = source.get("GOOSE_PROVIDER") or getattr(config, "goose_provider", DEFAULT_GOOSE_PROVIDER)
     env["GOOSE_MODEL"] = source.get("GOOSE_MODEL") or getattr(config, "goose_model", DEFAULT_GOOSE_MODEL)
+    # Cost-capture: hand Goose the Langfuse creds so it exports its OWN LLM
+    # generations (model + token usage + cost) to Langfuse -> populates the
+    # per-model cost dashboards (the price half of price/performance routing).
+    # The allowlist strips LANGFUSE_SECRET_KEY by default, so re-add explicitly.
+    # goose expects LANGFUSE_URL (not LANGFUSE_HOST).
+    lf_host = getattr(config, "langfuse_host", None)
+    lf_pub = getattr(config, "langfuse_public_key", None)
+    lf_sec = getattr(config, "langfuse_secret_key", None)
+    if lf_host and lf_pub and lf_sec:
+        env["LANGFUSE_URL"] = lf_host
+        env["LANGFUSE_PUBLIC_KEY"] = lf_pub
+        env["LANGFUSE_SECRET_KEY"] = lf_sec
     return env
 
 
