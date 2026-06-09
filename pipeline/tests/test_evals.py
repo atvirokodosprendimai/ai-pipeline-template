@@ -45,7 +45,7 @@ def test_gate_eval_dataset_path_is_independent_of_cwd(tmp_path, monkeypatch) -> 
 
 
 def test_spec_eval_flags_missing_proposed_approach() -> None:
-    spec = "## Problem\nMissing plan\n\n## Acceptance Criteria\n- clear enough\n"
+    spec = "## Classification\nbug\n\n## Problem Analysis\nMissing plan\n"
 
     assert spec_is_structurally_ok(spec) is False
 
@@ -60,7 +60,7 @@ def write_eval_dataset(tmp_path: Path, gate_lines: list[str]) -> Path:
     data_dir.mkdir()
     (data_dir / "gate_golden.jsonl").write_text("\n".join(gate_lines) + "\n")
     (data_dir / "spec_golden.jsonl").write_text(
-        '{"id":"ok","spec":"## Problem\\nP\\n\\n## Proposed Approach\\nA\\n\\n## Acceptance Criteria\\n- C\\n","expected_ok":true}\n'
+        '{"id":"ok","spec":"## Classification\\nbug\\n\\n## Problem Analysis\\nP\\n\\n## Proposed Approach\\nA\\n","expected_ok":true}\n'
     )
     return data_dir
 

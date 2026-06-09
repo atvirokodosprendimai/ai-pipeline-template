@@ -77,7 +77,12 @@ def spec_pr_node(state: GraphState) -> GraphState:
 def _prepare_spec_branch(repo_path: Path, branch: str, spec_rel: Path, title: str) -> None:
     if not (repo_path / ".git").exists():
         return
-    _git(repo_path, "checkout", "-B", branch)
+    _git(repo_path, "fetch", "origin", "main", check=False)
+    # Local test repos may not have origin/main; production branches from the
+    # target repo base so stale spec commits cannot accumulate.
+    checkout = _git(repo_path, "checkout", "-B", branch, "origin/main", check=False)
+    if checkout.returncode != 0:
+        _git(repo_path, "checkout", "-B", branch)
     _git(repo_path, "add", str(spec_rel))
     diff = _git(repo_path, "diff", "--cached", "--quiet", check=False)
     if diff.returncode == 0:

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Iterable
 
 
-REQUIRED_SECTIONS = ("## Problem", "## Proposed Approach", "## Acceptance Criteria")
+REQUIRED_SECTIONS = ("## Classification", "## Problem Analysis", "## Proposed Approach")
 
 
 class SpecEvalFailure(AssertionError):
@@ -42,4 +42,3 @@ def evaluate_specs(cases: Iterable[dict]) -> SpecMetrics:
     if failures:
         raise SpecEvalFailure(f"spec eval failed: {failures}")
     return metrics
-
