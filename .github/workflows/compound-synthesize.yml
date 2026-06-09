@@ -1,0 +1,173 @@
+name: Compound Synthesize
+
+on:
+  workflow_dispatch:
+  # schedule:
+  #   - cron: '0 6 * * 1'
+  # # Enable weekly synthesis by uncommenting; incurs ~1 model call/week
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  synthesize:
+    runs-on: ubuntu-latest
+    env:
+      BASE_BRANCH: ${{ github.event.repository.default_branch }}
+      SYNTHESIS_BRANCH: compound/synthesis-${{ github.run_id }}
+    steps:
+      - name: Checkout default branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          token: ${{ secrets.PUSH_TOKEN }}
+          fetch-depth: 0
+
+      - name: Read compound queue
+        id: queue
+        run: |
+          set -euo pipefail
+          if ! git fetch origin compound-queue:refs/remotes/origin/compound-queue; then
+            echo "queue empty, nothing to synthesize"
+            echo "has_queue=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if ! git cat-file -e origin/compound-queue:compound-queue.jsonl 2>/dev/null; then
+            echo "queue empty, nothing to synthesize"
+            echo "has_queue=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git show origin/compound-queue:compound-queue.jsonl > /tmp/compound-queue.jsonl
+          if [ ! -s /tmp/compound-queue.jsonl ]; then
+            echo "queue empty, nothing to synthesize"
+            echo "has_queue=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "has_queue=true" >> "$GITHUB_OUTPUT"
+
+      - name: Build synthesis prompt
+        if: steps.queue.outputs.has_queue == 'true'
+        run: |
+          set -euo pipefail
+          today="$(date -u '+%Y-%m-%d')"
+          cat > /tmp/system_prompt.txt <<'SYSEOF'
+          You synthesize reusable engineering lessons from merged implementation PRs.
+          Return ONLY a JSON array. Do not include prose, markdown fences, commentary, or explanations outside the array.
+          Each array item must match this schema:
+          {
+            "category": "integration-issues|logic-errors|design-decisions|runtime-errors",
+            "slug": "lowercase-kebab-case",
+            "title": "Human-readable title",
+            "tags": ["tag-one", "tag-two"],
+            "date": "YYYY-MM-DD",
+            "markdown": "## Problem\n...\n\n## Root Cause\n...\n\n## Solution\n...\n\n## Prevention\n..."
+          }
+          Create one entry per genuinely reusable learning. Return [] if none are worthy.
+          Do not include secrets, credentials, tokens, private URLs, personal data, or sensitive operational details.
+          SYSEOF
+
+          cat > /tmp/user_message.txt <<MSGEOF
+          Today is $today.
+
+          Synthesize reusable engineering learnings from these merged implementation PR queue entries.
+          Ignore entries that do not contain a lesson that should become long-lived documentation.
+
+          ## Queue Entries
+          $(cat /tmp/compound-queue.jsonl)
+          MSGEOF
+
+      - name: Call LLM
+        if: steps.queue.outputs.has_queue == 'true'
+        env:
+          OBSERVER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "$OBSERVER_API_KEY" ]; then
+            echo "::error::OPENROUTER_API_KEY is not configured"
+            exit 1
+          fi
+
+          # Call LLM via OpenAI-compatible API
+          jq -n \
+            --rawfile system /tmp/system_prompt.txt \
+            --rawfile user /tmp/user_message.txt \
+            '{
+              model: "anthropic/claude-sonnet-4",
+              max_tokens: 4096,
+              messages: [{role: "system", content: $system}, {role: "user", content: $user}]
+            }' > /tmp/request.json
+
+          # NOTE: Expects OpenAI-compatible chat/completions endpoint.
+          # Use OpenRouter or similar proxy for non-OpenAI providers.
+          http_code=$(curl -s -w '%{http_code}' -o /tmp/llm_response.json \
+            -H "Authorization: Bearer $OBSERVER_API_KEY" \
+            -H "content-type: application/json" \
+            -d @/tmp/request.json \
+            https://openrouter.ai/api/v1/chat/completions)
+
+          if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+            :
+          else
+            api_error=$(jq -r '.error.message // "unknown error"' /tmp/llm_response.json 2>/dev/null || echo "HTTP $http_code")
+            echo "::error::Synthesis LLM returned HTTP $http_code: $api_error"
+            exit 1
+          fi
+
+      - name: Render solution docs
+        if: steps.queue.outputs.has_queue == 'true'
+        id: render
+        run: |
+          set -euo pipefail
+          bash .github/scripts/compound-render-docs.sh /tmp/llm_response.json | tee /tmp/compound-written.txt
+          if [ -s /tmp/compound-written.txt ]; then
+            echo "written=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "written=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Sanitise rendered solution docs
+        if: steps.queue.outputs.has_queue == 'true' && steps.render.outputs.written == 'true'
+        run: |
+          set -euo pipefail
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            [ ! -f "$f" ] && continue
+            if ! bash company/scripts/sanitise.sh < "$f" > /dev/null; then
+              echo "::error::sanitise.sh rejected $f — not publishing synthesized docs"; exit 1
+            fi
+          done < /tmp/compound-written.txt
+
+      - name: Push synthesis docs branch and open PR
+        if: steps.queue.outputs.has_queue == 'true' && steps.render.outputs.written == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.PUSH_TOKEN }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$SYNTHESIS_BRANCH"
+          git add docs/solutions/
+          git commit -m "docs: synthesize compound learnings"
+          git push origin "$SYNTHESIS_BRANCH"
+          gh pr create \
+            --base "$BASE_BRANCH" \
+            --head "$SYNTHESIS_BRANCH" \
+            --title "docs: synthesize compound learnings" \
+            --body "Adds reusable solution notes synthesized from the compound learning queue."
+
+      - name: Truncate compound queue
+        if: steps.queue.outputs.has_queue == 'true'
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin compound-queue:compound-queue
+          git switch compound-queue
+          : > compound-queue.jsonl
+          git add compound-queue.jsonl
+          git commit -m "queue: truncate after synthesis run ${{ github.run_id }}"
+          git push origin compound-queue

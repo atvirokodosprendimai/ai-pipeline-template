@@ -1,0 +1,72 @@
+name: Compound Capture
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: compound-queue-append
+  cancel-in-progress: false
+
+jobs:
+  capture:
+    if: >-
+      github.event.pull_request.merged == true &&
+      !contains(github.event.pull_request.title, 'spec:') &&
+      !contains(github.event.pull_request.title, 'heal:') &&
+      !contains(github.event.pull_request.title, 'loop:')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout default branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          token: ${{ secrets.PUSH_TOKEN }}
+          fetch-depth: 0
+
+      - name: Checkout or create compound queue branch
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git ls-remote --exit-code --heads origin compound-queue >/dev/null 2>&1; then
+            git fetch origin compound-queue:compound-queue
+            git switch compound-queue
+          else
+            git switch -c compound-queue
+            touch compound-queue.jsonl
+            git add compound-queue.jsonl
+            git commit -m "queue: initialize compound queue"
+            git push origin compound-queue
+          fi
+
+      - name: Append merged PR to compound queue
+        env:
+          GH_TOKEN: ${{ secrets.PUSH_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          MERGED_AT: ${{ github.event.pull_request.merged_at }}
+        run: |
+          set -euo pipefail
+          ISSUE_NUMBER="$(printf '%s\n' "$PR_TITLE" | grep -oE 'Issue #[0-9]+' | grep -oE '[0-9]+' | head -1 || true)"
+          FILES="$(gh pr view "$PR_NUMBER" --json files --jq '[.files[].path] | join("\n")')"
+          if ! printf '%s\n%s\n%s\n' "$PR_TITLE" "$PR_BODY" "$FILES" | bash company/scripts/sanitise.sh > /dev/null; then
+            echo "::error::sanitise.sh rejected PR #$PR_NUMBER content — not appending to compound queue"; exit 1
+          fi
+          export ISSUE_NUMBER FILES
+          bash .github/scripts/compound-queue-append.sh compound-queue.jsonl
+
+      - name: Push compound queue
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          git add compound-queue.jsonl
+          git commit -m "queue: PR #$PR_NUMBER"
+          git push origin compound-queue
