@@ -75,7 +75,7 @@ jobs:
                         f"session={s.get('sessionId')} trace={s.get('traceId')} "
                         f"type={s.get('dataType')}")
           except Exception:
-              print("  (raw)", bodytext)
+              print("  (unparseable response; status above — body withheld to avoid re-logging old trace inputs)")
 
           print("\n=== GET recent traces (sessions wired?) ===")
           status, bodytext = call("GET", "/api/public/traces?limit=8")
@@ -85,5 +85,5 @@ jobs:
               for t in data.get("data", [])[:8]:
                   print(f"  - {t.get('name')} session={t.get('sessionId')}")
           except Exception:
-              print("  (raw)", bodytext)
+              print("  (unparseable response; status above — body withheld to avoid re-logging old trace inputs)")
           PY
