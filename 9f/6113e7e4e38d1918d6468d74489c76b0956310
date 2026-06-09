@@ -1,0 +1,25 @@
+.github/workflows/provision-pipeline-box.yml
+  s_56171e20dfcea0::t_fbfe59f9a81c24 163-170
+  s_56171e20dfcea0::t_bece32965031ce 190-195
+  s_56171e20dfcea0::t_707b9d78317b63 14-18
+pipeline/tests/test_goose_env.py
+  s_56171e20dfcea0::t_6454acbed77826 221-242
+pipeline/wgmesh_pipeline/goose/runner.py
+  s_56171e20dfcea0::t_f61ee1fa959dd8 37-39,41-50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "9f6113e7e4e38d1918d6468d74489c76b0956310",
+  "prompts": {},
+  "sessions": {
+    "s_56171e20dfcea0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "092640f5-451b-4c0a-8ce0-e37c90789114",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
