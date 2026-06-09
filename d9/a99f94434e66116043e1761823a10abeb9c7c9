@@ -1,0 +1,39 @@
+.github/workflows/spec-validation.yml
+  s_64f5490698279f::t_fe4fa759d47b9b 127-128
+.github/workflows/observation-loop.yml
+  s_64f5490698279f::t_b5b1cb3927c4f1 565-566
+.github/workflows/impl-merged-close.yml
+  s_64f5490698279f::t_3635733eddd74a 44-45
+.github/workflows/health-check.yml
+  s_64f5490698279f::t_82d272659c8330 87-88
+.github/workflows/heartbeat-pr-automerge.yml
+  s_64f5490698279f::t_7769620b718003 269-270
+.github/workflows/spec-merged-build.yml
+  s_64f5490698279f::t_9018b304904e28 67-68
+.github/workflows/pipeline-health.yml
+  s_64f5490698279f::t_12799cde502c2a 899-900
+.github/workflows/strategy-audit.yml
+  s_64f5490698279f::t_86e5ae2c5db011 412-413
+.github/workflows/copilot-triage.yml
+  s_64f5490698279f::t_86865eb92077b7 123-124
+.github/workflows/approve-build.yml
+  s_64f5490698279f::t_428fe133f551cf 80-81,206-207
+.github/workflows/copilot-undraft.yml
+  s_64f5490698279f::t_6079dab8812570 42-43
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "d9a99f94434e66116043e1761823a10abeb9c7c9",
+  "prompts": {},
+  "sessions": {
+    "s_64f5490698279f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ead68-9192-7fe3-9a29-c27539df0981",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
