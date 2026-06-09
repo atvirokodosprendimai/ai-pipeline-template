@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Callable, Mapping, Sequence
 
 from wgmesh_pipeline.config import Config, DEFAULT_GOOSE_MODEL, DEFAULT_GOOSE_PROVIDER
+from wgmesh_pipeline.models import ModelProfile, credential_for
 
 
 SubprocessRunner = Callable[..., subprocess.CompletedProcess[str]]
@@ -85,18 +86,69 @@ def _is_safe_var(name: str) -> bool:
     return name in _SAFE_ENV_NAMES or name.startswith(_SAFE_ENV_PREFIXES)
 
 
-def build_goose_env(config: Config, base_env: Mapping[str, str] | None = None) -> dict[str, str]:
+def build_goose_env(
+    config: Config,
+    base_env: Mapping[str, str] | None = None,
+    *,
+    profile: ModelProfile | None = None,
+) -> dict[str, str]:
     """Subprocess env for Goose: fail-closed allowlist of known-safe vars, then
-    the single LLM credential Goose legitimately needs added back explicitly.
+    the single LLM credential the selected model needs added back explicitly.
     Anything not on the allowlist (incl. the box's PAT and any unknown secret)
-    is dropped — the LLM agent never sees it."""
+    is dropped — the LLM agent never sees it.
+
+    When ``profile`` is given, the model's provider/model/credential/host come
+    from that profile and the credential value is read from the (filtered)
+    source env named by ``profile.credential_env``. This is what lets multiple
+    providers — including two Anthropic-family models (z.ai and real Anthropic)
+    — coexist in one process: each call writes only its OWN credential, so there
+    is no global ANTHROPIC_API_KEY hijack.
+
+    When ``profile`` is None, the legacy zero-config behavior applies (single
+    z.ai model from the config fields) so existing call sites are unchanged."""
     source = os.environ if base_env is None else base_env
     env = {key: value for key, value in source.items() if _is_safe_var(key)}
+    if profile is None:
+        _apply_legacy_default(env, config, source)
+    else:
+        _apply_profile(env, profile, source)
+    _apply_langfuse(env, config)
+    return env
+
+
+def _apply_legacy_default(env: dict[str, str], config: Config, source: Mapping[str, str]) -> None:
+    """Pre-routing behavior: one z.ai model from config, provider/model
+    overridable via the source env. Kept verbatim for backward compatibility."""
     if config.zai_api_key:
         env["ANTHROPIC_API_KEY"] = config.zai_api_key
     env["ANTHROPIC_HOST"] = config.anthropic_host
     env["GOOSE_PROVIDER"] = source.get("GOOSE_PROVIDER") or getattr(config, "goose_provider", DEFAULT_GOOSE_PROVIDER)
     env["GOOSE_MODEL"] = source.get("GOOSE_MODEL") or getattr(config, "goose_model", DEFAULT_GOOSE_MODEL)
+
+
+def _apply_profile(env: dict[str, str], profile: ModelProfile, source: Mapping[str, str]) -> None:
+    """Profile-driven model selection. Fail-closed: an unsupported provider/
+    billing combo or a missing credential raises rather than silently running
+    Goose against the wrong (or no) model."""
+    env["GOOSE_PROVIDER"] = profile.provider
+    env["GOOSE_MODEL"] = profile.model
+    cred = credential_for(profile, source)  # raises if the named var is unset
+    if profile.billing == "openrouter":
+        env["OPENROUTER_API_KEY"] = cred
+    elif profile.billing == "native" and profile.provider == "anthropic":
+        # z.ai today, real Anthropic later — distinguished only by host + key,
+        # both written per-call so the two never collide.
+        env["ANTHROPIC_API_KEY"] = cred
+        if profile.host:
+            env["ANTHROPIC_HOST"] = profile.host
+    else:
+        raise ValueError(
+            f"model profile {profile.key!r}: unsupported native provider "
+            f"{profile.provider!r}; route it via OpenRouter (billing='openrouter')"
+        )
+
+
+def _apply_langfuse(env: dict[str, str], config: Config) -> None:
     # Cost-capture: hand Goose the Langfuse creds so it exports its OWN LLM
     # generations (model + token usage + cost) to Langfuse -> populates the
     # per-model cost dashboards (the price half of price/performance routing).
@@ -109,7 +161,6 @@ def build_goose_env(config: Config, base_env: Mapping[str, str] | None = None) -
         env["LANGFUSE_URL"] = lf_host
         env["LANGFUSE_PUBLIC_KEY"] = lf_pub
         env["LANGFUSE_SECRET_KEY"] = lf_sec
-    return env
 
 
 @dataclass(frozen=True)

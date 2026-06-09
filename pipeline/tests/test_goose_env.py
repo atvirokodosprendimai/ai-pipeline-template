@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import pytest
+
 from wgmesh_pipeline.goose.runner import _is_secret_var, build_goose_env
+from wgmesh_pipeline.models import ModelProfile
 
 
 @dataclass(frozen=True)
@@ -122,3 +125,108 @@ def test_build_goose_env_omits_langfuse_when_unconfigured() -> None:
     env = build_goose_env(_Cfg(), base_env={"PATH": "/usr/bin"})
     assert "LANGFUSE_URL" not in env
     assert "LANGFUSE_SECRET_KEY" not in env
+
+
+# --- profile-driven routing (U2) ---------------------------------------------
+
+_ZAI = ModelProfile(
+    key="spec-cheap",
+    provider="anthropic",
+    model="GLM-4.7",
+    billing="native",
+    credential_env="ZAI_API_KEY",
+    host="https://api.z.ai/api/anthropic",
+)
+_REAL_ANTHROPIC = ModelProfile(
+    key="impl-claude",
+    provider="anthropic",
+    model="claude-sonnet-4-6",
+    billing="native",
+    credential_env="ANTHROPIC_API_KEY",
+    host="https://api.anthropic.com",
+)
+_OPENROUTER = ModelProfile(
+    key="impl-or",
+    provider="openrouter",
+    model="deepseek/deepseek-chat",
+    billing="openrouter",
+    credential_env="OPENROUTER_API_KEY",
+)
+
+
+def test_profile_native_anthropic_zai() -> None:
+    env = build_goose_env(
+        _Cfg(), base_env={"PATH": "/usr/bin", "ZAI_API_KEY": "zai-key"}, profile=_ZAI
+    )
+    assert env["GOOSE_PROVIDER"] == "anthropic"
+    assert env["GOOSE_MODEL"] == "GLM-4.7"
+    assert env["ANTHROPIC_API_KEY"] == "zai-key"
+    assert env["ANTHROPIC_HOST"] == "https://api.z.ai/api/anthropic"
+
+
+def test_two_anthropic_profiles_do_not_collide() -> None:
+    # R2 regression guard: z.ai-as-Anthropic and real Anthropic built in the
+    # same process produce distinct envs — no global ANTHROPIC_API_KEY hijack.
+    base = {"PATH": "/usr/bin", "ZAI_API_KEY": "zai-key", "ANTHROPIC_API_KEY": "real-key"}
+    zai_env = build_goose_env(_Cfg(), base_env=base, profile=_ZAI)
+    real_env = build_goose_env(_Cfg(), base_env=base, profile=_REAL_ANTHROPIC)
+    assert zai_env["ANTHROPIC_API_KEY"] == "zai-key"
+    assert zai_env["ANTHROPIC_HOST"] == "https://api.z.ai/api/anthropic"
+    assert real_env["ANTHROPIC_API_KEY"] == "real-key"
+    assert real_env["ANTHROPIC_HOST"] == "https://api.anthropic.com"
+    assert real_env["GOOSE_MODEL"] == "claude-sonnet-4-6"
+
+
+def test_profile_openrouter() -> None:
+    env = build_goose_env(
+        _Cfg(),
+        base_env={"PATH": "/usr/bin", "OPENROUTER_API_KEY": "or-key"},
+        profile=_OPENROUTER,
+    )
+    assert env["GOOSE_PROVIDER"] == "openrouter"
+    assert env["GOOSE_MODEL"] == "deepseek/deepseek-chat"
+    assert env["OPENROUTER_API_KEY"] == "or-key"
+    assert "ANTHROPIC_API_KEY" not in env
+    assert "ANTHROPIC_HOST" not in env
+
+
+def test_profile_still_strips_box_secrets() -> None:
+    base = {"PATH": "/usr/bin", "ZAI_API_KEY": "zai-key", "WGMESH_BOT_PAT": "ghp_x", "DB_PASSWORD": "p"}
+    env = build_goose_env(_Cfg(), base_env=base, profile=_ZAI)
+    assert "WGMESH_BOT_PAT" not in env
+    assert "DB_PASSWORD" not in env
+
+
+def test_profile_keeps_langfuse_creds() -> None:
+    @dataclass(frozen=True)
+    class _LfCfg:
+        zai_api_key: str | None = None
+        anthropic_host: str = "https://api.z.ai/api/anthropic"
+        langfuse_host: str | None = "http://lf:3000"
+        langfuse_public_key: str | None = "pk"
+        langfuse_secret_key: str | None = "sk"
+
+    env = build_goose_env(
+        _LfCfg(), base_env={"PATH": "/usr/bin", "ZAI_API_KEY": "zai-key"}, profile=_ZAI
+    )
+    assert env["LANGFUSE_URL"] == "http://lf:3000"
+    assert env["LANGFUSE_SECRET_KEY"] == "sk"
+
+
+def test_profile_missing_credential_raises() -> None:
+    with pytest.raises(ValueError, match="ZAI_API_KEY, which is unset"):
+        build_goose_env(_Cfg(), base_env={"PATH": "/usr/bin"}, profile=_ZAI)
+
+
+def test_profile_unsupported_native_provider_raises() -> None:
+    minimax_native = ModelProfile(
+        key="minimax",
+        provider="minimax",
+        model="abab6.5",
+        billing="native",
+        credential_env="MINIMAX_API_KEY",
+    )
+    with pytest.raises(ValueError, match="route it via OpenRouter"):
+        build_goose_env(
+            _Cfg(), base_env={"PATH": "/usr/bin", "MINIMAX_API_KEY": "m"}, profile=minimax_native
+        )
