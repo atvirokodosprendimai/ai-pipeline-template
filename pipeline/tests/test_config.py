@@ -27,6 +27,7 @@ def test_full_env_loads_frozen_config_with_shadow_default() -> None:
     assert cfg.repo == "wgmesh"
     assert cfg.poll_interval_seconds == 60
     assert cfg.max_files == 5
+    assert cfg.max_escalation_attempts == 2
     assert cfg.database_mode == "local"
     assert cfg.repo_path == "/opt/wgmesh-checkout"
     assert Path(cfg.recipes_dir).name == "recipes"
@@ -106,6 +107,7 @@ def test_zero_config_synthesizes_default_profile_matching_goose_fields() -> None
     assert default.credential_env == "ZAI_API_KEY"
     assert default.host == cfg.anthropic_host
     assert cfg.stage_routing == {}
+    assert cfg.max_escalation_attempts == 2
 
 
 def test_explicit_registry_and_routing_parse_into_config() -> None:
@@ -123,9 +125,32 @@ def test_explicit_registry_and_routing_parse_into_config() -> None:
         }
     )
     assert set(cfg.model_registry) == {"cheap", "capable"}
-    assert cfg.stage_routing == {"spec": "cheap", "implement": "capable"}
+    assert cfg.stage_routing == {"spec": ("cheap",), "implement": ("capable",)}
     # explicit registry is NOT overwritten by the zero-config default
     assert "default" not in cfg.model_registry
+
+
+def test_max_escalation_attempts_unset_defaults_and_invalid_values_raise() -> None:
+    cfg = load_config({"TARGET_REPO": "atvirokodosprendimai/wgmesh", "DATABASE_MODE": "local"})
+    assert cfg.max_escalation_attempts == 2
+
+    with pytest.raises(ValueError, match="MAX_ESCALATION_ATTEMPTS must be an integer"):
+        load_config(
+            {
+                "TARGET_REPO": "atvirokodosprendimai/wgmesh",
+                "DATABASE_MODE": "local",
+                "MAX_ESCALATION_ATTEMPTS": "nope",
+            }
+        )
+
+    with pytest.raises(ValueError, match="MAX_ESCALATION_ATTEMPTS must be positive"):
+        load_config(
+            {
+                "TARGET_REPO": "atvirokodosprendimai/wgmesh",
+                "DATABASE_MODE": "local",
+                "MAX_ESCALATION_ATTEMPTS": "0",
+            }
+        )
 
 
 def test_malformed_registry_env_fails_loud() -> None:
