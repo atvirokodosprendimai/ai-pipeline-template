@@ -1,0 +1,19 @@
+.github/workflows/provision-pipeline-box.yml
+  s_477336517b3bdf::t_20506ab74e97ed 30-31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "3c0711300523197776d08a41635225d5802d1647",
+  "prompts": {},
+  "sessions": {
+    "s_477336517b3bdf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bb3676d0-f730-4ba0-9b2f-ff2bad036c6d",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
