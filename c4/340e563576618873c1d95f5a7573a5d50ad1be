@@ -1,0 +1,19 @@
+.github/workflows/langfuse-llm-connection.yml
+  s_403b655a6daaae::t_6b7de6e3a71933 1-85
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "c4340e563576618873c1d95f5a7573a5d50ad1be",
+  "prompts": {},
+  "sessions": {
+    "s_403b655a6daaae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d88b5efe-79e0-419a-9f1b-6e46c07d8d55",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
