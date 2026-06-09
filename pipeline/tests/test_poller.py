@@ -313,6 +313,24 @@ def test_specced_issue_opens_spec_pr_then_stops_in_spec_only(tmp_path, cfg: Conf
     assert p.graph.calls == ["spec_pr"]
 
 
+def test_spec_opened_terminal_is_scored_in_spec_only(tmp_path, cfg: Config) -> None:
+    """spec_opened (spec-only terminal) emits a score so the Langfuse Scores
+    view reflects spec-only throughput, not just escalate/error/merge."""
+    from wgmesh_pipeline.scoring import init_scoring
+    spec_only = Config(target_repo=cfg.target_repo, mode="spec-only", max_files=cfg.max_files)
+    scorer = RecordingScorer()
+    init_scoring(spec_only, scorer=scorer)
+    try:
+        p = poller(tmp_path, spec_only)
+        p.store.upsert_issue(1, "Already specced", stage="specced")
+        asyncio.run(p.tick())
+        outcomes = [c["outcome"] for c in scorer.calls]
+        assert "spec_opened" in outcomes
+        assert [c for c in scorer.calls if c["outcome"] == "spec_opened"][0]["issue"] == 1
+    finally:
+        init_scoring(Config(target_repo=cfg.target_repo))  # reset module scorer
+
+
 def test_specced_issue_in_shadow_does_not_open_spec_pr_or_advance(tmp_path, cfg: Config) -> None:
     p = poller(tmp_path, cfg)
     p.store.upsert_issue(1, "Already specced", stage="specced")
