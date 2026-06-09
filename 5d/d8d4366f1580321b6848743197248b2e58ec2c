@@ -1,0 +1,19 @@
+docs/plans/2026-06-09-002-feat-escalate-on-fail-ladder-plan.md
+  s_56171e20dfcea0::t_0a5434f2dc5f70 1-413
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "5dd8d4366f1580321b6848743197248b2e58ec2c",
+  "prompts": {},
+  "sessions": {
+    "s_56171e20dfcea0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "092640f5-451b-4c0a-8ce0-e37c90789114",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
