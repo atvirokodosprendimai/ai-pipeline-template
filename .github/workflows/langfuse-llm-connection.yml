@@ -1,0 +1,85 @@
+name: Langfuse LLM Connection
+
+# Provisions the Langfuse LLM connection used by the Playground + managed
+# LLM-as-a-Judge evaluators. z.ai is Anthropic-compatible, so we register it
+# via the anthropic adapter with a custom baseURL. Idempotent: upserts on
+# `provider` (PUT /api/public/llm-connections).
+
+on:
+  workflow_dispatch:
+    inputs:
+      provider:
+        description: 'Connection name (unique, upsert key)'
+        default: 'zai'
+      model:
+        description: 'Custom model name'
+        default: 'glm-4.6'
+
+permissions:
+  contents: read
+
+jobs:
+  connect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate secrets
+        env:
+          LANGFUSE_HOST: ${{ secrets.LANGFUSE_HOST }}
+          LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+          LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set -euo pipefail
+          : "${LANGFUSE_HOST:?}"; : "${LANGFUSE_PUBLIC_KEY:?}"; : "${LANGFUSE_SECRET_KEY:?}"; : "${ANTHROPIC_API_KEY:?}"
+
+      - name: Upsert LLM connection
+        env:
+          LANGFUSE_HOST: ${{ secrets.LANGFUSE_HOST }}
+          LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+          LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          PROVIDER: ${{ github.event.inputs.provider }}
+          MODEL: ${{ github.event.inputs.model }}
+        run: |
+          python - <<'PY'
+          import os, base64, json, urllib.request, urllib.error
+
+          host = os.environ["LANGFUSE_HOST"].rstrip("/")
+          auth = base64.b64encode(
+              f'{os.environ["LANGFUSE_PUBLIC_KEY"]}:{os.environ["LANGFUSE_SECRET_KEY"]}'.encode()
+          ).decode()
+
+          def call(method, path, body=None):
+              data = json.dumps(body).encode() if body is not None else None
+              req = urllib.request.Request(
+                  host + path, method=method, data=data,
+                  headers={"Authorization": "Basic " + auth, "Content-Type": "application/json"})
+              try:
+                  with urllib.request.urlopen(req, timeout=25) as r:
+                      return r.status, r.read().decode()[:600]
+              except urllib.error.HTTPError as e:
+                  return e.code, e.read().decode()[:600]
+
+          # z.ai is Anthropic-compatible (same endpoint goose uses).
+          body = {
+              "provider": os.environ["PROVIDER"],
+              "adapter": "anthropic",
+              "secretKey": os.environ["ANTHROPIC_API_KEY"],
+              "baseURL": "https://api.z.ai/api/anthropic",
+              "customModels": [os.environ["MODEL"]],
+              "withDefaultModels": False,
+          }
+          print("=== PUT llm-connection ===")
+          status, resp = call("PUT", "/api/public/llm-connections", body)
+          # mask any echo of the key in the response
+          print("status:", status, "| body:", resp.replace(os.environ["ANTHROPIC_API_KEY"], "***"))
+
+          print("\n=== GET llm-connections (verify) ===")
+          status, resp = call("GET", "/api/public/llm-connections")
+          try:
+              for c in json.loads(resp).get("data", []):
+                  print(f"  - provider={c.get('provider')} adapter={c.get('adapter')} "
+                        f"models={c.get('customModels')} baseURL={c.get('baseURL')}")
+          except Exception:
+              print("  status:", status)
+          PY
