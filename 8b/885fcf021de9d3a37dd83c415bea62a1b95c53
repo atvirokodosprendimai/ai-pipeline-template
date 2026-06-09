@@ -1,0 +1,25 @@
+AGENTS.md
+  s_56171e20dfcea0::t_9e570bf8fb7859 116-137
+company/system-prompt.md
+  s_56171e20dfcea0::t_95e2de77633cfe 41-45
+docs/solutions/design-decisions/multi-model-routing.md
+  s_56171e20dfcea0::t_cb1a6cb49533cf 1-74
+memory/MEMORY.md
+  s_56171e20dfcea0::t_38f1572f51b5d3 41
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "8b885fcf021de9d3a37dd83c415bea62a1b95c53",
+  "prompts": {},
+  "sessions": {
+    "s_56171e20dfcea0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "092640f5-451b-4c0a-8ce0-e37c90789114",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
