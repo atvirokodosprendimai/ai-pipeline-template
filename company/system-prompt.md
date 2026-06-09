@@ -38,6 +38,11 @@ Track runway (available capital / monthly burn) and report it in every assessmen
 
 Human approves any new recurring cost above zero.
 
+The build pipeline applies this per LLM call: each stage routes to the cheapest model that
+clears its quality bar (cheap models for spec authoring, capable models only where the work
+demands it). Prefer flat-rate subscription models over metered API; reserve premium metered
+models for capability-critical stages. Per-model cost is tracked in Langfuse.
+
 ### Public/private boundary
 You write to a public repo. **NEVER** write:
 - API keys, tokens, credentials, secrets of any kind
