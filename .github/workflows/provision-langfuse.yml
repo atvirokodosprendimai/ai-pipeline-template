@@ -105,6 +105,12 @@ jobs:
           IP="$1"; LF_PUB="$2"; LF_SEC="$3"; ADMINPW="$4"
           cd /opt/langfuse
           curl -fsSL https://raw.githubusercontent.com/langfuse/langfuse/main/docker-compose.yml -o docker-compose.yml
+          # Pin ClickHouse: langfuse's compose leaves it untagged (=latest), which
+          # drifted to 26.5 and broke the v3 scores.all query ("Not found column
+          # and(...)"). 25.12 is the version langfuse actually tests against
+          # (their docker-compose.dev.yml). Pin only if still untagged.
+          sed -i 's#\(image: *docker.io/clickhouse/clickhouse-server\)$#\1:25.12#' docker-compose.yml
+          sed -i 's#\(image: *clickhouse/clickhouse-server\)$#\1:25.12#' docker-compose.yml
           if [ ! -f .env ]; then
             gen() { openssl rand -hex 32; }
             PG=$(gen); CH=$(gen); MN=$(gen); RD=$(gen)
