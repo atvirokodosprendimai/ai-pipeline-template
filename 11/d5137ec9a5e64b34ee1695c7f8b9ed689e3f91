@@ -1,0 +1,23 @@
+AGENTS.md
+  s_477336517b3bdf::t_9b2f17c3233ff9 34
+CONCEPTS.md
+  s_477336517b3bdf::t_35f962c3411617 87-92
+docs/solutions/runtime-errors/goose-weak-model-prints-spec-instead-of-writing.md
+  s_477336517b3bdf::t_7f1aa7dfcf1ae2 1-118
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "11d5137ec9a5e64b34ee1695c7f8b9ed689e3f91",
+  "prompts": {},
+  "sessions": {
+    "s_477336517b3bdf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bb3676d0-f730-4ba0-9b2f-ff2bad036c6d",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
