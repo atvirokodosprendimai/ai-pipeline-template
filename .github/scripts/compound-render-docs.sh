@@ -57,6 +57,11 @@ jq -c '.[]' "$tmp_array" | while IFS= read -r entry; do
   date="$(printf '%s\n' "$entry" | jq -r '.date // ""')"
   tags_line="$(printf '%s\n' "$entry" | jq -r '(.tags // []) | map(tostring) | "tags: [" + join(", ") + "]"')"
   markdown="$(printf '%s\n' "$entry" | jq -r '.markdown // ""')"
+  title="${title//$'\r'/ }"
+  title="${title//$'\n'/ }"
+  if ! [[ "$date" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+    date=$(date -u +%F)
+  fi
 
   {
     echo "---"

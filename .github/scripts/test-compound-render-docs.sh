@@ -78,4 +78,55 @@ grep -Fq 'tags: [logic, synthesis]' "$expected_two" || fail "logic tags frontmat
 grep -Fxq 'docs/solutions/integration-issues/valid-integration.md' "$output" || fail "integration output path missing"
 grep -Fxq 'docs/solutions/logic-errors/valid-logic.md' "$output" || fail "logic output path missing"
 
+newline_fixture="$tmp_dir/newline-title.json"
+newline_output="$tmp_dir/newline-title-output.txt"
+cat > "$newline_fixture" <<'JSON'
+[
+  {
+    "category": "design-decisions",
+    "slug": "newline-title",
+    "title": "First line\nSecond line",
+    "tags": ["frontmatter"],
+    "date": "2026-06-05",
+    "markdown": "## Problem\n\nTitle contained a newline."
+  }
+]
+JSON
+
+(
+  cd "$tmp_dir"
+  bash "$script_dir/compound-render-docs.sh" "$newline_fixture" > "$newline_output"
+)
+
+newline_doc="$tmp_dir/docs/solutions/design-decisions/newline-title.md"
+[[ -f "$newline_doc" ]] || fail "missing newline title doc"
+grep -Fxq 'title: "First line Second line"' "$newline_doc" || fail "title newline was not rendered as single-line YAML"
+[[ "$(sed -n '2p' "$newline_doc")" == 'title: "First line Second line"' ]] || fail "title frontmatter line mismatch"
+[[ "$(sed -n '3p' "$newline_doc")" == 'category: design-decisions' ]] || fail "title newline spilled into next frontmatter line"
+
+invalid_date_fixture="$tmp_dir/invalid-date.json"
+invalid_date_output="$tmp_dir/invalid-date-output.txt"
+cat > "$invalid_date_fixture" <<'JSON'
+[
+  {
+    "category": "runtime-errors",
+    "slug": "invalid-date",
+    "title": "Invalid date",
+    "tags": ["frontmatter"],
+    "date": "not-a-date",
+    "markdown": "## Problem\n\nDate was invalid."
+  }
+]
+JSON
+
+(
+  cd "$tmp_dir"
+  bash "$script_dir/compound-render-docs.sh" "$invalid_date_fixture" > "$invalid_date_output"
+)
+
+invalid_date_doc="$tmp_dir/docs/solutions/runtime-errors/invalid-date.md"
+[[ -f "$invalid_date_doc" ]] || fail "missing invalid date doc"
+rendered_date="$(sed -n '4s/^date: //p' "$invalid_date_doc")"
+[[ "$rendered_date" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || fail "invalid date did not fall back to YYYY-MM-DD"
+
 echo "PASS: compound-render-docs"

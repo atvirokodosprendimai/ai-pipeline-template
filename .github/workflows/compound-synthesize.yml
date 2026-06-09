@@ -110,11 +110,7 @@ jobs:
             https://openrouter.ai/api/v1/chat/completions)
 
           if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
-            content=$(jq -r '.choices[0].message.content' /tmp/llm_response.json)
-            echo "$content" | sed -n '/^```json/,/^```$/p' | sed '1d;$d' > /tmp/synthesis.json
-            if [ ! -s /tmp/synthesis.json ]; then
-              echo "$content" | jq . > /tmp/synthesis.json 2>/dev/null || echo "$content" > /tmp/synthesis.json
-            fi
+            :
           else
             api_error=$(jq -r '.error.message // "unknown error"' /tmp/llm_response.json 2>/dev/null || echo "HTTP $http_code")
             echo "::error::Synthesis LLM returned HTTP $http_code: $api_error"
@@ -132,6 +128,18 @@ jobs:
           else
             echo "written=false" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Sanitise rendered solution docs
+        if: steps.queue.outputs.has_queue == 'true' && steps.render.outputs.written == 'true'
+        run: |
+          set -euo pipefail
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            [ ! -f "$f" ] && continue
+            if ! bash company/scripts/sanitise.sh < "$f" > /dev/null; then
+              echo "::error::sanitise.sh rejected $f — not publishing synthesized docs"; exit 1
+            fi
+          done < /tmp/compound-written.txt
 
       - name: Push synthesis docs branch and open PR
         if: steps.queue.outputs.has_queue == 'true' && steps.render.outputs.written == 'true'

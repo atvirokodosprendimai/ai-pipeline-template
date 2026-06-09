@@ -44,4 +44,16 @@ bash "$script_dir/compound-queue-append.sh" "$queue_file"
 [[ "$(wc -l < "$queue_file" | tr -d ' ')" == "2" ]] || fail "second call did not append a second line"
 [[ "$(tail -n 1 "$queue_file" | jq -r '.issue')" == "77" ]] || fail "non-empty ISSUE_NUMBER mismatch"
 
+export PR_NUMBER="125"
+export PR_TITLE="Leaky PR"
+export PR_BODY="sk-123456789012345678901234"
+export ISSUE_NUMBER=""
+export FILES="src/leak.sh"
+export MERGED_AT="2026-06-05T14:00:00Z"
+
+if printf '%s\n%s\n%s\n' "$PR_TITLE" "$PR_BODY" "$FILES" | bash "$script_dir/../../company/scripts/sanitise.sh" > /dev/null 2>&1; then
+  fail "sanitise gate accepted secret-like PR content"
+fi
+[[ "$(wc -l < "$queue_file" | tr -d ' ')" == "2" ]] || fail "sanitise rejection should prevent append"
+
 echo "PASS: compound-queue-append"

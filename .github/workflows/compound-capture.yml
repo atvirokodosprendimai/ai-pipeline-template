@@ -55,13 +55,18 @@ jobs:
         run: |
           set -euo pipefail
           ISSUE_NUMBER="$(printf '%s\n' "$PR_TITLE" | grep -oE 'Issue #[0-9]+' | grep -oE '[0-9]+' | head -1 || true)"
-          FILES="$(gh pr view ${{ github.event.pull_request.number }} --json files --jq '[.files[].path] | join("\n")')"
+          FILES="$(gh pr view "$PR_NUMBER" --json files --jq '[.files[].path] | join("\n")')"
+          if ! printf '%s\n%s\n%s\n' "$PR_TITLE" "$PR_BODY" "$FILES" | bash company/scripts/sanitise.sh > /dev/null; then
+            echo "::error::sanitise.sh rejected PR #$PR_NUMBER content — not appending to compound queue"; exit 1
+          fi
           export ISSUE_NUMBER FILES
           bash .github/scripts/compound-queue-append.sh compound-queue.jsonl
 
       - name: Push compound queue
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
           git add compound-queue.jsonl
-          git commit -m "queue: PR #${{ github.event.pull_request.number }}"
+          git commit -m "queue: PR #$PR_NUMBER"
           git push origin compound-queue
