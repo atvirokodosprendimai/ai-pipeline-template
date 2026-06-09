@@ -141,6 +141,14 @@ class GitHubClient:
             spec_pr=spec_pr,
         )
 
+    def update_pr_body(self, pr_number: int, body: str) -> Any:
+        return self._write(
+            "update_pr",
+            "PATCH",
+            f"/repos/{self.config.owner}/{self.config.repo}/pulls/{pr_number}",
+            payload={"body": body},
+        )
+
     def merge_pr(self, pr_number: int, *, commit_title: str | None = None) -> Any:
         return self._write(
             "merge_pr",
@@ -231,6 +239,8 @@ class GitHubClient:
         elif operation == "create_pr":
             self._require_clean("create_pr title", str(payload.get("title", "")))
             self._require_clean("create_pr body", str(payload.get("body", "")))
+        elif operation == "update_pr":
+            self._require_clean("update_pr body", str(payload.get("body", "")))
 
     def _sanitise_spec_files(self, clone_path: Path) -> None:
         specs_dir = clone_path / "specs"

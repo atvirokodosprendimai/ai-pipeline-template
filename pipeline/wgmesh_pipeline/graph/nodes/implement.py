@@ -37,7 +37,24 @@ def implement_node(state: GraphState) -> GraphState:
         next_state["diff"] = "+docs-only change\n"
     next_state["changed_files"] = changed_files_from_diff(next_state["diff"])
     _ensure_impl_pr(next_state)
+    if tier > 0:
+        _note_escalation_on_pr(next_state, tier)
     return next_state
+
+
+def _note_escalation_on_pr(state: dict, tier: int) -> None:
+    """On a retry pass, annotate the EXISTING impl PR with the escalated tier
+    rather than opening a second PR (R5). The body text is static (no LLM
+    content), but update_pr_body still routes through the sanitise gate."""
+    client = state.get("github")
+    impl_pr = state.get("impl_pr")
+    if client is None or impl_pr is None:
+        return
+    model = state.get("implement_model_key") or f"tier {tier}"
+    issue_number = state["issue"].number
+    body = _impl_pr_body(issue_number, state.get("changed_files", []))
+    body += f"\nEscalated to model `{model}` (tier {tier}) after a quality-gate failure.\n"
+    client.update_pr_body(int(impl_pr), body)
 
 
 def changed_files_from_diff(diff: str) -> list[str]:
