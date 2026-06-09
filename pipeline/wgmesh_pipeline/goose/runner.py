@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Callable, Mapping, Sequence
 
 from wgmesh_pipeline.config import Config, DEFAULT_GOOSE_MODEL, DEFAULT_GOOSE_PROVIDER
-from wgmesh_pipeline.models import ModelProfile, credential_for, resolve_profile
+from wgmesh_pipeline.models import ModelProfile, credential_for, resolve_profile_for_tier
 
 
 SubprocessRunner = Callable[..., subprocess.CompletedProcess[str]]
@@ -215,7 +215,7 @@ class GooseRunner:
         self.config = config
         self._runner = runner or subprocess.run
 
-    def _resolve_profile(self, stage: str | None) -> ModelProfile | None:
+    def _resolve_profile(self, stage: str | None, tier: int) -> ModelProfile | None:
         """Pick the model profile for ``stage`` from the config registry/map.
 
         Returns None when no stage is given or the config carries no registry
@@ -226,7 +226,7 @@ class GooseRunner:
         routing = getattr(self.config, "stage_routing", {}) or {}
         if stage is None or not registry:
             return None
-        return resolve_profile(registry, routing, stage)
+        return resolve_profile_for_tier(registry, routing, stage, tier)
 
     def run_recipe(
         self,
@@ -236,6 +236,7 @@ class GooseRunner:
         params: Mapping[str, str],
         expected_output: str | Path,
         stage: str | None = None,
+        tier: int = 0,
     ) -> GooseResult:
         workdir_path = Path(workdir)
         output_path = Path(expected_output)
@@ -246,7 +247,7 @@ class GooseRunner:
         for key, value in params.items():
             command.extend(["--params", f"{key}={value}"])
 
-        profile = self._resolve_profile(stage)
+        profile = self._resolve_profile(stage, tier)
         model_key = profile.key if profile is not None else None
         env = build_goose_env(self.config, profile=profile, stage=stage)
 

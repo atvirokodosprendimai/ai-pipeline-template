@@ -10,7 +10,8 @@ from wgmesh_pipeline.graph.state import GraphState
 def implement_node(state: GraphState) -> GraphState:
     next_state = dict(state)
     _visit(next_state, "implement")
-    if next_state.get("diff"):
+    tier = int(next_state.get("escalation_tier", 0))
+    if next_state.get("diff") and tier == 0:
         next_state["changed_files"] = changed_files_from_diff(next_state["diff"])
         _ensure_impl_pr(next_state)
         return next_state
@@ -25,6 +26,7 @@ def implement_node(state: GraphState) -> GraphState:
             params={"spec_file": str(next_state["spec_path"])},
             expected_output=diff_rel,
             stage="implement",
+            tier=tier,
         )
         if not result.ok:
             raise RuntimeError(result.error or "goose implementation failed")
