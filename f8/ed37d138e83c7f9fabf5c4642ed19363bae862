@@ -1,0 +1,28 @@
+pipeline/tests/test_config.py
+  s_56171e20dfcea0::t_dce030985026d3 91-141
+pipeline/wgmesh_pipeline/models.py
+  s_56171e20dfcea0::t_a165b33b9582a5 1-151
+pipeline/wgmesh_pipeline/config.py
+  s_56171e20dfcea0::t_bdcf4d2961e6a9 48-51
+  s_56171e20dfcea0::t_dae84d2f715d18 4,8-12
+  s_56171e20dfcea0::t_5cd4309abc63fa 104,110-111,119-120,124-155
+  s_56171e20dfcea0::t_87f4ec9a86baca 89-98
+pipeline/tests/test_models.py
+  s_56171e20dfcea0::t_9ccaf15b18e64a 1-112
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "f8ed37d138e83c7f9fabf5c4642ed19363bae862",
+  "prompts": {},
+  "sessions": {
+    "s_56171e20dfcea0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "092640f5-451b-4c0a-8ce0-e37c90789114",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
