@@ -1,0 +1,19 @@
+pipeline/tests/test_spec_parity.py
+  s_002dc1a5f2abbf::t_81fe98e65a4613 54-57,60,63
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "91cecf9ea4f9bf48b881ea6db322be06c77ba66d",
+  "prompts": {},
+  "sessions": {
+    "s_002dc1a5f2abbf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5686c212-4035-4bed-bb07-be27455aefb4",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
