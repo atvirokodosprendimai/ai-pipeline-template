@@ -27,7 +27,8 @@ on:
         default: 'wgmesh-pipeline'
       server_type:
         description: 'Hetzner server type'
-        default: 'cx22'
+        # cpx22 (AMD) is available at hel1; cx22 is not (hcloud: "Server Type not found").
+        default: 'cpx22'
       location:
         description: 'Hetzner location'
         default: 'hel1'
