@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import yaml
-
 from evals import spec_parity
 from evals.spec_parity import IssueSpecReference, evaluate_spec_parity
 
@@ -53,11 +51,13 @@ def test_spec_parity_similarity_scoring_uses_injected_judge(tmp_path: Path) -> N
 
 
 def test_recipe_prompt_demands_validator_sections() -> None:
-    recipe = yaml.safe_load(RECIPE.read_text())
-    prompt = recipe["prompt"]
+    # Raw-text check on purpose: CI installs only the package deps, which do
+    # not include a YAML parser. The validator headings appear solely in the
+    # recipe's prompt block, so substring assertions carry the same guarantee.
+    recipe_text = RECIPE.read_text()
 
     for section in spec_parity.REQUIRED_SECTIONS:
-        assert section in prompt
+        assert section in recipe_text
 
     for stale_heading in ("## Summary", "## Context", "## Requirements"):
-        assert stale_heading not in prompt
+        assert stale_heading not in recipe_text
