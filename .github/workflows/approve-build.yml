@@ -77,6 +77,8 @@ jobs:
 
       - name: Append spec-approval outcome to MentisDB
         if: always()
+        continue-on-error: true
+        timeout-minutes: 1
         env:
           MENTISDB_URL: ${{ secrets.MENTISDB_URL }}
           MENTISDB_USER: ${{ secrets.MENTISDB_USER }}
@@ -201,6 +203,8 @@ jobs:
 
       - name: Append spec-approval outcome to MentisDB
         if: always()
+        continue-on-error: true
+        timeout-minutes: 1
         env:
           MENTISDB_URL: ${{ secrets.MENTISDB_URL }}
           MENTISDB_USER: ${{ secrets.MENTISDB_USER }}

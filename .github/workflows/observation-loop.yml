@@ -562,6 +562,8 @@ jobs:
           mv /tmp/new-state.json company/loop-state.json
 
       - name: Append assessment to MentisDB
+        continue-on-error: true
+        timeout-minutes: 1
         env:
           MENTISDB_URL: ${{ secrets.MENTISDB_URL }}
           MENTISDB_USER: ${{ secrets.MENTISDB_USER }}
