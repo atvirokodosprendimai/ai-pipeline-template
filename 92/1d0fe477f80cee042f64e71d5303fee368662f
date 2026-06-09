@@ -1,0 +1,21 @@
+pipeline/wgmesh_pipeline/poller.py
+  s_403b655a6daaae::t_a14e646d3c87bf 122-128
+pipeline/tests/test_poller.py
+  s_403b655a6daaae::t_4d08a78f6a44f6 316-333
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "921d0fe477f80cee042f64e71d5303fee368662f",
+  "prompts": {},
+  "sessions": {
+    "s_403b655a6daaae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d88b5efe-79e0-419a-9f1b-6e46c07d8d55",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
