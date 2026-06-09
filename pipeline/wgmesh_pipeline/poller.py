@@ -119,7 +119,13 @@ class Poller:
                     spec_pr=int(self.scratch[issue.number]["spec_pr"]),
                 )
             next_stage = "spec_opened" if self.config.mode == "spec-only" else "spec_ready"
-            return self.store.transition(issue.number, "specced", next_stage)
+            advanced = self.store.transition(issue.number, "specced", next_stage)
+            # spec_opened is the spec-only terminal — score it so the Langfuse
+            # Scores view reflects spec-only throughput (the happy path otherwise
+            # emits no score; scoring only fired on escalate/error/merge).
+            if next_stage == "spec_opened":
+                score_run(self.scratch[issue.number], outcome="spec_opened")
+            return advanced
 
         if issue.stage == "spec_ready":
             self.scratch[issue.number] = dict(self.graph.implement(state))
