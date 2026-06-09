@@ -35,6 +35,7 @@ def spec_node(state: GraphState) -> GraphState:
             "spec_file": str(spec_rel),
         },
         expected_output=spec_rel,
+        stage="spec",
     )
     if not result.ok:
         # Surface goose's actual output so a write-tool/model/recipe failure is

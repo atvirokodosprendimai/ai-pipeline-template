@@ -24,6 +24,7 @@ def implement_node(state: GraphState) -> GraphState:
             workdir=repo_path,
             params={"spec_file": str(next_state["spec_path"])},
             expected_output=diff_rel,
+            stage="implement",
         )
         if not result.ok:
             raise RuntimeError(result.error or "goose implementation failed")
