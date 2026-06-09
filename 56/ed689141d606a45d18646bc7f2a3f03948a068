@@ -1,0 +1,35 @@
+pipeline/tests/test_spec_node.py
+  s_56171e20dfcea0::t_b21ef66a2c371f 17
+pipeline/wgmesh_pipeline/graph/nodes/spec.py
+  s_56171e20dfcea0::t_eef8a7ed679de5 38
+pipeline/wgmesh_pipeline/goose/runner.py
+  s_56171e20dfcea0::t_a440c09536e669 11
+  s_56171e20dfcea0::t_af3af229c370f8 180-192
+  s_56171e20dfcea0::t_96950c99123f57 200,211
+pipeline/tests/test_runner_routing.py
+  s_56171e20dfcea0::t_3feab54d2d6b2a 1-20,27-62,64,66-73,75,77-85,87-88,90-104,106,108-110
+  s_56171e20dfcea0::t_4340b7490cce5e 63,65,74,76
+  s_56171e20dfcea0::t_6a0a28b3daab8e 86,89
+  s_56171e20dfcea0::t_c2b39009a4a4fb 105,107
+  s_56171e20dfcea0::t_91c631a3a0ecc1 21-26
+pipeline/wgmesh_pipeline/graph/nodes/implement.py
+  s_56171e20dfcea0::t_cc1735555bc339 27
+pipeline/tests/test_spec_pr.py
+  s_56171e20dfcea0::t_e67f8470c980e8 87
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "56ed689141d606a45d18646bc7f2a3f03948a068",
+  "prompts": {},
+  "sessions": {
+    "s_56171e20dfcea0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "092640f5-451b-4c0a-8ce0-e37c90789114",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
