@@ -84,6 +84,8 @@ jobs:
 
       - name: Append endpoint-health failure to MentisDB
         if: steps.health.outputs.down_count != '0'
+        continue-on-error: true
+        timeout-minutes: 1
         env:
           MENTISDB_URL: ${{ secrets.MENTISDB_URL }}
           MENTISDB_USER: ${{ secrets.MENTISDB_USER }}
