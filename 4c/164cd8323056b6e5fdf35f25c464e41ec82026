@@ -1,0 +1,25 @@
+pipeline/tests/test_goose_runner.py
+  s_477336517b3bdf::t_8c3686cd2c98cd 95-137
+pipeline/wgmesh_pipeline/goose/runner.py
+  s_477336517b3bdf::t_f97498ea296cdf 4
+  s_477336517b3bdf::t_58428c95492557 304
+  s_477336517b3bdf::t_4dfe6a9d048bfa 296-303,305-317
+  s_477336517b3bdf::t_79750791798aa3 337-345
+  s_477336517b3bdf::t_a1459af6977aa2 18-23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "4c164cd8323056b6e5fdf35f25c464e41ec82026",
+  "prompts": {},
+  "sessions": {
+    "s_477336517b3bdf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bb3676d0-f730-4ba0-9b2f-ff2bad036c6d",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
