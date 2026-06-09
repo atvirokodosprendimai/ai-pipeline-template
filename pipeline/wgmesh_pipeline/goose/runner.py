@@ -34,8 +34,20 @@ _SECRET_MARKERS = (
 # Known sensitive var names that the substring markers miss — notably
 # WGMESH_BOT_PAT (the box's GitHub token; "PAT" can't be a marker because it
 # would also strip PATH).
+# Provider API keys all match the "API_KEY" marker already, but list the
+# multi-model routing creds explicitly so the intent is documented and a future
+# marker refactor can't silently fail-open on them (R6).
 _KNOWN_SECRET_NAMES = frozenset(
-    {"WGMESH_BOT_PAT", "BOT_PAT", "GH_PAT", "HCLOUD_TOKEN", "OPENROUTER_API_KEY"}
+    {
+        "WGMESH_BOT_PAT",
+        "BOT_PAT",
+        "GH_PAT",
+        "HCLOUD_TOKEN",
+        "OPENROUTER_API_KEY",
+        "MINIMAX_API_KEY",
+        "DEEPSEEK_API_KEY",
+        "OPENAI_API_KEY",
+    }
 )
 
 

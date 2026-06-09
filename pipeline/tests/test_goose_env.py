@@ -218,6 +218,28 @@ def test_profile_missing_credential_raises() -> None:
         build_goose_env(_Cfg(), base_env={"PATH": "/usr/bin"}, profile=_ZAI)
 
 
+def test_new_provider_creds_stripped_when_profile_does_not_reference_them() -> None:
+    # U4 leak-guard: the openrouter profile pulls in ONLY OPENROUTER_API_KEY;
+    # every other provider key in the box env is dropped by the allowlist.
+    base = {
+        "PATH": "/usr/bin",
+        "OPENROUTER_API_KEY": "or-key",
+        "DEEPSEEK_API_KEY": "ds-key",
+        "OPENAI_API_KEY": "oa-key",
+        "MINIMAX_API_KEY": "mm-key",
+        "ANTHROPIC_API_KEY": "real-anthropic",
+    }
+    env = build_goose_env(_Cfg(zai_api_key=None), base_env=base, profile=_OPENROUTER)
+    assert env["OPENROUTER_API_KEY"] == "or-key"
+    for leaked in ("DEEPSEEK_API_KEY", "OPENAI_API_KEY", "MINIMAX_API_KEY", "ANTHROPIC_API_KEY"):
+        assert leaked not in env
+
+
+def test_new_provider_cred_names_are_secret_shaped() -> None:
+    for name in ("DEEPSEEK_API_KEY", "OPENAI_API_KEY", "MINIMAX_API_KEY", "OPENROUTER_API_KEY"):
+        assert _is_secret_var(name) is True
+
+
 def test_profile_unsupported_native_provider_raises() -> None:
     minimax_native = ModelProfile(
         key="minimax",

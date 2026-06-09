@@ -11,6 +11,11 @@ name: Provision Pipeline Box
 #   ZAI_API_KEY                  — Goose LLM (z.ai)
 #   TURSO_DATABASE_URL          — durable state (when database_mode=turso)
 #   TURSO_AUTH_TOKEN
+# Optional (multi-model routing, price/perf #2 — absent → single z.ai model):
+#   OPENROUTER_API_KEY           — metered-tier gateway (DeepSeek/OpenAI/Anthropic)
+#   DEEPSEEK_API_KEY / OPENAI_API_KEY / MINIMAX_API_KEY  — native provider keys
+#   MODEL_REGISTRY               — JSON: {key: {provider,model,billing,credential_env,host?}}
+#   STAGE_ROUTING                — JSON: {stage: registry_key}
 # wgmesh is PUBLIC, so shadow needs no GitHub token (reads only). Live (later)
 # needs WGMESH_BOT_PAT.
 
@@ -155,6 +160,14 @@ jobs:
           LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
           LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
           WGMESH_BOT_PAT: ${{ secrets.WGMESH_BOT_PAT }}
+          # Multi-model routing (price/perf #2): metered-tier creds + the
+          # registry/route map. All optional — absent → zero-config single model.
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
+          MODEL_REGISTRY: ${{ secrets.MODEL_REGISTRY }}
+          STAGE_ROUTING: ${{ secrets.STAGE_ROUTING }}
           MODE: ${{ github.event.inputs.pipeline_mode }}
           DBMODE: ${{ github.event.inputs.database_mode }}
           RESET_QUEUE_INPUT: ${{ github.event.inputs.reset_queue }}
@@ -174,6 +187,12 @@ jobs:
           ANTHROPIC_HOST=https://api.z.ai/api/anthropic
           GOOSE_PROVIDER=anthropic
           GOOSE_MODEL=glm-4.6
+          OPENROUTER_API_KEY=$OPENROUTER_API_KEY
+          DEEPSEEK_API_KEY=$DEEPSEEK_API_KEY
+          OPENAI_API_KEY=$OPENAI_API_KEY
+          MINIMAX_API_KEY=$MINIMAX_API_KEY
+          MODEL_REGISTRY='$MODEL_REGISTRY'
+          STAGE_ROUTING='$STAGE_ROUTING'
           WGMESH_CHECKOUT_PATH=/opt/wgmesh-checkout
           DATABASE_MODE=$DBMODE
           PIPELINE_DB_PATH=/opt/wgmesh-pipeline/state.db
