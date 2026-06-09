@@ -150,8 +150,9 @@ class GitHubClient:
         )
 
     def push_branch(self, clone_path: str, branch: str, *, spec_pr: bool = False) -> Any:
+        is_spec_branch = spec_pr or branch.startswith("bot/spec-")
         payload = {"clone_path": clone_path, "branch": branch}
-        if spec_pr or branch.startswith("bot/spec-"):
+        if is_spec_branch:
             self._sanitise_spec_branch_files(Path(clone_path), branch)
         else:
             self._sanitise_spec_files(Path(clone_path))
@@ -159,9 +160,18 @@ class GitHubClient:
             return self._write("push_branch", "GIT", "git push", payload=payload, spec_pr=spec_pr)
         if self.config.mode == "spec-only" and not spec_pr:
             return self._write("push_branch", "GIT", "git push", payload=payload, spec_pr=spec_pr)
+        # bot/spec-* branches are exclusively bot-owned and re-authored from a
+        # fresh checkout each pass (e.g. after a queue reset). A prior run's
+        # remote branch diverges -> a plain push is rejected non-fast-forward
+        # (bug #12) -> the issue fails. Force-update the bot branch so re-spec
+        # updates the existing spec PR's branch in place. (force-with-lease
+        # would need a remote-tracking ref the shallow clone never fetched.)
+        push_cmd = ["git", "push", "origin", branch]
+        if is_spec_branch:
+            push_cmd.insert(2, "--force")
         try:
             completed = subprocess.run(
-                ["git", "push", "origin", branch],
+                push_cmd,
                 cwd=clone_path,
                 check=False,
                 text=True,
