@@ -96,3 +96,29 @@ def test_build_goose_env_prefers_explicit_goose_provider_model_from_base_env() -
 
     assert env["GOOSE_PROVIDER"] == "anthropic"
     assert env["GOOSE_MODEL"] == "custom-zai-model"
+
+
+def test_build_goose_env_passes_langfuse_creds_for_cost_capture() -> None:
+    """Goose gets LANGFUSE_URL/PUBLIC_KEY/SECRET_KEY so it exports its own LLM
+    generations (model + token usage + cost) to Langfuse — the price half of
+    price/performance. SECRET_KEY is re-added past the allowlist."""
+    from dataclasses import dataclass
+
+    @dataclass(frozen=True)
+    class _LfCfg:
+        zai_api_key: str | None = "zai-secret"
+        anthropic_host: str = "https://api.z.ai/api/anthropic"
+        langfuse_host: str | None = "http://lf:3000"
+        langfuse_public_key: str | None = "pk-lf-x"
+        langfuse_secret_key: str | None = "sk-lf-x"
+
+    env = build_goose_env(_LfCfg(), base_env={"PATH": "/usr/bin"})
+    assert env["LANGFUSE_URL"] == "http://lf:3000"
+    assert env["LANGFUSE_PUBLIC_KEY"] == "pk-lf-x"
+    assert env["LANGFUSE_SECRET_KEY"] == "sk-lf-x"
+
+
+def test_build_goose_env_omits_langfuse_when_unconfigured() -> None:
+    env = build_goose_env(_Cfg(), base_env={"PATH": "/usr/bin"})
+    assert "LANGFUSE_URL" not in env
+    assert "LANGFUSE_SECRET_KEY" not in env
