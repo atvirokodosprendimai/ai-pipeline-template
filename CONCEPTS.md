@@ -84,6 +84,12 @@ The share of seeded Specs that reach merge and deploy with zero human interventi
 ### MSC
 The count of paying subscribers across seeded products — the project's lagging revenue north-star, tracked on the dashboard and excluding subscriptions from unrelated products.
 
+### Hollow-green
+A passing test suite that proves nothing about the real behavior, because the asserted path is satisfied by a stub, fake, or mock rather than the production code — so a green run coexists with a live failure. The recurring shape in this project: a safety guard or agent-output path is mocked to always cooperate, so the actual failure mode never executes until production.
+*Avoid:* false green.
+
+A related failure is a **never-run-path**: production code that no test ever exercises, so its first execution is on the live system. The fix for both is the same — drive a test through the lowest real boundary (the subprocess result, the HTTP layer), reproduce the production symptom, and confirm the test bites by reverting the fix.
+
 ## Flagged ambiguities
 
 - "The loop" had been used for both the work-selection cycle and the work-completion cycle — these are distinct: the **Observation Loop** chooses work, the **Convergence Engine** completes it.

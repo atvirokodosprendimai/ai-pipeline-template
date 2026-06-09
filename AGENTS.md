@@ -31,6 +31,7 @@ route them. Board columns move automatically from labels — never drag cards. S
 | `CONSTITUTION.md` | Governing principles and hard constraints for the autonomous company. |
 | `company/system-prompt.md` | The control-loop agent's full operating prompt: funnel stages 0–5, frugality rules, public/private boundary, issue/PR hygiene, output JSON schema. |
 | `CONCEPTS.md` | Shared domain vocabulary (glossary). *(seeded in PR #1440)* |
+| `docs/solutions/` | Documented solutions to past problems (bugs, best practices, workflow patterns), organized by category with YAML frontmatter (`module`, `tags`, `problem_type`). Relevant when implementing or debugging in documented areas. |
 | `CONTRIBUTING.md` | Pipeline stages and human review checkpoints. |
 | `STRATEGY.md` | Current product target, approach, metrics, tracks of work. |
 | `memory/MEMORY.md` | Curated cross-session learnings (semantic memory). Recent runs in `memory/episodic/` and `company/loop-history/`. |
