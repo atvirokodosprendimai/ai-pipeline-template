@@ -164,11 +164,17 @@ def _tags_for_state(state: Any, stage: str) -> dict[str, str]:
     return tags
 
 
+# Keys whose values carry secrets or live objects and must never be serialized
+# into a Langfuse trace input/output. `config` holds zai_api_key / wgmesh_bot_pat
+# in plaintext — leaking it into trace input was bug #13.
+_UNSAFE_STATE_KEYS = ("github", "goose_runner", "config")
+
+
 def _safe_state(value: Any) -> Any:
     if not isinstance(value, dict):
         return value
     safe = dict(value)
-    safe.pop("github", None)
-    safe.pop("goose_runner", None)
+    for key in _UNSAFE_STATE_KEYS:
+        safe.pop(key, None)
     return safe
 
