@@ -113,6 +113,28 @@ Bias toward correctness, small diffs, and verified changes.
 - Conventional commits (`feat|fix|refactor|docs|test|chore|perf|ci`). Branch off `main`;
   open a PR — `main` requires one review.
 
+## Model routing (price/performance)
+
+The LangGraph pipeline routes each LLM stage to a model picked for that stage's
+cost/capability. Cheap, structured stages (spec authoring) run cheap models; the
+capability-critical stage (implementation) runs a more capable one. Configured by two
+optional env vars (`pipeline/wgmesh_pipeline/models.py`):
+
+- `MODEL_REGISTRY` — JSON `{key: {provider, model, billing, credential_env, host?}}`.
+  `billing` is `native` (subscription endpoint, e.g. z.ai/MiniMax — flat-rate only works
+  on their own host) or `openrouter` (metered models — DeepSeek/OpenAI/Anthropic — through
+  one `OPENROUTER_API_KEY` gateway).
+- `STAGE_ROUTING` — JSON `{stage: registry_key}`. Stages today: `spec`, `implement`.
+  An unmapped stage falls back to a registry `default` profile, else fails closed.
+
+**Both unset → single z.ai model, exactly as before (zero-config default).** Credentials
+are read from the process env named by `credential_env`; they reach Goose only when a
+routed profile names them (the fail-closed allowlist in `goose/runner.py` strips everything
+else). Per-stage/per-model cost lands in Langfuse — slice the Scores dashboard by
+`spec_model_key` / `implement_model_key`. Escalate-on-fail (retry a failed stage on a
+stronger model) is **not** built yet — the map is static. See
+`docs/solutions/design-decisions/multi-model-routing.md`.
+
 ## Working memory
 
 `memory/MEMORY.md` is the index of hard-won learnings — consult it before changing a

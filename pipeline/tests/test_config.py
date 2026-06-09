@@ -88,6 +88,57 @@ def test_database_mode_explicit_no_silent_fallback() -> None:
     assert cfg.turso_url == "libsql://db.turso.io"
 
 
+def test_zero_config_synthesizes_default_profile_matching_goose_fields() -> None:
+    # R7: with no MODEL_REGISTRY env, routing falls back to a single 'default'
+    # profile built from the goose_* fields — pipeline behaves as before.
+    cfg = load_config(
+        {
+            "TARGET_REPO": "atvirokodosprendimai/wgmesh",
+            "DATABASE_MODE": "local",
+            "ZAI_API_KEY": "zai",
+        }
+    )
+    assert set(cfg.model_registry) == {"default"}
+    default = cfg.model_registry["default"]
+    assert default.provider == cfg.goose_provider
+    assert default.model == cfg.goose_model
+    assert default.billing == "native"
+    assert default.credential_env == "ZAI_API_KEY"
+    assert default.host == cfg.anthropic_host
+    assert cfg.stage_routing == {}
+
+
+def test_explicit_registry_and_routing_parse_into_config() -> None:
+    cfg = load_config(
+        {
+            "TARGET_REPO": "atvirokodosprendimai/wgmesh",
+            "DATABASE_MODE": "local",
+            "MODEL_REGISTRY": (
+                '{"cheap": {"provider": "anthropic", "model": "GLM-4.7", "billing": "native",'
+                ' "credential_env": "ZAI_API_KEY", "host": "https://api.z.ai/api/anthropic"},'
+                ' "capable": {"provider": "openrouter", "model": "deepseek/v3",'
+                ' "billing": "openrouter", "credential_env": "OPENROUTER_API_KEY"}}'
+            ),
+            "STAGE_ROUTING": '{"spec": "cheap", "implement": "capable"}',
+        }
+    )
+    assert set(cfg.model_registry) == {"cheap", "capable"}
+    assert cfg.stage_routing == {"spec": "cheap", "implement": "capable"}
+    # explicit registry is NOT overwritten by the zero-config default
+    assert "default" not in cfg.model_registry
+
+
+def test_malformed_registry_env_fails_loud() -> None:
+    with pytest.raises(ValueError, match="MODEL_REGISTRY"):
+        load_config(
+            {
+                "TARGET_REPO": "atvirokodosprendimai/wgmesh",
+                "DATABASE_MODE": "local",
+                "MODEL_REGISTRY": "{bad json",
+            }
+        )
+
+
 def test_wgmesh_checkout_path_env_and_recipes_dir_override() -> None:
     cfg = load_config(
         {

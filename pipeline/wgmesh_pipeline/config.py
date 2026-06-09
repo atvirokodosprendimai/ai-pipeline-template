@@ -1,9 +1,15 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Mapping
+
+from wgmesh_pipeline.models import (
+    ModelProfile,
+    parse_registry,
+    parse_stage_routing,
+)
 
 
 VALID_MODES = frozenset({"shadow", "spec-only", "live"})
@@ -39,6 +45,10 @@ class Config:
     langfuse_host: str | None = None
     langfuse_public_key: str | None = None
     langfuse_secret_key: str | None = None
+    # Multi-model routing (price/perf #2). Empty by default → callers synthesize
+    # a zero-config default profile from the goose_* fields above (R7).
+    model_registry: Mapping[str, ModelProfile] = field(default_factory=dict)
+    stage_routing: Mapping[str, str] = field(default_factory=dict)
 
     @property
     def owner(self) -> str:
@@ -76,19 +86,29 @@ def load_config(env: Mapping[str, str] | None = None) -> Config:
     if db_mode == "turso" and not turso_url:
         raise ValueError("DATABASE_MODE=turso requires TURSO_DATABASE_URL")
 
+    goose_provider = _get_nonempty(source, "GOOSE_PROVIDER") or DEFAULT_GOOSE_PROVIDER
+    goose_model = _get_nonempty(source, "GOOSE_MODEL") or DEFAULT_GOOSE_MODEL
+    anthropic_host = _get_nonempty(source, "ANTHROPIC_HOST") or DEFAULT_ANTHROPIC_HOST
+    model_registry, stage_routing = _build_routing(
+        source,
+        goose_provider=goose_provider,
+        goose_model=goose_model,
+        anthropic_host=anthropic_host,
+    )
+
     return Config(
         target_repo=target_repo,
         mode=mode,
         wgmesh_bot_pat=pat,
         zai_api_key=_get_nonempty(source, "ZAI_API_KEY"),
-        anthropic_host=_get_nonempty(source, "ANTHROPIC_HOST") or DEFAULT_ANTHROPIC_HOST,
+        anthropic_host=anthropic_host,
         langsmith_api_key=_get_nonempty(source, "LANGSMITH_API_KEY"),
         poll_interval_seconds=_get_int(source, "POLL_INTERVAL_SECONDS", DEFAULT_POLL_INTERVAL_SECONDS),
         max_files=_get_int(source, "MAX_FILES", DEFAULT_MAX_FILES),
         repo_path=_get_nonempty(source, "WGMESH_CHECKOUT_PATH") or DEFAULT_REPO_PATH,
         recipes_dir=_get_nonempty(source, "RECIPES_DIR") or DEFAULT_RECIPES_DIR,
-        goose_provider=_get_nonempty(source, "GOOSE_PROVIDER") or DEFAULT_GOOSE_PROVIDER,
-        goose_model=_get_nonempty(source, "GOOSE_MODEL") or DEFAULT_GOOSE_MODEL,
+        goose_provider=goose_provider,
+        goose_model=goose_model,
         database_mode=db_mode,
         database_path=_get_nonempty(source, "PIPELINE_DB_PATH") or "pipeline/state.db",
         turso_url=turso_url,
@@ -96,7 +116,43 @@ def load_config(env: Mapping[str, str] | None = None) -> Config:
         langfuse_host=_get_nonempty(source, "LANGFUSE_HOST"),
         langfuse_public_key=_get_nonempty(source, "LANGFUSE_PUBLIC_KEY"),
         langfuse_secret_key=_get_nonempty(source, "LANGFUSE_SECRET_KEY"),
+        model_registry=model_registry,
+        stage_routing=stage_routing,
     )
+
+
+# Goose provider id the zero-config fallback profile uses ANTHROPIC_API_KEY for.
+_DEFAULT_CREDENTIAL_ENV = "ZAI_API_KEY"
+
+
+def _build_routing(
+    source: Mapping[str, str],
+    *,
+    goose_provider: str,
+    goose_model: str,
+    anthropic_host: str,
+) -> tuple[Mapping[str, ModelProfile], Mapping[str, str]]:
+    """Registry + stage map from env, with a zero-config fallback (R7).
+
+    When MODEL_REGISTRY is unset, synthesize a single ``default`` profile from
+    the goose_* fields so the pipeline behaves exactly as it did before routing
+    existed: one model, every stage. When set, parse both and trust the
+    fail-closed validation in models.py (an unset STAGE_ROUTING is valid as long
+    as the registry carries a ``default`` profile)."""
+    registry = parse_registry(_get_nonempty(source, "MODEL_REGISTRY"))
+    routing = parse_stage_routing(_get_nonempty(source, "STAGE_ROUTING"))
+    if not registry:
+        registry = {
+            "default": ModelProfile(
+                key="default",
+                provider=goose_provider,
+                model=goose_model,
+                billing="native",
+                credential_env=_DEFAULT_CREDENTIAL_ENV,
+                host=anthropic_host,
+            )
+        }
+    return registry, routing
 
 
 def _required(env: Mapping[str, str], name: str) -> str:

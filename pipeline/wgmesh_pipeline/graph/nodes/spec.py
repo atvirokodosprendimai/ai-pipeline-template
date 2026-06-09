@@ -35,6 +35,7 @@ def spec_node(state: GraphState) -> GraphState:
             "spec_file": str(spec_rel),
         },
         expected_output=spec_rel,
+        stage="spec",
     )
     if not result.ok:
         # Surface goose's actual output so a write-tool/model/recipe failure is
@@ -51,6 +52,8 @@ def spec_node(state: GraphState) -> GraphState:
         )
         raise RuntimeError(result.error or "goose spec failed")
     next_state["spec_path"] = str(result.output_path)
+    if result.model_key is not None:
+        next_state["spec_model_key"] = result.model_key
     # Put the authored spec text into state so trace_node includes it in the
     # "spec" span output — this is what a managed Langfuse LLM-as-a-Judge reads
     # to score spec quality. Capped + best-effort (a read failure must not break

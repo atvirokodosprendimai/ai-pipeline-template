@@ -38,3 +38,4 @@ Last consolidated: 2026-04-10.
 - All code needs tests (80%+ coverage target), table-driven t.Parallel() patterns in Go
 - Public repo: never commit secrets, PII, or exact revenue figures
 - Assessment PRs auto-merge only if Copilot review has zero comments and zero blocking reviews
+- Multi-model routing: `STAGE_ROUTING`+`MODEL_REGISTRY` env (`pipeline/wgmesh_pipeline/models.py`) pick a model per stage (cheap=spec, capable=implement); hybrid billing (subs native, metered via OpenRouter); both unset → zero-config single z.ai model; fail-closed; per-model cost in Langfuse. Escalate-on-fail = Phase 2. Doc: `docs/solutions/design-decisions/multi-model-routing.md`

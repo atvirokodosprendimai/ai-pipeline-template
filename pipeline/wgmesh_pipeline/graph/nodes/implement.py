@@ -24,9 +24,12 @@ def implement_node(state: GraphState) -> GraphState:
             workdir=repo_path,
             params={"spec_file": str(next_state["spec_path"])},
             expected_output=diff_rel,
+            stage="implement",
         )
         if not result.ok:
             raise RuntimeError(result.error or "goose implementation failed")
+        if result.model_key is not None:
+            next_state["implement_model_key"] = result.model_key
         next_state["diff"] = Path(result.output_path).read_text()
     else:
         next_state["diff"] = "+docs-only change\n"
