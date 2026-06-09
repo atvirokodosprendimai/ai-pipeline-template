@@ -1,0 +1,26 @@
+AGENTS.md
+  s_56171e20dfcea0::t_58cb84ab07b27c 127-130,136-146
+company/system-prompt.md
+  s_56171e20dfcea0::t_2b5bb846d658be 46-50
+docs/solutions/design-decisions/multi-model-routing.md
+  s_56171e20dfcea0::t_30539dab9eade4 58-78
+.github/workflows/provision-pipeline-box.yml
+  s_56171e20dfcea0::t_f9953d80223d5e 171
+  s_56171e20dfcea0::t_7384c7990ca646 197
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "fc22cc70b0c557ad30d69e6165c5522861260157",
+  "prompts": {},
+  "sessions": {
+    "s_56171e20dfcea0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "092640f5-451b-4c0a-8ce0-e37c90789114",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
