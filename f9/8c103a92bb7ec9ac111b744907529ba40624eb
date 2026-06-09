@@ -1,0 +1,27 @@
+.github/workflows/compound-synthesize.yml
+  s_72ad9868bb38e1::t_07595208017690 113,132-142
+.github/scripts/compound-render-docs.sh
+  s_72ad9868bb38e1::t_07595208017690 60-64
+.github/scripts/test-compound-render-docs.sh
+  s_72ad9868bb38e1::t_07595208017690 81-131
+.github/scripts/test-compound-queue-append.sh
+  s_72ad9868bb38e1::t_07595208017690 47-58
+.github/workflows/compound-capture.yml
+  s_72ad9868bb38e1::t_07595208017690 58-61,66-67,71
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "f98c103a92bb7ec9ac111b744907529ba40624eb",
+  "prompts": {},
+  "sessions": {
+    "s_72ad9868bb38e1": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ead72-6f7b-7d31-8045-c38899e692cb",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
