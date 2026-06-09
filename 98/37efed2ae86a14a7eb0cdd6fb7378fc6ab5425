@@ -1,0 +1,60 @@
+pipeline/wgmesh_pipeline/scoring.py
+  s_56171e20dfcea0::t_6a4d6cdc7241f8 215-221
+pipeline/tests/test_runner_routing.py
+  s_56171e20dfcea0::t_3feab54d2d6b2a 1-20,27-62,64,66-73,75,77-85,87-88,90-104,129,131-133,106,123
+  s_56171e20dfcea0::t_91c631a3a0ecc1 21-26
+  s_56171e20dfcea0::t_4340b7490cce5e 63,65,74,76
+  s_56171e20dfcea0::t_6a0a28b3daab8e 86,89
+  s_56171e20dfcea0::t_c2b39009a4a4fb 128,130
+  s_56171e20dfcea0::t_fbf70e9e705648 105,107-122,124-127
+pipeline/wgmesh_pipeline/graph/nodes/spec.py
+  s_56171e20dfcea0::t_eef8a7ed679de5 38
+  s_56171e20dfcea0::t_43421727c8809c 55-56
+pipeline/wgmesh_pipeline/graph/nodes/implement.py
+  s_56171e20dfcea0::t_cc1735555bc339 27
+  s_56171e20dfcea0::t_7a20ce434930b8 31-32
+pipeline/tests/test_goose_env.py
+  s_56171e20dfcea0::t_46f2da26e56cc1 5-6,8
+  s_403b655a6daaae::t_1da71b8b593227 102-127
+  s_56171e20dfcea0::t_cc8e25dcf3e0bb 128-220,260-271,249
+  s_56171e20dfcea0::t_6454acbed77826 221-235,238-240
+  s_56171e20dfcea0::t_312a9f68c61eea 236-237,241-248,250-259
+pipeline/wgmesh_pipeline/goose/runner.py
+  s_56171e20dfcea0::t_3d15f08c796267 101-105,107,109,111-121,124-128,130-132,153-155,161-185
+  s_403b655a6daaae::t_8e1eae2983e8c6 186-197
+  s_56171e20dfcea0::t_af3af229c370f8 217,218-230,136,151-152
+  s_56171e20dfcea0::t_a440c09536e669 11
+  s_56171e20dfcea0::t_96950c99123f57 238
+  s_56171e20dfcea0::t_f61ee1fa959dd8 37-39,41-50
+  s_56171e20dfcea0::t_83ac01ff47e21f 106
+  s_56171e20dfcea0::t_008c874a2cee45 129,133-135,137-150
+  s_56171e20dfcea0::t_a5cac2bc940ebe 207-210
+  s_56171e20dfcea0::t_aac5175ed5750d 249-251,272,284,294
+  s_56171e20dfcea0::t_eb05b1cf2388a9 302
+pipeline/tests/test_scoring.py
+  s_56171e20dfcea0::t_9bd2f4066bd7f7 109-137
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "9837efed2ae86a14a7eb0cdd6fb7378fc6ab5425",
+  "prompts": {},
+  "sessions": {
+    "s_403b655a6daaae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d88b5efe-79e0-419a-9f1b-6e46c07d8d55",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    },
+    "s_56171e20dfcea0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "092640f5-451b-4c0a-8ce0-e37c90789114",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}

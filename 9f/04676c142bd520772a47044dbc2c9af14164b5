@@ -1,0 +1,19 @@
+docs/plans/2026-06-09-001-feat-multi-model-routing-plan.md
+  s_56171e20dfcea0::t_e29f820f855933 1-406
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "9f04676c142bd520772a47044dbc2c9af14164b5",
+  "prompts": {},
+  "sessions": {
+    "s_56171e20dfcea0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "092640f5-451b-4c0a-8ce0-e37c90789114",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}

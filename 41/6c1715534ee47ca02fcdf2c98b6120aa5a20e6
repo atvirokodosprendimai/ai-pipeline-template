@@ -1,0 +1,42 @@
+.github/workflows/provision-pipeline-box.yml
+  s_56171e20dfcea0::t_707b9d78317b63 14-18
+  s_56171e20dfcea0::t_fbfe59f9a81c24 163-170
+  s_56171e20dfcea0::t_bece32965031ce 190-195
+pipeline/tests/test_goose_env.py
+  s_56171e20dfcea0::t_46f2da26e56cc1 5-6,8
+  s_403b655a6daaae::t_1da71b8b593227 102-127
+  s_56171e20dfcea0::t_cc8e25dcf3e0bb 128-220,243-254
+  s_56171e20dfcea0::t_6454acbed77826 221-235,238-240
+  s_56171e20dfcea0::t_312a9f68c61eea 236-237,241-242
+pipeline/wgmesh_pipeline/goose/runner.py
+  s_56171e20dfcea0::t_3d15f08c796267 101-106,108,110-120,123-133,139-163
+  s_403b655a6daaae::t_8e1eae2983e8c6 164-175
+  s_56171e20dfcea0::t_af3af229c370f8 191,192-204
+  s_56171e20dfcea0::t_a440c09536e669 11
+  s_56171e20dfcea0::t_96950c99123f57 212
+  s_56171e20dfcea0::t_f61ee1fa959dd8 37-39,41-50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "416c1715534ee47ca02fcdf2c98b6120aa5a20e6",
+  "prompts": {},
+  "sessions": {
+    "s_403b655a6daaae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d88b5efe-79e0-419a-9f1b-6e46c07d8d55",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    },
+    "s_56171e20dfcea0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "092640f5-451b-4c0a-8ce0-e37c90789114",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
