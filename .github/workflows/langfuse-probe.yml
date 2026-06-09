@@ -38,7 +38,7 @@ jobs:
           sk = os.environ["LANGFUSE_SECRET_KEY"]
           auth = base64.b64encode(f"{pk}:{sk}".encode()).decode()
 
-          def call(method, path, body=None):
+          def call(method, path, body=None, cap=800):
               data = json.dumps(body).encode() if body is not None else None
               req = urllib.request.Request(
                   host + path, method=method, data=data,
@@ -47,9 +47,9 @@ jobs:
               )
               try:
                   with urllib.request.urlopen(req, timeout=25) as r:
-                      return r.status, r.read().decode()[:800]
+                      return r.status, r.read().decode()[:cap]
               except urllib.error.HTTPError as e:
-                  return e.code, e.read().decode()[:800]
+                  return e.code, e.read().decode()[:cap]
               except Exception as e:
                   return None, repr(e)
 
@@ -77,13 +77,24 @@ jobs:
           except Exception:
               print("  (unparseable response; status above — body withheld to avoid re-logging old trace inputs)")
 
-          print("\n=== GET recent traces (sessions wired?) ===")
-          status, bodytext = call("GET", "/api/public/traces?limit=8")
-          print("status:", status)
+          print("\n=== GET recent traces — is the box ticking NOW? ===")
+          # fromTimestamp = last 60min; cap raised so the list JSON parses (the
+          # old 800-char cap truncated multi-trace bodies → false 'unparseable').
+          import datetime
+          since = (datetime.datetime.utcnow() - datetime.timedelta(minutes=60)
+                   ).strftime("%Y-%m-%dT%H:%M:%SZ")
+          status, bodytext = call("GET",
+              f"/api/public/traces?limit=20&fromTimestamp={since}", cap=200000)
+          print("status:", status, "| window: traces since", since, "UTC")
           try:
               data = json.loads(bodytext)
-              for t in data.get("data", [])[:8]:
-                  print(f"  - {t.get('name')} session={t.get('sessionId')}")
-          except Exception:
-              print("  (unparseable response; status above — body withheld to avoid re-logging old trace inputs)")
+              rows = data.get("data", [])
+              total = data.get("meta", {}).get("totalItems", len(rows))
+              print(f"  traces in last 60min: {len(rows)} (meta.totalItems={total})")
+              for t in rows[:20]:
+                  print(f"  - {t.get('timestamp')}  {t.get('name')}  session={t.get('sessionId')}")
+              if not rows:
+                  print("  !! ZERO traces in window — box NOT ticking (or tracer disabled)")
+          except Exception as e:
+              print("  parse error:", repr(e))
           PY
