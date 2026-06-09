@@ -102,6 +102,29 @@ def test_zero_config_run_uses_default_profile(tmp_path, monkeypatch) -> None:
     assert env["ANTHROPIC_API_KEY"] == "zai-key"
 
 
+def test_result_carries_model_key_for_attribution(tmp_path, monkeypatch) -> None:
+    calls: list[dict[str, Any]] = []
+    config = _routed_config('{"spec": "cheap", "implement": "capable"}', monkeypatch)
+    spec_result = _run(config, "spec", tmp_path, calls)
+    impl_result = _run(config, "implement", tmp_path, calls)
+    assert spec_result.model_key == "cheap"
+    assert impl_result.model_key == "capable"
+
+
+def test_zero_config_result_model_key_is_default(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("ZAI_API_KEY", "zai-key")
+    config = load_config(
+        {
+            "TARGET_REPO": "atvirokodosprendimai/wgmesh",
+            "DATABASE_MODE": "local",
+            "ZAI_API_KEY": "zai-key",
+        }
+    )
+    calls: list[dict[str, Any]] = []
+    result = _run(config, "implement", tmp_path, calls)
+    assert result.model_key == "default"
+
+
 def test_unmapped_stage_no_default_raises(tmp_path, monkeypatch) -> None:
     # registry has no 'default' and routing omits 'implement' → fail-closed.
     config = _routed_config('{"spec": "cheap"}', monkeypatch)

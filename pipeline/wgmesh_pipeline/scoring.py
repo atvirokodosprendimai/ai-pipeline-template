@@ -212,6 +212,13 @@ def _tags_from_state(state: dict, outcome: str) -> dict[str, str]:
         value = state.get(key)
         if value is not None:
             tags[key] = str(value)[:200]
+    # Per-model attribution (R5): which model handled each LLM stage, so the
+    # Scores dashboard can slice outcome/quality by model — the perf half of
+    # price/performance routing.
+    for key in ("spec_model_key", "implement_model_key"):
+        value = state.get(key)
+        if value is not None:
+            tags[key] = str(value)[:200]
     return tags
 
 

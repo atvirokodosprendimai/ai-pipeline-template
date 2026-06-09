@@ -240,6 +240,23 @@ def test_new_provider_cred_names_are_secret_shaped() -> None:
         assert _is_secret_var(name) is True
 
 
+def test_attribution_otel_attrs_carry_stage_and_model_key() -> None:
+    env = build_goose_env(
+        _Cfg(),
+        base_env={"PATH": "/usr/bin", "ZAI_API_KEY": "zai-key"},
+        profile=_ZAI,
+        stage="spec",
+    )
+    attrs = env["OTEL_RESOURCE_ATTRIBUTES"]
+    assert "wgmesh.stage=spec" in attrs
+    assert "wgmesh.model_key=spec-cheap" in attrs
+
+
+def test_attribution_absent_without_stage_or_profile() -> None:
+    env = build_goose_env(_Cfg(), base_env={"PATH": "/usr/bin"})
+    assert "OTEL_RESOURCE_ATTRIBUTES" not in env
+
+
 def test_profile_unsupported_native_provider_raises() -> None:
     minimax_native = ModelProfile(
         key="minimax",

@@ -103,6 +103,7 @@ def build_goose_env(
     base_env: Mapping[str, str] | None = None,
     *,
     profile: ModelProfile | None = None,
+    stage: str | None = None,
 ) -> dict[str, str]:
     """Subprocess env for Goose: fail-closed allowlist of known-safe vars, then
     the single LLM credential the selected model needs added back explicitly.
@@ -125,7 +126,28 @@ def build_goose_env(
     else:
         _apply_profile(env, profile, source)
     _apply_langfuse(env, config)
+    _apply_attribution(env, stage, profile)
     return env
+
+
+def _apply_attribution(env: dict[str, str], stage: str | None, profile: ModelProfile | None) -> None:
+    """Tag Goose's telemetry with the pipeline stage and resolved model key so
+    cost/latency can be sliced by stage AND model in Langfuse (R5).
+
+    Emitted as OTEL resource attributes — Goose exports its generations over
+    OTLP, so a Goose build that forwards resource attributes will carry these
+    onto every span. Whether the installed Goose version forwards them is the
+    execution-time unknown noted in the plan; the authoritative per-model
+    attribution lands via scoring.py regardless (our code writes it directly)."""
+    if not stage and profile is None:
+        return
+    attrs = []
+    if stage:
+        attrs.append(f"wgmesh.stage={stage}")
+    if profile is not None:
+        attrs.append(f"wgmesh.model_key={profile.key}")
+    if attrs:
+        env["OTEL_RESOURCE_ATTRIBUTES"] = ",".join(attrs)
 
 
 def _apply_legacy_default(env: dict[str, str], config: Config, source: Mapping[str, str]) -> None:
@@ -182,6 +204,10 @@ class GooseResult:
     duration_seconds: float
     raw_log: str
     error: str | None = None
+    # Which model profile handled this stage — recorded into run state so the
+    # online score (scoring.py) attributes the outcome by model (R5). None when
+    # the runner used the legacy single-model path (no registry configured).
+    model_key: str | None = None
 
 
 class GooseRunner:
@@ -220,7 +246,9 @@ class GooseRunner:
         for key, value in params.items():
             command.extend(["--params", f"{key}={value}"])
 
-        env = build_goose_env(self.config, profile=self._resolve_profile(stage))
+        profile = self._resolve_profile(stage)
+        model_key = profile.key if profile is not None else None
+        env = build_goose_env(self.config, profile=profile, stage=stage)
 
         started = time.monotonic()
         try:
@@ -241,6 +269,7 @@ class GooseRunner:
                 duration_seconds=duration,
                 raw_log=_join_log(_decode_timeout_output(exc.output), _decode_timeout_output(exc.stderr)),
                 error=f"goose timed out after {GOOSE_TIMEOUT_SECONDS}s",
+                model_key=model_key,
             )
         duration = time.monotonic() - started
         raw_log = _join_log(completed.stdout, completed.stderr)
@@ -252,6 +281,7 @@ class GooseRunner:
                 duration_seconds=duration,
                 raw_log=raw_log,
                 error=f"goose exited {completed.returncode}",
+                model_key=model_key,
             )
 
         if not output_path.exists() or output_path.stat().st_size == 0:
@@ -261,6 +291,7 @@ class GooseRunner:
                 duration_seconds=duration,
                 raw_log=raw_log,
                 error=f"empty output guard fired for {output_path}",
+                model_key=model_key,
             )
 
         return GooseResult(
@@ -268,6 +299,7 @@ class GooseRunner:
             output_path=output_path,
             duration_seconds=duration,
             raw_log=raw_log,
+            model_key=model_key,
         )
 
 

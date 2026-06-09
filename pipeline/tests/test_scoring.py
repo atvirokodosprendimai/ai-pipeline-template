@@ -106,6 +106,35 @@ def test_score_run_records_merged_outcome() -> None:
     assert rec.calls[0]["tags"]["outcome"] == "merged"
 
 
+def test_score_run_tags_include_per_stage_model_keys() -> None:
+    # R5: the model that handled each LLM stage is attributed in the score tags.
+    rec = _RecordingScorer()
+    state = {
+        "issue": _Issue(601),
+        "decision": "merge",
+        "risk_tier": "low",
+        "tests_passed": True,
+        "sanitise_ok": True,
+        "review_findings": [],
+        "spec_model_key": "spec-cheap",
+        "implement_model_key": "impl-capable",
+    }
+    score_run(state, outcome="merged", scorer=rec)
+    tags = rec.calls[0]["tags"]
+    assert tags["spec_model_key"] == "spec-cheap"
+    assert tags["implement_model_key"] == "impl-capable"
+
+
+def test_score_run_omits_model_keys_when_absent() -> None:
+    # Zero-config / legacy runs that never recorded a model key don't emit empty tags.
+    rec = _RecordingScorer()
+    state = {"issue": _Issue(602), "review_findings": []}
+    score_run(state, outcome="failed", scorer=rec)
+    tags = rec.calls[0]["tags"]
+    assert "spec_model_key" not in tags
+    assert "implement_model_key" not in tags
+
+
 def test_langfuse_record_creates_pipeline_outcome_score_and_flushes(monkeypatch) -> None:
     client = _FakeLangfuse()
     scorer = _install_fake_langfuse(monkeypatch, client)
