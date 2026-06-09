@@ -1,0 +1,21 @@
+pipeline/wgmesh_pipeline/tracing.py
+  s_403b655a6daaae::t_11d9236b35a0b5 167-172,177-178
+pipeline/tests/test_tracing.py
+  s_403b655a6daaae::t_26265033e78923 172-199
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "4a758a37239a54fb1c2bcbdc5811a4b3798a7827",
+  "prompts": {},
+  "sessions": {
+    "s_403b655a6daaae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d88b5efe-79e0-419a-9f1b-6e46c07d8d55",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
