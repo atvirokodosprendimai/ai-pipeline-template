@@ -55,12 +55,29 @@ mechanisms:
   resource attributes onto its OTLP spans is an unverified execution-time detail — do not
   rely on it for attribution; the scoring path is the source of truth.
 
+## Escalate-on-fail ladder (Phase 2 — shipped, price/perf #3)
+
+`STAGE_ROUTING` values may be a **list** of registry keys (cheap→capable→premium). When a
+gate rejection is **quality-only** (tests failed / blocking review finding, `risk_tier` low,
+`sanitise` ok), the graph re-runs implement→review→gate on the next model up the ladder,
+bounded by `min(ladder_length-1, MAX_ESCALATION_ATTEMPTS)` (default 2). The gate is evaluated
+side-effect-free (`apply_side_effects=False`) on intermediate passes; the merge/`needs-human`
+side-effect applies once, terminally.
+
+**Autonomy lives inside the safety gates.** A `sanitise` failure (security) or any structural
+high-risk reason (`risk_tier` high) goes **straight** to `needs-human` — never climbed. A
+retry updates the existing impl PR (no per-tier duplicate). Escalation is attributed in
+Langfuse (`escalation_tier`, `escalated_recovered`) so escalation rate and tier-resolution
+chart out. A scalar route → single-shot, exactly as before (fail-safe-off).
+
+**Cost ceiling is bounded attempts, not a live $-cap.** Goose runs as a subprocess and reports
+token cost to Langfuse *asynchronously* — the runner gets no synchronous usage number — so a
+true per-issue dollar cap isn't implementable without new plumbing. The enforced bound is
+attempt-count + quality-only triggering. Plan:
+`docs/plans/2026-06-09-002-feat-escalate-on-fail-ladder-plan.md`.
+
 ## Deferred
 
-- **Escalate-on-fail (Phase 2).** When the gate escalates for a *quality* reason (tests
-  failed / blocking finding) rather than a structural high-risk one, re-run the stage once
-  on a stronger model before labeling `needs-human`. Needs a retry budget, loop-guard, and
-  cost ceiling — its own plan. The static map here is the precondition.
 - **Native non-Anthropic providers.** Only `native` Anthropic and `openrouter` are wired;
   any other native provider raises with "route it via OpenRouter". Add native support per
   provider when a subscription's own API proves worth the credential.

@@ -43,6 +43,11 @@ clears its quality bar (cheap models for spec authoring, capable models only whe
 demands it). Prefer flat-rate subscription models over metered API; reserve premium metered
 models for capability-critical stages. Per-model cost is tracked in Langfuse.
 
+The pipeline self-recovers within hard safety gates: a build that fails on a cheap model for a
+quality reason (failing tests / blocking review) auto-escalates up a model ladder before asking
+a human — but a security (`sanitise`) or high-risk failure always goes straight to a human,
+never brute-forced on a bigger model.
+
 ### Public/private boundary
 You write to a public repo. **NEVER** write:
 - API keys, tokens, credentials, secrets of any kind

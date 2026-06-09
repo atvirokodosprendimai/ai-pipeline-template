@@ -124,16 +124,26 @@ optional env vars (`pipeline/wgmesh_pipeline/models.py`):
   `billing` is `native` (subscription endpoint, e.g. z.ai/MiniMax — flat-rate only works
   on their own host) or `openrouter` (metered models — DeepSeek/OpenAI/Anthropic — through
   one `OPENROUTER_API_KEY` gateway).
-- `STAGE_ROUTING` — JSON `{stage: registry_key}`. Stages today: `spec`, `implement`.
-  An unmapped stage falls back to a registry `default` profile, else fails closed.
+- `STAGE_ROUTING` — JSON `{stage: registry_key}` for a single model, OR
+  `{stage: [key0, key1, ...]}` for an **escalation ladder** (cheap→capable→premium).
+  Stages today: `spec`, `implement`. An unmapped stage falls back to a registry `default`
+  profile, else fails closed.
 
 **Both unset → single z.ai model, exactly as before (zero-config default).** Credentials
 are read from the process env named by `credential_env`; they reach Goose only when a
 routed profile names them (the fail-closed allowlist in `goose/runner.py` strips everything
 else). Per-stage/per-model cost lands in Langfuse — slice the Scores dashboard by
-`spec_model_key` / `implement_model_key`. Escalate-on-fail (retry a failed stage on a
-stronger model) is **not** built yet — the map is static. See
-`docs/solutions/design-decisions/multi-model-routing.md`.
+`spec_model_key` / `implement_model_key`.
+
+**Escalate-on-fail (shipped).** When a `STAGE_ROUTING` value is a list, `implement`
+auto-climbs the ladder: a **quality-only** gate rejection (tests failed / blocking review
+finding, `risk_tier` low, `sanitise` ok) re-runs implement→review→gate on the next model up,
+bounded by `min(ladder_length-1, MAX_ESCALATION_ATTEMPTS)` (default 2). **Hard gates are never
+climbed** — a `sanitise` failure (security) or any structural high-risk reason goes straight
+to `needs-human`. A retry updates the existing impl PR (no duplicate). Escalation is attributed
+in Langfuse (`escalation_tier`, `escalated_recovered`). A scalar route → no ladder → single-shot,
+exactly as before. The "cost ceiling" is bounded attempts, not a live $-cap (Goose reports cost
+to Langfuse asynchronously). See `docs/solutions/design-decisions/multi-model-routing.md`.
 
 ## Working memory
 
