@@ -169,3 +169,31 @@ def test_langfuse_span_no_issue_uses_no_session(monkeypatch) -> None:
     _LangfuseSpan(lf, "triage", {}, {"stage": "triage"})  # no issue tag
     assert calls["used"] is False
     assert lf.record["name"] == "triage"  # span still created
+
+
+def test_safe_state_strips_config_secrets_from_trace(monkeypatch) -> None:
+    """config carries zai_api_key/wgmesh_bot_pat in plaintext — it must never be
+    serialized into a Langfuse trace input/output (bug #13 secret leak)."""
+    tracer = FakeTracer()
+    init_tracing(Config(target_repo="atvirokodosprendimai/wgmesh", langsmith_api_key="key"), tracer=tracer)
+
+    class _Cfg:
+        zai_api_key = "secret-zai-key"
+        wgmesh_bot_pat = "secret-pat"
+
+    def node(state):
+        return {**state, "classification": "fix"}
+
+    state = {
+        "issue": GitHubIssue(number=510, title="x", labels=(), state="open"),
+        "config": _Cfg(),
+        "github": object(),
+        "goose_runner": object(),
+    }
+    trace_node("triage", node)(state)
+    rec = tracer.records[0]
+    assert "config" not in rec["inputs"]
+    assert "github" not in rec["inputs"]
+    assert "goose_runner" not in rec["inputs"]
+    # and the outputs side too
+    assert "config" not in rec["outputs"]
