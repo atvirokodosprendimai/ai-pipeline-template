@@ -1,46 +1,46 @@
 {
-  "last_run_at": "2026-06-09T14:50:12Z",
+  "last_run_at": "2026-06-09T18:05:34Z",
   "last_run_top_ids": [
-    "atvirokodosprendimai/ai-pipeline-template#752",
     "atvirokodosprendimai/ai-pipeline-template#934",
-    "atvirokodosprendimai/ai-pipeline-template#736"
+    "atvirokodosprendimai/wgmesh#664",
+    "atvirokodosprendimai/wgmesh#667"
   ],
-  "rank_changed": false,
-  "run_number": 12,
+  "rank_changed": true,
+  "run_number": 13,
   "issue_number": 934,
   "issue_url": "https://github.com/atvirokodosprendimai/ai-pipeline-template/issues/934",
   "stage_summary": {
-    "triage": 11,
-    "spec": 9,
+    "triage": 9,
+    "spec": 7,
     "build": 0,
-    "review": 1,
+    "review": 0,
     "merge": 0,
     "verify": 0,
     "revenue": 0,
-    "unknown": 1
+    "unknown": 0
   },
-  "unknown_count": 1,
+  "unknown_count": 0,
   "top_actions": [
-    {
-      "id": "atvirokodosprendimai/ai-pipeline-template#752",
-      "action": "bounce-label"
-    },
     {
       "id": "atvirokodosprendimai/ai-pipeline-template#934",
       "action": "bounce-label"
     },
     {
-      "id": "atvirokodosprendimai/ai-pipeline-template#736",
-      "action": "escalate-needs-human"
+      "id": "atvirokodosprendimai/wgmesh#664",
+      "action": "bounce-label"
     },
     {
-      "id": "atvirokodosprendimai/ai-pipeline-template#753",
+      "id": "atvirokodosprendimai/wgmesh#667",
       "action": "manual-merge"
     },
     {
-      "id": "atvirokodosprendimai/wgmesh#664",
-      "action": "bounce-label"
+      "id": "atvirokodosprendimai/wgmesh#668",
+      "action": "manual-merge"
+    },
+    {
+      "id": "atvirokodosprendimai/wgmesh#688",
+      "action": "manual-merge"
     }
   ],
-  "material_fingerprint": "197c2c9f622a72a99a052ac1fd477907a30ea1352107793ad95666d26ff98c67"
+  "material_fingerprint": "b35618e93fa70a35bda13a84f02d96685e02f04a53e077017b8d39c30653e5d3"
 }
