@@ -1,0 +1,89 @@
+name: Langfuse Ingestion Probe
+
+# Gitops health probe for the self-hosted Langfuse: confirms scores/traces
+# actually land (no 400 server-side) using the LANGFUSE_* secrets. Surfaces the
+# "are our scores erroring?" answer without SSH to the Langfuse box. Creates a
+# couple of isolated probe-session scores (harmless test data).
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate secrets
+        env:
+          LANGFUSE_HOST: ${{ secrets.LANGFUSE_HOST }}
+          LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+          LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+        run: |
+          set -euo pipefail
+          : "${LANGFUSE_HOST:?}"; : "${LANGFUSE_PUBLIC_KEY:?}"; : "${LANGFUSE_SECRET_KEY:?}"
+
+      - name: Probe Langfuse ingestion
+        env:
+          LANGFUSE_HOST: ${{ secrets.LANGFUSE_HOST }}
+          LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+          LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+        run: |
+          python - <<'PY'
+          import os, base64, json, urllib.request, urllib.error
+
+          host = os.environ["LANGFUSE_HOST"].rstrip("/")
+          pk = os.environ["LANGFUSE_PUBLIC_KEY"]
+          sk = os.environ["LANGFUSE_SECRET_KEY"]
+          auth = base64.b64encode(f"{pk}:{sk}".encode()).decode()
+
+          def call(method, path, body=None):
+              data = json.dumps(body).encode() if body is not None else None
+              req = urllib.request.Request(
+                  host + path, method=method, data=data,
+                  headers={"Authorization": "Basic " + auth,
+                           "Content-Type": "application/json"},
+              )
+              try:
+                  with urllib.request.urlopen(req, timeout=25) as r:
+                      return r.status, r.read().decode()[:800]
+              except urllib.error.HTTPError as e:
+                  return e.code, e.read().decode()[:800]
+              except Exception as e:
+                  return None, repr(e)
+
+          print("=== health ===")
+          print(call("GET", "/api/public/health"))
+
+          print("\n=== POST session-linked score (expect 2xx — mirrors #1562 fix) ===")
+          print(call("POST", "/api/public/scores", {
+              "name": "probe_session_linked", "value": 1, "dataType": "NUMERIC",
+              "sessionId": "probe-session"}))
+
+          print("\n=== POST no-link score (expect 400 — the dormant bug shape) ===")
+          print(call("POST", "/api/public/scores", {
+              "name": "probe_no_link", "value": 1, "dataType": "NUMERIC"}))
+
+          print("\n=== GET recent scores (are the box's pipeline_outcome/auto_merged landing?) ===")
+          status, bodytext = call("GET", "/api/public/scores?limit=10")
+          print("status:", status)
+          try:
+              data = json.loads(bodytext)
+              for s in data.get("data", [])[:10]:
+                  print(f"  - {s.get('name')} = {s.get('value')} "
+                        f"session={s.get('sessionId')} trace={s.get('traceId')} "
+                        f"type={s.get('dataType')}")
+          except Exception:
+              print("  (raw)", bodytext)
+
+          print("\n=== GET recent traces (sessions wired?) ===")
+          status, bodytext = call("GET", "/api/public/traces?limit=8")
+          print("status:", status)
+          try:
+              data = json.loads(bodytext)
+              for t in data.get("data", [])[:8]:
+                  print(f"  - {t.get('name')} session={t.get('sessionId')}")
+          except Exception:
+              print("  (raw)", bodytext)
+          PY
