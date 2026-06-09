@@ -184,6 +184,7 @@ def score_run(state: dict, *, outcome: str, scorer: Scorer | None = None) -> dic
 
 def _scores_from_state(state: dict, outcome: str) -> dict[str, Any]:
     review = state.get("review_findings") or []
+    attempts = int(state.get("escalation_attempts", 0))
     return {
         "outcome": outcome,
         "decision": state.get("decision"),
@@ -193,6 +194,11 @@ def _scores_from_state(state: dict, outcome: str) -> dict[str, Any]:
         "review_findings_count": len(review),
         "auto_merged": 1 if outcome == "merged" else 0,
         "escalated": 1 if outcome == "escalated" else 0,
+        # Escalation-ladder attribution (R6): how far the climb went and whether
+        # it recovered a build that tier 0 failed.
+        "escalation_attempts": attempts,
+        "escalation_tier": int(state.get("escalation_tier", 0)),
+        "escalated_recovered": 1 if (attempts > 0 and outcome == "merged") else 0,
     }
 
 
@@ -219,6 +225,12 @@ def _tags_from_state(state: dict, outcome: str) -> dict[str, str]:
         value = state.get(key)
         if value is not None:
             tags[key] = str(value)[:200]
+    # Escalation-ladder attribution (R6): group runs by terminal tier and whether
+    # the climb recovered a tier-0 failure.
+    if "escalation_attempts" in state:
+        attempts = int(state.get("escalation_attempts", 0))
+        tags["escalation_tier"] = str(state.get("escalation_tier", 0))
+        tags["escalated_recovered"] = str(bool(attempts > 0 and outcome == "merged")).lower()
     return tags
 
 

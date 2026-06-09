@@ -11,6 +11,7 @@ class GateDecision:
     decision: Decision
     risk_tier: str
     reasons: tuple[str, ...]
+    retryable: bool = False
 
 
 def decide_gate(
@@ -32,8 +33,19 @@ def decide_gate(
         reasons.append("blocking review finding")
 
     if risk.high or reasons:
-        return GateDecision(decision="escalate", risk_tier=risk.tier, reasons=tuple(reasons))
-    return GateDecision(decision="merge", risk_tier="low", reasons=())
+        retryable_reasons = {"tests failed", "blocking review finding"}
+        retryable = (
+            risk.tier == "low"
+            and sanitise_ok
+            and set(reasons).issubset(retryable_reasons)
+        )
+        return GateDecision(
+            decision="escalate",
+            risk_tier=risk.tier,
+            reasons=tuple(reasons),
+            retryable=retryable,
+        )
+    return GateDecision(decision="merge", risk_tier="low", reasons=(), retryable=False)
 
 
 def gate_node(state: GraphState, *, max_files: int, apply_side_effects: bool = True) -> GraphState:
@@ -50,6 +62,7 @@ def gate_node(state: GraphState, *, max_files: int, apply_side_effects: bool = T
     next_state["decision"] = decision.decision
     next_state["risk_tier"] = decision.risk_tier
     next_state["risk_reasons"] = list(decision.reasons)
+    next_state["retryable"] = decision.retryable
 
     if apply_side_effects:
         apply_gate_side_effects(next_state)

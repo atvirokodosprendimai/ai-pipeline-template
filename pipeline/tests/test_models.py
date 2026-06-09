@@ -5,9 +5,11 @@ import pytest
 from wgmesh_pipeline.models import (
     ModelProfile,
     credential_for,
+    ladder_length_for,
     parse_registry,
     parse_stage_routing,
     resolve_profile,
+    resolve_profile_for_tier,
 )
 
 
@@ -32,7 +34,62 @@ def test_parse_registry_two_profiles() -> None:
 
 def test_parse_stage_routing_maps_stage_to_key() -> None:
     routing = parse_stage_routing('{"spec": "spec-cheap", "implement": "impl-capable"}')
-    assert routing == {"spec": "spec-cheap", "implement": "impl-capable"}
+    assert routing == {"spec": ("spec-cheap",), "implement": ("impl-capable",)}
+
+
+def test_list_route_resolves_requested_tier() -> None:
+    registry = {
+        key: ModelProfile(
+            key=key,
+            provider="anthropic",
+            model=f"model-{key}",
+            billing="native",
+            credential_env="ZAI_API_KEY",
+        )
+        for key in ("a", "b", "c")
+    }
+    routing = parse_stage_routing('{"implement": ["a", "b", "c"]}')
+
+    assert ladder_length_for(routing, "implement") == 3
+    assert resolve_profile_for_tier(registry, routing, "implement", 1).key == "b"
+
+
+def test_scalar_route_is_single_entry_ladder() -> None:
+    registry = {
+        "a": ModelProfile(
+            key="a",
+            provider="anthropic",
+            model="model-a",
+            billing="native",
+            credential_env="ZAI_API_KEY",
+        )
+    }
+    routing = parse_stage_routing('{"implement": "a"}')
+
+    assert ladder_length_for(routing, "implement") == 1
+    assert resolve_profile_for_tier(registry, routing, "implement", 0).key == "a"
+    with pytest.raises(ValueError, match="tier 1 is out of range"):
+        resolve_profile_for_tier(registry, routing, "implement", 1)
+
+
+def test_ladder_route_to_missing_key_raises() -> None:
+    registry = {
+        "a": ModelProfile(
+            key="a",
+            provider="anthropic",
+            model="model-a",
+            billing="native",
+            credential_env="ZAI_API_KEY",
+        )
+    }
+    routing = parse_stage_routing('{"implement": ["a", "missing"]}')
+    with pytest.raises(ValueError, match="model key 'missing'"):
+        resolve_profile_for_tier(registry, routing, "implement", 1)
+
+
+def test_empty_list_route_raises() -> None:
+    with pytest.raises(ValueError, match="non-empty route"):
+        parse_stage_routing('{"implement": []}')
 
 
 def test_resolve_profile_by_stage() -> None:

@@ -22,6 +22,7 @@ DEFAULT_REPO_PATH = "/opt/wgmesh-checkout"
 DEFAULT_RECIPES_DIR = str(Path(__file__).resolve().parents[1] / "recipes")
 DEFAULT_GOOSE_PROVIDER = "anthropic"
 DEFAULT_GOOSE_MODEL = "GLM-4.7"
+DEFAULT_MAX_ESCALATION_ATTEMPTS = 2
 
 
 @dataclass(frozen=True)
@@ -48,7 +49,8 @@ class Config:
     # Multi-model routing (price/perf #2). Empty by default → callers synthesize
     # a zero-config default profile from the goose_* fields above (R7).
     model_registry: Mapping[str, ModelProfile] = field(default_factory=dict)
-    stage_routing: Mapping[str, str] = field(default_factory=dict)
+    stage_routing: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
+    max_escalation_attempts: int = DEFAULT_MAX_ESCALATION_ATTEMPTS
 
     @property
     def owner(self) -> str:
@@ -118,6 +120,11 @@ def load_config(env: Mapping[str, str] | None = None) -> Config:
         langfuse_secret_key=_get_nonempty(source, "LANGFUSE_SECRET_KEY"),
         model_registry=model_registry,
         stage_routing=stage_routing,
+        max_escalation_attempts=_get_int(
+            source,
+            "MAX_ESCALATION_ATTEMPTS",
+            DEFAULT_MAX_ESCALATION_ATTEMPTS,
+        ),
     )
 
 
@@ -131,7 +138,7 @@ def _build_routing(
     goose_provider: str,
     goose_model: str,
     anthropic_host: str,
-) -> tuple[Mapping[str, ModelProfile], Mapping[str, str]]:
+) -> tuple[Mapping[str, ModelProfile], Mapping[str, tuple[str, ...]]]:
     """Registry + stage map from env, with a zero-config fallback (R7).
 
     When MODEL_REGISTRY is unset, synthesize a single ``default`` profile from

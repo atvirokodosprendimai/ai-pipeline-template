@@ -106,6 +106,59 @@ def test_score_run_records_merged_outcome() -> None:
     assert rec.calls[0]["tags"]["outcome"] == "merged"
 
 
+def test_score_run_records_escalation_recovery() -> None:
+    # R6: a run that climbed the ladder (0->1) and merged is attributed as recovered.
+    rec = _RecordingScorer()
+    state = {
+        "issue": _Issue(610),
+        "decision": "merge",
+        "risk_tier": "low",
+        "review_findings": [],
+        "escalation_attempts": 1,
+        "escalation_tier": 1,
+        "implement_model_key": "impl-capable",
+    }
+    scores = score_run(state, outcome="merged", scorer=rec)
+    assert scores["escalation_attempts"] == 1
+    assert scores["escalation_tier"] == 1
+    assert scores["escalated_recovered"] == 1
+    tags = rec.calls[0]["tags"]
+    assert tags["escalation_tier"] == "1"
+    assert tags["escalated_recovered"] == "true"
+    assert tags["implement_model_key"] == "impl-capable"
+
+
+def test_score_run_exhausted_ladder_not_recovered() -> None:
+    rec = _RecordingScorer()
+    state = {
+        "issue": _Issue(611),
+        "decision": "escalate",
+        "risk_tier": "low",
+        "review_findings": [],
+        "escalation_attempts": 2,
+        "escalation_tier": 2,
+    }
+    scores = score_run(state, outcome="escalated", scorer=rec)
+    assert scores["escalation_attempts"] == 2
+    assert scores["escalated_recovered"] == 0
+    assert rec.calls[0]["tags"]["escalated_recovered"] == "false"
+
+
+def test_score_run_clean_tier0_merge_no_escalation() -> None:
+    rec = _RecordingScorer()
+    state = {
+        "issue": _Issue(612),
+        "decision": "merge",
+        "risk_tier": "low",
+        "review_findings": [],
+        "escalation_attempts": 0,
+        "escalation_tier": 0,
+    }
+    scores = score_run(state, outcome="merged", scorer=rec)
+    assert scores["escalation_attempts"] == 0
+    assert scores["escalated_recovered"] == 0
+
+
 def test_score_run_tags_include_per_stage_model_keys() -> None:
     # R5: the model that handled each LLM stage is attributed in the score tags.
     rec = _RecordingScorer()

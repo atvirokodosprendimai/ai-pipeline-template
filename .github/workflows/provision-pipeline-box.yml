@@ -168,6 +168,7 @@ jobs:
           MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
           MODEL_REGISTRY: ${{ secrets.MODEL_REGISTRY }}
           STAGE_ROUTING: ${{ secrets.STAGE_ROUTING }}
+          MAX_ESCALATION_ATTEMPTS: ${{ vars.MAX_ESCALATION_ATTEMPTS }}
           MODE: ${{ github.event.inputs.pipeline_mode }}
           DBMODE: ${{ github.event.inputs.database_mode }}
           RESET_QUEUE_INPUT: ${{ github.event.inputs.reset_queue }}
@@ -193,6 +194,7 @@ jobs:
           MINIMAX_API_KEY=$MINIMAX_API_KEY
           MODEL_REGISTRY='$MODEL_REGISTRY'
           STAGE_ROUTING='$STAGE_ROUTING'
+          MAX_ESCALATION_ATTEMPTS=$MAX_ESCALATION_ATTEMPTS
           WGMESH_CHECKOUT_PATH=/opt/wgmesh-checkout
           DATABASE_MODE=$DBMODE
           PIPELINE_DB_PATH=/opt/wgmesh-pipeline/state.db

@@ -26,6 +26,84 @@ def test_gate_merges_low_risk_green_clean_review() -> None:
 
     assert decision.decision == "merge"
     assert decision.risk_tier == "low"
+    assert decision.retryable is False
+
+
+def test_gate_tests_failed_only_low_risk_is_retryable() -> None:
+    decision = decide_gate(
+        changed_files=["docs/readme.md"],
+        diff="+docs\n",
+        max_files=3,
+        tests_passed=False,
+        sanitise_ok=True,
+        review_findings=[],
+    )
+
+    assert decision.decision == "escalate"
+    assert decision.reasons == ("tests failed",)
+    assert decision.retryable is True
+
+
+def test_gate_blocking_review_finding_only_low_risk_is_retryable() -> None:
+    decision = decide_gate(
+        changed_files=["docs/readme.md"],
+        diff="+docs\n",
+        max_files=3,
+        tests_passed=True,
+        sanitise_ok=True,
+        review_findings=[{"blocking": True, "message": "missing test"}],
+    )
+
+    assert decision.decision == "escalate"
+    assert decision.reasons == ("blocking review finding",)
+    assert decision.retryable is True
+
+
+def test_gate_tests_failed_with_sanitise_failure_is_not_retryable() -> None:
+    decision = decide_gate(
+        changed_files=["docs/readme.md"],
+        diff="+docs\n",
+        max_files=3,
+        tests_passed=False,
+        sanitise_ok=False,
+        review_findings=[],
+    )
+
+    assert decision.decision == "escalate"
+    assert set(decision.reasons) == {"tests failed", "sanitise failed"}
+    assert decision.retryable is False
+
+
+def test_gate_tests_failed_with_high_risk_path_is_not_retryable() -> None:
+    decision = decide_gate(
+        changed_files=["internal/auth/login.go"],
+        diff="+return nil\n",
+        max_files=3,
+        tests_passed=False,
+        sanitise_ok=True,
+        review_findings=[],
+    )
+
+    assert decision.decision == "escalate"
+    assert decision.risk_tier == "high"
+    assert "tests failed" in decision.reasons
+    assert decision.retryable is False
+
+
+def test_gate_net_new_network_call_with_passing_tests_is_not_retryable() -> None:
+    decision = decide_gate(
+        changed_files=["internal/client.go"],
+        diff="+resp, err := http.Get(url)\n",
+        max_files=3,
+        tests_passed=True,
+        sanitise_ok=True,
+        review_findings=[],
+    )
+
+    assert decision.decision == "escalate"
+    assert decision.risk_tier == "high"
+    assert "net-new outbound network call" in decision.reasons
+    assert decision.retryable is False
 
 
 def test_gate_escalates_high_risk_path_even_when_green() -> None:
@@ -40,6 +118,7 @@ def test_gate_escalates_high_risk_path_even_when_green() -> None:
 
     assert decision.decision == "escalate"
     assert decision.risk_tier == "high"
+    assert decision.retryable is False
 
 
 def test_implement_derives_changed_files_from_existing_diff_for_gate() -> None:
@@ -123,6 +202,7 @@ def test_review_failed_verification_escalates_at_gate(monkeypatch) -> None:
     assert reviewed["tests_passed"] is False
     assert decision.decision == "escalate"
     assert "tests failed" in decision.reasons
+    assert decision.retryable is True
 
 
 def test_gate_escalates_blocking_review_finding() -> None:
@@ -137,6 +217,7 @@ def test_gate_escalates_blocking_review_finding() -> None:
 
     assert decision.decision == "escalate"
     assert "blocking review finding" in decision.reasons
+    assert decision.retryable is True
 
 
 def test_gate_escalates_sanitise_failure() -> None:
@@ -151,6 +232,25 @@ def test_gate_escalates_sanitise_failure() -> None:
 
     assert decision.decision == "escalate"
     assert "sanitise failed" in decision.reasons
+    assert decision.retryable is False
+
+
+def test_gate_node_surfaces_retryable_in_state() -> None:
+    result = gate_node(
+        {
+            "issue": GitHubIssue(number=10, title="Fix docs", labels=("needs-triage",), state="open"),
+            "diff": "+docs\n",
+            "changed_files": ["docs/readme.md"],
+            "tests_passed": False,
+            "sanitise_ok": True,
+            "review_findings": [],
+        },
+        max_files=3,
+        apply_side_effects=False,
+    )
+
+    assert result["decision"] == "escalate"
+    assert result["retryable"] is True
 
 
 def test_graph_wont_do_routes_to_escalate_and_skips_spec_implement() -> None:
