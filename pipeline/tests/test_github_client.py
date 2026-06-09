@@ -207,7 +207,9 @@ def test_spec_only_allows_spec_branch_push_and_label_swap(cfg: Config, tmp_path,
     client.remove_label(17, "needs-triage", spec_pr=True)
     client.add_label(17, "copilot-triaging", spec_pr=True)
 
-    assert pushes == [(["git", "push", "origin", "bot/spec-17"], str(tmp_path))]
+    # bot/spec-* push is force (bug #12: re-spec after reset diverges from the
+    # prior run's remote branch -> plain push rejected non-fast-forward).
+    assert pushes == [(["git", "push", "--force", "origin", "bot/spec-17"], str(tmp_path))]
     assert [call["method"] for call in session.calls] == ["DELETE", "POST"]
 
 
