@@ -11,7 +11,7 @@ from wgmesh_pipeline.config import Config
 from wgmesh_pipeline.github.client import GitHubIssue
 from wgmesh_pipeline.graph.build import CompiledGraph
 from wgmesh_pipeline.graph.nodes.spec import spec_node
-from wgmesh_pipeline.graph.nodes.spec_pr import spec_pr_node
+from wgmesh_pipeline.graph.nodes.spec_pr import _prepare_spec_branch, spec_pr_node
 from wgmesh_pipeline.goose.runner import GooseResult
 
 
@@ -54,7 +54,7 @@ def issue() -> GitHubIssue:
 def test_spec_pr_node_creates_exact_spec_title_and_swaps_labels(tmp_path: Path, cfg: Config) -> None:
     spec_path = tmp_path / "specs" / "issue-17-spec.md"
     spec_path.parent.mkdir()
-    spec_path.write_text("## Classification\nfix\n\n## Problem Analysis\nbug\n\n## Proposed Approach\nfix it\n")
+    spec_path.write_text("## Classification\nbug\n\n## Problem Analysis\nbug\n\n## Proposed Approach\nfix it\n")
     client = RecordingClient(cfg)
 
     result = spec_pr_node(
@@ -89,9 +89,9 @@ class WritingRunner:
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(
             "# Issue 17 Spec\n\n"
-            "## Summary\nFix mesh discovery.\n\n"
-            "## Context\nThe issue needs a structured implementation spec.\n\n"
-            "## Requirements\n- Preserve existing discovery behavior.\n\n"
+            "## Classification\nbug\n\n"
+            "## Problem Analysis\nThe issue needs a structured implementation spec.\n\n"
+            "## Proposed Approach\nPreserve existing discovery behavior while fixing the bug.\n\n"
             "## Acceptance Criteria\n- The discovery fix is covered.\n\n"
             "## Out of scope\n- Unrelated networking changes.\n"
         )
@@ -125,6 +125,47 @@ def test_spec_to_spec_pr_commits_spec_file_and_targets_wgmesh(tmp_path: Path) ->
     assert (tmp_path / "specs/issue-17-spec.md").exists()
     assert _git(tmp_path, "branch", "--show-current").stdout.strip() == "bot/spec-17"
     assert _git(tmp_path, "log", "--format=%s", "-1").stdout.strip() == "spec: Issue #17 - Fix mesh discovery"
+
+
+def test_prepare_spec_branch_roots_at_origin_main(tmp_path: Path) -> None:
+    origin = tmp_path / "origin"
+    clone = tmp_path / "clone"
+    origin.mkdir()
+    _git(origin, "init", "-b", "main")
+    _git(origin, "config", "user.email", "bot@example.invalid")
+    _git(origin, "config", "user.name", "wgmesh bot")
+    (origin / "README.md").write_text("wgmesh\n")
+    _git(origin, "add", "README.md")
+    _git(origin, "commit", "-m", "initial")
+
+    subprocess.run(
+        ["git", "clone", str(origin), str(clone)],
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+    _git(clone, "config", "user.email", "bot@example.invalid")
+    _git(clone, "config", "user.name", "wgmesh bot")
+    _git(clone, "checkout", "-B", "bot/spec-old")
+    stale_spec = clone / "specs" / "issue-1-spec.md"
+    stale_spec.parent.mkdir()
+    stale_spec.write_text("## Classification\nbug\n")
+    _git(clone, "add", str(stale_spec.relative_to(clone)))
+    _git(clone, "commit", "-m", "spec: Issue #1 - Stale")
+
+    new_spec = clone / "specs" / "issue-17-spec.md"
+    new_spec.write_text("## Classification\nbug\n")
+
+    _prepare_spec_branch(
+        clone,
+        "bot/spec-17",
+        Path("specs/issue-17-spec.md"),
+        "spec: Issue #17 - Fix mesh discovery",
+    )
+
+    changed_files = _git(clone, "diff", "--name-only", "origin/main..HEAD").stdout.splitlines()
+    assert changed_files == ["specs/issue-17-spec.md"]
+    assert _git(clone, "branch", "--show-current").stdout.strip() == "bot/spec-17"
 
 
 def _git(repo_path: Path, *args: str) -> subprocess.CompletedProcess[str]:
