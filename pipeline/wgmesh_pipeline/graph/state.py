@@ -22,10 +22,14 @@ class GraphState(TypedDict, total=False):
     changed_files: list[str]
     risk_tier: str
     risk_reasons: list[str]
+    retryable: bool
     review_findings: list[dict[str, Any]]
     tests_passed: bool
     sanitise_ok: bool
     decision: Decision
+    escalation_tier: int
+    escalation_attempts: int
+    escalation_history: list[int]
     visited: list[str]
     github: GitHubClient
     repo_path: str | Path

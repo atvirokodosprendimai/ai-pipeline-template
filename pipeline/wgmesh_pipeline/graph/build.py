@@ -1,16 +1,18 @@
 from __future__ import annotations
 
+import inspect
 from dataclasses import dataclass
 from typing import Callable
 
 from wgmesh_pipeline.config import Config
-from wgmesh_pipeline.graph.nodes.gate import gate_node
+from wgmesh_pipeline.graph.nodes.gate import apply_gate_side_effects, gate_node
 from wgmesh_pipeline.graph.nodes.implement import implement_node
 from wgmesh_pipeline.graph.nodes.review import review_node
 from wgmesh_pipeline.graph.nodes.spec import spec_node
 from wgmesh_pipeline.graph.nodes.spec_pr import spec_pr_node
 from wgmesh_pipeline.graph.nodes.triage import triage_node
 from wgmesh_pipeline.graph.state import GraphState
+from wgmesh_pipeline.models import ladder_length_for
 from wgmesh_pipeline.tracing import trace_node
 
 
@@ -38,9 +40,51 @@ class CompiledGraph:
         current = self.spec_pr(current)
         if self.config.mode == "spec-only":
             return current
-        current = self.implement(current)
-        current = self.review(current)
-        return self.gate(current, max_files=self.config.max_files)
+        current = self._run_implementation_ladder(current)
+        apply_gate_side_effects(current)
+        return current
+
+    def _run_implementation_ladder(self, state: GraphState) -> GraphState:
+        current = dict(state)
+        tier = int(current.get("escalation_tier", 0))
+        attempts = int(current.get("escalation_attempts", 0))
+        history = list(current.get("escalation_history", []))
+        ladder_length = ladder_length_for(self.config.stage_routing, "implement")
+
+        while True:
+            current["escalation_tier"] = tier
+            current["escalation_attempts"] = attempts
+            history.append(tier)
+            current["escalation_history"] = list(history)
+
+            current = self.implement(current)
+            current = self.review(current)
+            current = self._evaluate_gate(current)
+
+            if current.get("decision") == "merge":
+                return current
+
+            can_retry = (
+                bool(current.get("retryable", False))
+                and tier + 1 < ladder_length
+                and attempts < self.config.max_escalation_attempts
+            )
+            if not can_retry:
+                return current
+
+            tier += 1
+            attempts += 1
+            current = dict(current)
+
+    def _evaluate_gate(self, state: GraphState) -> GraphState:
+        parameters = inspect.signature(self.gate).parameters
+        if "apply_side_effects" in parameters:
+            return self.gate(
+                state,
+                max_files=self.config.max_files,
+                apply_side_effects=False,
+            )
+        return self.gate(state, max_files=self.config.max_files)
 
 
 def build_graph(config: Config) -> CompiledGraph:
