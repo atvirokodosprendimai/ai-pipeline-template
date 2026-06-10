@@ -205,6 +205,59 @@ def test_review_failed_verification_escalates_at_gate(monkeypatch) -> None:
     assert decision.retryable is True
 
 
+def test_live_review_uses_verification_result_and_gate_can_merge(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr("wgmesh_pipeline.graph.nodes.review.run_sanitise", lambda text: True)
+    calls = []
+
+    def fake_run_verification(repo_path, branch):
+        calls.append({"repo_path": repo_path, "branch": branch})
+        return {
+            "tests_passed": True,
+            "steps": [{"cmd": "go build", "returncode": 0, "duration_seconds": 0.01}],
+            "failed_step": None,
+            "output_tail": "",
+        }
+
+    monkeypatch.setattr("wgmesh_pipeline.graph.nodes.review.run_verification", fake_run_verification)
+    client = GitHubClient(cfg(mode="live"), session=SessionForPr({"number": 456}), sanitiser=lambda text: True)
+
+    reviewed = review_node(
+        {
+            "issue": GitHubIssue(number=11, title="Fix docs", labels=("needs-triage",), state="open"),
+            "github": client,
+            "goose_runner": object(),
+            "repo_path": tmp_path,
+            "impl_branch": "bot/impl-11",
+            "impl_pr": 456,
+            "diff": "+docs\n",
+            "changed_files": ["docs/readme.md"],
+        }
+    )
+    gated = gate_node(reviewed, max_files=3)
+
+    assert calls == [{"repo_path": tmp_path, "branch": "bot/impl-11"}]
+    assert reviewed["tests_passed"] is True
+    assert reviewed["verification"]["tests_passed"] is True
+    assert gated["decision"] == "merge"
+    assert client.session.calls[-1]["url"].endswith("/pulls/456/merge")
+
+
+def test_non_live_review_keeps_tests_passed_fallback(monkeypatch) -> None:
+    monkeypatch.setattr("wgmesh_pipeline.graph.nodes.review.run_sanitise", lambda text: True)
+
+    reviewed = review_node(
+        {
+            "issue": GitHubIssue(number=12, title="Fix docs", labels=("needs-triage",), state="open"),
+            "goose_runner": object(),
+            "diff": "+docs\n",
+            "verification": {"tests_passed": True},
+        }
+    )
+
+    assert reviewed["tests_passed"] is True
+    assert reviewed["verification"] == {"tests_passed": True}
+
+
 def test_gate_escalates_blocking_review_finding() -> None:
     decision = decide_gate(
         changed_files=["docs/readme.md"],
