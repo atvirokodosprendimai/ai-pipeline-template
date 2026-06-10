@@ -159,6 +159,7 @@ class GitHubClient:
 
     def push_branch(self, clone_path: str, branch: str, *, spec_pr: bool = False) -> Any:
         is_spec_branch = spec_pr or branch.startswith("bot/spec-")
+        is_force_updated_bot_branch = is_spec_branch or branch.startswith("bot/impl-")
         payload = {"clone_path": clone_path, "branch": branch}
         if is_spec_branch:
             self._sanitise_spec_branch_files(Path(clone_path), branch)
@@ -168,14 +169,12 @@ class GitHubClient:
             return self._write("push_branch", "GIT", "git push", payload=payload, spec_pr=spec_pr)
         if self.config.mode == "spec-only" and not spec_pr:
             return self._write("push_branch", "GIT", "git push", payload=payload, spec_pr=spec_pr)
-        # bot/spec-* branches are exclusively bot-owned and re-authored from a
-        # fresh checkout each pass (e.g. after a queue reset). A prior run's
-        # remote branch diverges -> a plain push is rejected non-fast-forward
-        # (bug #12) -> the issue fails. Force-update the bot branch so re-spec
-        # updates the existing spec PR's branch in place. (force-with-lease
+        # bot/spec-* and bot/impl-* branches are exclusively bot-owned and
+        # re-authored from the base branch each pass. A prior remote branch can
+        # diverge, so force-update the bot branch in place. (force-with-lease
         # would need a remote-tracking ref the shallow clone never fetched.)
         push_cmd = ["git", "push", "origin", branch]
-        if is_spec_branch:
+        if is_force_updated_bot_branch:
             push_cmd.insert(2, "--force")
         try:
             completed = subprocess.run(
@@ -226,7 +225,11 @@ class GitHubClient:
             response = self.session.request(method, f"{self.api_root}{path}", headers=headers, **kwargs)
         except requests.Timeout as exc:
             raise RuntimeError(f"GitHub request timed out after {kwargs['timeout']}s") from exc
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except requests.HTTPError as exc:
+            detail = (response.text or "")[:300]
+            raise requests.HTTPError(f"{exc} :: {detail}", response=response) from None
         if raw_text:
             return response.text
         if response.text:
