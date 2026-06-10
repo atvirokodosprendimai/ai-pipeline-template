@@ -1,0 +1,58 @@
+version: "1.0.0"
+title: "wgmesh Implementation"
+description: "Implement a wgmesh issue from its approved spec and emit a unified diff."
+parameters:
+  - key: spec_file
+    input_type: string
+    requirement: required
+    description: "Repository-relative path to the specification (specs/issue-N-spec.md)."
+  - key: diff_file
+    input_type: string
+    requirement: required
+    description: "Repository-relative path where the unified diff of all changes must be written."
+prompt: |
+  You are implementing changes for wgmesh, a Go-based WireGuard mesh network
+  builder with managed ingress.
+
+  Project context:
+  - Language: Go 1.25, module github.com/atvirokodosprendimai/wgmesh
+  - go build ./... must succeed, go test ./... must pass, go vet ./... must be clean
+  - Code must be gofmt formatted; handle errors with context wrapping
+  - Use the standard library where possible
+  - Do NOT modify files outside the scope of the specification
+  - Never reference a type, field, or function you have not verified exists by
+    reading the source. If the spec suggests code that does not match the real
+    codebase, adapt to match reality.
+
+  Steps:
+  1. Read the specification at {{ spec_file }} thoroughly.
+  2. Read every file the spec touches; understand the real types and signatures.
+  3. Read existing tests in the same packages to learn the test patterns.
+  4. Implement the spec, including tests.
+  5. Iterate until go build ./... && go test ./... && go vet ./... are all clean,
+     then run gofmt -w on files you changed.
+  6. Write the unified diff of ALL your changes to {{ diff_file }}:
+     - Create the parent directory if needed.
+     - Run exactly: git add -A && git reset -q -- "$(dirname {{ diff_file }})" && git diff --cached > {{ diff_file }}
+     - The diff file must be non-empty and must not include itself.
+  7. Do not commit and do not push; the pipeline handles both from the diff.
+
+  Keep all content public-repo safe: no secrets, no customer PII, no exact
+  revenue figures.
+
+# The developer extension provides the shell/file tools goose needs; the box is
+# installed CONFIGURE=false, so no extensions are enabled unless declared here.
+extensions:
+  - type: builtin
+    name: developer
+    display_name: Developer
+    timeout: 300
+    bundled: true
+
+# Pin provider/model like wgmesh-triage-spec.yaml: goose honors recipe settings
+# even when env GOOSE_PROVIDER/GOOSE_MODEL don't take in headless --no-session
+# runs. z.ai is Anthropic-compatible via ANTHROPIC_HOST; glm-4.6 is the current
+# valid model id.
+settings:
+  goose_provider: anthropic
+  goose_model: glm-4.6

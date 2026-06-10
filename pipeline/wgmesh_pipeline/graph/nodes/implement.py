@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+from wgmesh_pipeline.config import DEFAULT_RECIPES_DIR
 from wgmesh_pipeline.graph.state import GraphState
 
 
@@ -20,10 +21,21 @@ def implement_node(state: GraphState) -> GraphState:
     repo_path = Path(next_state.get("repo_path", "."))
     diff_rel = Path("pipeline-output") / f"issue-{next_state['issue'].number}.diff"
     if runner is not None:
+        # Resolve against the pipeline's recipes dir (mirrors spec_node): goose
+        # runs with cwd=repo_path (the wgmesh clone), where a bare recipe name
+        # does not exist — that was the live-mode 'goose exited 1' on every
+        # implement attempt.
+        config = next_state.get("config")
+        recipes_dir = Path(getattr(config, "recipes_dir", DEFAULT_RECIPES_DIR))
         result = runner.run_recipe(
-            recipe="wgmesh-implementation.yaml",
+            recipe=recipes_dir / "wgmesh-implementation.yaml",
             workdir=repo_path,
-            params={"spec_file": str(next_state["spec_path"])},
+            # diff_file mirrors expected_output: the recipe instructs goose to
+            # write the unified diff there, the runner verifies it appeared.
+            params={
+                "spec_file": str(next_state["spec_path"]),
+                "diff_file": str(diff_rel),
+            },
             expected_output=diff_rel,
             stage="implement",
             tier=tier,
