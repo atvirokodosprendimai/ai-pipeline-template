@@ -1,8 +1,12 @@
 # wgmesh pipeline
 
-Shadow-mode Python service for the autonomous wgmesh pipeline.
+Python service for the autonomous wgmesh pipeline.
 
-Phase 1 is intentionally safe by default:
+`PIPELINE_MODE=live` is the current production mode for the `wgmesh-pipeline`
+box on Hetzner. `spec-only` and `shadow` remain fallback/rollback modes.
+`spec_opened` rows resume at `spec_ready` when a live-mode box picks them up.
+
+Phase 1 was intentionally safe by default:
 
 - `PIPELINE_MODE` defaults to `shadow`.
 - GitHub writes must route through `wgmesh_pipeline.github.client.GitHubClient`.
@@ -18,10 +22,10 @@ pip install -e pipeline/
 pytest pipeline/tests/
 ```
 
-## Phase 2: spec-only live
+## Fallback: spec-only live
 
-Phase 2 lets the box open real spec PRs for wgmesh and then stop. GitHub Actions still
-own spec review, build, code review, and merge.
+Spec-only lets the box open real spec PRs for wgmesh and then stop. It is now a
+rollback mode; GitHub Actions own spec review, build, code review, and merge.
 
 Run from the repo root:
 

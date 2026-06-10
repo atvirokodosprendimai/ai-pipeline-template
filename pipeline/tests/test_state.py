@@ -123,6 +123,17 @@ def test_illegal_transition_rejected(tmp_path) -> None:
         db.transition(1, "merged", "queued")
 
 
+def test_spec_opened_transitions_to_spec_ready_only(tmp_path) -> None:
+    db = store(tmp_path)
+    db.upsert_issue(1, "Spec opened", stage="spec_opened")
+
+    assert db.transition(1, "spec_opened", "spec_ready").stage == "spec_ready"
+
+    db.upsert_issue(2, "Spec opened", stage="spec_opened")
+    with pytest.raises(TransitionError, match="spec_opened->implemented"):
+        db.transition(2, "spec_opened", "implemented")
+
+
 def test_claim_next_skips_cooldown_and_returns_eldest_eligible(tmp_path) -> None:
     db = store(tmp_path)
     now = datetime(2026, 6, 7, 12, tzinfo=timezone.utc)

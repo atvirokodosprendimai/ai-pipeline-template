@@ -11,7 +11,7 @@ from wgmesh_pipeline.github.client import GitHubClient, GitHubIssue
 from wgmesh_pipeline.github.reconcile import reconcile_issues
 from wgmesh_pipeline.graph.nodes.gate import apply_gate_side_effects, gate_node
 from wgmesh_pipeline.scoring import score_run
-from wgmesh_pipeline.state.store import IssueRecord, StateStore
+from wgmesh_pipeline.state.store import ACTIONABLE_STAGES, IssueRecord, StateStore
 
 log = logging.getLogger("wgmesh_pipeline.poller")
 
@@ -38,7 +38,10 @@ class Poller:
     async def tick(self) -> IssueRecord | None:
         try:
             result = reconcile_issues(self.client, self.store)
-            issue = self.store.claim_next(now=datetime.now(timezone.utc))
+            claim_stages = ACTIONABLE_STAGES
+            if self.config.mode != "spec-only":
+                claim_stages = ACTIONABLE_STAGES + ("spec_opened",)
+            issue = self.store.claim_next(now=datetime.now(timezone.utc), stages=claim_stages)
         except Exception as exc:
             # Never silently swallow: a reconcile/claim failure here previously
             # left the loop reconciling-but-never-advancing with the cause
@@ -126,6 +129,11 @@ class Poller:
             if next_stage == "spec_opened":
                 score_run(self.scratch[issue.number], outcome="spec_opened")
             return advanced
+
+        if issue.stage == "spec_opened":
+            # spec-only terminal; in live mode the spec PR is already open, so the
+            # issue resumes at implementation.
+            return self.store.transition(issue.number, "spec_opened", "spec_ready")
 
         if issue.stage == "spec_ready":
             self.scratch[issue.number] = dict(self.graph.implement(state))

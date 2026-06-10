@@ -129,6 +129,34 @@ def test_spec_only_wont_do_issue_escalates_and_is_not_reclaimed(tmp_path, cfg: C
     assert session.calls[0]["kwargs"]["json"] == {"labels": ["needs-human"]}
 
 
+def test_live_mode_resumes_spec_opened_issue(tmp_path, cfg: Config) -> None:
+    live = Config(target_repo=cfg.target_repo, mode="live", max_files=cfg.max_files)
+    store = StateStore(tmp_path / "state.db")
+    store.upsert_issue(12, "Implement approved spec", stage="spec_opened", spec_pr=99)
+    p = Poller(config=live, store=store, client=EmptyClient(live), graph=Graph())
+
+    result = asyncio.run(p.tick())
+
+    assert result is not None
+    assert result.stage == "spec_ready"
+    assert store.get_issue(12).stage == "spec_ready"
+    assert store.list_runs()[0]["node"] == "spec_opened"
+    assert store.list_runs()[0]["outcome"] == "ok"
+
+
+def test_spec_only_mode_never_claims_spec_opened(tmp_path, cfg: Config) -> None:
+    spec_only = Config(target_repo=cfg.target_repo, mode="spec-only", max_files=cfg.max_files)
+    store = StateStore(tmp_path / "state.db")
+    store.upsert_issue(12, "Spec already opened", stage="spec_opened", spec_pr=99)
+    p = Poller(config=spec_only, store=store, client=EmptyClient(spec_only), graph=Graph())
+
+    result = asyncio.run(p.tick())
+
+    assert result is None
+    assert store.get_issue(12).stage == "spec_opened"
+    assert store.list_runs() == []
+
+
 def test_tick_no_actionable_issue_is_noop(tmp_path, cfg: Config) -> None:
     p = poller(tmp_path, cfg)
 

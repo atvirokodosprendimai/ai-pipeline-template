@@ -15,7 +15,7 @@ ALLOWED_TRANSITIONS: dict[str, set[str]] = {
     "spec_ready": {"implemented", "escalated", "failed"},
     "implemented": {"reviewed", "escalated", "failed"},
     "reviewed": {"merged", "escalated", "failed"},
-    "spec_opened": set(),
+    "spec_opened": {"spec_ready"},
     "merged": set(),
     "escalated": set(),
     "failed": set(),
@@ -188,16 +188,21 @@ class StateStore:
         self._conn.commit()
         return self.get_issue(number)
 
-    def claim_next(self, *, now: datetime | None = None) -> IssueRecord | None:
+    def claim_next(
+        self,
+        *,
+        now: datetime | None = None,
+        stages: tuple[str, ...] = ACTIONABLE_STAGES,
+    ) -> IssueRecord | None:
         current = _dt(now)
         rows = self._conn.execute(
             f"""
             SELECT * FROM issues
              WHERE status = 'open'
-               AND stage IN ({",".join("?" for _ in ACTIONABLE_STAGES)})
+               AND stage IN ({",".join("?" for _ in stages)})
              ORDER BY updated_at ASC, number ASC
             """,
-            ACTIONABLE_STAGES,
+            stages,
         ).fetchall()
         for row in rows:
             issue = _issue(row)

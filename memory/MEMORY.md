@@ -39,3 +39,4 @@ Last consolidated: 2026-04-10.
 - Public repo: never commit secrets, PII, or exact revenue figures
 - Assessment PRs auto-merge only if Copilot review has zero comments and zero blocking reviews
 - Multi-model routing: `STAGE_ROUTING`+`MODEL_REGISTRY` env (`pipeline/wgmesh_pipeline/models.py`) pick a model per stage (cheap=spec, capable=implement); hybrid billing (subs native, metered via OpenRouter); both unset → zero-config single z.ai model; fail-closed; per-model cost in Langfuse. Escalate-on-fail = Phase 2. Doc: `docs/solutions/design-decisions/multi-model-routing.md`
+- Pipeline live mode since 2026-06-10: durable `spec_opened` rows resume at `spec_ready` when live/shadow boxes claim them; `goose-build.yml`/`goose-review.yml` GitHub-Actions lanes are legacy/bridge while the box implements via `bot/impl-N` branches.
