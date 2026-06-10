@@ -1,0 +1,24 @@
+pipeline/tests/test_runner_routing.py
+  s_79f95db834bd2f::t_84fab69bfcc7d1 67-74,233
+  s_79f95db834bd2f::t_1607a4982f1689 83-88,90,99-104,106,210-211,213-232,234-236,238-243,245-261,263-293
+  s_79f95db834bd2f::t_f1e907fec1a3fe 24-28,48-55,212,237,244,262
+pipeline/wgmesh_pipeline/goose/runner.py
+  s_79f95db834bd2f::t_c193ed9ae03c66 397,401
+  s_79f95db834bd2f::t_11b514873827e1 265-283,383-396,398-400,402-419
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "78681471eac5c9c61d25147b33af157373d7a6d7",
+  "prompts": {},
+  "sessions": {
+    "s_79f95db834bd2f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eb1c7-74f7-7860-bc44-38cac350ddf2",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
