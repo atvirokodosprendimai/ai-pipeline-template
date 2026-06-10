@@ -60,6 +60,14 @@ jobs:
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               -o ConnectTimeout=15 -i "$RUNNER_TEMP/deploy_key" root@"$BOX_IP" \
             "set -euo pipefail
+             # Toolchain self-heal: a box recreated from an older provision may
+             # lack Go (2026-06-10: a 70s install race cost two gate decisions
+             # 'go binary not found'). Idempotent — skips when present.
+             if [ ! -x /usr/local/go/bin/go ]; then
+               curl -fsSL https://go.dev/dl/go1.25.5.linux-amd64.tar.gz -o /tmp/go.tgz
+               tar -C /usr/local -xzf /tmp/go.tgz && rm -f /tmp/go.tgz
+             fi
+             ln -sf /usr/local/go/bin/go /usr/local/bin/go
              git config --global --add safe.directory /opt/wgmesh-pipeline
              cd /opt/wgmesh-pipeline
              git fetch origin main

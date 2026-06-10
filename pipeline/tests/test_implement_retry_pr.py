@@ -194,6 +194,49 @@ def test_implement_starts_from_clean_workspace(tmp_path: Path) -> None:
     assert result["impl_pr"] == 4242
     assert client.calls[:2] == [("push_branch", "bot/impl-77"), ("create_pr", "bot/impl-77")]
     assert _git(clone, "diff", "--name-only", "origin/main..HEAD").stdout.splitlines() == ["README.md"]
+
+
+class _LitteringRunner(_FakeRunner):
+    """Mimics 2026-06-10: the model materialized a go/ toolchain tree and a
+    go-cache/ module cache in the checkout alongside its real edit."""
+
+    def run_recipe(self, **kwargs):
+        workdir = Path(kwargs["workdir"])
+        (workdir / "go" / "src" / "cmd" / "dist").mkdir(parents=True, exist_ok=True)
+        (workdir / "go" / "src" / "cmd" / "dist" / "build_test.go").write_text("package dist\n")
+        (workdir / "go-cache" / "some" / "mod@v1").mkdir(parents=True, exist_ok=True)
+        (workdir / "go-cache" / "some" / "mod@v1" / "a.go").write_text("package a\n")
+        return super().run_recipe(**kwargs)
+
+
+def test_stage_excludes_model_litter(tmp_path: Path) -> None:
+    origin = tmp_path / "origin"
+    clone = tmp_path / "clone"
+    _init_origin_with_spec_branch(origin)
+    _clone(origin, clone)
+
+    client = _RecordingClient()
+    runner = _LitteringRunner(
+        "diff --git a/README.md b/README.md\n--- a/README.md\n+++ b/README.md\n@@ -1 +1 @@\n-wgmesh\n+wgmesh fixed\n",
+        edit_file="README.md",
+        edit_content="wgmesh fixed\n",
+    )
+
+    result = implement_node(
+        {
+            "issue": GitHubIssue(number=77, title="Fix relay", labels=("needs-triage",), state="open"),
+            "github": client,
+            "goose_runner": runner,
+            "repo_path": clone,
+            "spec_path": "specs/issue-77-spec.md",
+        }
+    )
+
+    assert result["impl_pr"] == 4242
+    committed = _git(clone, "diff", "--name-only", "origin/main..HEAD").stdout.splitlines()
+    assert committed == ["README.md"]
+    assert not any(p.startswith(("go/", "go-cache/")) for p in committed)
+    assert not any(p.startswith(("go/", "go-cache/")) for p in result["changed_files"])
     assert _git(clone, "show", "HEAD:README.md").stdout == "wgmesh fixed\n"
     assert _git(clone, "show", "HEAD:main.go").stdout == "package main\n\nfunc main() {}\n"
     assert result["diff"].startswith("diff --git a/README.md b/README.md")
