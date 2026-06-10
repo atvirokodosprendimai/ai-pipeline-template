@@ -104,13 +104,23 @@ jobs:
           set -euo pipefail
           IP="$1"; LF_PUB="$2"; LF_SEC="$3"; ADMINPW="$4"
           cd /opt/langfuse
-          curl -fsSL https://raw.githubusercontent.com/langfuse/langfuse/main/docker-compose.yml -o docker-compose.yml
-          # Pin ClickHouse: langfuse's compose leaves it untagged (=latest), which
-          # drifted to 26.5 and broke the v3 scores.all query ("Not found column
-          # and(...)"). 25.12 is the version langfuse actually tests against
-          # (their docker-compose.dev.yml). Pin only if still untagged.
+          # Fetch the compose from a RELEASE TAG, not main: main can change
+          # service shape between provisions with zero signal.
+          LANGFUSE_VERSION="3.181"
+          curl -fsSL "https://raw.githubusercontent.com/langfuse/langfuse/v${LANGFUSE_VERSION}.0/docker-compose.yml" -o docker-compose.yml
+          # Pin the PAIR, not just ClickHouse. The vendor compose floats
+          # langfuse:3 AND leaves clickhouse untagged; each partial pin has
+          # bitten once:
+          #   - CH floated to 26.5 → broke v3 scores.all ("Not found column
+          #     and(...)", bug #14)
+          #   - langfuse:3 floated to 3.179.1 → sessions.byIdWithScores
+          #     NOT_FOUND on data the public API served fine (2026-06-10)
+          # 25.12 is what langfuse's own docker-compose.dev.yml develops against.
+          sed -i "s#image: *docker.io/langfuse/langfuse-worker:3\$#image: docker.io/langfuse/langfuse-worker:${LANGFUSE_VERSION}#" docker-compose.yml
+          sed -i "s#image: *docker.io/langfuse/langfuse:3\$#image: docker.io/langfuse/langfuse:${LANGFUSE_VERSION}#" docker-compose.yml
           sed -i 's#\(image: *docker.io/clickhouse/clickhouse-server\)$#\1:25.12#' docker-compose.yml
           sed -i 's#\(image: *clickhouse/clickhouse-server\)$#\1:25.12#' docker-compose.yml
+          grep -n "image: docker.io/langfuse\|clickhouse-server" docker-compose.yml
           if [ ! -f .env ]; then
             gen() { openssl rand -hex 32; }
             PG=$(gen); CH=$(gen); MN=$(gen); RD=$(gen)
