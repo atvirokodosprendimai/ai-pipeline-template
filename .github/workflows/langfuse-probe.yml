@@ -60,6 +60,21 @@ jobs:
           print("=== health ===")
           print(call("GET", "/api/public/health"))
 
+          print("\n=== POST probe trace via ingestion (expect 207) ===")
+          # A score-only sessionId creates a GHOST session: it appears in lists
+          # but has no trace_sessions row, so clicking it in the UI 404s with
+          # "Session not found in project" (found 2026-06-10 — the probe itself
+          # had poisoned the Sessions view). Ingest a real trace into the probe
+          # session FIRST so the session exists everywhere.
+          import time, uuid
+          now = time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime())
+          print(call("POST", "/api/public/ingestion", {
+              "batch": [{
+                  "id": str(uuid.uuid4()), "type": "trace-create", "timestamp": now,
+                  "body": {"id": "probe-trace-" + now[:10], "timestamp": now,
+                           "name": "probe", "sessionId": "probe-session"},
+              }]}))
+
           print("\n=== POST session-linked score (expect 2xx — mirrors #1562 fix) ===")
           print(call("POST", "/api/public/scores", {
               "name": "probe_session_linked", "value": 1, "dataType": "NUMERIC",
@@ -111,4 +126,65 @@ jobs:
               print("  id:", data.get("id"), "traces:", len(data.get("traces", [])))
           except Exception:
               print("  body head:", bodytext[:300])
+          PY
+
+      # The public API (basic auth) can be green while the UI (cookie auth +
+      # tRPC) is broken — 3.179.1's sessions view and the ghost-session 404
+      # were both invisible to the public-API checks above. This step logs in
+      # exactly like the browser and FAILS the workflow on any tRPC error.
+      - name: UI-path probe (login + tRPC, asserts)
+        env:
+          LANGFUSE_HOST: ${{ secrets.LANGFUSE_HOST }}
+          LANGFUSE_ADMIN_PASSWORD: ${{ secrets.LANGFUSE_ADMIN_PASSWORD }}
+        run: |
+          python - <<'PY'
+          import json, os, sys, urllib.parse, urllib.request
+          from http.cookiejar import CookieJar
+
+          HOST = os.environ["LANGFUSE_HOST"].rstrip("/")
+          EMAIL = "admin@wgmesh.local"
+          PASSWORD = os.environ["LANGFUSE_ADMIN_PASSWORD"]
+          PROJECT = "pipeline"
+
+          jar = CookieJar()
+          opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
+
+          def req(method, path, data=None):
+              body = urllib.parse.urlencode(data).encode() if data is not None else None
+              headers = {"Content-Type": "application/x-www-form-urlencoded"} if data is not None else {}
+              r = urllib.request.Request(HOST + path, method=method, data=body, headers=headers)
+              try:
+                  with opener.open(r, timeout=25) as resp:
+                      return resp.status, resp.read().decode()
+              except urllib.error.HTTPError as e:
+                  return e.code, e.read().decode()
+
+          def trpc(proc, payload):
+              qs = urllib.parse.quote(json.dumps({"json": payload}))
+              return req("GET", f"/api/trpc/{proc}?input={qs}")
+
+          st, body = req("GET", "/api/auth/csrf")
+          csrf = json.loads(body)["csrfToken"]
+          st, _ = req("POST", "/api/auth/callback/credentials",
+                      data={"csrfToken": csrf, "email": EMAIL, "password": PASSWORD, "json": "true"})
+          if not any("session-token" in c.name for c in jar):
+              print(f"LOGIN FAILED status={st}")
+              sys.exit(1)
+          print("login ok")
+
+          failures = []
+          checks = [
+              ("sessions.byIdWithScores", {"sessionId": "issue-510", "projectId": PROJECT}),
+              ("sessions.byIdWithScores", {"sessionId": "probe-session", "projectId": PROJECT}),
+              ("sessions.all", {"projectId": PROJECT, "filter": [], "orderBy": {"column": "createdAt", "order": "DESC"}, "page": 0, "limit": 5}),
+              ("traces.all", {"projectId": PROJECT, "filter": [], "searchQuery": None, "searchType": ["id"], "orderBy": {"column": "timestamp", "order": "DESC"}, "page": 0, "limit": 5}),
+          ]
+          for proc, payload in checks:
+              st, body = trpc(proc, payload)
+              ok = st == 200 and '"error"' not in body[:200]
+              print(f"{proc}({payload.get('sessionId', 'list')}): status={st} {'OK' if ok else 'FAIL'}")
+              if not ok:
+                  failures.append(proc)
+                  print("  body head:", body[:300])
+          sys.exit(1 if failures else 0)
           PY
