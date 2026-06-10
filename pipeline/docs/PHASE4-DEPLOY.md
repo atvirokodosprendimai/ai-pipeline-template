@@ -1,8 +1,9 @@
 # Phase 4 — Hetzner Deployment
 
 Stand up the wgmesh-pipeline as a long-running service. All artifacts are in
-`pipeline/deploy/`. Code is ready; this is the operational step (needs a host +
-secrets). Two host options — a dedicated Hetzner VM, or co-locate on chimney.
+`pipeline/deploy/`. Production now runs in `PIPELINE_MODE=live` on the Hetzner
+`wgmesh-pipeline` box. Two host options remain documented for rebuilds or
+rollback — a dedicated Hetzner VM, or co-locate on chimney.
 
 ## What ships in this phase
 
@@ -47,10 +48,12 @@ REPO_URL=<this repo> bash pipeline/deploy/deploy.sh
 
 ## Bring-up sequence
 
-Start in **shadow** (`PIPELINE_MODE=shadow`, the env default) — the service runs
-the full loop against real wgmesh issues with zero GitHub writes. Watch the logs
-/ LangSmith. Then walk **spec-only → live** per `PHASE3-CUTOVER.md` (which also
-covers disabling the three wgmesh Actions workflows and rollback).
+Current production is **live** (`PIPELINE_MODE=live`). For a fresh rebuild or
+rollback rehearsal, start in **shadow** (`PIPELINE_MODE=shadow`, the env
+default) — the service runs the full loop against real wgmesh issues with zero
+GitHub writes. Watch the logs / LangSmith. Then walk **spec-only → live** per
+`PHASE3-CUTOVER.md` (which also covers disabling the three wgmesh Actions
+workflows and rollback).
 
 ## Observability
 

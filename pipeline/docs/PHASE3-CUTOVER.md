@@ -1,5 +1,9 @@
 # Phase 3 — Full-Live Cutover Runbook
 
+**Status 2026-06-10:** cutover to live executed. The box was redeployed via
+Provision Pipeline Box with `pipeline_mode=live`; the spec-only run from
+2026-06-09 to 2026-06-10 produced 7 specs and validated the flow end-to-end.
+
 This is the operational procedure to take the self-hosted LangGraph pipeline
 from spec-only to **full live** (box owns the loop through merge). The code is
 ready and tested (shadow + spec-only + live paths, 79 tests). Nothing here is

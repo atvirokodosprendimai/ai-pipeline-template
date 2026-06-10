@@ -8,6 +8,9 @@ deepened: 2026-06-07
 
 # feat: Self-hosted LangGraph autonomous pipeline on Hetzner (wgmesh)
 
+**Status 2026-06-10:** phases complete; production flipped to `PIPELINE_MODE=live`
+on the Hetzner `wgmesh-pipeline` box.
+
 **Target repo:** this repo (`ai-pipeline-template`). New component dir `pipeline/`. Operates on `atvirokodosprendimai/wgmesh`.
 
 ---
