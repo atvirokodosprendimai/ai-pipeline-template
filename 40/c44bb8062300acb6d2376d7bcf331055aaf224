@@ -1,0 +1,23 @@
+pipeline/wgmesh_pipeline/graph/nodes/implement.py
+  s_002dc1a5f2abbf::t_1de38dd980651e 149-156,163-164,169
+pipeline/tests/test_implement_retry_pr.py
+  s_002dc1a5f2abbf::t_29bdeb7f37519a 197-239
+.github/workflows/update-pipeline-box.yml
+  s_002dc1a5f2abbf::t_0944e592d8b2ea 63-70
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "40c44bb8062300acb6d2376d7bcf331055aaf224",
+  "prompts": {},
+  "sessions": {
+    "s_002dc1a5f2abbf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5686c212-4035-4bed-bb07-be27455aefb4",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
