@@ -252,7 +252,9 @@ jobs:
             exit 0
           fi
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i "$RUNNER_TEMP/box_key" root@"$BOX_IP" \
-            "grep -qF '$DEPLOY_PUBKEY' /root/.ssh/authorized_keys 2>/dev/null || printf '%s\n' '$DEPLOY_PUBKEY' >> /root/.ssh/authorized_keys
+            "set -euo pipefail
+             grep -qF '$DEPLOY_PUBKEY' /root/.ssh/authorized_keys 2>/dev/null || printf '%s\n' '$DEPLOY_PUBKEY' >> /root/.ssh/authorized_keys
+             grep -qF '$DEPLOY_PUBKEY' /root/.ssh/authorized_keys
              echo 'deploy key installed'"
 
       - name: Capture journal after ticks (diagnostic)

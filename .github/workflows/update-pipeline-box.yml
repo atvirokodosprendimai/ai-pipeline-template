@@ -45,7 +45,8 @@ jobs:
           HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
         run: |
           set -euo pipefail
-          echo "BOX_IP=$(hcloud server ip "${{ github.event.inputs.server_name }}")" >> "$GITHUB_ENV"
+          IP=$(hcloud server ip "${{ github.event.inputs.server_name }}")
+          echo "BOX_IP=$IP" >> "$GITHUB_ENV"
 
       - name: Update + restart
         env:
