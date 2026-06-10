@@ -1,0 +1,21 @@
+.github/workflows/provision-pipeline-box.yml
+  s_002dc1a5f2abbf::t_e3d9029222a6bc 255-257
+.github/workflows/update-pipeline-box.yml
+  s_002dc1a5f2abbf::t_e2ed9ad9e50957 48-49
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "8aebc6cbc58394077a804e6e2dcff2bf5e3c4993",
+  "prompts": {},
+  "sessions": {
+    "s_002dc1a5f2abbf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5686c212-4035-4bed-bb07-be27455aefb4",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
