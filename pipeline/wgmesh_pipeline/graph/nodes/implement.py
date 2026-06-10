@@ -37,8 +37,7 @@ def implement_node(state: GraphState) -> GraphState:
         # implement attempt.
         config = next_state.get("config")
         recipes_dir = Path(getattr(config, "recipes_dir", DEFAULT_RECIPES_DIR))
-        result = _run_recipe(
-            runner,
+        result = runner.run_recipe(
             recipe=recipes_dir / "wgmesh-implementation.yaml",
             workdir=repo_path,
             # diff_file mirrors expected_output: the recipe instructs goose to
@@ -205,13 +204,3 @@ def _status(exc: HTTPError) -> int | None:
 
 def _visit(state: dict, node: str) -> None:
     state.setdefault("visited", []).append(node)
-
-
-def _run_recipe(runner, **kwargs):
-    try:
-        return runner.run_recipe(**kwargs)
-    except TypeError as exc:
-        if "session_id" not in str(exc) or "unexpected keyword argument" not in str(exc):
-            raise
-        kwargs.pop("session_id", None)
-        return runner.run_recipe(**kwargs)

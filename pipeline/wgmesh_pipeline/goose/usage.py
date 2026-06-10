@@ -47,24 +47,25 @@ def collect_usage_delta(logs_dir: Path, snapshot: dict[str, int]) -> UsageTotals
             size = path.stat().st_size
             if offset < 0 or offset > size:
                 offset = 0
+            # Iterate lazily: a busy implement run appends megabytes of request
+            # payloads between snapshot and collection.
             with path.open("rb") as fh:
                 fh.seek(offset)
-                lines = fh.readlines()
+                for line in fh:
+                    if not line.strip():
+                        continue
+                    try:
+                        usage = _usage_from_line(line)
+                    except (TypeError, ValueError, json.JSONDecodeError):
+                        skipped += 1
+                        continue
+                    input_tokens += usage["input_tokens"]
+                    output_tokens += usage["output_tokens"]
+                    total_tokens += usage["total_tokens"]
+                    requests += 1
         except OSError:
             skipped += 1
             continue
-        for line in lines:
-            if not line.strip():
-                continue
-            try:
-                usage = _usage_from_line(line)
-            except (TypeError, ValueError, json.JSONDecodeError):
-                skipped += 1
-                continue
-            input_tokens += usage["input_tokens"]
-            output_tokens += usage["output_tokens"]
-            total_tokens += usage["total_tokens"]
-            requests += 1
 
     return UsageTotals(
         input_tokens=input_tokens,
