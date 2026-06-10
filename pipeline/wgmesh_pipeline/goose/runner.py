@@ -262,12 +262,28 @@ class GooseRunner:
         if not output_path.is_absolute():
             output_path = workdir_path / output_path
 
-        command = ["goose", "run", "--no-session", "--recipe", str(recipe)]
+        profile = self._resolve_profile(stage, tier)
+        model_key = profile.key if profile is not None else None
+        recipe_path = Path(recipe)
+        command_recipe = recipe_path
+        if profile is not None:
+            command_recipe = _write_recipe_override(
+                recipe_path=recipe_path,
+                workdir=workdir_path,
+                stage=stage,
+                profile=profile,
+            )
+            log.info(
+                "goose recipe override: stage=%s provider=%s model=%s",
+                stage,
+                profile.provider,
+                profile.model,
+            )
+
+        command = ["goose", "run", "--no-session", "--recipe", str(command_recipe)]
         for key, value in params.items():
             command.extend(["--params", f"{key}={value}"])
 
-        profile = self._resolve_profile(stage, tier)
-        model_key = profile.key if profile is not None else None
         resolved_model = _resolved_model(self.config, profile)
         env = build_goose_env(self.config, profile=profile, stage=stage)
         logs_dir: Path | None = None
@@ -364,6 +380,43 @@ class GooseRunner:
 
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
+_GOOSE_PROVIDER_RE = re.compile(r"^(\s*goose_provider:).*$", re.MULTILINE)
+_GOOSE_MODEL_RE = re.compile(r"^(\s*goose_model:).*$", re.MULTILINE)
+
+
+def _write_recipe_override(
+    *,
+    recipe_path: Path,
+    workdir: Path,
+    stage: str | None,
+    profile: ModelProfile,
+) -> Path:
+    source_path = recipe_path if recipe_path.is_absolute() else workdir / recipe_path
+    text = source_path.read_text(encoding="utf-8")
+    text, provider_count = _GOOSE_PROVIDER_RE.subn(
+        lambda match: f'{match.group(1)} "{_yaml_scalar(profile.provider)}"',
+        text,
+    )
+    text, model_count = _GOOSE_MODEL_RE.subn(
+        lambda match: f'{match.group(1)} "{_yaml_scalar(profile.model)}"',
+        text,
+    )
+    if provider_count == 0 or model_count == 0:
+        if text and not text.endswith("\n"):
+            text += "\n"
+        text += (
+            "settings:\n"
+            f'  goose_provider: "{_yaml_scalar(profile.provider)}"\n'
+            f'  goose_model: "{_yaml_scalar(profile.model)}"\n'
+        )
+    override_path = workdir / "pipeline-output" / f"recipe-override-{stage or 'run'}.yaml"
+    override_path.parent.mkdir(parents=True, exist_ok=True)
+    override_path.write_text(text, encoding="utf-8")
+    return override_path
+
+
+def _yaml_scalar(value: str) -> str:
+    return value.replace("\\", "\\\\").replace('"', '\\"')
 
 
 def _strip_ansi(text: str) -> str:
