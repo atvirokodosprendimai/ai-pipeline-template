@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import sys
 import time
 from contextlib import AbstractContextManager, nullcontext
@@ -8,6 +9,7 @@ from typing import Any, Callable, Protocol, TypeVar
 
 from wgmesh_pipeline.config import Config
 
+log = logging.getLogger("wgmesh_pipeline.tracing")
 
 T = TypeVar("T")
 
@@ -122,6 +124,9 @@ _tracer: Tracer = NoopTracer()
 
 
 def init_tracing(config: Config, *, tracer: Tracer | None = None) -> Tracer:
+    # Announce the selected tracer and WHY. A silent fallback here cost a full
+    # day of "no traces in Langfuse" with no way to tell missing-env from
+    # SDK-init failure without SSH to the box.
     global _tracer
     if tracer is not None:
         _tracer = tracer
@@ -129,11 +134,20 @@ def init_tracing(config: Config, *, tracer: Tracer | None = None) -> Tracer:
         try:
             _tracer = LangfuseTracer(config)
         except Exception:
+            log.exception(
+                "tracing: Langfuse init FAILED (host=%s) — falling back to NoopTracer, no traces will be emitted",
+                config.langfuse_host,
+            )
             _tracer = NoopTracer()
     elif config.langsmith_api_key:
         _tracer = LangSmithTracer(config.langsmith_api_key)
     else:
+        log.info(
+            "tracing: Langfuse env incomplete (host=%s public_key=%s secret_key=%s) — NoopTracer",
+            bool(config.langfuse_host), bool(config.langfuse_public_key), bool(config.langfuse_secret_key),
+        )
         _tracer = NoopTracer()
+    log.info("tracing: active tracer=%s", type(_tracer).__name__)
     return _tracer
 
 
