@@ -91,4 +91,15 @@ jobs:
                   print(f"  - {t.get('timestamp')} {t.get('name')} session={t.get('sessionId')}")
           except Exception:
               print("  (unparseable response; status above — body withheld to avoid re-logging old trace inputs)")
+
+          print("\n=== GET sessions (UI sessions click errors — server-side or UI-side?) ===")
+          status, bodytext = call("GET", "/api/public/sessions?limit=10", full=True)
+          print("status:", status)
+          try:
+              data = json.loads(bodytext)
+              print("  total:", data.get("meta", {}).get("totalItems"))
+              for s in data.get("data", [])[:10]:
+                  print(f"  - {s.get('createdAt')} id={s.get('id')}")
+          except Exception:
+              print("  body head:", bodytext[:300])
           PY
