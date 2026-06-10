@@ -1,0 +1,24 @@
+pipeline/wgmesh_pipeline/tracing.py
+  s_002dc1a5f2abbf::t_2837af03fab291 3
+  s_002dc1a5f2abbf::t_e20590d0a0d1b1 127-129,137-140,145-148,150
+  s_002dc1a5f2abbf::t_43e275a8dab164 12
+.github/workflows/langfuse-probe.yml
+  s_002dc1a5f2abbf::t_f69d90737ea76a 41-44,53-54
+  s_002dc1a5f2abbf::t_bc855f173100ac 73,77,79-80,85,89-91
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "6e4ed18e4b630761acf80e11df8b8daffafe6ffa",
+  "prompts": {},
+  "sessions": {
+    "s_002dc1a5f2abbf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5686c212-4035-4bed-bb07-be27455aefb4",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
