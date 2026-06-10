@@ -1,0 +1,25 @@
+pipeline/recipes/wgmesh-implementation.yaml
+  s_002dc1a5f2abbf::t_e837ac8f3773cc 1-58
+pipeline/wgmesh_pipeline/graph/nodes/implement.py
+  s_002dc1a5f2abbf::t_8918e2c9eddb7b 24-29,31
+  s_002dc1a5f2abbf::t_c362dc8ed89ccf 7
+  s_002dc1a5f2abbf::t_5e7db0e5105761 33-38
+pipeline/tests/test_recipes_exist.py
+  s_002dc1a5f2abbf::t_61681a2f80010b 1-41
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "f49aca78c9e2a83a358fa95b54de747bfbee23f3",
+  "prompts": {},
+  "sessions": {
+    "s_002dc1a5f2abbf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5686c212-4035-4bed-bb07-be27455aefb4",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
