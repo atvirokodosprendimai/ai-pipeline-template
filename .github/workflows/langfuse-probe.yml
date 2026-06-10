@@ -66,14 +66,19 @@ jobs:
           # "Session not found in project" (found 2026-06-10 — the probe itself
           # had poisoned the Sessions view). Ingest a real trace into the probe
           # session FIRST so the session exists everywhere.
-          import time, uuid
+          import sys, time, uuid
           now = time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime())
-          print(call("POST", "/api/public/ingestion", {
+          ing_status, ing_body = call("POST", "/api/public/ingestion", {
               "batch": [{
                   "id": str(uuid.uuid4()), "type": "trace-create", "timestamp": now,
                   "body": {"id": "probe-trace-" + now[:10], "timestamp": now,
                            "name": "probe", "sessionId": "probe-session"},
-              }]}))
+              }]})
+          print((ing_status, ing_body))
+          if ing_status not in (200, 207):
+              # Without the trace, the score below would re-create the ghost.
+              print("ingestion failed — skipping score to avoid re-poisoning the session")
+              sys.exit(1)
 
           print("\n=== POST session-linked score (expect 2xx — mirrors #1562 fix) ===")
           print(call("POST", "/api/public/scores", {
@@ -138,7 +143,7 @@ jobs:
           LANGFUSE_ADMIN_PASSWORD: ${{ secrets.LANGFUSE_ADMIN_PASSWORD }}
         run: |
           python - <<'PY'
-          import json, os, sys, urllib.parse, urllib.request
+          import json, os, sys, time, urllib.error, urllib.parse, urllib.request
           from http.cookiejar import CookieJar
 
           HOST = os.environ["LANGFUSE_HOST"].rstrip("/")
@@ -172,16 +177,37 @@ jobs:
               sys.exit(1)
           print("login ok")
 
+          def trpc_ok(st, body):
+              # tRPC errors come as {"error": {...}} at the envelope top level;
+              # substring checks false-positive on data containing "error".
+              if st != 200:
+                  return False
+              try:
+                  return "error" not in json.loads(body)
+              except Exception:
+                  return False
+
+          def check(proc, payload, retries=1, wait=10):
+              # probe-session is created by THIS run's ingestion; ClickHouse
+              # ingestion is async (PG row lands in ms, CH traces in seconds),
+              # so the freshly-ingested session needs a short retry window.
+              for attempt in range(retries):
+                  st, body = trpc(proc, payload)
+                  if trpc_ok(st, body):
+                      return True, st, body
+                  if attempt < retries - 1:
+                      time.sleep(wait)
+              return False, st, body
+
           failures = []
           checks = [
-              ("sessions.byIdWithScores", {"sessionId": "issue-510", "projectId": PROJECT}),
-              ("sessions.byIdWithScores", {"sessionId": "probe-session", "projectId": PROJECT}),
-              ("sessions.all", {"projectId": PROJECT, "filter": [], "orderBy": {"column": "createdAt", "order": "DESC"}, "page": 0, "limit": 5}),
-              ("traces.all", {"projectId": PROJECT, "filter": [], "searchQuery": None, "searchType": ["id"], "orderBy": {"column": "timestamp", "order": "DESC"}, "page": 0, "limit": 5}),
+              ("sessions.byIdWithScores", {"sessionId": "issue-510", "projectId": PROJECT}, 1),
+              ("sessions.byIdWithScores", {"sessionId": "probe-session", "projectId": PROJECT}, 6),
+              ("sessions.all", {"projectId": PROJECT, "filter": [], "orderBy": {"column": "createdAt", "order": "DESC"}, "page": 0, "limit": 5}, 1),
+              ("traces.all", {"projectId": PROJECT, "filter": [], "searchQuery": None, "searchType": ["id"], "orderBy": {"column": "timestamp", "order": "DESC"}, "page": 0, "limit": 5}, 1),
           ]
-          for proc, payload in checks:
-              st, body = trpc(proc, payload)
-              ok = st == 200 and '"error"' not in body[:200]
+          for proc, payload, retries in checks:
+              ok, st, body = check(proc, payload, retries=retries)
               print(f"{proc}({payload.get('sessionId', 'list')}): status={st} {'OK' if ok else 'FAIL'}")
               if not ok:
                   failures.append(proc)
