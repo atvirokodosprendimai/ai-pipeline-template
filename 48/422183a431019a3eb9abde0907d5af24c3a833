@@ -1,0 +1,22 @@
+pipeline/wgmesh_pipeline/verification.py
+  s_002dc1a5f2abbf::t_5f8bf1c99537cb 35-43,45
+  s_002dc1a5f2abbf::t_d771f3f0a63f62 90
+pipeline/tests/test_verification.py
+  s_002dc1a5f2abbf::t_9377f399136ef8 61-62,65,67-68,71,80-92
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "48422183a431019a3eb9abde0907d5af24c3a833",
+  "prompts": {},
+  "sessions": {
+    "s_002dc1a5f2abbf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5686c212-4035-4bed-bb07-be27455aefb4",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
