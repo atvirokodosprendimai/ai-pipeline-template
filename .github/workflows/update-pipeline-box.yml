@@ -60,6 +60,7 @@ jobs:
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               -o ConnectTimeout=15 -i "$RUNNER_TEMP/deploy_key" root@"$BOX_IP" \
             "set -euo pipefail
+             git config --global --add safe.directory /opt/wgmesh-pipeline
              cd /opt/wgmesh-pipeline
              git fetch origin main
              OLD=\$(git rev-parse --short HEAD)
