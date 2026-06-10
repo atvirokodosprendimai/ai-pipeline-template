@@ -1,0 +1,37 @@
+pipeline/wgmesh_pipeline/graph/nodes/spec.py
+  s_2d28174f9e9a1d::t_e49451d34c64f2 40
+  s_2d28174f9e9a1d::t_04ba80c5db285d 29-30,79-88
+pipeline/tests/test_goose_runner.py
+  s_2d28174f9e9a1d::t_ce1e4496820812 9,158-231
+pipeline/tests/test_goose_usage.py
+  s_2d28174f9e9a1d::t_58951729bfce86 54
+  s_2d28174f9e9a1d::t_d8c90f5819fd83 1-53
+pipeline/wgmesh_pipeline/tracing.py
+  s_2d28174f9e9a1d::t_4f7928217dad10 32-45,138,186-217
+pipeline/tests/test_tracing.py
+  s_2d28174f9e9a1d::t_ac6338fbdb2302 3-4,7-9,204-257
+pipeline/wgmesh_pipeline/graph/nodes/implement.py
+  s_2d28174f9e9a1d::t_3bf938c9e07a9a 40-41,208-217
+  s_2d28174f9e9a1d::t_4141ed3346eeba 53
+pipeline/wgmesh_pipeline/goose/usage.py
+  s_2d28174f9e9a1d::t_4dc0d84d88bcc8 1-96
+pipeline/wgmesh_pipeline/goose/runner.py
+  s_2d28174f9e9a1d::t_9e383ea4997b9b 3,14-19
+  s_2d28174f9e9a1d::t_72ab4b2afc320f 12,25-26,228,258,271,273-279,294-295,303,306-307,318,342,353,362,383-418
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "54ccfd9424a5af3d844b945df9de1fc26584d005",
+  "prompts": {},
+  "sessions": {
+    "s_2d28174f9e9a1d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eb182-90fc-75c3-8ed0-e086c7f189da",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
