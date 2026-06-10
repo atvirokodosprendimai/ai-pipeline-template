@@ -84,7 +84,7 @@ def test_spec_pr_node_creates_exact_spec_title_and_swaps_labels(tmp_path: Path, 
 
 
 class WritingRunner:
-    def run_recipe(self, *, recipe, workdir, params, expected_output, stage=None):
+    def run_recipe(self, *, recipe, workdir, params, expected_output, stage=None, session_id=None):
         output = Path(workdir) / expected_output
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(

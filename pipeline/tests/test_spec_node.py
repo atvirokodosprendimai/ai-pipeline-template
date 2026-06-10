@@ -14,7 +14,7 @@ from wgmesh_pipeline.goose.runner import GooseResult
 class FakeRunner:
     calls: list[dict[str, Any]]
 
-    def run_recipe(self, *, recipe, workdir, params, expected_output, stage=None):
+    def run_recipe(self, *, recipe, workdir, params, expected_output, stage=None, session_id=None):
         output = Path(workdir) / expected_output
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(
