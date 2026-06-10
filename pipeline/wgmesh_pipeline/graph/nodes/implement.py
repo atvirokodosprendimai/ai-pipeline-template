@@ -22,7 +22,14 @@ def implement_node(state: GraphState) -> GraphState:
 
     runner = next_state.get("goose_runner")
     repo_path = Path(next_state.get("repo_path", "."))
+    real_path = runner is not None and next_state.get("github") is not None
+    issue = next_state["issue"]
+    branch = str(next_state.get("impl_branch") or f"bot/impl-{issue.number}")
     diff_rel = Path("pipeline-output") / f"issue-{next_state['issue'].number}.diff"
+    spec_rel = Path("pipeline-output") / f"issue-{issue.number}-spec.md"
+    if real_path:
+        _materialize_spec(repo_path, next_state, spec_rel)
+        _prepare_impl_workspace(repo_path, branch)
     if runner is not None:
         # Resolve against the pipeline's recipes dir (mirrors spec_node): goose
         # runs with cwd=repo_path (the wgmesh clone), where a bare recipe name
@@ -36,7 +43,7 @@ def implement_node(state: GraphState) -> GraphState:
             # diff_file mirrors expected_output: the recipe instructs goose to
             # write the unified diff there, the runner verifies it appeared.
             params={
-                "spec_file": str(next_state["spec_path"]),
+                "spec_file": str(spec_rel if real_path else next_state["spec_path"]),
                 "diff_file": str(diff_rel),
             },
             expected_output=diff_rel,
@@ -47,14 +54,23 @@ def implement_node(state: GraphState) -> GraphState:
             raise RuntimeError(result.error or "goose implementation failed")
         if result.model_key is not None:
             next_state["implement_model_key"] = result.model_key
-        next_state["diff"] = Path(result.output_path).read_text()
+        if real_path:
+            _stage_impl_tree(repo_path)
+            if _git(repo_path, "diff", "--cached", "--quiet", check=False).returncode == 0:
+                raise RuntimeError("goose implementation produced no tree changes")
+            next_state["diff"] = _git(repo_path, "diff", "--cached").stdout
+            _git(
+                repo_path,
+                "-c", f"user.name={GIT_AUTHOR_NAME}",
+                "-c", f"user.email={GIT_AUTHOR_EMAIL}",
+                "commit", "-m", f"impl: Issue #{issue.number} - {issue.title}",
+            )
+        else:
+            next_state["diff"] = Path(result.output_path).read_text()
     else:
         next_state["diff"] = "+docs-only change\n"
     next_state["changed_files"] = changed_files_from_diff(next_state["diff"])
-    if runner is not None and next_state.get("github") is not None:
-        issue = next_state["issue"]
-        branch = str(next_state.get("impl_branch") or f"bot/impl-{issue.number}")
-        _prepare_impl_branch(repo_path, branch, diff_rel, issue.number, issue.title)
+    if real_path:
         next_state["github"].push_branch(str(repo_path), branch)
         next_state["impl_branch"] = branch
     _ensure_impl_pr(next_state)
@@ -110,28 +126,37 @@ def _normalise_diff_path(path: str) -> str | None:
     return path
 
 
-def _prepare_impl_branch(repo_path: Path, branch: str, diff_rel: Path, issue_number: int, title: str) -> None:
-    if not (repo_path / ".git").exists():
-        return
+def _materialize_spec(repo_path: Path, state: dict, spec_rel: Path) -> None:
+    issue_number = state["issue"].number
+    content: str | None = None
+    fetched = _git(repo_path, "fetch", "origin", f"bot/spec-{issue_number}", check=False)
+    if fetched.returncode == 0:
+        shown = _git(repo_path, "show", f"FETCH_HEAD:specs/issue-{issue_number}-spec.md", check=False)
+        if shown.returncode == 0:
+            content = shown.stdout
+    if content is None:
+        current_spec = repo_path / str(state["spec_path"])
+        if current_spec.exists():
+            content = current_spec.read_text()
+    if content is None:
+        raise RuntimeError("spec file unavailable for implement")
+    spec_path = repo_path / spec_rel
+    spec_path.parent.mkdir(parents=True, exist_ok=True)
+    spec_path.write_text(content)
+
+
+def _prepare_impl_workspace(repo_path: Path, branch: str) -> None:
     _git(repo_path, "fetch", "origin", "main", check=False)
     checkout = _git(repo_path, "checkout", "-B", branch, "origin/main", check=False)
     if checkout.returncode != 0:
         _git(repo_path, "checkout", "-B", branch)
     _git(repo_path, "checkout", "--", ".")
     _git(repo_path, "clean", "-fd", "--exclude=pipeline-output")
-    applied = _git(repo_path, "apply", "--index", str(diff_rel), check=False)
-    if applied.returncode != 0:
-        detail = applied.stderr.strip() or f"git apply --index {diff_rel} failed"
-        raise RuntimeError(f"git apply failed: {detail}")
-    diff = _git(repo_path, "diff", "--cached", "--quiet", check=False)
-    if diff.returncode == 0:
-        return
-    _git(
-        repo_path,
-        "-c", f"user.name={GIT_AUTHOR_NAME}",
-        "-c", f"user.email={GIT_AUTHOR_EMAIL}",
-        "commit", "-m", f"impl: Issue #{issue_number} - {title}",
-    )
+
+
+def _stage_impl_tree(repo_path: Path) -> None:
+    _git(repo_path, "add", "-A")
+    _git(repo_path, "reset", "-q", "--", "pipeline-output")
 
 
 def _ensure_impl_pr(state: dict) -> None:
