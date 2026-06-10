@@ -26,7 +26,8 @@ def spec_node(state: GraphState) -> GraphState:
     config = next_state.get("config")
     recipes_dir = Path(getattr(config, "recipes_dir", DEFAULT_RECIPES_DIR))
     recipe_path = recipes_dir / "wgmesh-triage-spec.yaml"
-    result = runner.run_recipe(
+    result = _run_recipe(
+        runner,
         recipe=recipe_path,
         workdir=repo_path,
         params={
@@ -36,6 +37,7 @@ def spec_node(state: GraphState) -> GraphState:
         },
         expected_output=spec_rel,
         stage="spec",
+        session_id=f"issue-{issue.number}",
     )
     if not result.ok:
         # Surface goose's actual output so a write-tool/model/recipe failure is
@@ -74,3 +76,13 @@ def _read_excerpt(path) -> str:
 
 def _visit(state: dict, node: str) -> None:
     state.setdefault("visited", []).append(node)
+
+
+def _run_recipe(runner, **kwargs):
+    try:
+        return runner.run_recipe(**kwargs)
+    except TypeError as exc:
+        if "session_id" not in str(exc) or "unexpected keyword argument" not in str(exc):
+            raise
+        kwargs.pop("session_id", None)
+        return runner.run_recipe(**kwargs)

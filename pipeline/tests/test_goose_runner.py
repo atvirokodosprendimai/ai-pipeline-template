@@ -6,6 +6,7 @@ from typing import Any
 
 from wgmesh_pipeline.config import Config
 from wgmesh_pipeline.goose.runner import GooseRunner
+from wgmesh_pipeline.goose.usage import UsageTotals
 
 
 def cfg() -> Config:
@@ -154,3 +155,77 @@ def test_near_zero_duration_is_surfaced(tmp_path, monkeypatch) -> None:
 
     assert result.ok is True
     assert 0 < result.duration_seconds < 0.001
+
+
+def test_goose_runner_populates_usage_and_emits_generation(tmp_path, monkeypatch) -> None:
+    logs = tmp_path / "goose-logs"
+    logs.mkdir()
+    output = tmp_path / "specs/issue-19-spec.md"
+    emitted: list[dict[str, Any]] = []
+
+    monkeypatch.setattr("wgmesh_pipeline.goose.runner.default_logs_dir", lambda: logs)
+    monkeypatch.setattr(
+        "wgmesh_pipeline.goose.runner.tracing.emit_generation",
+        lambda **kwargs: emitted.append(kwargs),
+    )
+
+    def run(command, **kwargs):
+        output.parent.mkdir()
+        output.write_text("content")
+        (logs / "llm_request.1.jsonl").write_text(
+            '{"usage":{"input_tokens":12,"output_tokens":7,"total_tokens":19}}\n',
+            encoding="utf-8",
+        )
+        return completed(stdout="wrote spec")
+
+    result = GooseRunner(cfg(), runner=run).run_recipe(
+        recipe="recipe.yaml",
+        workdir=tmp_path,
+        params={},
+        expected_output=output,
+        stage="spec",
+        session_id="issue-19",
+    )
+
+    assert result.ok is True
+    assert result.usage == UsageTotals(input_tokens=12, output_tokens=7, total_tokens=19, requests=1, skipped=0)
+    assert emitted == [
+        {
+            "session_id": "issue-19",
+            "stage": "spec",
+            "model": cfg().goose_model,
+            "usage": result.usage,
+        }
+    ]
+
+
+def test_goose_runner_usage_collection_exception_does_not_break_run(tmp_path, monkeypatch) -> None:
+    output = tmp_path / "specs/issue-20-spec.md"
+    emitted: list[dict[str, Any]] = []
+
+    def boom():
+        raise OSError("logs unavailable")
+
+    monkeypatch.setattr("wgmesh_pipeline.goose.runner.default_logs_dir", boom)
+    monkeypatch.setattr(
+        "wgmesh_pipeline.goose.runner.tracing.emit_generation",
+        lambda **kwargs: emitted.append(kwargs),
+    )
+
+    def run(command, **kwargs):
+        output.parent.mkdir()
+        output.write_text("content")
+        return completed(stdout="wrote spec")
+
+    result = GooseRunner(cfg(), runner=run).run_recipe(
+        recipe="recipe.yaml",
+        workdir=tmp_path,
+        params={},
+        expected_output=output,
+        stage="spec",
+        session_id="issue-20",
+    )
+
+    assert result.ok is True
+    assert result.usage is None
+    assert emitted == []

@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import logging
+
 from wgmesh_pipeline.config import Config
 from wgmesh_pipeline.github.client import GitHubIssue
-from wgmesh_pipeline.tracing import _LangfuseSpan, init_tracing, trace_node
+from wgmesh_pipeline.goose.usage import UsageTotals
+from wgmesh_pipeline import tracing
+from wgmesh_pipeline.tracing import _LangfuseSpan, LangfuseTracer, NoopTracer, init_tracing, trace_node
 
 
 class _FakeSdkSpan:
@@ -197,3 +201,57 @@ def test_safe_state_strips_config_secrets_from_trace(monkeypatch) -> None:
     assert "goose_runner" not in rec["inputs"]
     # and the outputs side too
     assert "config" not in rec["outputs"]
+
+
+def test_emit_generation_noop_tracer_is_silent_noop(caplog) -> None:
+    init_tracing(Config(target_repo="atvirokodosprendimai/wgmesh"), tracer=NoopTracer())
+
+    with caplog.at_level(logging.INFO, logger="wgmesh_pipeline.tracing"):
+        tracing.emit_generation(
+            session_id="issue-21",
+            stage="spec",
+            model="GLM-4.7",
+            usage=UsageTotals(input_tokens=1, output_tokens=2, total_tokens=3, requests=1, skipped=0),
+        )
+
+    assert "generation emitted" not in caplog.text
+
+
+def test_emit_generation_langfuse_tracer_starts_generation_observation(monkeypatch) -> None:
+    class _FakeGeneration:
+        def __init__(self, record):
+            self.record = record
+
+        def end(self):
+            self.record["ended"] = True
+
+    class _FakeLf:
+        def __init__(self):
+            self.record = {}
+            self.flushed = False
+
+        def start_observation(self, **kwargs):
+            self.record.update(kwargs)
+            return _FakeGeneration(self.record)
+
+        def flush(self):
+            self.flushed = True
+
+    fake_lf = _FakeLf()
+    tracer = object.__new__(LangfuseTracer)
+    tracer._lf = fake_lf
+    monkeypatch.setattr(tracing, "_tracer", tracer)
+
+    tracing.emit_generation(
+        session_id="issue-22",
+        stage="implement",
+        model="openai/gpt-5-mini",
+        usage=UsageTotals(input_tokens=10, output_tokens=4, total_tokens=14, requests=1, skipped=0),
+    )
+
+    assert fake_lf.record["name"] == "implement-llm"
+    assert fake_lf.record["as_type"] == "generation"
+    assert fake_lf.record["model"] == "openai/gpt-5-mini"
+    assert fake_lf.record["usage_details"] == {"input": 10, "output": 4}
+    assert fake_lf.record["ended"] is True
+    assert fake_lf.flushed is True
