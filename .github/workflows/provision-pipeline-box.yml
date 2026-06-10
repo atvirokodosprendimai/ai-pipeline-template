@@ -121,6 +121,13 @@ jobs:
             # service user) — the default ~/.local/bin lands in root's home and
             # is unreachable by the service + the non-interactive SSH PATH.
             - curl -fsSL https://github.com/block/goose/releases/latest/download/download_cli.sh | HOME=/root GOOSE_BIN_DIR=/usr/local/bin CONFIGURE=false bash
+            # Go toolchain: review_node runs the REAL go build/test/vet gate on
+            # bot/impl-N branches (the tests_passed signal). Pinned to the
+            # wgmesh go.mod toolchain line.
+            - curl -fsSL https://go.dev/dl/go1.25.5.linux-amd64.tar.gz -o /tmp/go.tgz
+            - tar -C /usr/local -xzf /tmp/go.tgz
+            - ln -sf /usr/local/go/bin/go /usr/local/bin/go
+            - rm -f /tmp/go.tgz
             - install -d -m 700 /etc/wgmesh-pipeline
             - touch /etc/wgmesh-pipeline/.cloud-init-done
           CLOUD
