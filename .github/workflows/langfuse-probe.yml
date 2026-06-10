@@ -38,7 +38,10 @@ jobs:
           sk = os.environ["LANGFUSE_SECRET_KEY"]
           auth = base64.b64encode(f"{pk}:{sk}".encode()).decode()
 
-          def call(method, path, body=None):
+          def call(method, path, body=None, full=False):
+              # full=True: return the whole body — list endpoints exceed 800
+              # chars and a truncated body parses as "unparseable", which read
+              # as "no traces" during the 2026-06-10 no-sessions investigation.
               data = json.dumps(body).encode() if body is not None else None
               req = urllib.request.Request(
                   host + path, method=method, data=data,
@@ -47,7 +50,8 @@ jobs:
               )
               try:
                   with urllib.request.urlopen(req, timeout=25) as r:
-                      return r.status, r.read().decode()[:800]
+                      text = r.read().decode()
+                      return r.status, text if full else text[:800]
               except urllib.error.HTTPError as e:
                   return e.code, e.read().decode()[:800]
               except Exception as e:
@@ -66,24 +70,25 @@ jobs:
               "name": "probe_no_link", "value": 1, "dataType": "NUMERIC"}))
 
           print("\n=== GET recent scores (are the box's pipeline_outcome/auto_merged landing?) ===")
-          status, bodytext = call("GET", "/api/public/scores?limit=10")
+          status, bodytext = call("GET", "/api/public/scores?limit=10", full=True)
           print("status:", status)
           try:
               data = json.loads(bodytext)
+              print("  total:", data.get("meta", {}).get("totalItems"))
               for s in data.get("data", [])[:10]:
-                  print(f"  - {s.get('name')} = {s.get('value')} "
-                        f"session={s.get('sessionId')} trace={s.get('traceId')} "
-                        f"type={s.get('dataType')}")
+                  print(f"  - {s.get('timestamp')} {s.get('name')} = {s.get('value')} "
+                        f"session={s.get('sessionId')} type={s.get('dataType')}")
           except Exception:
               print("  (unparseable response; status above — body withheld to avoid re-logging old trace inputs)")
 
           print("\n=== GET recent traces (sessions wired?) ===")
-          status, bodytext = call("GET", "/api/public/traces?limit=8")
+          status, bodytext = call("GET", "/api/public/traces?limit=10", full=True)
           print("status:", status)
           try:
               data = json.loads(bodytext)
-              for t in data.get("data", [])[:8]:
-                  print(f"  - {t.get('name')} session={t.get('sessionId')}")
+              print("  total:", data.get("meta", {}).get("totalItems"))
+              for t in data.get("data", [])[:10]:
+                  print(f"  - {t.get('timestamp')} {t.get('name')} session={t.get('sessionId')}")
           except Exception:
               print("  (unparseable response; status above — body withheld to avoid re-logging old trace inputs)")
           PY
