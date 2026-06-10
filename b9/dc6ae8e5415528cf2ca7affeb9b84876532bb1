@@ -1,0 +1,27 @@
+pipeline/wgmesh_pipeline/github/client.py
+  s_24a6775584d983::t_7ef64110fa4433 172-174
+  s_24a6775584d983::t_50370f2f4f9c41 162,177,228-232
+pipeline/wgmesh_pipeline/graph/nodes/implement.py
+  s_24a6775584d983::t_c03dc69ff1760d 7-8,11,54-59,113-136,141-154,174-176
+pipeline/tests/test_github_client.py
+  s_24a6775584d983::t_2ca543b3a589e4 8,36-44,72-81
+  s_24a6775584d983::t_c0ca5e1712e1b0 238-252
+pipeline/tests/test_implement_retry_pr.py
+  s_24a6775584d983::t_cdd4327ba356e5 3,7-8,10-11,19,21,24-28,30,40,42,48,61,75,89,106-227
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "b9dc6ae8e5415528cf2ca7affeb9b84876532bb1",
+  "prompts": {},
+  "sessions": {
+    "s_24a6775584d983": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eb14d-f37a-7761-9069-84c15813a5e4",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
