@@ -102,4 +102,13 @@ jobs:
                   print(f"  - {s.get('createdAt')} id={s.get('id')}")
           except Exception:
               print("  body head:", bodytext[:300])
+
+          print("\n=== GET single session detail (UI byIdWithScores 404s — does public API?) ===")
+          status, bodytext = call("GET", "/api/public/sessions/issue-510", full=True)
+          print("status:", status)
+          try:
+              data = json.loads(bodytext)
+              print("  id:", data.get("id"), "traces:", len(data.get("traces", [])))
+          except Exception:
+              print("  body head:", bodytext[:300])
           PY
