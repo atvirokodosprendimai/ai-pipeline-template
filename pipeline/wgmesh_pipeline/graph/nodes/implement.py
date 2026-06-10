@@ -152,7 +152,10 @@ def _prepare_impl_workspace(repo_path: Path, branch: str) -> None:
     if checkout.returncode != 0:
         _git(repo_path, "checkout", "-B", branch)
     _git(repo_path, "checkout", "--", ".")
-    _git(repo_path, "clean", "-fd", "--exclude=pipeline-output")
+    # go-cache: goose's model has improvised GOMODCACHE=go-cache inside the
+    # checkout; Go module caches are write-protected, so git clean dies on
+    # them (live incident 2026-06-10 18:29Z). Exclude rather than fight.
+    _git(repo_path, "clean", "-fd", "--exclude=pipeline-output", "--exclude=go-cache")
 
 
 def _stage_impl_tree(repo_path: Path) -> None:

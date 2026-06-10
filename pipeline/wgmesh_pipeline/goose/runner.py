@@ -143,6 +143,10 @@ def build_goose_env(
     else:
         _apply_profile(env, profile, source)
     _apply_langfuse(env, config)
+    # Any go invocation goose makes must leave a removable module cache —
+    # the default cache is write-protected and breaks git clean when the
+    # model points GOMODCACHE inside the checkout.
+    env["GOFLAGS"] = (env.get("GOFLAGS", "") + " -modcacherw").strip()
     _apply_attribution(env, stage, profile)
     return env
 
@@ -301,6 +305,9 @@ class GooseRunner:
                 cwd=str(workdir_path),
                 env=env,
                 text=True,
+                # goose output can carry invalid UTF-8 (binary tool output);
+                # strict decoding crashed a live run 2026-06-10 18:11Z.
+                errors="replace",
                 capture_output=True,
                 check=False,
                 timeout=GOOSE_TIMEOUT_SECONDS,
