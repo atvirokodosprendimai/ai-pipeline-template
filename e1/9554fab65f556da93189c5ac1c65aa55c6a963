@@ -1,0 +1,19 @@
+.github/workflows/provision-langfuse.yml
+  s_002dc1a5f2abbf::t_7b0e268ec89eba 107-120,123
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "e19554fab65f556da93189c5ac1c65aa55c6a963",
+  "prompts": {},
+  "sessions": {
+    "s_002dc1a5f2abbf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5686c212-4035-4bed-bb07-be27455aefb4",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
