@@ -58,17 +58,17 @@ def test_run_verification_stops_on_go_test_failure_and_captures_tail(tmp_path: P
 
 def test_run_verification_checkout_failure_returns_reason(tmp_path: Path) -> None:
     failures = {
+        ("git", "fetch", "origin", "bot/impl-7"): subprocess.CompletedProcess(
+            ["git", "fetch", "origin", "bot/impl-7"],
+            1,
+            stdout="",
+            stderr="no remote",
+        ),
         ("git", "checkout", "bot/impl-7"): subprocess.CompletedProcess(
             ["git", "checkout", "bot/impl-7"],
             1,
             stdout="",
             stderr="local missing",
-        ),
-        ("git", "checkout", "-B", "bot/impl-7", "origin/bot/impl-7"): subprocess.CompletedProcess(
-            ["git", "checkout", "-B", "bot/impl-7", "origin/bot/impl-7"],
-            1,
-            stdout="",
-            stderr="remote missing",
         ),
     }
     runner = FakeRunner(failures)
@@ -77,7 +77,19 @@ def test_run_verification_checkout_failure_returns_reason(tmp_path: Path) -> Non
 
     assert result["tests_passed"] is False
     assert "branch checkout failed" in result["reason"]
-    assert "remote missing" in result["reason"]
+    assert "local missing" in result["reason"]
+
+
+def test_run_verification_prefers_remote_state_when_fetch_succeeds(tmp_path: Path) -> None:
+    # The gate merges the REMOTE branch; a stale local branch must not vouch
+    # for code it does not match.
+    runner = FakeRunner()
+
+    result = run_verification(tmp_path, "bot/impl-7", runner=runner, go_bin="/bin/go")
+
+    assert result["tests_passed"] is True
+    assert ["git", "checkout", "-B", "bot/impl-7", "FETCH_HEAD"] in runner.commands
+    assert ["git", "checkout", "bot/impl-7"] not in runner.commands
 
 
 def test_run_verification_missing_go_binary_returns_failure(tmp_path: Path, monkeypatch) -> None:

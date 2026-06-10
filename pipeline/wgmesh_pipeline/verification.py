@@ -32,10 +32,17 @@ def run_verification(
             "reason": "go binary not found",
         }
 
-    _run(runner, ["git", "fetch", "origin", branch], repo_path, timeout)
-    checkout = _run(runner, ["git", "checkout", branch], repo_path, timeout)
+    # The gate merges the REMOTE branch (the GitHub PR head), so verify that
+    # exact state when it is reachable; a stale local branch must not vouch
+    # for code it doesn't match. Local checkout is only a fallback for
+    # remoteless test repos / network blips.
+    fetch = _run(runner, ["git", "fetch", "origin", branch], repo_path, timeout)
+    if fetch.returncode == 0:
+        checkout = _run(runner, ["git", "checkout", "-B", branch, "FETCH_HEAD"], repo_path, timeout)
+    else:
+        checkout = _run(runner, ["git", "checkout", branch], repo_path, timeout)
     if checkout.returncode != 0:
-        fallback = _run(runner, ["git", "checkout", "-B", branch, f"origin/{branch}"], repo_path, timeout)
+        fallback = _run(runner, ["git", "checkout", branch], repo_path, timeout)
         if fallback.returncode != 0:
             stderr = fallback.stderr or checkout.stderr or ""
             reason = f"branch checkout failed: {stderr}"
@@ -80,6 +87,7 @@ def run_verification(
                 "steps": steps,
                 "failed_step": name,
                 "output_tail": _tail(output),
+                "reason": f"{name} failed",
             }
 
     total = time.monotonic() - started
