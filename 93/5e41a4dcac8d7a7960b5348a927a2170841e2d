@@ -1,0 +1,25 @@
+pipeline/tests/test_gate.py
+  s_5d9a3256d29482::t_52961d0b57b347 208-260
+pipeline/tests/test_verification.py
+  s_5d9a3256d29482::t_8db50d9dc5cbd1 1-107
+pipeline/wgmesh_pipeline/graph/nodes/review.py
+  s_5d9a3256d29482::t_2604c81643cfc3 7,19-27
+pipeline/wgmesh_pipeline/verification.py
+  s_5d9a3256d29482::t_c1c75b34fbc50e 1-145
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "935e41a4dcac8d7a7960b5348a927a2170841e2d",
+  "prompts": {},
+  "sessions": {
+    "s_5d9a3256d29482": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eb20e-f663-7750-8476-a0d46b4b25d8",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
