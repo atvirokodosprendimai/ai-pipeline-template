@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import re
 import subprocess
@@ -8,12 +9,21 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Mapping, Sequence
 
+from wgmesh_pipeline import tracing
 from wgmesh_pipeline.config import Config, DEFAULT_GOOSE_MODEL, DEFAULT_GOOSE_PROVIDER
+from wgmesh_pipeline.goose.usage import (
+    UsageTotals,
+    collect_usage_delta,
+    default_logs_dir,
+    snapshot_usage_logs,
+)
 from wgmesh_pipeline.models import ModelProfile, credential_for, resolve_profile_for_tier
 
 
 SubprocessRunner = Callable[..., subprocess.CompletedProcess[str]]
 GOOSE_TIMEOUT_SECONDS = 1800
+log = logging.getLogger("wgmesh_pipeline.goose.runner")
+_USAGE_WARNING_EMITTED = False
 
 # Minimum stripped-stdout length to treat a printed-only goose run as a real
 # deliverable worth salvaging to the output file. A genuine spec/diff is KB-scale;
@@ -215,6 +225,7 @@ class GooseResult:
     # online score (scoring.py) attributes the outcome by model (R5). None when
     # the runner used the legacy single-model path (no registry configured).
     model_key: str | None = None
+    usage: UsageTotals | None = None
 
 
 class GooseRunner:
@@ -244,6 +255,7 @@ class GooseRunner:
         expected_output: str | Path,
         stage: str | None = None,
         tier: int = 0,
+        session_id: str | None = None,
     ) -> GooseResult:
         workdir_path = Path(workdir)
         output_path = Path(expected_output)
@@ -256,7 +268,15 @@ class GooseRunner:
 
         profile = self._resolve_profile(stage, tier)
         model_key = profile.key if profile is not None else None
+        resolved_model = _resolved_model(self.config, profile)
         env = build_goose_env(self.config, profile=profile, stage=stage)
+        logs_dir: Path | None = None
+        usage_snapshot: dict[str, int] | None = None
+        try:
+            logs_dir = default_logs_dir()
+            usage_snapshot = snapshot_usage_logs(logs_dir)
+        except Exception as exc:  # telemetry must never break goose
+            _warn_usage_once("snapshot", exc)
 
         started = time.monotonic()
         try:
@@ -271,6 +291,8 @@ class GooseRunner:
             )
         except subprocess.TimeoutExpired as exc:
             duration = time.monotonic() - started
+            usage = _collect_usage_safely(logs_dir, usage_snapshot)
+            _emit_usage_safely(session_id=session_id, stage=stage, model=resolved_model, usage=usage)
             return GooseResult(
                 ok=False,
                 output_path=None,
@@ -278,8 +300,11 @@ class GooseRunner:
                 raw_log=_join_log(_decode_timeout_output(exc.output), _decode_timeout_output(exc.stderr)),
                 error=f"goose timed out after {GOOSE_TIMEOUT_SECONDS}s",
                 model_key=model_key,
+                usage=usage,
             )
         duration = time.monotonic() - started
+        usage = _collect_usage_safely(logs_dir, usage_snapshot)
+        _emit_usage_safely(session_id=session_id, stage=stage, model=resolved_model, usage=usage)
         raw_log = _join_log(completed.stdout, completed.stderr)
 
         if completed.returncode != 0:
@@ -290,6 +315,7 @@ class GooseRunner:
                 raw_log=raw_log,
                 error=f"goose exited {completed.returncode}",
                 model_key=model_key,
+                usage=usage,
             )
 
         if not output_path.exists() or output_path.stat().st_size == 0:
@@ -313,6 +339,7 @@ class GooseRunner:
                         raw_log=raw_log,
                         error=f"empty output + salvage write failed for {output_path}: {exc}",
                         model_key=model_key,
+                        usage=usage,
                     )
 
         if not output_path.exists() or output_path.stat().st_size == 0:
@@ -323,6 +350,7 @@ class GooseRunner:
                 raw_log=raw_log,
                 error=f"empty output guard fired for {output_path}",
                 model_key=model_key,
+                usage=usage,
             )
 
         return GooseResult(
@@ -331,6 +359,7 @@ class GooseRunner:
             duration_seconds=duration,
             raw_log=raw_log,
             model_key=model_key,
+            usage=usage,
         )
 
 
@@ -351,3 +380,39 @@ def _decode_timeout_output(value: str | bytes | None) -> str | None:
     if isinstance(value, bytes):
         return value.decode(errors="replace")
     return value
+
+
+def _resolved_model(config: Config, profile: ModelProfile | None) -> str:
+    if profile is not None:
+        return profile.model
+    return getattr(config, "goose_model", DEFAULT_GOOSE_MODEL)
+
+
+def _collect_usage_safely(logs_dir: Path | None, snapshot: dict[str, int] | None) -> UsageTotals | None:
+    if logs_dir is None or snapshot is None:
+        return None
+    try:
+        return collect_usage_delta(logs_dir, snapshot)
+    except Exception as exc:  # telemetry must never break goose
+        _warn_usage_once("collect", exc)
+        return None
+
+
+def _emit_usage_safely(
+    *,
+    session_id: str | None,
+    stage: str | None,
+    model: str,
+    usage: UsageTotals | None,
+) -> None:
+    if usage is None or usage.total_tokens <= 0:
+        return
+    tracing.emit_generation(session_id=session_id, stage=stage, model=model, usage=usage)
+
+
+def _warn_usage_once(phase: str, exc: BaseException) -> None:
+    global _USAGE_WARNING_EMITTED
+    if _USAGE_WARNING_EMITTED:
+        return
+    _USAGE_WARNING_EMITTED = True
+    log.warning("goose usage %s failed; continuing without token cost capture: %r", phase, exc)

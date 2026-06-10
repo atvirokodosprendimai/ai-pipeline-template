@@ -49,6 +49,7 @@ def implement_node(state: GraphState) -> GraphState:
             expected_output=diff_rel,
             stage="implement",
             tier=tier,
+            session_id=f"issue-{issue.number}",
         )
         if not result.ok:
             raise RuntimeError(result.error or "goose implementation failed")

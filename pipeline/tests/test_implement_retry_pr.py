@@ -44,7 +44,7 @@ class _FakeRunner:
         self.edit_content = edit_content
         self.calls: list[dict[str, Any]] = []
 
-    def run_recipe(self, *, recipe, workdir, params, expected_output, stage=None, tier=0):
+    def run_recipe(self, *, recipe, workdir, params, expected_output, stage=None, tier=0, session_id=None):
         self.tiers.append(tier)
         self.calls.append(
             {
@@ -209,7 +209,7 @@ def test_implement_materializes_spec_from_spec_branch(tmp_path: Path) -> None:
     seen: dict[str, str] = {}
 
     class SpecAssertingRunner(_FakeRunner):
-        def run_recipe(self, *, recipe, workdir, params, expected_output, stage=None, tier=0):
+        def run_recipe(self, *, recipe, workdir, params, expected_output, stage=None, tier=0, session_id=None):
             spec_file = Path(params["spec_file"])
             assert spec_file.parts[0] == "pipeline-output"
             materialized = Path(workdir) / spec_file

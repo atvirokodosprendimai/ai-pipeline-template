@@ -29,6 +29,20 @@ def _session_ctx(issue: str | None):
         return nullcontext()
 
 
+def _session_id_ctx(session_id: str | None):
+    """Group an observation under an already-formed Langfuse session id.
+    Guarded the same way as _session_ctx: telemetry context setup must never
+    break the pipeline."""
+    if not session_id:
+        return nullcontext()
+    try:
+        from langfuse import propagate_attributes  # public v4 API
+
+        return propagate_attributes(session_id=session_id)
+    except Exception:
+        return nullcontext()
+
+
 class Span(Protocol):
     def end(self, *, outputs: Any = None, error: BaseException | None = None, latency_seconds: float = 0.0) -> None:
         ...
@@ -121,6 +135,7 @@ class LangfuseTracer:
 
 
 _tracer: Tracer = NoopTracer()
+_generation_warned = False
 
 
 def init_tracing(config: Config, *, tracer: Tracer | None = None) -> Tracer:
@@ -168,6 +183,38 @@ def trace_node(name: str, fn: Callable[[T], T]) -> Callable[[T], T]:
     return wrapped
 
 
+def emit_generation(*, session_id: str | None, stage: str | None, model: str, usage) -> None:
+    if not isinstance(_tracer, LangfuseTracer):
+        return
+    try:
+        lf = _tracer._lf
+        with _session_id_ctx(session_id):
+            observation = lf.start_observation(
+                name=f"{stage or 'goose'}-llm",
+                as_type="generation",
+                model=model,
+                usage_details={"input": usage.input_tokens, "output": usage.output_tokens},
+            )
+            observation.end()
+        lf.flush()
+        log.info(
+            "tracing: generation emitted stage=%s model=%s tokens=%d/%d",
+            stage,
+            model,
+            usage.input_tokens,
+            usage.output_tokens,
+        )
+    except Exception as exc:
+        _announce_generation(exc)
+
+
+def _announce_generation(exc: BaseException) -> None:
+    global _generation_warned
+    if not _generation_warned:
+        _generation_warned = True
+        print(f"[tracing] langfuse generation creation failed, tracing degraded: {exc!r}", file=sys.stderr)
+
+
 def _tags_for_state(state: Any, stage: str) -> dict[str, str]:
     tags = {"stage": stage}
     if isinstance(state, dict) and "issue" in state:
@@ -191,4 +238,3 @@ def _safe_state(value: Any) -> Any:
     for key in _UNSAFE_STATE_KEYS:
         safe.pop(key, None)
     return safe
-

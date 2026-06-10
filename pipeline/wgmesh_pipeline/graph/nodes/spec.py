@@ -36,6 +36,7 @@ def spec_node(state: GraphState) -> GraphState:
         },
         expected_output=spec_rel,
         stage="spec",
+        session_id=f"issue-{issue.number}",
     )
     if not result.ok:
         # Surface goose's actual output so a write-tool/model/recipe failure is
