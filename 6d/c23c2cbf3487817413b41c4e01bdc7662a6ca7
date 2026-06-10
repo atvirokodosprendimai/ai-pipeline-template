@@ -1,0 +1,19 @@
+docs/pulse-reports/2026-06-10_21-30.md
+  s_002dc1a5f2abbf::t_c77c60df5bc141 1-33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "6dc23c2cbf3487817413b41c4e01bdc7662a6ca7",
+  "prompts": {},
+  "sessions": {
+    "s_002dc1a5f2abbf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5686c212-4035-4bed-bb07-be27455aefb4",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
