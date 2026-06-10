@@ -146,21 +146,27 @@ def _materialize_spec(repo_path: Path, state: dict, spec_rel: Path) -> None:
     spec_path.write_text(content)
 
 
+# Model litter: goose's LLM materializes toolchain/cache dirs inside the
+# checkout (observed: GOMODCACHE=go-cache 18:29Z; a full go/ toolchain source
+# tree that git add -A committed and go test then rejected, 19:56Z — both
+# 2026-06-10). Cache dirs contain write-protected files git clean can't
+# remove, and none of it may ever reach an impl commit.
+MODEL_LITTER_DIRS = ("pipeline-output", "go", "go-cache", ".cache")
+
+
 def _prepare_impl_workspace(repo_path: Path, branch: str) -> None:
     _git(repo_path, "fetch", "origin", "main", check=False)
     checkout = _git(repo_path, "checkout", "-B", branch, "origin/main", check=False)
     if checkout.returncode != 0:
         _git(repo_path, "checkout", "-B", branch)
     _git(repo_path, "checkout", "--", ".")
-    # go-cache: goose's model has improvised GOMODCACHE=go-cache inside the
-    # checkout; Go module caches are write-protected, so git clean dies on
-    # them (live incident 2026-06-10 18:29Z). Exclude rather than fight.
-    _git(repo_path, "clean", "-fd", "--exclude=pipeline-output", "--exclude=go-cache")
+    excludes = [f"--exclude={d}" for d in MODEL_LITTER_DIRS]
+    _git(repo_path, "clean", "-fd", *excludes)
 
 
 def _stage_impl_tree(repo_path: Path) -> None:
     _git(repo_path, "add", "-A")
-    _git(repo_path, "reset", "-q", "--", "pipeline-output")
+    _git(repo_path, "reset", "-q", "--", *MODEL_LITTER_DIRS)
 
 
 def _ensure_impl_pr(state: dict) -> None:
