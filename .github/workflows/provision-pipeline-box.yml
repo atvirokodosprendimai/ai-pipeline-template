@@ -242,6 +242,21 @@ jobs:
                sed -i 's/^RESET_QUEUE=.*/RESET_QUEUE=0/' /etc/wgmesh-pipeline/env
              fi"
 
+      - name: Install deploy key (enables fast Update Pipeline Box workflow)
+        env:
+          DEPLOY_PUBKEY: ${{ vars.DEPLOY_SSH_PUBKEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DEPLOY_PUBKEY:-}" ]; then
+            echo "DEPLOY_SSH_PUBKEY var unset — in-place updates unavailable until set"
+            exit 0
+          fi
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i "$RUNNER_TEMP/box_key" root@"$BOX_IP" \
+            "set -euo pipefail
+             grep -qF '$DEPLOY_PUBKEY' /root/.ssh/authorized_keys 2>/dev/null || printf '%s\n' '$DEPLOY_PUBKEY' >> /root/.ssh/authorized_keys
+             grep -qF '$DEPLOY_PUBKEY' /root/.ssh/authorized_keys
+             echo 'deploy key installed'"
+
       - name: Capture journal after ticks (diagnostic)
         run: |
           set -euo pipefail

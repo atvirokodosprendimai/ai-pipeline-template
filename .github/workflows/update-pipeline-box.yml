@@ -1,0 +1,77 @@
+name: Update Pipeline Box
+
+# Fast in-place deploy (~1 min): git reset to origin/main + pip install +
+# service restart over SSH. Use for CODE changes. Full "Provision Pipeline
+# Box" (~13 min, server recreate) is still required when the /etc env file
+# must change (new secrets, MODEL_REGISTRY/STAGE_ROUTING edits, mode flips)
+# or the box is gone/broken.
+#
+# Auth: DEPLOY_SSH_KEY secret (dedicated deploy keypair); its public half is
+# installed at provision time (vars.DEPLOY_SSH_PUBKEY) and was hand-added to
+# the current box 2026-06-10.
+
+on:
+  workflow_dispatch:
+    inputs:
+      server_name:
+        description: 'Hetzner server name'
+        default: 'wgmesh-pipeline'
+
+permissions:
+  contents: read
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate secrets
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+        run: |
+          set -euo pipefail
+          : "${DEPLOY_SSH_KEY:?DEPLOY_SSH_KEY secret missing}"
+          : "${HCLOUD_TOKEN:?HCLOUD_TOKEN secret missing (org)}"
+
+      - name: Install hcloud CLI
+        run: |
+          set -euo pipefail
+          curl -fsSL https://github.com/hetznercloud/cli/releases/latest/download/hcloud-linux-amd64.tar.gz \
+            | tar xz hcloud
+          sudo mv hcloud /usr/local/bin/
+
+      - name: Resolve box IP
+        env:
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+        run: |
+          set -euo pipefail
+          IP=$(hcloud server ip "${{ github.event.inputs.server_name }}")
+          echo "BOX_IP=$IP" >> "$GITHUB_ENV"
+
+      - name: Update + restart
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$RUNNER_TEMP/deploy_key"
+          # UserKnownHostsFile=/dev/null: provision recreates the server, which
+          # rotates the host key; the deploy key is the real gate.
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              -o ConnectTimeout=15 -i "$RUNNER_TEMP/deploy_key" root@"$BOX_IP" \
+            "set -euo pipefail
+             cd /opt/wgmesh-pipeline
+             git fetch origin main
+             OLD=\$(git rev-parse --short HEAD)
+             git reset --hard origin/main
+             NEW=\$(git rev-parse --short HEAD)
+             echo \"code: \$OLD -> \$NEW\"
+             .venv/bin/pip install -q -e '/opt/wgmesh-pipeline/pipeline[turso,trace]'
+             chown -R wgmesh:wgmesh /opt/wgmesh-pipeline
+             systemctl restart wgmesh-pipeline
+             sleep 8
+             systemctl is-active wgmesh-pipeline
+             journalctl -u wgmesh-pipeline -n 5 --no-pager"
+
+      - name: Report
+        run: echo "Box updated in place at $BOX_IP — service restarted on latest main."
