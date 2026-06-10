@@ -5,6 +5,7 @@ from dataclasses import replace
 from typing import Any
 
 import pytest
+import requests
 
 from wgmesh_pipeline.config import Config
 from wgmesh_pipeline.github.client import DryRunResult, GitHubClient
@@ -32,6 +33,15 @@ class Session:
         return self.response
 
 
+class ErrorResponse(Response):
+    def __init__(self, status_code: int, text: str):
+        super().__init__(text=text)
+        self.status_code = status_code
+
+    def raise_for_status(self) -> None:
+        raise requests.HTTPError(f"{self.status_code} Error", response=self)
+
+
 @pytest.fixture
 def cfg() -> Config:
     return Config(target_repo="atvirokodosprendimai/wgmesh", mode="shadow", wgmesh_bot_pat="pat")
@@ -57,6 +67,18 @@ def test_list_needs_triage_returns_parsed_issues(cfg: Config) -> None:
     assert issues[0].labels == ("needs-triage", "fn:dev")
     assert session.calls[0]["method"] == "GET"
     assert session.calls[0]["kwargs"]["params"]["labels"] == "needs-triage"
+
+
+def test_request_http_error_includes_response_body(cfg: Config) -> None:
+    body = '{"message":"Validation Failed","errors":[{"message":"Head does not exist"}]}'
+    session = Session(ErrorResponse(422, body))
+    client = GitHubClient(cfg, session=session)
+
+    with pytest.raises(requests.HTTPError) as exc_info:
+        client.list_needs_triage()
+
+    assert body in str(exc_info.value)
+    assert exc_info.value.response is session.response
 
 
 def test_shadow_create_pr_dry_runs_with_no_network_write(cfg: Config) -> None:
@@ -211,6 +233,21 @@ def test_spec_only_allows_spec_branch_push_and_label_swap(cfg: Config, tmp_path,
     # prior run's remote branch -> plain push rejected non-fast-forward).
     assert pushes == [(["git", "push", "--force", "origin", "bot/spec-17"], str(tmp_path))]
     assert [call["method"] for call in session.calls] == ["DELETE", "POST"]
+
+
+def test_live_impl_branch_push_is_force_updated(cfg: Config, tmp_path, monkeypatch) -> None:
+    client = GitHubClient(replace(cfg, mode="live"), sanitiser=lambda text: True)
+    pushes: list[tuple[list[str], str]] = []
+
+    def fake_run(command, *, cwd, check, text, capture_output, timeout):
+        pushes.append((command, cwd))
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    monkeypatch.setattr("wgmesh_pipeline.github.client.subprocess.run", fake_run)
+
+    client.push_branch(str(tmp_path), "bot/impl-17")
+
+    assert pushes == [(["git", "push", "--force", "origin", "bot/impl-17"], str(tmp_path))]
 
 
 def test_list_open_issues_filters_out_pull_requests(cfg: Config) -> None:

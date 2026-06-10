@@ -4,8 +4,11 @@ import re
 from pathlib import Path
 from typing import Any
 
+from requests import HTTPError
+
 from wgmesh_pipeline.config import DEFAULT_RECIPES_DIR
 from wgmesh_pipeline.graph.state import GraphState
+from wgmesh_pipeline.graph.nodes.spec_pr import GIT_AUTHOR_EMAIL, GIT_AUTHOR_NAME, _git
 
 
 def implement_node(state: GraphState) -> GraphState:
@@ -48,6 +51,12 @@ def implement_node(state: GraphState) -> GraphState:
     else:
         next_state["diff"] = "+docs-only change\n"
     next_state["changed_files"] = changed_files_from_diff(next_state["diff"])
+    if runner is not None and next_state.get("github") is not None:
+        issue = next_state["issue"]
+        branch = str(next_state.get("impl_branch") or f"bot/impl-{issue.number}")
+        _prepare_impl_branch(repo_path, branch, diff_rel, issue.number, issue.title)
+        next_state["github"].push_branch(str(repo_path), branch)
+        next_state["impl_branch"] = branch
     _ensure_impl_pr(next_state)
     if tier > 0:
         _note_escalation_on_pr(next_state, tier)
@@ -101,17 +110,48 @@ def _normalise_diff_path(path: str) -> str | None:
     return path
 
 
+def _prepare_impl_branch(repo_path: Path, branch: str, diff_rel: Path, issue_number: int, title: str) -> None:
+    if not (repo_path / ".git").exists():
+        return
+    _git(repo_path, "fetch", "origin", "main", check=False)
+    checkout = _git(repo_path, "checkout", "-B", branch, "origin/main", check=False)
+    if checkout.returncode != 0:
+        _git(repo_path, "checkout", "-B", branch)
+    _git(repo_path, "checkout", "--", ".")
+    _git(repo_path, "clean", "-fd", "--exclude=pipeline-output")
+    applied = _git(repo_path, "apply", "--index", str(diff_rel), check=False)
+    if applied.returncode != 0:
+        detail = applied.stderr.strip() or f"git apply --index {diff_rel} failed"
+        raise RuntimeError(f"git apply failed: {detail}")
+    diff = _git(repo_path, "diff", "--cached", "--quiet", check=False)
+    if diff.returncode == 0:
+        return
+    _git(
+        repo_path,
+        "-c", f"user.name={GIT_AUTHOR_NAME}",
+        "-c", f"user.email={GIT_AUTHOR_EMAIL}",
+        "commit", "-m", f"impl: Issue #{issue_number} - {title}",
+    )
+
+
 def _ensure_impl_pr(state: dict) -> None:
     if state.get("impl_pr") is not None or state.get("github") is None:
         return
     issue = state["issue"]
-    result = state["github"].create_pr(
-        title=f"fix: Issue #{issue.number} - {issue.title}",
-        head=f"bot/impl-{issue.number}",
-        base="main",
-        body=_impl_pr_body(issue.number, state.get("changed_files", [])),
-    )
-    pr_number = _pr_number(result)
+    branch = str(state.get("impl_branch") or f"bot/impl-{issue.number}")
+    try:
+        result = state["github"].create_pr(
+            title=f"fix: Issue #{issue.number} - {issue.title}",
+            head=branch,
+            base="main",
+            body=_impl_pr_body(issue.number, state.get("changed_files", [])),
+        )
+        pr_number = _pr_number(result)
+    except HTTPError as exc:
+        if _status(exc) == 422 and "already exists" in str(exc).lower():
+            pr_number = state["github"].find_open_pr_number(branch)
+        else:
+            raise
     if pr_number is None:
         raise RuntimeError("implementation PR creation did not return a PR number")
     state["impl_pr"] = pr_number
@@ -129,6 +169,11 @@ def _pr_number(result: Any) -> int | None:
     if isinstance(payload, dict) and payload.get("number") is not None:
         return int(payload["number"])
     return None
+
+
+def _status(exc: HTTPError) -> int | None:
+    resp = getattr(exc, "response", None)
+    return getattr(resp, "status_code", None) if resp is not None else None
 
 
 def _visit(state: dict, node: str) -> None:
