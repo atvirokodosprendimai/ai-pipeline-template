@@ -728,8 +728,12 @@ jobs:
 
             # Guard 1: never autonomously close a human escalation. The loop
             # closed needs-human #652 on its own judgment (2026-06-11).
-            labels=$(gh issue view "$number" --repo "$TARGET_REPO" --json labels --jq '[.labels[].name] | join(",")' 2>/dev/null || echo "")
-            if echo "$labels" | grep -q "needs-human"; then
+            # Fail-closed: if the label fetch fails we refuse to close blind.
+            if ! labels=$(gh issue view "$number" --repo "$TARGET_REPO" --json labels --jq '[.labels[].name] | join(",")' 2>/dev/null); then
+              echo "SKIP close #${number}: label fetch failed — refusing to close blind (reason was: $reason)"
+              continue
+            fi
+            if echo ",$labels," | grep -q ",needs-human,"; then
               echo "SKIP close #${number}: needs-human label — human-lane only (reason was: $reason)"
               continue
             fi
