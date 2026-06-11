@@ -725,7 +725,27 @@ jobs:
           jq -c '.issues_to_close // [] | .[]' /tmp/assessment.json | while read -r item; do
             number=$(echo "$item" | jq -r '.number')
             reason=$(echo "$item" | jq -r '.reason')
-            gh issue close "$number" --repo "$TARGET_REPO" --comment "Closed by observation loop: $reason" || true
+
+            # Guard 1: never autonomously close a human escalation. The loop
+            # closed needs-human #652 on its own judgment (2026-06-11).
+            labels=$(gh issue view "$number" --repo "$TARGET_REPO" --json labels --jq '[.labels[].name] | join(",")' 2>/dev/null || echo "")
+            if echo "$labels" | grep -q "needs-human"; then
+              echo "SKIP close #${number}: needs-human label — human-lane only (reason was: $reason)"
+              continue
+            fi
+
+            # Guard 2: if the assessment's own reason says relabel/reopen,
+            # the disposition is not a close — #652's close comment literally
+            # read 'Relabel rather than close' while the step closed it.
+            if echo "$reason" | grep -qiE "relabel|reopen|rather than clos"; then
+              echo "SKIP close #${number}: reason contradicts close action: $reason"
+              continue
+            fi
+
+            # Guard 3 (R5): an LLM assessment is a non-merge signal — close
+            # as 'not planned', never COMPLETED. COMPLETED is reserved for
+            # the merged-impl-PR closer.
+            gh issue close "$number" --repo "$TARGET_REPO" --reason "not planned" --comment "Closed by observation loop: $reason" || true
           done
 
       - name: Create needs-human issue if requested
