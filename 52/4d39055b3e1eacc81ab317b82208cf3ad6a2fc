@@ -1,0 +1,42 @@
+pipeline/wgmesh_pipeline/risk.py
+  s_fa1006d7430d08::t_64beab88689506 28-34,47-60
+.github/workflows/provision-pipeline-box.yml
+  s_002dc1a5f2abbf::t_8a548b6826dc72 125-130
+  s_fa1006d7430d08::t_064f8dd77a97f4 19,187-189,216
+.github/workflows/update-pipeline-box.yml
+  s_002dc1a5f2abbf::t_6da86b0588718d 73
+  s_fa1006d7430d08::t_064f8dd77a97f4 71-72
+pipeline/tests/test_risk.py
+  s_fa1006d7430d08::t_ad5dc671f01a35 3,64-112
+  s_fa1006d7430d08::t_cf94443a6711dc 27-36
+pipeline/wgmesh_pipeline/secret_scan.py
+  s_fa1006d7430d08::t_64beab88689506 1-64,66-85
+  s_fa1006d7430d08::t_595015fc0340d5 65
+pipeline/tests/test_secret_scan.py
+  s_fa1006d7430d08::t_ad5dc671f01a35 1-72,74-99
+  s_fa1006d7430d08::t_cf94443a6711dc 73
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "524d39055b3e1eacc81ab317b82208cf3ad6a2fc",
+  "prompts": {},
+  "sessions": {
+    "s_002dc1a5f2abbf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5686c212-4035-4bed-bb07-be27455aefb4",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    },
+    "s_fa1006d7430d08": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eb507-060f-7b21-871f-db9b1c097376",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
