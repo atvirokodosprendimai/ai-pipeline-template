@@ -272,3 +272,46 @@ def test_list_open_issues_filters_out_pull_requests(cfg: Config) -> None:
     issues = GitHubClient(cfg, session=session).list_open_issues()
 
     assert [i.number for i in issues] == [10]
+
+
+def _search_response(*titles: str) -> Response:
+    return Response({"total_count": len(titles), "items": [{"title": t} for t in titles]})
+
+
+def test_has_merged_resolution_pr_matches_exact_prefix_title(cfg: Config) -> None:
+    session = Session(_search_response("impl: Issue #540 - Goose implementation"))
+
+    client = GitHubClient(cfg, session=session)
+
+    assert client.has_merged_resolution_pr(540) is True
+    assert len(session.calls) == 1
+    assert "/search/issues" in session.calls[0]["url"]
+
+
+def test_has_merged_resolution_pr_accepts_copilot_era_spec_suffix(cfg: Config) -> None:
+    session = Session(
+        _search_response("spec: Add `wgmesh status --json` output format (Issue #510)")
+    )
+
+    assert GitHubClient(cfg, session=session).has_merged_resolution_pr(510) is True
+
+
+def test_has_merged_resolution_pr_rejects_loose_token_match(cfg: Config) -> None:
+    """Search-API quoted phrases are token-loose: a query for "impl: Issue #540"
+    also returns PRs that merely mention the issue. A referencing PR must not
+    mark the issue resolved — that silently drops it from the pipeline."""
+    session = Session(_search_response("fix: regression caused by Issue #540 rollout"))
+
+    assert GitHubClient(cfg, session=session).has_merged_resolution_pr(540) is False
+
+
+def test_has_merged_resolution_pr_rejects_number_prefix_match(cfg: Config) -> None:
+    session = Session(_search_response("impl: Issue #5401 - other work"))
+
+    assert GitHubClient(cfg, session=session).has_merged_resolution_pr(540) is False
+
+
+def test_has_merged_resolution_pr_rejects_alphanumeric_continuation(cfg: Config) -> None:
+    session = Session(_search_response("impl: Issue #540A - other work"))
+
+    assert GitHubClient(cfg, session=session).has_merged_resolution_pr(540) is False

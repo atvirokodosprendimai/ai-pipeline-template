@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 from wgmesh_pipeline.github.client import GitHubClient, GitHubIssue
 from wgmesh_pipeline.state.store import StateStore
+
+log = logging.getLogger(__name__)
 
 
 TERMINAL_STAGES = {"merged", "escalated", "failed"}
@@ -44,6 +47,31 @@ def reconcile_issues(client: GitHubClient, store: StateStore) -> ReconcileResult
                 # reconcile every tick and stalled the whole loop.
                 client.remove_label(issue.number, "needs-triage", spec_pr=True)
         else:
+            # Resolved-guard: only for issues the store has never seen (fresh
+            # or post-reset_queue — the path that wipes Turso state). An issue
+            # with a live stage is mid-flight; its merged *spec* PR must not
+            # mark it resolved, or every impl is abandoned after spec merge.
+            if current_stage is None:
+                try:
+                    resolved = client.has_merged_resolution_pr(issue.number)
+                except Exception as exc:
+                    # Skip this issue for the tick: aborting the whole
+                    # reconcile on a search rate-limit stalls every claim,
+                    # and failing open re-queues a resolved issue — the bug
+                    # this guard exists to stop.
+                    log.warning("reconcile: resolution lookup failed for #%s: %s", issue.number, exc)
+                    continue
+                if resolved:
+                    if "needs-rework" not in labels:
+                        store.upsert_issue(issue.number, issue.title, stage="merged", status=issue.state)
+                        merged += 1
+                        continue
+                    if client.find_open_pr_number(f"bot/impl-{issue.number}") is not None:
+                        continue
+                    store.upsert_issue(issue.number, issue.title, stage="queued", status="open")
+                    client.remove_label(issue.number, "needs-rework", spec_pr=True)
+                    queued += 1
+                    continue
             store.upsert_issue(issue.number, issue.title, stage=current_stage or "queued", status="open")
     return ReconcileResult(seen=seen, queued=queued, escalated=escalated, merged=merged)
 
