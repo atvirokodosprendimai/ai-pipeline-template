@@ -1,0 +1,42 @@
+pipeline/tests/test_reconcile.py
+  s_e572593943375e::t_6370e3f1ab18c2 19,25
+  s_e572593943375e::t_ecf5e668bc864f 36-37
+  s_e572593943375e::t_eda5b7c2a5f04a 166-203
+  s_c95501ca497b28::t_18c415ddd916a4 13-18,20,23-24,27-29,34-35,38-45,48,107-163
+pipeline/wgmesh_pipeline/github/client.py
+  s_e572593943375e::t_3380bce6af3b94 95-103,106-118
+  s_e572593943375e::t_0e9d148d7aaa5f 3
+  s_c95501ca497b28::t_99d0c2269963c6 94,104-105,119
+pipeline/wgmesh_pipeline/github/reconcile.py
+  s_e572593943375e::t_5096e85fe1250d 50-62,64-72
+  s_c95501ca497b28::t_399b637ced752c 63,73
+  s_e572593943375e::t_451e81bf098347 3,9
+docs/brainstorms/2026-06-11-issue-lifecycle-guards-requirements.md
+  s_e572593943375e::t_eb194d86a5d5b6 1-109
+pipeline/tests/test_github_client.py
+  s_e572593943375e::t_a6e918cbe49095 275-311
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "6a81bd8c00247a36c6f0d4c8b648ece7e92197a8",
+  "prompts": {},
+  "sessions": {
+    "s_c95501ca497b28": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eb64d-303c-7cc3-8730-871d007447cd",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    },
+    "s_e572593943375e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "73f3e1b0-bc7b-47d7-97f0-2bec21527939",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
