@@ -1,0 +1,24 @@
+pipeline/tests/test_risk.py
+  s_002dc1a5f2abbf::t_71574e57fcdf04 5,13-16,18
+  s_002dc1a5f2abbf::t_92fe10e737e8dc 3-4,10-12,17,19-21
+pipeline/wgmesh_pipeline/secret_scan.py
+  s_002dc1a5f2abbf::t_03a9fe42de6fae 34-43,47
+pipeline/wgmesh_pipeline/risk.py
+  s_002dc1a5f2abbf::t_9c87a304585ee5 53-70
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "6308e950da93f69d12757d6970153fd2ad288e10",
+  "prompts": {},
+  "sessions": {
+    "s_002dc1a5f2abbf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5686c212-4035-4bed-bb07-be27455aefb4",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
