@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from typing import Callable
 
-from wgmesh_pipeline.github.client import GitHubClient, GitHubIssue
+from wgmesh_pipeline.forge.protocol import Forge, ForgeIssue as GitHubIssue
 from wgmesh_pipeline.state.store import StateStore
 
 log = logging.getLogger(__name__)
@@ -21,7 +22,26 @@ class ReconcileResult:
     merged: int
 
 
-def reconcile_issues(client: GitHubClient, store: StateStore) -> ReconcileResult:
+def _label_write_best_effort(fn: Callable[..., object], *args: object, **kwargs: object) -> None:
+    """Labels are mirrors for humans, not gates — the store is authoritative.
+    A failed label write must never block reconcile (telemetry-write lesson:
+    side-channel writes stay off the convergence path)."""
+    try:
+        fn(*args, **kwargs)
+    except Exception as exc:
+        log.warning("label write failed (non-blocking): %s(%s): %s", getattr(fn, "__name__", fn), args, exc)
+
+
+def reconcile_issues(
+    client: Forge,
+    store: StateStore,
+    *,
+    resolution_lookup: Callable[[int], bool] | None = None,
+) -> ReconcileResult:
+    """resolution_lookup defaults to the forge's host API; main wires the
+    git-first lookup (forge/gitfacts.py) so resolution is keyed on git facts
+    with the host API as freshness fallback."""
+    lookup = resolution_lookup or client.has_merged_resolution_pr
     seen = queued = escalated = merged = 0
     for issue in client.list_open_issues():
         seen += 1
@@ -45,7 +65,9 @@ def reconcile_issues(client: GitHubClient, store: StateStore) -> ReconcileResult
                 # spec-lane label write (same as spec_pr_node). Without the flag
                 # the spec-only write-gate raises PermissionError, which crashed
                 # reconcile every tick and stalled the whole loop.
-                client.remove_label(issue.number, "needs-triage", spec_pr=True)
+                _label_write_best_effort(
+                    client.remove_label, issue.number, "needs-triage", spec_pr=True
+                )
         else:
             # Resolved-guard: only for issues the store has never seen (fresh
             # or post-reset_queue — the path that wipes Turso state). An issue
@@ -53,7 +75,7 @@ def reconcile_issues(client: GitHubClient, store: StateStore) -> ReconcileResult
             # mark it resolved, or every impl is abandoned after spec merge.
             if current_stage is None:
                 try:
-                    resolved = client.has_merged_resolution_pr(issue.number)
+                    resolved = lookup(issue.number)
                 except Exception as exc:
                     # Skip this issue for the tick: aborting the whole
                     # reconcile on a search rate-limit stalls every claim,
@@ -69,7 +91,9 @@ def reconcile_issues(client: GitHubClient, store: StateStore) -> ReconcileResult
                     if client.find_open_pr_number(f"bot/impl-{issue.number}") is not None:
                         continue
                     store.upsert_issue(issue.number, issue.title, stage="queued", status="open")
-                    client.remove_label(issue.number, "needs-rework", spec_pr=True)
+                    _label_write_best_effort(
+                        client.remove_label, issue.number, "needs-rework", spec_pr=True
+                    )
                     queued += 1
                     continue
             store.upsert_issue(issue.number, issue.title, stage=current_stage or "queued", status="open")

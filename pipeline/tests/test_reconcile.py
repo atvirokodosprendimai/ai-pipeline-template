@@ -241,3 +241,38 @@ def test_reconcile_then_claim_returns_only_actionable_issue(tmp_path) -> None:
 
     assert claimed is not None
     assert claimed.number == 2
+
+
+def test_injected_resolution_lookup_is_used_instead_of_client(tmp_path) -> None:
+    store = StateStore(tmp_path / "state.db")
+    client = Client([issue(510, (), title="Already fixed")])
+    lookups: list[int] = []
+
+    def lookup(number: int) -> bool:
+        lookups.append(number)
+        return True
+
+    result = reconcile_issues(client, store, resolution_lookup=lookup)
+
+    assert result.merged == 1
+    assert lookups == [510]
+    assert client.merged_resolution_lookups == []
+
+
+def test_label_write_failure_does_not_block_reconcile(tmp_path) -> None:
+    """Labels are mirrors, not gates: a failed needs-rework removal must not
+    abort the tick or undo the requeue."""
+
+    class LabelFailClient(Client):
+        def remove_label(self, issue_number: int, label: str, *, spec_pr: bool = False):
+            raise RuntimeError("label API down")
+
+    store = StateStore(tmp_path / "state.db")
+    client = LabelFailClient(
+        [issue(540, ("needs-rework",), title="Redo")], merged_resolution_prs={540}
+    )
+
+    result = reconcile_issues(client, store)
+
+    assert result.queued == 1
+    assert store.get_issue(540).stage == "queued"

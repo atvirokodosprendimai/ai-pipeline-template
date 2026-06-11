@@ -37,7 +37,7 @@ def test_async_main_honors_reset_queue_env_before_polling(monkeypatch, capsys) -
     monkeypatch.setattr(main, "init_tracing", lambda config: None)
     monkeypatch.setattr(main, "init_scoring", lambda config: None)
     monkeypatch.setattr(main, "open_state_store", lambda config: store)
-    monkeypatch.setattr(main, "GitHubClient", lambda config: object())
+    monkeypatch.setattr(main, "make_forge", lambda config: object())
     monkeypatch.setattr(main, "build_graph", lambda config: object())
     monkeypatch.setattr(main, "GooseRunner", lambda config: goose_runner, raising=False)
     monkeypatch.setattr(main, "Poller", DummyPoller)

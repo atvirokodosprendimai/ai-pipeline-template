@@ -39,6 +39,7 @@ class Config:
     recipes_dir: str = DEFAULT_RECIPES_DIR
     goose_provider: str = DEFAULT_GOOSE_PROVIDER
     goose_model: str = DEFAULT_GOOSE_MODEL
+    forge_kind: str = "github"
     database_mode: str = "local"
     database_path: str = "pipeline/state.db"
     turso_url: str | None = None
@@ -105,6 +106,7 @@ def load_config(env: Mapping[str, str] | None = None) -> Config:
         zai_api_key=_get_nonempty(source, "ZAI_API_KEY"),
         anthropic_host=anthropic_host,
         langsmith_api_key=_get_nonempty(source, "LANGSMITH_API_KEY"),
+        forge_kind=_get_nonempty(source, "FORGE_KIND") or "github",
         poll_interval_seconds=_get_int(source, "POLL_INTERVAL_SECONDS", DEFAULT_POLL_INTERVAL_SECONDS),
         max_files=_get_int(source, "MAX_FILES", DEFAULT_MAX_FILES),
         repo_path=_get_nonempty(source, "WGMESH_CHECKOUT_PATH") or DEFAULT_REPO_PATH,

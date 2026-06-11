@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from wgmesh_pipeline.config import Config
-from wgmesh_pipeline.github.client import GitHubClient, GitHubIssue
+from wgmesh_pipeline.forge.protocol import Forge, ForgeIssue as GitHubIssue
 from wgmesh_pipeline.github.reconcile import reconcile_issues
 from wgmesh_pipeline.graph.nodes.gate import apply_gate_side_effects, gate_node
 from wgmesh_pipeline.scoring import score_run
@@ -20,8 +20,9 @@ log = logging.getLogger("wgmesh_pipeline.poller")
 class Poller:
     config: Config
     store: StateStore
-    client: GitHubClient
+    client: Forge
     graph: object
+    resolution_lookup: object | None = None
     goose_runner: object | None = None
     scratch: dict[int, dict] = field(default_factory=dict)
     last_reconcile_error: str | None = None
@@ -37,7 +38,7 @@ class Poller:
 
     async def tick(self) -> IssueRecord | None:
         try:
-            result = reconcile_issues(self.client, self.store)
+            result = reconcile_issues(self.client, self.store, resolution_lookup=self.resolution_lookup)
             claim_stages = ACTIONABLE_STAGES
             if self.config.mode != "spec-only":
                 claim_stages = ACTIONABLE_STAGES + ("spec_opened",)

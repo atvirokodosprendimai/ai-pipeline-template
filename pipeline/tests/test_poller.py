@@ -187,7 +187,7 @@ def test_reconcile_exception_does_not_halt_tick(tmp_path, cfg: Config, monkeypat
     p = poller(tmp_path, cfg)
     p.store.upsert_issue(1, "Fix bug")
 
-    def fail_reconcile(client, store):
+    def fail_reconcile(client, store, **kwargs):
         raise RuntimeError("github unavailable")
 
     monkeypatch.setattr("wgmesh_pipeline.poller.reconcile_issues", fail_reconcile)
@@ -207,7 +207,7 @@ def test_reconcile_exception_records_failed_score_with_stage_and_truncated_error
     p = poller(tmp_path, cfg)
     p.store.upsert_issue(1, "Fix bug")
 
-    def fail_reconcile(client, store):
+    def fail_reconcile(client, store, **kwargs):
         raise RuntimeError("x" * 250)
 
     monkeypatch.setattr("wgmesh_pipeline.poller.reconcile_issues", fail_reconcile)
