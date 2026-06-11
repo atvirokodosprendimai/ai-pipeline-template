@@ -1,0 +1,23 @@
+docs/brainstorms/2026-06-09-actions-to-langchain-migration-requirements.md
+  s_e572593943375e::t_74bfeaeeb79d96 3,24,100
+docs/pulse-reports/2026-06-09_18-53.md
+  s_e572593943375e::t_74bfeaeeb79d96 33
+docs/plans/2026-06-09-002-refactor-retire-actions-langgraph-cutover-plan.md
+  s_e572593943375e::t_74bfeaeeb79d96 203
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "1ec4e9e84ecd651e61b2d4305e7ba7e328b1f6e1",
+  "prompts": {},
+  "sessions": {
+    "s_e572593943375e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "73f3e1b0-bc7b-47d7-97f0-2bec21527939",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
