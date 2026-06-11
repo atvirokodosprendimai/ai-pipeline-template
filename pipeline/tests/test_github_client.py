@@ -309,3 +309,9 @@ def test_has_merged_resolution_pr_rejects_number_prefix_match(cfg: Config) -> No
     session = Session(_search_response("impl: Issue #5401 - other work"))
 
     assert GitHubClient(cfg, session=session).has_merged_resolution_pr(540) is False
+
+
+def test_has_merged_resolution_pr_rejects_alphanumeric_continuation(cfg: Config) -> None:
+    session = Session(_search_response("impl: Issue #540A - other work"))
+
+    assert GitHubClient(cfg, session=session).has_merged_resolution_pr(540) is False

@@ -112,7 +112,7 @@ class GitHubClient:
             },
         )
         pattern = re.compile(
-            rf"^(?:impl|spec|fix): (?:Issue #{issue_number}(?!\d)|.*\(Issue #{issue_number}\)\s*$)"
+            rf"^(?:impl|spec|fix): (?:Issue #{issue_number}(?!\w)|.*\(Issue #{issue_number}\)\s*$)"
         )
         items = data.get("items") or []
         return any(pattern.match(str(item.get("title", ""))) for item in items)

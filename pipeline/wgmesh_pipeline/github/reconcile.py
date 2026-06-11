@@ -70,6 +70,7 @@ def reconcile_issues(client: GitHubClient, store: StateStore) -> ReconcileResult
                         continue
                     store.upsert_issue(issue.number, issue.title, stage="queued", status="open")
                     client.remove_label(issue.number, "needs-rework", spec_pr=True)
+                    queued += 1
                     continue
             store.upsert_issue(issue.number, issue.title, stage=current_stage or "queued", status="open")
     return ReconcileResult(seen=seen, queued=queued, escalated=escalated, merged=merged)

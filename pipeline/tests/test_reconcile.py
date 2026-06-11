@@ -126,6 +126,7 @@ def test_reopened_resolved_issue_with_rework_and_no_open_bot_pr_is_requeued_and_
 
     claimed = store.claim_next(now=datetime.now(timezone.utc))
     assert result.merged == 0
+    assert result.queued == 1
     assert claimed is not None
     assert claimed.number == 540
     assert claimed.stage == "queued"
