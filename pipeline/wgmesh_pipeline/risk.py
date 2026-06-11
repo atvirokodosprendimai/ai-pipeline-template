@@ -25,7 +25,13 @@ class RiskResult:
         return self.tier == "high"
 
 
-def classify_risk(changed_files: Iterable[str], diff_text: str, *, max_files: int) -> RiskResult:
+def classify_risk(
+    changed_files: Iterable[str],
+    diff_text: str,
+    *,
+    max_files: int,
+    secret_scanner=None,
+) -> RiskResult:
     """Classify implementation risk.
 
     `max_files` is inclusive: exactly MAX_FILES changed files is allowed;
@@ -38,15 +44,30 @@ def classify_risk(changed_files: Iterable[str], diff_text: str, *, max_files: in
     if risky_paths:
         reasons.append(f"high-risk path: {risky_paths[0]}")
 
-    risky_added_line = _high_risk_added_line(diff_text)
-    if risky_added_line:
-        reasons.append(f"high-risk diff content: {risky_added_line}")
-
     if len(files) > max_files:
         reasons.append(f"changed file count {len(files)} exceeds MAX_FILES={max_files}")
 
     if _adds_network_call(diff_text):
         reasons.append("net-new outbound network call")
+
+    # Secret scan runs LAST and only when the cheap checks left the change
+    # otherwise-mergeable: that's the only state where its result changes the
+    # decision. An already-high change escalates regardless, so spending a
+    # ggshield API call / subprocess on it would be pure cost.
+    if not reasons:
+        if secret_scanner is None:
+            from wgmesh_pipeline.secret_scan import scan_diff_for_secrets
+
+            secret_scanner = scan_diff_for_secrets
+        scan = secret_scanner(diff_text)
+        if scan.available is False:
+            risky_added_line = _high_risk_added_line(diff_text)
+            if risky_added_line:
+                reasons.append(
+                    f"high-risk diff content (keyword fallback, ggshield unavailable): {risky_added_line}"
+                )
+        elif scan.found:
+            reasons.append(f"verified secret in diff: {scan.detail}")
 
     if reasons:
         return RiskResult(tier="high", reasons=tuple(reasons))
