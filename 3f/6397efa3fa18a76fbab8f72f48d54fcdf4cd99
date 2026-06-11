@@ -1,0 +1,45 @@
+pipeline/wgmesh_pipeline/poller.py
+  s_e572593943375e::t_dbde5a0493a15f 41
+  s_e572593943375e::t_a65b627ffeb4ce 10,23
+  s_e572593943375e::t_75f7d3f354bb86 25
+pipeline/wgmesh_pipeline/main.py
+  s_e572593943375e::t_a65b627ffeb4ce 12
+pipeline/wgmesh_pipeline/github/reconcile.py
+  s_e572593943375e::t_a65b627ffeb4ce 7
+  s_e572593943375e::t_c824aed324c7ae 5,25-44,68-70,78,94-96
+pipeline/tests/test_forge_factory.py
+  s_e572593943375e::t_0cb1ab6760fc5a 1-29,33-34
+  s_e572593943375e::t_2b7e6cdcdc13f1 30-32
+pipeline/wgmesh_pipeline/forge/factory.py
+  s_e572593943375e::t_1b6025012d7e6c 1-25
+pipeline/wgmesh_pipeline/forge/gitfacts.py
+  s_e572593943375e::t_7cc6d7605aad4a 1-91
+pipeline/wgmesh_pipeline/forge/github.py
+  s_e572593943375e::t_42dae8a464f783 1-13
+pipeline/wgmesh_pipeline/config.py
+  s_e572593943375e::t_064d630b489125 42,109
+pipeline/tests/test_reconcile.py
+  s_e572593943375e::t_1d957b0e29c466 244-278
+pipeline/tests/test_gitfacts.py
+  s_e572593943375e::t_248b4d9dd8dd24 1-114
+pipeline/tests/test_poller.py
+  s_e572593943375e::t_467205cd3afc99 190,210
+pipeline/tests/test_main.py
+  s_e572593943375e::t_ccc44ef315fe69 40
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "3f6397efa3fa18a76fbab8f72f48d54fcdf4cd99",
+  "prompts": {},
+  "sessions": {
+    "s_e572593943375e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "73f3e1b0-bc7b-47d7-97f0-2bec21527939",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
