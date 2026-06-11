@@ -68,6 +68,9 @@ jobs:
                tar -C /usr/local -xzf /tmp/go.tgz && rm -f /tmp/go.tgz
              fi
              ln -sf /usr/local/go/bin/go /usr/local/bin/go
+             # GITGUARDIAN_API_KEY is optional; without it ggshield is unavailable
+             # and the gate fails closed to the existing keyword scan.
+             command -v ggshield >/dev/null || { python3 -m venv /opt/ggshield-venv && /opt/ggshield-venv/bin/pip install -q ggshield && ln -sf /opt/ggshield-venv/bin/ggshield /usr/local/bin/ggshield; }
              git config --global --add safe.directory /opt/wgmesh-pipeline
              cd /opt/wgmesh-pipeline
              git fetch origin main
