@@ -9,6 +9,7 @@ from typing import Any, Callable
 import requests
 
 from wgmesh_pipeline.config import Config
+from wgmesh_pipeline.forge.protocol import ForgeIssue
 
 
 API_ROOT = "https://api.github.com"
@@ -23,13 +24,9 @@ class SanitiseError(RuntimeError):
     pass
 
 
-@dataclass(frozen=True)
-class GitHubIssue:
-    number: int
-    title: str
-    labels: tuple[str, ...]
-    state: str
-    pull_request: dict[str, Any] | None = None
+# Backwards-compatible alias: the host-neutral dataclass lives in
+# forge/protocol.py; existing imports of GitHubIssue keep working.
+GitHubIssue = ForgeIssue
 
 
 @dataclass(frozen=True)
