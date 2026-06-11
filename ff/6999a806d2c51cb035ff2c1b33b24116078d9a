@@ -1,0 +1,38 @@
+.github/workflows/provision-pipeline-box.yml
+  s_eb299dd877501d::t_d4fe9a75fc4053 136,141,175
+  s_eb299dd877501d::t_461104d873bd0d 3-6,10,14-17,53,55,62,73,86,112,114-118,138,146,149,151,184,191,193-194,197,208-219,227-235,237,240-242,247,253,262,281
+.github/workflows/update-pipeline-box.yml
+  s_eb299dd877501d::t_417914eaa807b4 1-6
+.gitignore
+  s_68555e95a0b174::t_972794db340678 14
+pipeline/deploy/wgmesh-pipeline.service
+  s_eb299dd877501d::t_461104d873bd0d 2-3,5,9-10,12-14
+pipeline/deploy/Dockerfile
+  s_eb299dd877501d::t_8cfe4219da3ca6 1-10,13-33,39-43,45
+pipeline/deploy/env.example
+  s_eb299dd877501d::t_8cfe4219da3ca6 1-2,6,8-10,13-23,28-30,35
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "ff6999a806d2c51cb035ff2c1b33b24116078d9a",
+  "prompts": {},
+  "sessions": {
+    "s_68555e95a0b174": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5b2db709-63f0-48df-8394-4d6b66b3d9eb",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    },
+    "s_eb299dd877501d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eb588-7263-7cd0-8761-6b75b417c4db",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
