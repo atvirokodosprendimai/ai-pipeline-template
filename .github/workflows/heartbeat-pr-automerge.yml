@@ -79,13 +79,24 @@ jobs:
               ;;
           esac
 
+          # GitHub computes the PR file list asynchronously after creation;
+          # an immediate query on the `opened` event can return an empty list
+          # for a PR that does have changes. With no retrigger (heartbeat PRs
+          # never get new commits), one lost race left the PR dwelling
+          # forever (#1634). Retry before treating empty as a real violation.
           changed_files=()
-          while IFS= read -r path; do
-            [ -n "$path" ] && changed_files+=("$path")
-          done < <(gh pr view "$PR_NUMBER" --repo "$TARGET_REPO" --json files --jq '.files[].path')
+          for attempt in 1 2 3 4 5; do
+            changed_files=()
+            while IFS= read -r path; do
+              [ -n "$path" ] && changed_files+=("$path")
+            done < <(gh pr view "$PR_NUMBER" --repo "$TARGET_REPO" --json files --jq '.files[].path')
+            [ "${#changed_files[@]}" -gt 0 ] && break
+            echo "PR file list empty (attempt $attempt/5); waiting for GitHub to compute the diff"
+            sleep 10
+          done
 
           if [ "${#changed_files[@]}" -eq 0 ]; then
-            echo "::error::Heartbeat PR has no changed files"
+            echo "::error::Heartbeat PR has no changed files after 5 attempts"
             exit 1
           fi
 
