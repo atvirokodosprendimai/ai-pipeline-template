@@ -31,10 +31,20 @@ def scan_diff_for_secrets(
         log.info("ggshield not installed; using keyword fallback")
         return SecretScanResult(available=False, found=False, detail="ggshield not installed")
 
+    # Scan only ADDED content: a secret being removed (or sitting in an
+    # unchanged context line / the diff header) must not block the merge.
+    added = "\n".join(
+        line[1:]
+        for line in diff_text.splitlines()
+        if line.startswith("+") and not line.startswith("+++")
+    )
+    if not added.strip():
+        return SecretScanResult(available=True, found=False, detail="ggshield: 0 incident(s)")
+
     tmp_path: str | None = None
     try:
         with tempfile.NamedTemporaryFile("w", suffix=".diff", delete=False) as tmp:
-            tmp.write(diff_text)
+            tmp.write(added)
             tmp_path = tmp.name
 
         completed = runner(

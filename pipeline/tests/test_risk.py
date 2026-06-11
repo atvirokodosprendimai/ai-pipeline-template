@@ -1,7 +1,24 @@
 from __future__ import annotations
 
+import pytest
+
+from wgmesh_pipeline import secret_scan as secret_scan_mod
 from wgmesh_pipeline.secret_scan import SecretScanResult
 from wgmesh_pipeline.risk import classify_risk
+
+
+@pytest.fixture(autouse=True)
+def _no_real_ggshield(monkeypatch):
+    # Tests that don't inject a scanner must not spawn a real ggshield
+    # subprocess. risk.classify_risk does a call-time import from
+    # wgmesh_pipeline.secret_scan, so patch the source attribute. Default to
+    # "clean scan available"; tests exercising keyword fallback or a found
+    # secret inject their own scanner explicitly.
+    monkeypatch.setattr(
+        secret_scan_mod,
+        "scan_diff_for_secrets",
+        lambda diff_text: SecretScanResult(available=True, found=False, detail="ggshield: 0 incident(s)"),
+    )
 
 
 def test_docs_only_diff_is_low_risk() -> None:
