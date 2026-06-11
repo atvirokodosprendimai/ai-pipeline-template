@@ -1,0 +1,19 @@
+.github/workflows/observation-loop.yml
+  s_e572593943375e::t_fe83ba10e93164 728-748
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "18ce4fd28cb66b3d1373f22a77f30bc57cb8c4e0",
+  "prompts": {},
+  "sessions": {
+    "s_e572593943375e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "73f3e1b0-bc7b-47d7-97f0-2bec21527939",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
