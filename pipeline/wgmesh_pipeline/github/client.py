@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -89,6 +90,32 @@ class GitHubClient:
         if isinstance(resp, list) and resp and resp[0].get("number") is not None:
             return int(resp[0]["number"])
         return None
+
+    def has_merged_resolution_pr(self, issue_number: int) -> bool:
+        """True if a merged resolution PR (impl/spec/fix) exists for the issue.
+
+        Search-API quoted phrases are token-loose — a query for
+        "spec: Issue #510" also matches 'spec: Add ... (Issue #510)' and PRs
+        that merely mention the issue — so search is only a candidate
+        generator; titles are verified locally against the exact resolution
+        formats. One call total, not one per prefix: search counts against
+        the 30-requests/minute search budget, not the core API budget.
+        """
+        owner = self.config.owner
+        repo = self.config.repo
+        data = self._request(
+            "GET",
+            "/search/issues",
+            params={
+                "q": f'repo:{owner}/{repo} is:pr is:merged in:title "Issue #{issue_number}"',
+                "per_page": 30,
+            },
+        )
+        pattern = re.compile(
+            rf"^(?:impl|spec|fix): (?:Issue #{issue_number}(?!\d)|.*\(Issue #{issue_number}\)\s*$)"
+        )
+        items = data.get("items") or []
+        return any(pattern.match(str(item.get("title", ""))) for item in items)
 
     def get_diff(self, pr_number: int) -> str:
         return self._request(
