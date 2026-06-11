@@ -1,25 +1,22 @@
 # Assessment: 2026-06-11
 
-**Stage**: Revenue | **Run**: 245
+**Stage**: Revenue | **Run**: 246
 
-Stage 5, day 85. Company maintains revenue with 5 active subscribers and recent paid orders, but critical attribution gap persists: seed cloudroof products still show 0 subscribers while revenue comes from separate product line. Pipeline is busy with 7 open PRs and 1 fn:dev issue, but CI failure (#652) blocking merge pipeline needs immediate attention. Focus remains on bridging successful revenue model to wgmesh/cloudroof product line.
+Stage 5, day 85. Company has paying customers (5 subscribers, recent orders) but seed product attribution is misconfigured - orders flow to all_org instead of seed_product_bucket. Pipeline bottlenecked by CI failures blocking 7 PRs. Product remains fully functional (v0.2.1, 19 stars) with comprehensive mesh networking architecture already implemented.
 
 ## Blockers
-- CI failure blocking merge pipeline and development velocity
-- Revenue attribution mismatch - cloudroof seed products have 0 subscribers despite functional billing integration
-- No customer acquisition bridge between successful revenue product and wgmesh/cloudroof offerings
+- CI failures blocking merge pipeline for 7 PRs
+- Polar.sh product attribution misconfigured - paid orders not credited to seed product tracking
 
 ## Top Actions
-- **fn:dev**: Investigate and fix CI failure blocking merge pipeline (zero)
-- **fn:gtm**: Create wgmesh production deployment case study with concrete reliability metrics and cost analysis (zero)
-- **fn:gtm**: Add clear Polar checkout CTAs to cloudroof.eu landing page (zero)
+- **fn:ops**: Fix CI pipeline failures to unblock 7 stalled PRs (zero)
+- **fn:billing**: Fix Polar.sh product configuration to properly attribute cloudroof orders to seed product bucket (zero)
+- **fn:gtm**: Create comprehensive case study of internal wgmesh usage with concrete metrics (zero)
 
 ## Contributions
-- **Marty**: Git commits maintaining codebase stability over past 7 days
-- **Copilot**: Recent git commits contributing to development pipeline
-- **pupabobas[bot]**: 100 bot commits in past 7 days maintaining CI/CD pipeline operations
-- **github-community**: Project growth to 19 stars and 2 forks showing sustained organic interest
-- **polar-customers**: 5 active subscribers with recent paid orders maintaining revenue stream
+- **Copilot**: Spec generation for multiple issues despite CI bottleneck
+- **Marty**: Recent git commits maintaining codebase
+- **pupabobas[bot]**: 100 bot commits in past 7 days maintaining pipeline operations
 
 ## Needs Human
-- [soon] Clarify business relationship between revenue-generating product (8e8e1c33-cd06-4652-9032-6cb3b49ec6b4) and wgmesh/cloudroof seed products
+- [soon] Fix Polar.sh organization configuration to properly track cloudroof product revenue in seed_product_bucket
