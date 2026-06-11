@@ -1,23 +1,25 @@
 # Assessment: 2026-06-11
 
-**Stage**: Revenue | **Run**: 244
+**Stage**: Revenue | **Run**: 245
 
-Stage 5, day 85. Revenue is confirmed active with 5 subscribers generating emerging-tier MRR (€4+) and recent paid orders. Pipeline is extremely healthy: 15 PRs merged in 7 days, 13 open PRs progressing normally, only 2 fn:dev issues active. Product remains stable at v0.2.1 with 19 stars. The bottleneck has shifted from product functionality to revenue optimization and customer expansion.
+Stage 5, day 85. Company maintains revenue with 5 active subscribers and recent paid orders, but critical attribution gap persists: seed cloudroof products still show 0 subscribers while revenue comes from separate product line. Pipeline is busy with 7 open PRs and 1 fn:dev issue, but CI failure (#652) blocking merge pipeline needs immediate attention. Focus remains on bridging successful revenue model to wgmesh/cloudroof product line.
 
 ## Blockers
-- Low MRR (€4) from 5 subscribers indicates significant pricing model optimization needed
-- No documented customer success strategy to expand from current subscriber base
+- CI failure blocking merge pipeline and development velocity
+- Revenue attribution mismatch - cloudroof seed products have 0 subscribers despite functional billing integration
+- No customer acquisition bridge between successful revenue product and wgmesh/cloudroof offerings
 
 ## Top Actions
-- **fn:gtm**: Analyze current subscriber payment patterns and create pricing optimization strategy document with upselling recommendations (zero)
-- **fn:gtm**: Document comprehensive customer retention playbook based on current subscriber behavior patterns (zero)
-- **fn:dev**: Create revenue attribution analysis distinguishing cloudroof/wgmesh performance vs other org products (zero)
+- **fn:dev**: Investigate and fix CI failure blocking merge pipeline (zero)
+- **fn:gtm**: Create wgmesh production deployment case study with concrete reliability metrics and cost analysis (zero)
+- **fn:gtm**: Add clear Polar checkout CTAs to cloudroof.eu landing page (zero)
 
 ## Contributions
-- **polar-customers**: 5 active subscribers maintaining €4+ MRR with paid orders on June 10-09, demonstrating sustained revenue generation
-- **Marty**: Git commits maintaining project stability and product development
-- **pupabobas[bot]**: 98 bot commits in past 7 days maintaining pipeline automation and high development velocity
-- **Copilot**: Recent spec writing and development work maintaining pipeline flow
+- **Marty**: Git commits maintaining codebase stability over past 7 days
+- **Copilot**: Recent git commits contributing to development pipeline
+- **pupabobas[bot]**: 100 bot commits in past 7 days maintaining CI/CD pipeline operations
+- **github-community**: Project growth to 19 stars and 2 forks showing sustained organic interest
+- **polar-customers**: 5 active subscribers with recent paid orders maintaining revenue stream
 
 ## Needs Human
-_Nothing this cycle._
+- [soon] Clarify business relationship between revenue-generating product (8e8e1c33-cd06-4652-9032-6cb3b49ec6b4) and wgmesh/cloudroof seed products
