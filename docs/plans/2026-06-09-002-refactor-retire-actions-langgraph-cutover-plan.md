@@ -200,7 +200,7 @@ flowchart TB
 - **Requirements:** R5
 - **Dependencies:** U2
 - **Files:** `pipeline/wgmesh_pipeline/` (Polar synthetic module + tests), `.github/workflows/{checkout-monitor,polar-discovery}.yml` (disable)
-- **Approach:** Move the Polar sandbox synthetic + product discovery onto the box. **Reconcile with the #1589 funnel-instrumentation work — don't duplicate the synthetic transaction:** `docs/plans/2026-06-09-001-feat-customer-funnel-instrumentation-plan.md` already owns a Polar sandbox synthetic, so share one implementation.
+- **Approach:** Move the Polar sandbox synthetic + product discovery onto the box. **Reconcile with the #1589 funnel-instrumentation work — don't duplicate the synthetic transaction:** `specs/issue-1589-spec.md` (#1589, spec merged via #1590) already owns a Polar sandbox synthetic, so share one implementation.
 - **Test scenarios:** Covers R5. The synthetic fires on the box and reports the same result as `checkout-monitor`. No duplicate synthetic vs the funnel work.
 - **Verification:** Polar synthetics run on the box; the two workflows are disabled.
 

@@ -1,6 +1,6 @@
 ---
 date: 2026-06-09
-topic: actions-to-langchain-migration
+topic: actions-to-langgraph-migration
 ---
 
 # Retire GitHub Actions — LangGraph Box Owns the Whole Loop
@@ -21,7 +21,7 @@ The replacement already exists: `pipeline/wgmesh_pipeline` is a LangGraph servic
 
 ## Key Decisions
 
-- **Total cutover, with two deliberate exceptions.** The box absorbs every orchestration job — Observation Loop, Self-Heal, Supervisor-Rank, Strategy-Audit, Pulse, and PR CI for bot PRs all move onto the box. Two things stay off it: a single retained Actions workflow that CI's untrusted external-contributor PRs in GitHub's sandbox (so their code never runs on the secret-bearing box), and the off-box dead-man's-switch below. Maximal autonomy, accepting that the box's blast radius becomes total.
+- **Total cutover, with two deliberate exceptions.** The box absorbs every orchestration job — Observation Loop, Self-Heal, Supervisor-Rank, Strategy-Audit, Pulse, and PR CI for bot PRs all move onto the box. Two things stay off it: a single retained Actions workflow that runs CI for untrusted external-contributor PRs in GitHub's sandbox (so their code never runs on the secret-bearing box), and the off-box dead-man's-switch below. Maximal autonomy, accepting that the box's blast radius becomes total.
 - **This is a cutover, not a rebuild.** The convergence graph, the R5 risk-tier merge gate, the single-PAT identity (KTD3), and the high-risk regexes (KTD4) are inherited from the 2026-06-07 plan and not re-decided here. The `needs-human` ceiling that correctly stopped #1589's payment spec carries over unchanged.
 - **Off-box, non-Actions dead-man's-switch.** Box-liveness detection lives on a separate cheap external surface (uptime monitor / second tiny host / serverless ping) — the single external dependency, deliberately *not* on GitHub and *not* on the box. The watcher can't be the watched.
 - **Fast reproducible box-rebuild is in scope, not a follow-up.** Total scope makes box death a total outage; the watcher only detects it, so recovery must be a one-command re-provision with state surviving off-box.
@@ -97,7 +97,7 @@ The replacement already exists: `pipeline/wgmesh_pipeline` is a LangGraph servic
 ## Outstanding Questions
 
 **Resolve before planning**
-- None. The external/untrusted-PR-CI security boundary is resolved: a single retained Actions workflow CI's external PRs in GitHub's sandbox, never on the box (R6).
+- None. The external/untrusted-PR-CI security boundary is resolved: a single retained Actions workflow runs CI for external PRs in GitHub's sandbox, never on the box (R6).
 
 **Deferred to planning**
 - Which off-box monitor surface (uptime SaaS free tier vs second tiny host vs serverless ping).
