@@ -64,20 +64,32 @@ jobs:
 
           docker pull "${IMAGE}:${SHA}"
 
-          previous_sha=$(cat /etc/wgmesh-pipeline/deployed_sha)
+          # First containerized deploy has no prior SHA — empty means "no
+          # rollback target", not a hard failure.
+          previous_sha=$(cat /etc/wgmesh-pipeline/deployed_sha 2>/dev/null || echo "")
           echo "${SHA}" > /etc/wgmesh-pipeline/deployed_sha
+          # Record the exact image ref for run-container.sh so the unit and
+          # the deploy workflow can never diverge on owner/name.
+          echo "${IMAGE}:${SHA}" > /etc/wgmesh-pipeline/image_ref
 
+          # Health window starts AT the restart — "1 minute ago" could match
+          # a tick from the pre-restart process.
+          restart_ts=$(date "+%Y-%m-%d %H:%M:%S")
           if systemctl restart wgmesh-pipeline \
             && sleep 10 \
             && systemctl is-active wgmesh-pipeline \
-            && journalctl -u wgmesh-pipeline --since "1 minute ago" --no-pager | grep -q "tick"; then
+            && journalctl -u wgmesh-pipeline --since "$restart_ts" --no-pager | grep -q "tick"; then
             echo "Deploy healthy: ${previous_sha} -> ${SHA}"
             exit 0
           fi
 
-          echo "${previous_sha}" > /etc/wgmesh-pipeline/deployed_sha
-          systemctl restart wgmesh-pipeline
-          echo "ROLLBACK complete"
+          if [ -n "${previous_sha}" ]; then
+            echo "${previous_sha}" > /etc/wgmesh-pipeline/deployed_sha
+            systemctl restart wgmesh-pipeline
+            echo "ROLLBACK complete to ${previous_sha}"
+          else
+            echo "ROLLBACK impossible: no previous SHA recorded (first deploy)"
+          fi
           exit 1
           REMOTE
 

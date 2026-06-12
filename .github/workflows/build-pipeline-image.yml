@@ -50,7 +50,9 @@ jobs:
         run: docker run --rm "$IMAGE_NAME:test" python -m pytest pipeline/tests/ -q
 
       - name: Run eval gate inside image
-        run: docker run --rm "$IMAGE_NAME:test" python -m evals.run_evals --check
+        # evals/ is repo-level code, not in the installed package — needs
+        # PYTHONPATH inside the container (mirrors release.yml + ci.yml).
+        run: docker run --rm -e PYTHONPATH=/app/pipeline "$IMAGE_NAME:test" python -m evals.run_evals --check
 
       - name: Push image
         uses: docker/build-push-action@v6
