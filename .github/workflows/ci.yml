@@ -60,22 +60,21 @@ jobs:
         shell: bash
         run: bash scripts/lint/check-llm-emit-sanitise.sh
 
-  # gh-free-gate — placeholder, enabled by U8 (SDLC runbook + gh-free
-  # verification sweep). Fails CI if `gh ` (GitHub CLI) appears in the box's
-  # runtime code, keeping the SDLC path host-agnostic. Do NOT enable before
-  # U3 lands (current tree still carries gh-coupled code being migrated).
-  #
-  # gh-free-gate:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout
-  #       uses: actions/checkout@v4
-  #
-  #     - name: Fail if gh CLI appears in pipeline runtime code
-  #       run: |
-  #         set -euo pipefail
-  #         if grep -rnE '(^|[^[:alnum:]_."'"'"'])gh ' pipeline/wgmesh_pipeline/ --include='*.py'; then
-  #           echo "::error::gh CLI usage found in pipeline runtime code — SDLC must stay forge-agnostic (U8 wall)."
-  #           exit 1
-  #         fi
-  #         echo "No gh CLI usage in pipeline runtime code. PASS."
+  # gh-free-gate (U8): the wall keeping the box's SDLC path host-agnostic.
+  # Catches both shell form (`gh pr ...`) and subprocess list form
+  # (["gh", ...]). Verified to bite on an injected probe before enabling.
+  gh-free-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fail if gh CLI appears in pipeline runtime code
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -rnE '(^|[^[:alnum:]_.])gh([[:space:]]|["'"'"'])' pipeline/wgmesh_pipeline/ --include='*.py'; then
+            echo "::error::gh CLI usage found in pipeline runtime code — SDLC must stay forge-agnostic (U8 wall)."
+            exit 1
+          fi
+          echo "No gh CLI usage in pipeline runtime code. PASS."
