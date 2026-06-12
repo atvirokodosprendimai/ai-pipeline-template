@@ -25,7 +25,7 @@ GitHub reads or writes (the label snapshot for close-vetting arrives in
 
 Sanitise gate (caller-side, workflow parity): every ``ObservationAction``
 title/body/comment MUST pass ``company/scripts/sanitise.sh`` before the
-executor publishes it — the workflow gates every ``gh issue create`` on it
+executor publishes it — the workflow gates every issue-create call on it
 and SKIPS the item when sanitisation fails. Emission, and therefore the
 gate, is the caller's wall; this module only plans.
 
@@ -155,7 +155,7 @@ def build_dedup_corpus(inputs: ObservationInputs) -> list[str]:
 def build_open_board(
     primary_issues: Sequence[Mapping[str, Any]] | None,
     primary_prs: Sequence[Mapping[str, Any]] | None,
-    secondary_issues: Mapping[str, Sequence[Mapping[str, Any]]] = {},
+    secondary_issues: Mapping[str, Sequence[Mapping[str, Any]]] | None = None,
 ) -> str:
     """The /tmp/open_board.txt text fed to the LLM. ``None`` for a primary
     list mirrors a failed fetch (the workflow prints a failure marker rather
@@ -176,7 +176,7 @@ def build_open_board(
             author = pr.get("author")
             login = author.get("login") if isinstance(author, Mapping) else author
             lines.append(f"- PR #{pr['number']} {pr['title']} (by {login})")
-    for name, issues in secondary_issues.items():
+    for name, issues in (secondary_issues or {}).items():
         if not issues:
             continue
         lines += ["", f"## Open Issues ({name})", ""]
@@ -203,7 +203,7 @@ def vet_issue_close(item: Mapping[str, Any],
                     issue_labels: Mapping[int, Sequence[str] | None],
                     ) -> tuple[ObservationAction | None, ObservationSkip | None]:
     """The #1665 close-guard chain, in workflow order. A malformed/missing
-    number lands in the fail-closed branch too: the workflow's ``gh issue
+    number lands in the fail-closed branch too: the workflow's issue-view call (``gh-issue
     view "null"`` fails the label fetch, which refuses the close."""
     reason = str(item.get("reason") or "")
     try:
@@ -277,8 +277,8 @@ def plan_actions(assessment: Mapping[str, Any], inputs: ObservationInputs) -> Ob
         if not request:
             raise ValueError(f"needs_human entry without a request: {req!r}")
         full_title = f"[{NEEDS_HUMAN_LABEL}] {request}"
-        body = (f"**Urgency**: {req.get('urgency')}\n\n"
-                f"**Reason**: {req.get('reason')}\n\n_Created by observation loop._")
+        body = (f"**Urgency**: {req.get('urgency') or 'unspecified'}\n\n"
+                f"**Reason**: {req.get('reason') or 'unspecified'}\n\n_Created by observation loop._")
         action, skip = _vet_create(
             req, corpus, kind="create_needs_human", title=full_title, body=body,
             labels=(NEEDS_HUMAN_LABEL,),
@@ -290,10 +290,22 @@ def plan_actions(assessment: Mapping[str, Any], inputs: ObservationInputs) -> Ob
 
     for item in assessment.get("prs_to_close") or []:
         # Workflow parity: PR closes carry no guards and no close reason —
-        # just the comment. Repo arrives as the short name.
+        # just the comment. Repo arrives as the short name. The entry shape
+        # is LLM-produced, so malformed entries become fail-closed skips,
+        # never exceptions (the #1665 posture).
         reason = str(item.get("reason") or "")
+        repo_name = item.get("repo")
+        try:
+            number = int(item.get("number"))
+        except (TypeError, ValueError):
+            number = None
+        if not repo_name or number is None:
+            skips.append(ObservationSkip(
+                kind="close_pr", number=number,
+                message=f"SKIP close PR: malformed entry (repo={repo_name!r}) — refusing to act blind"))
+            continue
         actions.append(ObservationAction(
-            kind="close_pr", repo=f"{ORG}/{item['repo']}", number=int(item["number"]),
+            kind="close_pr", repo=f"{ORG}/{repo_name}", number=number,
             comment=f"Closed by observation loop: {reason}", reason=reason))
 
     return ObservationPlan(actions=tuple(actions), skips=tuple(skips))
