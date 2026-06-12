@@ -40,6 +40,14 @@ class _Session:
         # create_pr returns a PR number; everything else returns ok
         if url.endswith("/pulls"):
             return _Response({"number": 4242})
+        # Distinct-principal merge-gate readiness reads (stub the HTTP
+        # boundary; the gate itself stays in the tested path):
+        if "/check-runs" in url:
+            return _Response({"check_runs": [{"status": "completed", "conclusion": "success"}]})
+        if method == "GET" and url.endswith("/reviews"):
+            return _Response([{"user": {"login": "reviewer-bot"}, "state": "APPROVED"}])
+        if method == "GET" and "/pulls/" in url:
+            return _Response({"number": 4242, "user": {"login": "author-bot"}, "head": {"sha": "abc"}})
         return _Response({"ok": True})
 
 
@@ -149,12 +157,10 @@ def test_live_high_risk_issue_escalates_no_merge(tmp_path) -> None:
 
 class _MergeFailSession(_Session):
     def request(self, method, url, **kwargs):
-        self.calls.append({"method": method, "url": url, "kwargs": kwargs})
-        if url.endswith("/pulls"):
-            return _Response({"number": 4242})
         if url.endswith("/merge"):
+            self.calls.append({"method": method, "url": url, "kwargs": kwargs})
             raise RuntimeError("502 from GitHub merge endpoint")
-        return _Response({"ok": True})
+        return super().request(method, url, **kwargs)
 
 
 def test_live_merge_failure_leaves_issue_retriable_not_phantom_merged(tmp_path) -> None:
