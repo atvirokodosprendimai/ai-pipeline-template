@@ -69,7 +69,16 @@ def run_box_ci(
     sanitise = sanitiser if sanitiser is not None else _run_sanitise
     failures: list[str] = []
 
-    pr = client.get_pr(pr_number)
+    # Fail closed on the very first read too: a forge outage is a red
+    # verdict, never an exception stranding the gate mid-merge.
+    try:
+        pr = client.get_pr(pr_number)
+    except Exception:
+        log.exception("box ci: could not fetch PR #%s", pr_number)
+        return BoxCiResult(
+            green=False,
+            failures=(f"box ci: could not fetch PR #{pr_number} (see box logs)",),
+        )
     branch = str(((pr.get("head") or {}).get("ref")) or "")
     head_sha = str(((pr.get("head") or {}).get("sha")) or "")
     base_sha = str(((pr.get("base") or {}).get("sha")) or "")
@@ -85,8 +94,8 @@ def run_box_ci(
     try:
         verification = verifier(repo_path, branch)
     except Exception as exc:
-        log.warning("box ci: verification could not run for PR #%s: %s", pr_number, exc)
-        verification = {"tests_passed": False, "reason": f"verification could not run: {exc}"}
+        log.exception("box ci: verification could not run for PR #%s: %s", pr_number, exc)
+        verification = {"tests_passed": False, "reason": "verification could not run (see box logs)"}
     if not verification.get("tests_passed", False):
         reason = verification.get("reason") or verification.get("failed_step") or "tests failed"
         failures.append(f"box ci: verification failed ({reason})")
@@ -94,8 +103,8 @@ def run_box_ci(
     try:
         diff = client.get_diff(pr_number)
     except Exception as exc:
-        log.warning("box ci: could not fetch diff for PR #%s: %s", pr_number, exc)
-        failures.append(f"box ci: could not fetch PR diff ({exc})")
+        log.exception("box ci: could not fetch diff for PR #%s: %s", pr_number, exc)
+        failures.append("box ci: could not fetch PR diff (see box logs)")
     else:
         if not sanitise(diff):
             failures.append("box ci: sanitise failed")
@@ -103,8 +112,8 @@ def run_box_ci(
     try:
         pii = pii_path_violations(repo_path, base_sha, head_sha, runner=runner)
     except Exception as exc:
-        log.warning("box ci: pii check could not run for PR #%s: %s", pr_number, exc)
-        pii = (f"pii check could not run: {exc}",)
+        log.exception("box ci: pii check could not run for PR #%s: %s", pr_number, exc)
+        pii = ("pii check could not run (see box logs)",)
     failures.extend(f"box ci: pii violation: {violation}" for violation in pii)
 
     if failures:

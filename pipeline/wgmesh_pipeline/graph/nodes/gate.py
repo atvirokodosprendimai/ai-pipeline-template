@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
+from wgmesh_pipeline.forge.box_ci import BoxCiResult
 from wgmesh_pipeline.forge.merge_gate import ensure_mergeable
 from wgmesh_pipeline.graph.state import Decision, GraphState
 from wgmesh_pipeline.risk import classify_risk
@@ -88,7 +89,17 @@ def apply_gate_side_effects(state: GraphState) -> None:
             # Cutover U9: when a box-CI runner is wired, the box's own verdict
             # IS the CI signal — the host's Actions check-runs are not polled.
             box_ci = state.get("box_ci")
-            ci_verdict = box_ci(client, int(impl_pr)) if box_ci is not None else None
+            ci_verdict = None
+            if box_ci is not None:
+                try:
+                    ci_verdict = box_ci(client, int(impl_pr))
+                except Exception:
+                    # A crashing runner is a red verdict (fail closed), never
+                    # an exception that strands the issue mid-merge.
+                    log.exception("gate: box CI runner crashed for PR #%s", impl_pr)
+                    ci_verdict = BoxCiResult(
+                        green=False, failures=("box ci: runner crashed (see box logs)",)
+                    )
             readiness = ensure_mergeable(client, int(impl_pr), ci_verdict=ci_verdict)
             if not readiness.ready:
                 log.warning(
