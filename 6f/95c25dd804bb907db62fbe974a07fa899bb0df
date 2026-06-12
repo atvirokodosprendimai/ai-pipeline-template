@@ -1,0 +1,21 @@
+pipeline/tests/test_strategy_audit.py
+  s_e572593943375e::t_73f7846a744913 40-42
+pipeline/tests/fixtures/strategy_audit_baseline.json
+  s_e572593943375e::t_73f7846a744913 1-345
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "6f95c25dd804bb907db62fbe974a07fa899bb0df",
+  "prompts": {},
+  "sessions": {
+    "s_e572593943375e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "73f3e1b0-bc7b-47d7-97f0-2bec21527939",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
