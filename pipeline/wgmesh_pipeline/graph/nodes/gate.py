@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
+from wgmesh_pipeline.forge.merge_gate import ensure_mergeable
 from wgmesh_pipeline.graph.state import Decision, GraphState
 from wgmesh_pipeline.risk import classify_risk
+
+log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -77,6 +81,21 @@ def apply_gate_side_effects(state: GraphState) -> None:
         impl_pr = state.get("impl_pr")
         if impl_pr is None:
             raise RuntimeError("cannot merge implementation without impl_pr")
+        # Distinct-principal merge gate: CI green + approval by a non-author.
+        # Shadow mode skips the live readiness reads — the merge itself is
+        # only a dry-run record there.
+        if getattr(getattr(client, "config", None), "mode", None) != "shadow":
+            readiness = ensure_mergeable(client, int(impl_pr))
+            if not readiness.ready:
+                log.warning(
+                    "gate: PR #%s not mergeable (%s); escalating instead of merging",
+                    impl_pr,
+                    "; ".join(readiness.reasons),
+                )
+                state["decision"] = "escalate"
+                state["risk_reasons"] = list(state.get("risk_reasons", [])) + list(readiness.reasons)
+                client.add_label(state["issue"].number, "needs-human")
+                return
         client.merge_pr(int(impl_pr), commit_title=f"Merge issue #{state['issue'].number}")
     else:
         client.add_label(state["issue"].number, "needs-human")

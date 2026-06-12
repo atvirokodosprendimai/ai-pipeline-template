@@ -315,3 +315,28 @@ def test_has_merged_resolution_pr_rejects_alphanumeric_continuation(cfg: Config)
     session = Session(_search_response("impl: Issue #540A - other work"))
 
     assert GitHubClient(cfg, session=session).has_merged_resolution_pr(540) is False
+
+
+def test_list_needs_triage_filters_out_pull_requests(cfg: Config) -> None:
+    """Same bug-#11 guard as list_open_issues: a needs-triage-labeled PR must
+    not re-enter triage as an issue. Truthiness check — Gitea-shaped payloads
+    carry "pull_request": null for plain issues."""
+    session = Session(
+        Response(
+            [
+                {"number": 10, "title": "Real issue", "labels": [], "state": "open"},
+                {"number": 11, "title": "Null pr key", "labels": [], "state": "open", "pull_request": None},
+                {
+                    "number": 667,
+                    "title": "spec: Issue #652 - ...",
+                    "labels": [],
+                    "state": "open",
+                    "pull_request": {"url": "https://api.github.com/.../pulls/667"},
+                },
+            ]
+        )
+    )
+
+    issues = GitHubClient(cfg, session=session).list_needs_triage()
+
+    assert [i.number for i in issues] == [10, 11]

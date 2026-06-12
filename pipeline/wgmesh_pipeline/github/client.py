@@ -9,6 +9,7 @@ from typing import Any, Callable
 import requests
 
 from wgmesh_pipeline.config import Config
+from wgmesh_pipeline.forge.protocol import ForgeIssue
 
 
 API_ROOT = "https://api.github.com"
@@ -23,13 +24,9 @@ class SanitiseError(RuntimeError):
     pass
 
 
-@dataclass(frozen=True)
-class GitHubIssue:
-    number: int
-    title: str
-    labels: tuple[str, ...]
-    state: str
-    pull_request: dict[str, Any] | None = None
+# Backwards-compatible alias: the host-neutral dataclass lives in
+# forge/protocol.py; existing imports of GitHubIssue keep working.
+GitHubIssue = ForgeIssue
 
 
 @dataclass(frozen=True)
@@ -61,7 +58,10 @@ class GitHubClient:
             f"/repos/{self.config.owner}/{self.config.repo}/issues",
             params={"state": "open", "labels": "needs-triage"},
         )
-        return [_parse_issue(item) for item in data]
+        # Same PR filter as list_open_issues (bug #11): a labeled PR returned
+        # by the issues endpoint must not re-enter triage as an issue.
+        # Truthiness, not key presence — Gitea sends "pull_request": null.
+        return [_parse_issue(item) for item in data if not item.get("pull_request")]
 
     def list_open_issues(self) -> list[GitHubIssue]:
         data = self._request(
@@ -111,10 +111,10 @@ class GitHubClient:
                 "per_page": 30,
             },
         )
-        pattern = re.compile(
-            rf"^(?:impl|spec|fix): (?:Issue #{issue_number}(?!\w)|.*\(Issue #{issue_number}\)\s*$)"
-        )
+        from wgmesh_pipeline.forge.gitfacts import resolution_pattern
+
         items = data.get("items") or []
+        pattern = resolution_pattern(issue_number)
         return any(pattern.match(str(item.get("title", ""))) for item in items)
 
     def get_diff(self, pr_number: int) -> str:
@@ -184,6 +184,66 @@ class GitHubClient:
             payload={"commit_title": commit_title} if commit_title else {},
         )
 
+    def pr_checks_green(self, pr_number: int) -> bool:
+        """All check runs on the PR head completed successfully. No checks at
+        all counts as NOT green — fail closed."""
+        pr = self.get_pr(pr_number)
+        sha = (pr.get("head") or {}).get("sha")
+        if not sha:
+            return False
+        data = self._request(
+            "GET",
+            f"/repos/{self.config.owner}/{self.config.repo}/commits/{sha}/check-runs",
+            params={"per_page": 100},
+        )
+        runs = data.get("check_runs") or []
+        if not runs:
+            return False
+        ok = {"success", "neutral", "skipped"}
+        return all(
+            run.get("status") == "completed" and run.get("conclusion") in ok for run in runs
+        )
+
+    def list_pr_approvals(self, pr_number: int) -> list[str]:
+        """Logins whose LATEST review on the PR is an approval."""
+        reviews = self._request(
+            "GET",
+            f"/repos/{self.config.owner}/{self.config.repo}/pulls/{pr_number}/reviews",
+            params={"per_page": 100},
+        )
+        latest: dict[str, str] = {}
+        for review in reviews or []:
+            login = str(((review.get("user") or {}).get("login")) or "")
+            state = str(review.get("state") or "")
+            if login and state in {"APPROVED", "CHANGES_REQUESTED", "DISMISSED"}:
+                latest[login] = state
+        return [login for login, state in latest.items() if state == "APPROVED"]
+
+    def can_review(self) -> bool:
+        return bool(self.config.reviewer_pat)
+
+    def approve_pr(self, pr_number: int) -> Any:
+        """Approve as the REVIEWER identity — a distinct principal from the
+        author bot. Approving with the author credential 422s on GitHub
+        ('Can not approve your own pull request') and would defeat the
+        distinct-principal gate anyway."""
+        if not self.config.reviewer_pat:
+            raise RuntimeError("approve_pr requires WGMESH_REVIEWER_PAT (reviewer identity)")
+        if self.config.mode == "shadow":
+            result = DryRunResult(
+                dry_run=True, operation="approve_pr", payload={"pr": pr_number, "event": "APPROVE"}
+            )
+            self.dry_run_records.append(result)
+            return result
+        if self.config.mode == "spec-only":
+            raise PermissionError("approve_pr is not allowed when PIPELINE_MODE=spec-only")
+        return self._request(
+            "POST",
+            f"/repos/{self.config.owner}/{self.config.repo}/pulls/{pr_number}/reviews",
+            json={"event": "APPROVE"},
+            headers={"Authorization": f"Bearer {self.config.reviewer_pat}"},
+        )
+
     def push_branch(self, clone_path: str, branch: str, *, spec_pr: bool = False) -> Any:
         is_spec_branch = spec_pr or branch.startswith("bot/spec-")
         is_force_updated_bot_branch = is_spec_branch or branch.startswith("bot/impl-")
@@ -246,7 +306,7 @@ class GitHubClient:
         headers = dict(kwargs.pop("headers", {}) or {})
         headers.setdefault("Accept", "application/vnd.github+json")
         if self.config.wgmesh_bot_pat:
-            headers["Authorization"] = f"Bearer {self.config.wgmesh_bot_pat}"
+            headers.setdefault("Authorization", f"Bearer {self.config.wgmesh_bot_pat}")
         kwargs.setdefault("timeout", HTTP_TIMEOUT_SECONDS)
         try:
             response = self.session.request(method, f"{self.api_root}{path}", headers=headers, **kwargs)

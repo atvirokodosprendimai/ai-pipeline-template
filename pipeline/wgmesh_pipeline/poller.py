@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from wgmesh_pipeline.config import Config
-from wgmesh_pipeline.github.client import GitHubClient, GitHubIssue
+from wgmesh_pipeline.forge.protocol import Forge, ForgeIssue as GitHubIssue
 from wgmesh_pipeline.github.reconcile import reconcile_issues
 from wgmesh_pipeline.graph.nodes.gate import apply_gate_side_effects, gate_node
 from wgmesh_pipeline.scoring import score_run
@@ -20,8 +20,9 @@ log = logging.getLogger("wgmesh_pipeline.poller")
 class Poller:
     config: Config
     store: StateStore
-    client: GitHubClient
+    client: Forge
     graph: object
+    resolution_lookup: object | None = None
     goose_runner: object | None = None
     scratch: dict[int, dict] = field(default_factory=dict)
     last_reconcile_error: str | None = None
@@ -37,7 +38,7 @@ class Poller:
 
     async def tick(self) -> IssueRecord | None:
         try:
-            result = reconcile_issues(self.client, self.store)
+            result = reconcile_issues(self.client, self.store, resolution_lookup=self.resolution_lookup)
             claim_stages = ACTIONABLE_STAGES
             if self.config.mode != "spec-only":
                 claim_stages = ACTIONABLE_STAGES + ("spec_opened",)
@@ -154,8 +155,6 @@ class Poller:
 
         if issue.stage == "reviewed":
             result = gate_node(state, max_files=self.config.max_files, apply_side_effects=False)
-            self.scratch[issue.number] = dict(result)
-            outcome = "merged" if result["decision"] == "merge" else "escalated"
             # Side-effect BEFORE the terminal transition: if the merge/label
             # network call fails it raises here, the issue stays at 'reviewed'
             # (retried next tick, terminal-failed after max attempts), and we
@@ -166,6 +165,14 @@ class Poller:
             # retry; merge_pr should tolerate an already-merged PR at the API
             # layer to make that fully idempotent.
             apply_gate_side_effects(result)
+            # Scratch + outcome AFTER side effects: the distinct-principal merge
+            # gate can
+            # flip the decision merge -> escalate at side-effect time (red CI,
+            # no distinct approval). Reading decision or scratch before the
+            # flip recorded a terminal 'merged' state inconsistent with the PR —
+            # the false-completion class this pipeline exists to prevent.
+            self.scratch[issue.number] = dict(result)
+            outcome = "merged" if result["decision"] == "merge" else "escalated"
             advanced = self.store.transition(issue.number, "reviewed", outcome)
             score_run(result, outcome=outcome)
             return advanced

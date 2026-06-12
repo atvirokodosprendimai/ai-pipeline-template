@@ -9,7 +9,8 @@ import sys
 from pathlib import Path
 
 from wgmesh_pipeline.config import load_config
-from wgmesh_pipeline.github.client import GitHubClient
+from wgmesh_pipeline.forge.factory import make_forge
+from wgmesh_pipeline.forge.gitfacts import make_resolution_lookup
 from wgmesh_pipeline.goose.runner import GooseRunner
 from wgmesh_pipeline.graph.build import build_graph
 from wgmesh_pipeline.poller import Poller
@@ -46,10 +47,12 @@ async def async_main(*, reset_queue: bool = False) -> None:
             f"[pipeline] reset_queue cleared issues={cleared['issues']} runs={cleared['runs']}",
             file=sys.stderr,
         )
+    client = make_forge(config)
     poller = Poller(
         config=config,
         store=store,
-        client=GitHubClient(config),
+        client=client,
+        resolution_lookup=make_resolution_lookup(config.repo_path, client),
         graph=build_graph(config),
         goose_runner=GooseRunner(config),
     )

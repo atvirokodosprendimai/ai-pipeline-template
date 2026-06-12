@@ -1,0 +1,90 @@
+name: Release
+
+# U5 of the forge-portable SDLC plan (docs/plans/2026-06-11-003): release is
+# tag-driven. The box (or an operator) cuts a release with plain
+# `git tag vX.Y.Z && git push origin vX.Y.Z` — a normal developer action —
+# and this workflow builds and pushes the pipeline container image tagged
+# with the git tag + latest.
+#
+# Replaces the branch-triggered build-pipeline-image.yml (which is NOT
+# deleted here; retirement is sequenced by the workflow disposition map,
+# U6 / #1599). Registry coordinates are reused from that workflow.
+#
+# Syntax stays in the portable subset (docs/ci-portability.md):
+# docker/login-action and docker/build-push-action work on Gitea/Forgejo
+# Actions. The GitHub-only `type=gha` build cache from the legacy workflow
+# is intentionally dropped for portability.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve image name and release tag
+        env:
+          # Bind contexts to env vars — interpolating ${{ }} directly into a
+          # run block is the classic Actions script-injection shape (a tag
+          # name is attacker-influenced input on forks).
+          REPO_OWNER: ${{ github.repository_owner }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          OWNER_LC=$(echo "$REPO_OWNER" | tr '[:upper:]' '[:lower:]')
+          # Git tags allow characters Docker tags reject (e.g. '/'); validate
+          # rather than push a mangled or failing reference.
+          if ! echo "$REF_NAME" | grep -Eq '^v[A-Za-z0-9._-]+$'; then
+            echo "::error::tag '$REF_NAME' is not a Docker-safe release tag (expected ^v[A-Za-z0-9._-]+$)"
+            exit 1
+          fi
+          echo "IMAGE_NAME=ghcr.io/$OWNER_LC/wgmesh-pipeline" >> "$GITHUB_ENV"
+          echo "RELEASE_TAG=$REF_NAME" >> "$GITHUB_ENV"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build image for test
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: pipeline/deploy/Dockerfile
+          load: true
+          push: false
+          tags: ${{ env.IMAGE_NAME }}:test
+
+      - name: Run pytest inside image
+        run: docker run --rm "$IMAGE_NAME:test" python -m pytest pipeline/tests/ -q
+
+      - name: Run eval gate inside image
+        # evals/ is repo-level code, not part of the installed wgmesh_pipeline
+        # package — it needs PYTHONPATH=/app/pipeline inside the container,
+        # mirroring ci.yml's PYTHONPATH=pipeline.
+        run: docker run --rm -e PYTHONPATH=/app/pipeline "$IMAGE_NAME:test" python -m evals.run_evals --check
+
+      - name: Push the TESTED image (release tag + latest)
+        # Re-tag and push the exact bytes that passed the gates — a second
+        # build-push-action build is not guaranteed to reproduce the tested
+        # image (no shared cache in the portable subset).
+        run: |
+          set -euo pipefail
+          docker tag "$IMAGE_NAME:test" "$IMAGE_NAME:$RELEASE_TAG"
+          docker tag "$IMAGE_NAME:test" "$IMAGE_NAME:latest"
+          docker push "$IMAGE_NAME:$RELEASE_TAG"
+          docker push "$IMAGE_NAME:latest"
