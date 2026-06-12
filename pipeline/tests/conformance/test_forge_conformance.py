@@ -111,11 +111,10 @@ def test_list_open_issues_filters_host_pr_objects(kind: str) -> None:
 
 @parametrize_adapters
 def test_list_needs_triage_requests_label_filter(kind: str) -> None:
-    # Contract: server-side needs-triage label filter on both hosts.
-    # NOTE (encoded actual behavior): GitHubClient.list_needs_triage does NOT
-    # filter pull_request objects — the bug #11 guard lives only on
-    # list_open_issues. GiteaForge filters in both (see gitea-only test below)
-    # because Gitea's issue listing is PR-heavy by default.
+    # Contract: server-side needs-triage label filter on both hosts. Both
+    # adapters also filter pull_request objects in BOTH listing methods (the
+    # bug #11 guard; GitHubClient gained the list_needs_triage filter after
+    # this suite first caught the asymmetry).
     payload = [item for item in _issues_payload(kind) if not item.get("pull_request")]
     client, session = make_client(kind, "shadow", [("GET", "/issues", Response(payload))])
 

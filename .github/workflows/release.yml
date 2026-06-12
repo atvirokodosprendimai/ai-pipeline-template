@@ -41,6 +41,12 @@ jobs:
         run: |
           set -euo pipefail
           OWNER_LC=$(echo "$REPO_OWNER" | tr '[:upper:]' '[:lower:]')
+          # Git tags allow characters Docker tags reject (e.g. '/'); validate
+          # rather than push a mangled or failing reference.
+          if ! echo "$REF_NAME" | grep -Eq '^v[A-Za-z0-9._-]+$'; then
+            echo "::error::tag '$REF_NAME' is not a Docker-safe release tag (expected ^v[A-Za-z0-9._-]+$)"
+            exit 1
+          fi
           echo "IMAGE_NAME=ghcr.io/$OWNER_LC/wgmesh-pipeline" >> "$GITHUB_ENV"
           echo "RELEASE_TAG=$REF_NAME" >> "$GITHUB_ENV"
 
