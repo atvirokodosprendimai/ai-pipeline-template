@@ -11,6 +11,11 @@ RUN apt-get update \
 
 WORKDIR /app
 COPY pipeline/ /app/pipeline/
+# company/ is runtime-critical: the write gate resolves
+# company/scripts/sanitise.sh relative to the package (client.py
+# SANITISE_SCRIPT) — without it every gated write would fail closed at
+# runtime. Parity tests also read recorded state from company/.
+COPY company/ /app/company/
 RUN pip install --no-cache-dir -e /app/pipeline
 
 # Non-root: the container holds the bot PAT; shrink the blast radius.
