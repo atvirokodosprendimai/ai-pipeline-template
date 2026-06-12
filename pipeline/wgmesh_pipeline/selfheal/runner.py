@@ -80,6 +80,7 @@ def run_self_heal(forge: Forge, inputs: SelfHealInputs) -> SelfHealRun:
         actions += copilot.actions
         audit += copilot.audit
         taken += copilot.actions_taken
+        errors += copilot.errors
         created += copilot.issues_created
         found["copilot"] = copilot.stale_found
         tripped = circuit_breaker_tripped(created, errors)
@@ -90,6 +91,7 @@ def run_self_heal(forge: Forge, inputs: SelfHealInputs) -> SelfHealRun:
         actions += approved.actions
         audit += approved.audit
         taken += approved.actions_taken
+        errors += approved.errors
         created += approved.issues_created
         found["approved"] = approved.stale_found
         tripped = circuit_breaker_tripped(created, errors)
@@ -105,6 +107,7 @@ def run_self_heal(forge: Forge, inputs: SelfHealInputs) -> SelfHealRun:
         actions += humans.actions
         audit += humans.audit
         taken += humans.actions_taken
+        errors += humans.errors
         closed += humans.closed
         funnel_signals, funnel_audit = check_funnel_signals(inputs)
         audit.append(funnel_audit)
