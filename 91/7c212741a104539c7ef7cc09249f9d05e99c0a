@@ -1,0 +1,34 @@
+pipeline/wgmesh_pipeline/config.py
+  s_e572593943375e::t_bddd7f89cb27ca 43,111
+pipeline/wgmesh_pipeline/github/client.py
+  s_e572593943375e::t_e178c565fc3f9e 184-243
+  s_e572593943375e::t_bddd7f89cb27ca 306
+pipeline/tests/test_merge_gate.py
+  s_e572593943375e::t_6228eb7ce09085 1-84
+pipeline/wgmesh_pipeline/graph/nodes/gate.py
+  s_e572593943375e::t_176e8686b7d094 84-98
+  s_e572593943375e::t_dbfcd87908c4b6 3,6,10
+pipeline/tests/test_gate.py
+  s_e572593943375e::t_ae6f31e6c26c62 382-419
+  s_e572593943375e::t_2b2b8515764af4 356-367
+pipeline/wgmesh_pipeline/forge/merge_gate.py
+  s_e572593943375e::t_79d6284b2cc8bb 1-60
+pipeline/wgmesh_pipeline/forge/protocol.py
+  s_e572593943375e::t_35b2e3aaaeebdc 58-65
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "917c212741a104539c7ef7cc09249f9d05e99c0a",
+  "prompts": {},
+  "sessions": {
+    "s_e572593943375e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "73f3e1b0-bc7b-47d7-97f0-2bec21527939",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
