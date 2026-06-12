@@ -1,0 +1,21 @@
+pipeline/docs/CONTAINER-CUTOVER.md
+  s_e572593943375e::t_bc85895bbf8e0a 60-73
+pipeline/deploy/run-container.sh
+  s_e572593943375e::t_3ceff8a6b3b91a 4-14,17,21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "fa93b4dae3576395cd3d8b1be98e6593cd0a47c3",
+  "prompts": {},
+  "sessions": {
+    "s_e572593943375e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "73f3e1b0-bc7b-47d7-97f0-2bec21527939",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
