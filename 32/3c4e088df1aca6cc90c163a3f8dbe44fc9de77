@@ -1,0 +1,21 @@
+.github/workflows/deploy-pipeline-box.yml
+  s_e572593943375e::t_3186405b838456 67-69,71-73,75-77,81,86-92
+.github/workflows/build-pipeline-image.yml
+  s_e572593943375e::t_3186405b838456 53-55
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "323c4e088df1aca6cc90c163a3f8dbe44fc9de77",
+  "prompts": {},
+  "sessions": {
+    "s_e572593943375e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "73f3e1b0-bc7b-47d7-97f0-2bec21527939",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
