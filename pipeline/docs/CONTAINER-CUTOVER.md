@@ -57,3 +57,17 @@ container.
   the exact merged SHA).
 - `release.yml` — operator-cut `v*` tags build versioned images from the
   TESTED bytes (see #1673). Human-meaningful milestones, not every merge.
+
+## Pre-cutover requirements (review findings, 2026-06-12)
+
+- **systemd unit**: the in-repo `pipeline/deploy/wgmesh-pipeline.service` still
+  starts the venv Python directly. At cutover, point `ExecStart` at
+  `pipeline/deploy/run-container.sh` (and `ExecStop` at `docker stop
+  wgmesh-pipeline`) — the deploy workflow assumes the containerized unit.
+- **State durability**: the pipeline defaults to `database_mode="local"`
+  (SQLite inside the container — lost on swap). Before cutover either set
+  `DATABASE_MODE=turso` (the box's current production mode) or mount the DB
+  path as a host volume in `run-container.sh`.
+- **Provision drift**: step 3's "shrunk provision path" lands with #1599 U12;
+  until then the legacy provision workflow still builds the venv stack —
+  containerized boxes are cut over manually per this runbook.
