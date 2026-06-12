@@ -1,0 +1,20 @@
+pipeline/tests/test_live_e2e.py
+  s_e572593943375e::t_dfeb3ffa0de5d9 161,163
+  s_e572593943375e::t_c4ab9d723170fd 43-50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "ec55687c7db0955a5cc80c6f5a9b6ae0c7b8ae4e",
+  "prompts": {},
+  "sessions": {
+    "s_e572593943375e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "73f3e1b0-bc7b-47d7-97f0-2bec21527939",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
