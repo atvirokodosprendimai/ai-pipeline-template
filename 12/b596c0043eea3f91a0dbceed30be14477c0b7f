@@ -1,0 +1,21 @@
+.github/workflows/ci.yml
+  s_e572593943375e::t_04ce9dcfacda6b 81-296
+docs/plans/2026-06-11-003a-workflow-disposition.md
+  s_e572593943375e::t_312d5dd2605159 42-43
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "12b596c0043eea3f91a0dbceed30be14477c0b7f",
+  "prompts": {},
+  "sessions": {
+    "s_e572593943375e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "73f3e1b0-bc7b-47d7-97f0-2bec21527939",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
