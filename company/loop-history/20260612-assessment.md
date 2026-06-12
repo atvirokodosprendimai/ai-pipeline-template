@@ -1,23 +1,22 @@
 # Assessment: 2026-06-12
 
-**Stage**: Reachable | **Run**: 247
+**Stage**: Reachable | **Run**: 248
 
-Correcting stage assessment: Company is Stage 3 (Reachable) not Stage 5. Revenue exists (5 subscribers, €4+ MRR) but attribution is misconfigured - paid orders flow to all_org instead of seed products (cloudroof tier shows 0 subscribers). Product is fully functional with low pipeline activity (8 PRs, 1 issue). Primary blocker is Polar.sh configuration preventing proper seed product revenue tracking.
+Stage 3, day 87. wgmesh remains fully functional (v0.2.1, 19 stars) with extremely clean pipeline - only 1 fn:ops issue, 8 PRs progressing. Critical blocker unchanged: seed product billing shows 0 subscribers while all_org has 5 subscribers and recent paid orders, indicating Polar.sh misconfiguration preventing Stage 4 advancement for 87+ days. Pipeline is clearly idle, perfect for Commercial Idle Policy application.
 
 ## Blockers
-- Polar.sh product attribution misconfigured - cloudroof orders not credited to seed_product_bucket, preventing Stage 4 advancement verification
-- No clear positioning for cloudroof.eu target market despite functional product
+- Polar.sh billing attribution mismatch - seed products show 0 subscribers while all_org shows 5 subscribers and recent paid orders, preventing Stage 4 (Pipeline) advancement for 87+ days
 
 ## Top Actions
-- **fn:billing**: Fix Polar.sh product configuration to properly attribute cloudroof orders to seed product tracking (zero)
-- **fn:gtm**: Create cloudroof.eu value proposition page targeting specific network administrator use cases (zero)
-- **fn:gtm**: Document concrete internal wgmesh usage metrics as proof points for customer acquisition (zero)
+- **fn:gtm**: Create concrete internal dogfooding case study documenting team's real wgmesh usage with specific metrics, uptime data, peer connectivity stats, and problems solved as social proof for cloudroof.eu landing page (zero)
+- **fn:billing**: Fix Polar.sh product configuration to correctly attribute cloudroof.eu billing to seed product bucket rather than all_org bucket (zero)
+- **fn:ops**: Investigate and fix CI failure blocking merge pipeline confidence (zero)
 
 ## Contributions
-- **paying-customers**: 5 active subscribers maintaining revenue with recent orders on 2026-06-09 and 2026-06-10
-- **Copilot**: Recent git commits contributing to development workflow
-- **Marty**: Recent git commits maintaining codebase stability
-- **pupabobas[bot]**: 103 bot commits in past 7 days maintaining pipeline operations
+- **Marty**: Recent git commits maintaining wgmesh codebase over past 7 days
+- **pupabobas[bot]**: 104 bot commits in past 7 days maintaining pipeline automation
+- **Copilot**: Active in recent git commits contributing to development pipeline
+- **all-org-subscribers**: 5 active subscribers with recent paid orders generating revenue (though misattributed to wrong products)
 
 ## Needs Human
-- [soon] Verify Polar.sh organization access and product configuration to fix revenue attribution
+- [blocking] Fix Polar.sh organization configuration to correctly attribute cloudroof.eu product orders to seed_product_bucket instead of all_org_bucket - 10+ paid orders exist but are misconfigured
