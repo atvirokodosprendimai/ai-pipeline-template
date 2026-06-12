@@ -480,3 +480,63 @@ def test_gate_self_serves_reviewer_approval_then_merges() -> None:
     )
     assert approve["kwargs"]["headers"]["Authorization"] == "Bearer reviewer-pat"
     assert any(c["url"].endswith("/pulls/456/merge") for c in client.session.calls)
+
+
+# ---- cutover U9: box-run CI feeds the gate for bot PRs; no Actions
+# check-run poll happens when a box CI verdict is in the state ----
+
+
+def _u9_state(client, *, box_ci):
+    return {
+        "issue": GitHubIssue(number=9, title="Fix relay", labels=(), state="open"),
+        "github": client,
+        "diff": "+docs\n",
+        "changed_files": ["docs/readme.md"],
+        "impl_pr": 456,
+        "tests_passed": True,
+        "sanitise_ok": True,
+        "review_findings": [],
+        "box_ci": box_ci,
+    }
+
+
+def test_gate_red_box_ci_blocks_merge_without_any_actions_run() -> None:
+    """U9 verification scenario: a failing test on a box PR blocks its merge
+    without any Actions run — the gate consumes the box verdict and never
+    touches the check-runs API."""
+    from wgmesh_pipeline.forge.box_ci import BoxCiResult
+
+    client = GitHubClient(
+        cfg(mode="live"), session=SessionForPr({"number": 456}), sanitiser=lambda text: True
+    )
+    ci_calls: list[int] = []
+
+    def box_ci(forge, pr_number: int) -> BoxCiResult:
+        ci_calls.append(pr_number)
+        return BoxCiResult(green=False, failures=("box ci: go test failed",))
+
+    result = gate_node(_u9_state(client, box_ci=box_ci), max_files=3)
+
+    assert ci_calls == [456]
+    assert result["decision"] == "escalate"
+    assert any("go test failed" in r for r in result["risk_reasons"])
+    assert not any("/check-runs" in c["url"] for c in client.session.calls)
+    assert not any(c["url"].endswith("/pulls/456/merge") for c in client.session.calls)
+    assert any(c["url"].endswith("/issues/9/labels") for c in client.session.calls)
+
+
+def test_gate_green_box_ci_merges_without_actions_check_runs() -> None:
+    from wgmesh_pipeline.forge.box_ci import BoxCiResult
+
+    client = GitHubClient(
+        cfg(mode="live"), session=SessionForPr({"number": 456}), sanitiser=lambda text: True
+    )
+
+    result = gate_node(
+        _u9_state(client, box_ci=lambda forge, pr: BoxCiResult(green=True, failures=())),
+        max_files=3,
+    )
+
+    assert result["decision"] == "merge"
+    assert not any("/check-runs" in c["url"] for c in client.session.calls)
+    assert any(c["url"].endswith("/pulls/456/merge") for c in client.session.calls)

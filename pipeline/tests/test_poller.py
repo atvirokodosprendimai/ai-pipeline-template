@@ -5,6 +5,7 @@ import asyncio
 import pytest
 
 from wgmesh_pipeline.config import Config
+from wgmesh_pipeline.forge.box_ci import BoxCiResult
 from wgmesh_pipeline.github.client import GitHubClient
 from wgmesh_pipeline.graph.build import build_graph
 from wgmesh_pipeline.poller import Poller
@@ -269,7 +270,14 @@ def test_reviewed_issue_not_phantom_merged_when_side_effect_fails(tmp_path, cfg:
     store = StateStore(tmp_path / "state.db")
     store.upsert_issue(2, "Ready", stage="reviewed", impl_pr=321)
     client = FailingMergeClient(live)
-    p = Poller(config=live, store=store, client=client, graph=Graph())
+    # Box CI (U9) green so the gate proceeds to the merge call under test.
+    p = Poller(
+        config=live,
+        store=store,
+        client=client,
+        graph=Graph(),
+        box_ci=lambda forge, pr: BoxCiResult(green=True, failures=()),
+    )
     p.scratch[2] = {
         "diff": "+docs\n",
         "changed_files": ["docs/readme.md"],
@@ -313,10 +321,21 @@ def test_advance_one_stage_injects_goose_runner_and_repo_path(tmp_path, cfg: Con
     graph = InspectingGraph()
     repo_path = tmp_path / "wgmesh"
     runner = object()
+
+    def box_ci(forge, pr):
+        return BoxCiResult(green=True, failures=())
+
     spec_only = Config(target_repo=cfg.target_repo, mode="spec-only", repo_path=str(repo_path))
     store = StateStore(tmp_path / "state.db")
     store.upsert_issue(17, "Already triaged", stage="triaged")
-    p = Poller(config=spec_only, store=store, client=EmptyClient(spec_only), graph=graph, goose_runner=runner)
+    p = Poller(
+        config=spec_only,
+        store=store,
+        client=EmptyClient(spec_only),
+        graph=graph,
+        goose_runner=runner,
+        box_ci=box_ci,
+    )
 
     p._advance_one_stage(store.get_issue(17))
 
@@ -324,6 +343,7 @@ def test_advance_one_stage_injects_goose_runner_and_repo_path(tmp_path, cfg: Con
     assert graph.seen_state["goose_runner"] is runner
     assert graph.seen_state["repo_path"] == repo_path
     assert graph.seen_state["config"] is spec_only
+    assert graph.seen_state["box_ci"] is box_ci
 
 
 def test_specced_issue_opens_spec_pr_then_stops_in_spec_only(tmp_path, cfg: Config) -> None:
@@ -411,9 +431,6 @@ def test_reviewed_issue_records_escalated_when_gate_flips_decision(tmp_path, cfg
 
         def request(self, method, url, **kwargs):
             self.calls.append({"method": method, "url": url, "kwargs": kwargs})
-            if "/check-runs" in url:
-                # CI red -> gate must refuse the merge and escalate.
-                return Response({"check_runs": [{"status": "completed", "conclusion": "failure"}]})
             if method == "GET" and url.endswith("/reviews"):
                 return Response([])
             if method == "GET" and "/pulls/" in url:
@@ -425,7 +442,14 @@ def test_reviewed_issue_records_escalated_when_gate_flips_decision(tmp_path, cfg
     store.upsert_issue(3, "Ready", stage="reviewed", impl_pr=321)
     session = RoutedSession()
     client = EmptyClient(live, session=session)
-    p = Poller(config=live, store=store, client=client, graph=Graph())
+    # Box CI (U9) red -> gate must refuse the merge and escalate.
+    p = Poller(
+        config=live,
+        store=store,
+        client=client,
+        graph=Graph(),
+        box_ci=lambda forge, pr: BoxCiResult(green=False, failures=("box ci: go test failed",)),
+    )
     p.scratch[3] = {
         "diff": "+docs\n",
         "changed_files": ["docs/readme.md"],

@@ -19,6 +19,12 @@ permissions:
 
 jobs:
   pytest:
+    # Cutover #1599 U9: bot PRs (bot/* head branches) are CI'd on the box
+    # itself (wgmesh_pipeline.forge.box_ci feeds the merge gate); this
+    # Actions run is retired for that PR class. External/host PRs keep
+    # Actions CI via ci.yml (U10), which runs unconditionally — so a
+    # branch named to dodge this filter still gets the full ci.yml suite.
+    if: github.event_name != 'pull_request' || !startsWith(github.event.pull_request.head.ref, 'bot/')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

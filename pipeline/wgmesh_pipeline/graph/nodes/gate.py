@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
+from wgmesh_pipeline.forge.box_ci import BoxCiResult
 from wgmesh_pipeline.forge.merge_gate import ensure_mergeable
 from wgmesh_pipeline.graph.state import Decision, GraphState
 from wgmesh_pipeline.risk import classify_risk
@@ -85,7 +86,21 @@ def apply_gate_side_effects(state: GraphState) -> None:
         # Shadow mode skips the live readiness reads — the merge itself is
         # only a dry-run record there.
         if getattr(getattr(client, "config", None), "mode", None) != "shadow":
-            readiness = ensure_mergeable(client, int(impl_pr))
+            # Cutover U9: when a box-CI runner is wired, the box's own verdict
+            # IS the CI signal — the host's Actions check-runs are not polled.
+            box_ci = state.get("box_ci")
+            ci_verdict = None
+            if box_ci is not None:
+                try:
+                    ci_verdict = box_ci(client, int(impl_pr))
+                except Exception:
+                    # A crashing runner is a red verdict (fail closed), never
+                    # an exception that strands the issue mid-merge.
+                    log.exception("gate: box CI runner crashed for PR #%s", impl_pr)
+                    ci_verdict = BoxCiResult(
+                        green=False, failures=("box ci: runner crashed (see box logs)",)
+                    )
+            readiness = ensure_mergeable(client, int(impl_pr), ci_verdict=ci_verdict)
             if not readiness.ready:
                 log.warning(
                     "gate: PR #%s not mergeable (%s); escalating instead of merging",

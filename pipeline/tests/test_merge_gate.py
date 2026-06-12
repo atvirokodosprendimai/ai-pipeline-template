@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from wgmesh_pipeline.forge.box_ci import BoxCiResult
 from wgmesh_pipeline.forge.merge_gate import ensure_mergeable
 
 
@@ -19,11 +20,13 @@ class ReviewClient:
         self._approvals = list(approvals or [])
         self._reviewer_credential = reviewer_credential
         self.approve_calls: list[int] = []
+        self.checks_polls: list[int] = []
 
     def get_pr(self, number: int) -> dict[str, Any]:
         return {"user": {"login": self._author}}
 
     def pr_checks_green(self, pr_number: int) -> bool:
+        self.checks_polls.append(pr_number)
         return self._checks_green
 
     def list_pr_approvals(self, pr_number: int) -> list[str]:
@@ -111,3 +114,54 @@ def test_approve_failure_becomes_readiness_reason_not_exception() -> None:
 
     assert readiness.ready is False
     assert any("reviewer approval failed" in r for r in readiness.reasons)
+
+
+# ---- box-run CI verdict (cutover U9): bot PRs are CI'd on the box, the
+# gate consumes that verdict and never polls Actions check-runs for them ----
+
+
+def test_box_ci_verdict_replaces_actions_check_runs() -> None:
+    client = ReviewClient(checks_green=False, approvals=["reviewer-bot"])
+
+    readiness = ensure_mergeable(
+        client, 7, ci_verdict=BoxCiResult(green=True, failures=())
+    )
+
+    assert readiness.ready is True
+    assert client.checks_polls == []
+
+
+def test_red_box_ci_blocks_merge_with_its_failures_as_reasons() -> None:
+    client = ReviewClient(checks_green=True, approvals=["reviewer-bot"])
+
+    readiness = ensure_mergeable(
+        client,
+        7,
+        ci_verdict=BoxCiResult(green=False, failures=("box ci: go test failed",)),
+    )
+
+    assert readiness.ready is False
+    assert "ci not green" in readiness.reasons
+    assert any("go test failed" in r for r in readiness.reasons)
+    assert client.checks_polls == []
+
+
+def test_red_box_ci_defers_reviewer_approval() -> None:
+    """Same as the red-Actions case: don't burn an approval on a red build."""
+    client = ReviewClient(approvals=[], reviewer_credential=True)
+
+    readiness = ensure_mergeable(
+        client, 7, ci_verdict=BoxCiResult(green=False, failures=("box ci: sanitise failed",))
+    )
+
+    assert readiness.ready is False
+    assert client.approve_calls == []
+
+
+def test_no_verdict_keeps_actions_check_runs_path() -> None:
+    client = ReviewClient(checks_green=True, approvals=["reviewer-bot"])
+
+    readiness = ensure_mergeable(client, 7)
+
+    assert readiness.ready is True
+    assert client.checks_polls == [7]

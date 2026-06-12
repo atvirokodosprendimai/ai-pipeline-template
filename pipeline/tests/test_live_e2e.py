@@ -13,6 +13,7 @@ import asyncio
 import pytest
 
 from wgmesh_pipeline.config import Config
+from wgmesh_pipeline.forge.box_ci import BoxCiResult
 from wgmesh_pipeline.github.client import GitHubClient
 from wgmesh_pipeline.poller import Poller
 from wgmesh_pipeline.scoring import init_scoring
@@ -113,7 +114,15 @@ def _live_poller(tmp_path, graph, session):
     cfg = Config(target_repo="atvirokodosprendimai/wgmesh", mode="live", max_files=3)
     store = StateStore(tmp_path / "state.db")
     client = _RecordingClient(cfg, session=session)
-    return Poller(config=cfg, store=store, client=client, graph=graph)
+    # Box CI (U9) green: these scenarios exercise the flow downstream of the
+    # box's own pre-merge CI; box_ci internals are covered in test_box_ci.py.
+    return Poller(
+        config=cfg,
+        store=store,
+        client=client,
+        graph=graph,
+        box_ci=lambda forge, pr: BoxCiResult(green=True, failures=()),
+    )
 
 
 def test_live_low_risk_issue_merges_and_scores(tmp_path) -> None:
