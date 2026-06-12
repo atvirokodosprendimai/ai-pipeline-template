@@ -1,0 +1,51 @@
+.github/workflows/pii-policy-check.yml
+  s_e572593943375e::t_720f1a896829ba 40-46
+pipeline/wgmesh_pipeline/forge/box_ci.py
+  s_e572593943375e::t_eef6c4dd5adfc7 103-108
+  s_e572593943375e::t_7ef75b71b4825d 1-81,90-102,109-230
+  s_e572593943375e::t_4555ccd4a65026 82-89
+pipeline/tests/test_box_ci.py
+  s_e572593943375e::t_b08598de75f087 1-309,330-359
+  s_e572593943375e::t_0c0f0256f2fb2d 310-329
+.github/workflows/sanitise-wall.yml
+  s_e572593943375e::t_66749f92305ece 12-16
+.github/workflows/pipeline-ci.yml
+  s_e572593943375e::t_74581b5bd88f3e 22-27
+pipeline/wgmesh_pipeline/forge/merge_gate.py
+  s_e572593943375e::t_03a213624dfad2 43-48,51-59
+  s_e572593943375e::t_1e96e28f2811bc 20-21
+pipeline/wgmesh_pipeline/graph/state.py
+  s_e572593943375e::t_b4d74d8aaef6d8 37-39
+pipeline/tests/test_poller.py
+  s_e572593943375e::t_cb998644027fba 324-327,331-338,346
+  s_e572593943375e::t_4ba146959a78fd 445-452
+  s_e572593943375e::t_317f82d757fabf 8
+  s_e572593943375e::t_c6c68f2dfc4465 273-280
+pipeline/wgmesh_pipeline/poller.py
+  s_e572593943375e::t_787c75cc220f4a 10
+  s_e572593943375e::t_d5ad7eadb773cb 91
+  s_e572593943375e::t_af934a9ec495f9 88-90
+  s_e572593943375e::t_9e71bb16711c34 28-29
+pipeline/tests/test_merge_gate.py
+  s_e572593943375e::t_fd87a01641257c 117-167
+  s_e572593943375e::t_d21a876c2ccd5b 5,23,29
+pipeline/tests/test_live_e2e.py
+  s_e572593943375e::t_87a2cf52694d12 16
+  s_e572593943375e::t_d18e299a92c2e8 117-125
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "a8ae50e69982ec14e0d9aa9f223f082e34c77c3a",
+  "prompts": {},
+  "sessions": {
+    "s_e572593943375e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "73f3e1b0-bc7b-47d7-97f0-2bec21527939",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
