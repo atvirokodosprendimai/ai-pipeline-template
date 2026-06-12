@@ -1,0 +1,62 @@
+# Throwaway Forgejo instance for the live forge-conformance tests.
+# Opt-in only — never started by CI; the stubbed conformance suite is the
+# default contract check.
+#
+# Start:
+#   docker compose -f docker-compose.gitea.yml up -d
+#
+# First-run bootstrap (the container is deliberately VOLUME-LESS — all state
+# dies with `down`, so re-run bootstrap after every fresh start):
+#
+#   1. Create the admin/author user:
+#        docker compose -f docker-compose.gitea.yml exec forgejo \
+#          forgejo admin user create --admin \
+#          --username conformance --password conformance-local \
+#          --email conformance@localhost
+#
+#   2. Mint an API token for it:
+#        docker compose -f docker-compose.gitea.yml exec forgejo \
+#          forgejo admin user generate-access-token \
+#          --username conformance --token-name conformance \
+#          --scopes write:repository,write:issue,write:user
+#
+#   3. Create the target repo (auto_init gives it a main branch):
+#        curl -sf -X POST http://localhost:3000/api/v1/user/repos \
+#          -H "Authorization: token <TOKEN>" \
+#          -H "Content-Type: application/json" \
+#          -d '{"name":"conformance","auto_init":true,"default_branch":"main"}'
+#
+#   4. (Optional, for approve_pr/distinct-principal tests) repeat steps 1-2
+#      for a second user `reviewer` and add it as a repo collaborator:
+#        curl -sf -X PUT \
+#          http://localhost:3000/api/v1/repos/conformance/conformance/collaborators/reviewer \
+#          -H "Authorization: token <TOKEN>" \
+#          -H "Content-Type: application/json" -d '{"permission":"write"}'
+#
+#   5. Run the live contract:
+#        GITEA_LIVE=1 GITEA_TOKEN=<TOKEN> \
+#        GITEA_REPO=conformance/conformance \
+#        .venv/bin/python -m pytest tests/conformance/ -q
+#
+# Image is PINNED to an exact release — never :latest. Untagged third-party
+# infra drifts under you (the clickhouse/langfuse lesson, bug #14).
+services:
+  forgejo:
+    image: codeberg.org/forgejo/forgejo:11.0.3
+    container_name: forge-conformance
+    environment:
+      - USER_UID=1000
+      - USER_GID=1000
+      # Skip the interactive web installer entirely: lock install and supply
+      # the minimal local config (sqlite, localhost root URL).
+      - FORGEJO__security__INSTALL_LOCK=true
+      - FORGEJO__server__ROOT_URL=http://localhost:3000/
+      - FORGEJO__server__HTTP_PORT=3000
+      - FORGEJO__database__DB_TYPE=sqlite3
+      - FORGEJO__repository__DEFAULT_BRANCH=main
+      # No outbound mail, no registration spam surface on a local throwaway.
+      - FORGEJO__mailer__ENABLED=false
+      - FORGEJO__service__DISABLE_REGISTRATION=true
+    ports:
+      - "3000:3000"
+    # Deliberately no volumes: throwaway instance, wiped on `down`.

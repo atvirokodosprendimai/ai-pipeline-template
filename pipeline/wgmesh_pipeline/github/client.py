@@ -58,7 +58,10 @@ class GitHubClient:
             f"/repos/{self.config.owner}/{self.config.repo}/issues",
             params={"state": "open", "labels": "needs-triage"},
         )
-        return [_parse_issue(item) for item in data]
+        # Same PR filter as list_open_issues (bug #11): a labeled PR returned
+        # by the issues endpoint must not re-enter triage as an issue.
+        # Truthiness, not key presence — Gitea sends "pull_request": null.
+        return [_parse_issue(item) for item in data if not item.get("pull_request")]
 
     def list_open_issues(self) -> list[GitHubIssue]:
         data = self._request(
