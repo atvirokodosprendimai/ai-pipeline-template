@@ -1,0 +1,141 @@
+"""Self-Heal dataclasses, constants, and shared pure helpers (cutover U4).
+
+Constants mirror the ``pipeline-health`` workflow's hard-coded values; the
+dataclasses are the planning surface — no forge writes happen here.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
+from typing import Any, Mapping
+
+TARGET_REPO_NAME = "wgmesh"
+MAX_RETRIES_BEFORE_ESCALATE = 2
+CIRCUIT_MAX_CREATES = 10
+CIRCUIT_MAX_ERRORS = 5
+ESCALATE_COOLDOWN_HOURS = 24
+IDLE_DISPATCH_COOLDOWN_SECONDS = 6 * 60 * 60
+CHECK_INTERVAL_HOURS = 0.5
+ACTIVE_PIPELINE_LABELS = (
+    "needs-triage", "copilot-triaging", "copilot-revising",
+    "approved-for-build", "goose-implementation",
+)
+SUPERVISOR_DEAD_TITLE = "supervisor-dead: pipeline-health frozen"
+
+
+@dataclass(frozen=True)
+class HealAction:
+    """One planned heal write. ``body``/``comment`` MUST pass the sanitise
+    gate before the executor publishes them (workflow parity)."""
+
+    kind: str  # audit action name: retrigger_* / escalate / close_needs_human / ...
+    number: int | None = None
+    target: str = "issue"  # "issue" | "pr" | "repo"
+    remove_label: str | None = None
+    add_label: str | None = None
+    title: str | None = None
+    body: str | None = None
+    comment: str | None = None
+    reason: str = ""
+
+
+@dataclass(frozen=True)
+class SweepOutcome:
+    """Counters + planned actions from one detector (mirrors the per-step
+    ``local_*`` counters the workflow accumulates into GITHUB_ENV)."""
+
+    actions: tuple[HealAction, ...] = ()
+    audit: tuple[dict[str, Any], ...] = ()
+    retry_tracker: Mapping[str, Any] = field(default_factory=dict)
+    stale_found: int = 0
+    actions_taken: int = 0
+    errors: int = 0
+    issues_created: int = 0
+    closed: int = 0
+
+
+@dataclass(frozen=True)
+class SelfHealInputs:
+    """Plain-dict inputs replacing the workflow's label-filtered queries
+    (see protocol gaps in the package docstring). Items carry the query JSON
+    shapes: number, title, createdAt/updatedAt, labels (names or
+    ``{"name": …}``)."""
+
+    now: str
+    run_id: str = "local"
+    previous_state: Mapping[str, Any] = field(default_factory=dict)
+    stale_triage_issues: tuple[Mapping[str, Any], ...] = ()
+    stale_copilot_issues: tuple[Mapping[str, Any], ...] = ()
+    stale_approved_prs: tuple[Mapping[str, Any], ...] = ()
+    needs_human_issues: tuple[Mapping[str, Any], ...] | None = None
+    merged_resolution_issues: frozenset[int] = frozenset()
+    open_spec_pr_issues: frozenset[int] = frozenset()
+    open_impl_pr_issues: frozenset[int] = frozenset()
+    linked_merged_pr_counts: Mapping[int, int] = field(default_factory=dict)
+    loop_state: Mapping[str, Any] = field(default_factory=dict)
+    costs: Mapping[str, Any] = field(default_factory=dict)
+    endpoints: tuple[Mapping[str, Any], ...] = ()  # {name, url, status}
+    claude_md_text: str | None = None
+    open_prs: int = 0
+    open_issues: tuple[Mapping[str, Any], ...] = ()
+    cutoff_override_minutes: int | None = None
+    signals_now: str | None = None  # separate step clock; defaults to ``now``
+
+
+@dataclass(frozen=True)
+class SelfHealRun:
+    """Runner outcome: planned actions + the state dict the caller may
+    persist (after the sanitise gate), plus the mutation-assertion verdict."""
+
+    state: dict[str, Any]
+    actions: tuple[HealAction, ...]
+    audit: tuple[dict[str, Any], ...]
+    circuit_breaker_tripped: bool
+    mutation_asserted: bool
+
+
+def parse_iso(value: str) -> datetime:
+    return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(timezone.utc)
+
+
+def iso(value: datetime) -> str:
+    return value.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def shift(now: str, *, hours: float = 0, minutes: float = 0) -> str:
+    return iso(parse_iso(now) + timedelta(hours=hours, minutes=minutes))
+
+
+def labels_joined(item: Mapping[str, Any]) -> str:
+    """Comma-joined label names — the workflow greps this string, so all
+    label checks downstream are SUBSTRING matches (ported as-is)."""
+    names = []
+    for label in item.get("labels") or []:
+        names.append(str(label.get("name")) if isinstance(label, Mapping) else str(label))
+    return ",".join(names)
+
+
+def first_timestamp(item: Mapping[str, Any], keys: tuple[str, ...]) -> str:
+    for key in keys:
+        if item.get(key):
+            return str(item[key])
+    return ""
+
+
+def audit_entry(now: str, run_id: str, action: str, number: int | None, reason: str,
+                retry_count: int | None, **extra: Any) -> dict[str, Any]:
+    """Audit-log entry, key order byte-compatible with the workflow's jq -nc."""
+    return {
+        "timestamp": now, "run_id": run_id, "action": action,
+        "issue_number": number, "target_repo": TARGET_REPO_NAME,
+        "reason": reason, "outcome": "success", "retry_count": retry_count,
+        **extra,
+    }
+
+
+def tracker_entry(tracker: Mapping[str, Any], key: str) -> dict[str, Any]:
+    entry = tracker.get(key) or {}
+    if not isinstance(entry, Mapping):  # fail loudly, never swallow
+        raise ValueError(f"malformed retry_tracker entry for {key!r}: {entry!r}")
+    return dict(entry)
