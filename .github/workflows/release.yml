@@ -1,0 +1,74 @@
+name: Release
+
+# U5 of the forge-portable SDLC plan (docs/plans/2026-06-11-003): release is
+# tag-driven. The box (or an operator) cuts a release with plain
+# `git tag vX.Y.Z && git push origin vX.Y.Z` — a normal developer action —
+# and this workflow builds and pushes the pipeline container image tagged
+# with the git tag + latest.
+#
+# Replaces the branch-triggered build-pipeline-image.yml (which is NOT
+# deleted here; retirement is sequenced by the workflow disposition map,
+# U6 / #1599). Registry coordinates are reused from that workflow.
+#
+# Syntax stays in the portable subset (docs/ci-portability.md):
+# docker/login-action and docker/build-push-action work on Gitea/Forgejo
+# Actions. The GitHub-only `type=gha` build cache from the legacy workflow
+# is intentionally dropped for portability.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve image name and release tag
+        run: |
+          set -euo pipefail
+          OWNER_LC=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "IMAGE_NAME=ghcr.io/$OWNER_LC/wgmesh-pipeline" >> "$GITHUB_ENV"
+          echo "RELEASE_TAG=${{ github.ref_name }}" >> "$GITHUB_ENV"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build image for test
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: pipeline/deploy/Dockerfile
+          load: true
+          push: false
+          tags: ${{ env.IMAGE_NAME }}:test
+
+      - name: Run pytest inside image
+        run: docker run --rm "$IMAGE_NAME:test" python -m pytest pipeline/tests/ -q
+
+      - name: Run eval gate inside image
+        run: docker run --rm "$IMAGE_NAME:test" python -m evals.run_evals --check
+
+      - name: Push image (release tag + latest)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: pipeline/deploy/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ env.RELEASE_TAG }}
+            ${{ env.IMAGE_NAME }}:latest

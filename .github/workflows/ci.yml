@@ -1,0 +1,81 @@
+name: CI
+
+# U5 of the forge-portable SDLC plan (docs/plans/2026-06-11-003): host CI
+# reduced to normal git flow — test on PR/push here, release on tag in
+# release.yml. This file deliberately stays inside the Gitea/Forgejo-Actions-
+# compatible syntax subset (actions/checkout, actions/setup-python, plain
+# `run:` steps; no GitHub-only contexts, no concurrency cancel groups, no app
+# tokens) so porting to another forge is a file copy, not a rewrite — see
+# docs/ci-portability.md.
+#
+# The legacy split workflows (pipeline-ci.yml, sanitise-wall.yml,
+# pii-policy-check.yml, build-pipeline-image.yml) are NOT deleted here;
+# their retirement is sequenced by the workflow disposition map (U6 / #1599).
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  pipeline-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install pipeline package
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          pip install -e pipeline/
+
+      - name: Run tests (from repo root — dataset paths are repo-root-relative)
+        run: |
+          set -euo pipefail
+          python -m pytest pipeline/tests/ -q
+
+      - name: Run gate eval check
+        env:
+          PYTHONPATH: pipeline
+        run: |
+          set -euo pipefail
+          python -m evals.run_evals --check
+
+  sanitise-wall:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check LLM emit sanitise gate
+        shell: bash
+        run: bash scripts/lint/check-llm-emit-sanitise.sh
+
+  # gh-free-gate — placeholder, enabled by U8 (SDLC runbook + gh-free
+  # verification sweep). Fails CI if `gh ` (GitHub CLI) appears in the box's
+  # runtime code, keeping the SDLC path host-agnostic. Do NOT enable before
+  # U3 lands (current tree still carries gh-coupled code being migrated).
+  #
+  # gh-free-gate:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v4
+  #
+  #     - name: Fail if gh CLI appears in pipeline runtime code
+  #       run: |
+  #         set -euo pipefail
+  #         if grep -rnE '(^|[^[:alnum:]_."'"'"'])gh ' pipeline/wgmesh_pipeline/ --include='*.py'; then
+  #           echo "::error::gh CLI usage found in pipeline runtime code — SDLC must stay forge-agnostic (U8 wall)."
+  #           exit 1
+  #         fi
+  #         echo "No gh CLI usage in pipeline runtime code. PASS."
