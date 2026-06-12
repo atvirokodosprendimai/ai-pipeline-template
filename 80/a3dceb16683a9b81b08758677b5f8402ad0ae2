@@ -1,0 +1,20 @@
+pipeline/wgmesh_pipeline/selfheal/runner.py
+  s_e572593943375e::t_36d563fa78c36e 110
+  s_e572593943375e::t_c52f54d287022c 83,94
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "80a3dceb16683a9b81b08758677b5f8402ad0ae2",
+  "prompts": {},
+  "sessions": {
+    "s_e572593943375e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "73f3e1b0-bc7b-47d7-97f0-2bec21527939",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
