@@ -7,7 +7,7 @@ FROM python:3.11-slim
 RUN apt-get update \
  && apt-get install -y --no-install-recommends git curl ca-certificates bzip2 unzip xz-utils \
  && rm -rf /var/lib/apt/lists/* \
- && curl -fsSL https://github.com/block/goose/releases/latest/download/download_cli.sh | bash
+ && curl -fsSL https://github.com/block/goose/releases/latest/download/download_cli.sh | CONFIGURE=false bash
 
 WORKDIR /app
 COPY pipeline/ /app/pipeline/
