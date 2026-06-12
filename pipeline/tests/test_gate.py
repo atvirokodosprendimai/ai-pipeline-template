@@ -353,6 +353,18 @@ class SessionForPr:
         self.calls.append({"method": method, "url": url, "kwargs": kwargs})
         if method == "POST" and url.endswith("/pulls"):
             return ResponseForPr(self.create_response)
+        # Distinct-principal merge-gate readiness reads (keep the gate in the
+        # tested path — stub the HTTP boundary, never the gate itself):
+        if "/check-runs" in url:
+            return ResponseForPr(
+                {"check_runs": [{"status": "completed", "conclusion": "success"}]}
+            )
+        if url.endswith("/reviews") and method == "GET":
+            return ResponseForPr([{"user": {"login": "reviewer-bot"}, "state": "APPROVED"}])
+        if method == "GET" and "/pulls/" in url:
+            return ResponseForPr(
+                {**self.create_response, "user": {"login": "author-bot"}, "head": {"sha": "abc"}}
+            )
         return ResponseForPr({"merged": True})
 
 
@@ -367,3 +379,41 @@ class ResponseForPr:
 
     def json(self) -> dict:
         return self._data
+
+
+class SessionRedCi(SessionForPr):
+    def request(self, method: str, url: str, **kwargs):
+        if "/check-runs" in url:
+            self.calls.append({"method": method, "url": url, "kwargs": kwargs})
+            return ResponseForPr(
+                {"check_runs": [{"status": "completed", "conclusion": "failure"}]}
+            )
+        return super().request(method, url, **kwargs)
+
+
+def test_gate_escalates_instead_of_merging_when_ci_red() -> None:
+    """Merge decision + red CI at side-effect time -> needs-human label, no
+    merge call, decision flipped to escalate. The box never merges past a
+    red check run."""
+    client = GitHubClient(
+        cfg(mode="live"), session=SessionRedCi({"number": 456}), sanitiser=lambda text: True
+    )
+
+    result = gate_node(
+        {
+            "issue": GitHubIssue(number=9, title="Fix relay", labels=(), state="open"),
+            "github": client,
+            "diff": "+docs\n",
+            "changed_files": ["docs/readme.md"],
+            "impl_pr": 456,
+            "tests_passed": True,
+            "sanitise_ok": True,
+            "review_findings": [],
+        },
+        max_files=3,
+    )
+
+    assert result["decision"] == "escalate"
+    assert any("ci not green" in r for r in result["risk_reasons"])
+    assert not any(c["url"].endswith("/pulls/456/merge") for c in client.session.calls)
+    assert any(c["url"].endswith("/issues/9/labels") for c in client.session.calls)
