@@ -9,6 +9,11 @@ permissions:
 
 jobs:
   check-sanitise-gate:
+    # Cutover #1599 U9: bot PRs are sanitise-gated on the box (box_ci runs
+    # company/scripts/sanitise.sh over the PR diff before merge); retire
+    # this Actions run for that PR class. The leak guard never lapses for
+    # ANY class: ci.yml (U10) runs its sanitise job on every PR and push.
+    if: github.event_name != 'pull_request' || !startsWith(github.event.pull_request.head.ref, 'bot/')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

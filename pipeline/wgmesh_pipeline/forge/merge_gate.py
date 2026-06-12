@@ -17,6 +17,8 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+from wgmesh_pipeline.forge.box_ci import BoxCiResult
+
 log = logging.getLogger(__name__)
 
 
@@ -38,10 +40,23 @@ class MergeReadiness:
     reasons: tuple[str, ...]
 
 
-def ensure_mergeable(client: _ReviewSurface, pr_number: int) -> MergeReadiness:
+def ensure_mergeable(
+    client: _ReviewSurface,
+    pr_number: int,
+    *,
+    ci_verdict: BoxCiResult | None = None,
+) -> MergeReadiness:
     reasons: list[str] = []
 
-    if not client.pr_checks_green(pr_number):
+    # Cutover U9: bot PRs are CI'd on the box itself; when a box-run verdict
+    # is supplied it IS the CI signal and the Actions check-runs API is never
+    # polled. Without a verdict (external PRs / not-yet-cutover configs) the
+    # host's check-runs remain the source.
+    if ci_verdict is not None:
+        if not ci_verdict.green:
+            reasons.append("ci not green")
+            reasons.extend(ci_verdict.failures)
+    elif not client.pr_checks_green(pr_number):
         reasons.append("ci not green")
 
     pr = client.get_pr(pr_number)

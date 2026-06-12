@@ -34,5 +34,8 @@ class GraphState(TypedDict, total=False):
     github: GitHubClient
     repo_path: str | Path
     goose_runner: Any
+    # Box-side pre-merge CI for bot PRs (cutover U9):
+    # (client, pr_number) -> wgmesh_pipeline.forge.box_ci.BoxCiResult
+    box_ci: Any
     impl_pr: int
     config: Config

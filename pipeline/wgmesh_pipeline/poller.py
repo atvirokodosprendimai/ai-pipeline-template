@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from wgmesh_pipeline.config import Config
+from wgmesh_pipeline.forge.box_ci import make_box_ci_runner
 from wgmesh_pipeline.forge.protocol import Forge, ForgeIssue as GitHubIssue
 from wgmesh_pipeline.github.reconcile import reconcile_issues
 from wgmesh_pipeline.graph.nodes.gate import apply_gate_side_effects, gate_node
@@ -24,6 +25,8 @@ class Poller:
     graph: object
     resolution_lookup: object | None = None
     goose_runner: object | None = None
+    # (client, pr_number) -> BoxCiResult; None wires the real box CI runner.
+    box_ci: object | None = None
     scratch: dict[int, dict] = field(default_factory=dict)
     last_reconcile_error: str | None = None
 
@@ -82,6 +85,10 @@ class Poller:
             "github": self.client,
             "config": self.config,
             "repo_path": Path(self.config.repo_path),
+            # Cutover U9: the box CIs its own bot PRs (verification +
+            # sanitise + path-scoped PII) — the gate consumes this verdict
+            # instead of polling the host's Actions check-runs.
+            "box_ci": self.box_ci or make_box_ci_runner(self.config.repo_path),
         }
         if self.goose_runner is not None:
             state["goose_runner"] = self.goose_runner
