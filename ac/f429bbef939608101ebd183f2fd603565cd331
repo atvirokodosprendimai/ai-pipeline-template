@@ -1,0 +1,30 @@
+pipeline/docs/FORGE-SWAP.md
+  s_e572593943375e::t_483c7e324a6377 1-131
+pipeline/wgmesh_pipeline/forge/gitea.py
+  s_e572593943375e::t_2d6e97100dcc97 1-239
+pipeline/wgmesh_pipeline/github/client.py
+  s_e572593943375e::t_f261bae924bdbc 61-64
+pipeline/tests/conformance/docker-compose.gitea.yml
+  s_e572593943375e::t_c5dd3150c383ab 1-62
+pipeline/tests/test_github_client.py
+  s_e572593943375e::t_52b807c2588f81 318-342
+pipeline/tests/conformance/test_forge_conformance.py
+  s_e572593943375e::t_27317de50dbfd2 1-112,121-125,134-516
+  s_e572593943375e::t_7c15fc91c205ab 113-120,126-133
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "acf429bbef939608101ebd183f2fd603565cd331",
+  "prompts": {},
+  "sessions": {
+    "s_e572593943375e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "73f3e1b0-bc7b-47d7-97f0-2bec21527939",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
