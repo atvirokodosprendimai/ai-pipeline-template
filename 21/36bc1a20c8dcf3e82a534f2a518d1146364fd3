@@ -1,0 +1,23 @@
+pipeline/tests/conformance/test_forge_conformance.py
+  s_e572593943375e::t_6eb164559c2ce0 114-117
+pipeline/wgmesh_pipeline/poller.py
+  s_e572593943375e::t_1e832c0cb89ec4 168-169,171-174
+.github/workflows/release.yml
+  s_e572593943375e::t_581211e65a2caa 44-49
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "2136bc1a20c8dcf3e82a534f2a518d1146364fd3",
+  "prompts": {},
+  "sessions": {
+    "s_e572593943375e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "73f3e1b0-bc7b-47d7-97f0-2bec21527939",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
