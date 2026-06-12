@@ -85,7 +85,11 @@ def apply_gate_side_effects(state: GraphState) -> None:
         # Shadow mode skips the live readiness reads — the merge itself is
         # only a dry-run record there.
         if getattr(getattr(client, "config", None), "mode", None) != "shadow":
-            readiness = ensure_mergeable(client, int(impl_pr))
+            # Cutover U9: when a box-CI runner is wired, the box's own verdict
+            # IS the CI signal — the host's Actions check-runs are not polled.
+            box_ci = state.get("box_ci")
+            ci_verdict = box_ci(client, int(impl_pr)) if box_ci is not None else None
+            readiness = ensure_mergeable(client, int(impl_pr), ci_verdict=ci_verdict)
             if not readiness.ready:
                 log.warning(
                     "gate: PR #%s not mergeable (%s); escalating instead of merging",
