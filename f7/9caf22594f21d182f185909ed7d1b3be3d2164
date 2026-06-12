@@ -1,0 +1,23 @@
+.github/workflows/ci.yml
+  s_e572593943375e::t_9ef4b99a32fe28 1-81
+docs/ci-portability.md
+  s_e572593943375e::t_9ccc0e8c81522e 1-71
+.github/workflows/release.yml
+  s_e572593943375e::t_fb24b54d589f91 1-74
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "f79caf22594f21d182f185909ed7d1b3be3d2164",
+  "prompts": {},
+  "sessions": {
+    "s_e572593943375e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "73f3e1b0-bc7b-47d7-97f0-2bec21527939",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
