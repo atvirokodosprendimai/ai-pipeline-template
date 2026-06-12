@@ -37,7 +37,9 @@ from wgmesh_pipeline.strategy_audit import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-BASELINE_FILE = REPO_ROOT / "company" / "strategy-audit-baseline.json"
+# FROZEN fixture (same lesson as #1691): the live baseline mutates on every
+# strategy-audit cron run; parity pins the recorded copy.
+BASELINE_FILE = Path(__file__).parent / "fixtures" / "strategy_audit_baseline.json"
 STRATEGY_FILE = REPO_ROOT / "STRATEGY.md"
 
 # Milestones section frozen as of the recorded runs (matches the recorded
