@@ -30,7 +30,11 @@ from wgmesh_pipeline.supervisor import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-STATE_FILE = REPO_ROOT / "company" / "supervisor-rank-state.json"
+# FROZEN fixture — a copy of company/supervisor-rank-state.json at the time
+# the parity values were recorded. The live file mutates every 4h cron run;
+# parity must pin the recorded inputs, not chase a moving file (broke CI on
+# the first post-merge cron commit, 2026-06-12).
+STATE_FILE = Path(__file__).parent / "fixtures" / "supervisor_rank_state.json"
 TAXONOMY_FILE = REPO_ROOT / "company" / "pipeline-stages.json"
 
 AIT = "atvirokodosprendimai/ai-pipeline-template"
