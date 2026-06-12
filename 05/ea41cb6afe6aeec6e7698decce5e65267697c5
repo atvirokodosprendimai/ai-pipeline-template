@@ -1,0 +1,21 @@
+pipeline/tests/fixtures/supervisor_rank_state.json
+  s_e572593943375e::t_8fbfdd0d56fc4c 1-46
+pipeline/tests/test_supervisor.py
+  s_e572593943375e::t_b5cd9308d4b467 33-37
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "05ea41cb6afe6aeec6e7698decce5e65267697c5",
+  "prompts": {},
+  "sessions": {
+    "s_e572593943375e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "73f3e1b0-bc7b-47d7-97f0-2bec21527939",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
