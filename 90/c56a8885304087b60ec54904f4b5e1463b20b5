@@ -1,0 +1,22 @@
+pipeline/wgmesh_pipeline/forge/box_ci.py
+  s_e572593943375e::t_7332efcc33260d 72-81,97-98,106-107,115-116
+pipeline/wgmesh_pipeline/graph/nodes/gate.py
+  s_e572593943375e::t_7e63730c3f757b 6
+  s_e572593943375e::t_7d43260138a305 92-102
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "90c56a8885304087b60ec54904f4b5e1463b20b5",
+  "prompts": {},
+  "sessions": {
+    "s_e572593943375e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "73f3e1b0-bc7b-47d7-97f0-2bec21527939",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
