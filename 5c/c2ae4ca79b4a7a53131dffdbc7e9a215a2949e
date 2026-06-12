@@ -1,0 +1,27 @@
+.github/workflows/deploy-pipeline-box.yml
+  s_e572593943375e::t_4470e5185942cc 1-85
+.github/workflows/build-pipeline-image.yml
+  s_e572593943375e::t_4470e5185942cc 1-65
+docs/brainstorms/2026-06-11-containerized-box-deploy-requirements.md
+  s_e572593943375e::t_4470e5185942cc 1-106
+pipeline/deploy/run-container.sh
+  s_e572593943375e::t_4470e5185942cc 1-12
+pipeline/docs/CONTAINER-CUTOVER.md
+  s_e572593943375e::t_4470e5185942cc 1-59
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "5cc2ae4ca79b4a7a53131dffdbc7e9a215a2949e",
+  "prompts": {},
+  "sessions": {
+    "s_e572593943375e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "73f3e1b0-bc7b-47d7-97f0-2bec21527939",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
