@@ -1,0 +1,97 @@
+name: Deploy Pipeline Box
+
+on:
+  workflow_dispatch:
+    inputs:
+      server_name:
+        description: 'Hetzner server name'
+        default: 'wgmesh-pipeline'
+      sha:
+        description: 'Image tag to deploy'
+        default: 'latest'
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate secrets
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+        run: |
+          set -euo pipefail
+          : "${DEPLOY_SSH_KEY:?DEPLOY_SSH_KEY secret missing}"
+          : "${HCLOUD_TOKEN:?HCLOUD_TOKEN secret missing (org)}"
+
+      - name: Resolve image owner
+        run: |
+          set -euo pipefail
+          OWNER_LC=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "IMAGE=ghcr.io/$OWNER_LC/wgmesh-pipeline" >> "$GITHUB_ENV"
+
+      - name: Install hcloud CLI
+        run: |
+          set -euo pipefail
+          curl -fsSL https://github.com/hetznercloud/cli/releases/latest/download/hcloud-linux-amd64.tar.gz \
+            | tar xz hcloud
+          sudo mv hcloud /usr/local/bin/
+
+      - name: Resolve box IP
+        env:
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+        run: |
+          set -euo pipefail
+          IP=$(hcloud server ip "${{ github.event.inputs.server_name }}")
+          echo "BOX_IP=$IP" >> "$GITHUB_ENV"
+
+      - name: Deploy image
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SHA: ${{ github.event.inputs.sha }}
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$RUNNER_TEMP/deploy_key"
+          SSH_SHA=$(printf '%q' "$SHA")
+          SSH_IMAGE=$(printf '%q' "$IMAGE")
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              -o ConnectTimeout=15 -i "$RUNNER_TEMP/deploy_key" root@"$BOX_IP" \
+              "SHA=$SSH_SHA IMAGE=$SSH_IMAGE bash -se" <<'REMOTE'
+          set -euo pipefail
+
+          docker pull "${IMAGE}:${SHA}"
+
+          # First containerized deploy has no prior SHA — empty means "no
+          # rollback target", not a hard failure.
+          previous_sha=$(cat /etc/wgmesh-pipeline/deployed_sha 2>/dev/null || echo "")
+          echo "${SHA}" > /etc/wgmesh-pipeline/deployed_sha
+          # Record the exact image ref for run-container.sh so the unit and
+          # the deploy workflow can never diverge on owner/name.
+          echo "${IMAGE}:${SHA}" > /etc/wgmesh-pipeline/image_ref
+
+          # Health window starts AT the restart — "1 minute ago" could match
+          # a tick from the pre-restart process.
+          restart_ts=$(date "+%Y-%m-%d %H:%M:%S")
+          if systemctl restart wgmesh-pipeline \
+            && sleep 10 \
+            && systemctl is-active wgmesh-pipeline \
+            && journalctl -u wgmesh-pipeline --since "$restart_ts" --no-pager | grep -q "tick"; then
+            echo "Deploy healthy: ${previous_sha} -> ${SHA}"
+            exit 0
+          fi
+
+          if [ -n "${previous_sha}" ]; then
+            echo "${previous_sha}" > /etc/wgmesh-pipeline/deployed_sha
+            systemctl restart wgmesh-pipeline
+            echo "ROLLBACK complete to ${previous_sha}"
+          else
+            echo "ROLLBACK impossible: no previous SHA recorded (first deploy)"
+          fi
+          exit 1
+          REMOTE
+
+      - name: Report
+        run: echo "Box $BOX_IP deployed image tag '${{ github.event.inputs.sha }}'."
