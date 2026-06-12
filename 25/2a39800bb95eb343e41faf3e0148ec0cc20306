@@ -1,0 +1,58 @@
+pipeline/tests/test_forge_factory.py
+  s_e572593943375e::t_d4b9b1ba4ccc13 35-54
+docs/plans/2026-06-11-003a-workflow-disposition.md
+  s_e572593943375e::t_e294fd7477894a 42-43
+pipeline/wgmesh_pipeline/github/client.py
+  s_e572593943375e::t_c8455b8e1a922e 114-115,117
+pipeline/wgmesh_pipeline/forge/gitea.py
+  s_e572593943375e::t_08dd9e0c70e71a 63-64
+  s_e572593943375e::t_bea842986c58e6 73
+  s_e572593943375e::t_21eb6e2fba2455 227-231,236-240,244-263
+  s_e572593943375e::t_a85e4dcbfde50f 48-51
+.github/workflows/release.yml
+  s_e572593943375e::t_2d4b2e78f3aac2 70-73,75-84
+  s_e572593943375e::t_591e20fd67c36e 35-40,43,45
+docs/plans/2026-06-11-001-feat-containerized-box-deploy-plan.md
+  s_e572593943375e::t_ae9fa7caa0fbf0 1-222
+pipeline/tests/conformance/test_forge_conformance.py
+  s_e572593943375e::t_abd55a0c602b38 351-354
+  s_e572593943375e::t_8285b606bdf2f6 520-527
+  s_e572593943375e::t_9c285601d1468a 256-258,260
+pipeline/wgmesh_pipeline/config.py
+  s_e572593943375e::t_8307e3a28fb35c 44,113
+pipeline/wgmesh_pipeline/forge/gitfacts.py
+  s_e572593943375e::t_a85e4dcbfde50f 35,70
+pipeline/tests/test_gate.py
+  s_e572593943375e::t_d5faf2ee557c28 420-482
+pipeline/docs/FORGE-SWAP.md
+  s_e572593943375e::t_8a422836d3a5aa 107,110,113
+  s_e572593943375e::t_e294fd7477894a 39
+docs/plans/2026-06-11-003-refactor-forge-portable-sdlc-plan.md
+  s_e572593943375e::t_ae9fa7caa0fbf0 1-217
+pipeline/tests/test_merge_gate.py
+  s_e572593943375e::t_d4b9b1ba4ccc13 85-113
+pipeline/wgmesh_pipeline/poller.py
+  s_e572593943375e::t_fda161c3e14bfd 169-174
+pipeline/tests/test_poller.py
+  s_e572593943375e::t_79ae7be0226ba9 400-442
+pipeline/wgmesh_pipeline/forge/merge_gate.py
+  s_e572593943375e::t_2a3c7a475deb3c 53-57,59-67
+pipeline/tests/test_reconcile.py
+  s_e572593943375e::t_8285b606bdf2f6 279-296
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "252a39800bb95eb343e41faf3e0148ec0cc20306",
+  "prompts": {},
+  "sessions": {
+    "s_e572593943375e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "73f3e1b0-bc7b-47d7-97f0-2bec21527939",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
