@@ -1,0 +1,26 @@
+pipeline/wgmesh_pipeline/strategy_audit.py
+  s_e572593943375e::t_081e9859d08c75 50-51,53
+  s_e572593943375e::t_25629f64fc94fb 8-11
+  s_e572593943375e::t_bcea82327dfcfd 206
+  s_e572593943375e::t_b15b46d019ac63 14-19,21-23
+  s_e572593943375e::t_5a941ae4c0cf9c 1-7,12-13,20,24-49,52,54-205,207-314,316-399
+  s_e572593943375e::t_6a229ad52c56a5 315
+pipeline/tests/test_strategy_audit.py
+  s_e572593943375e::t_b4894b17ecc006 1-353
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "0886e77457ae7de022c4cab56ffd4e65ddf5d9e0",
+  "prompts": {},
+  "sessions": {
+    "s_e572593943375e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "73f3e1b0-bc7b-47d7-97f0-2bec21527939",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
