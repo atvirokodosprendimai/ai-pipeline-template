@@ -1,8 +1,8 @@
 {
-  "last_check": "2026-06-12T21:16:50Z",
+  "last_check": "2026-06-12T22:56:45Z",
   "check_interval_hours": 0.5,
-  "checks_run": 840,
-  "issues_healed_total": 30,
+  "checks_run": 841,
+  "issues_healed_total": 31,
   "consecutive_no_mutation_runs": 0,
   "retry_tracker": {
     "651": {
@@ -56,8 +56,8 @@
       "action": "retrigger_goose"
     },
     "pr-720": {
-      "retries": 1,
-      "last_retry": "2026-06-11T21:34:29Z",
+      "retries": 2,
+      "last_retry": "2026-06-12T22:56:42Z",
       "action": "retrigger_goose"
     },
     "pr-689": {
@@ -70,25 +70,25 @@
     "dogfood": true,
     "presence": true,
     "endpoint_details": "chimney:ok,cloudroof:ok,coroot:ok,tvcentras:ok",
-    "checked_at": "2026-06-12T21:16:49Z"
+    "checked_at": "2026-06-12T22:56:45Z"
   },
   "idle_signal": {
     "idle": false,
     "open_prs": 6,
     "active_pipeline_issues": 0,
-    "checked_at": "2026-06-12T21:16:49Z"
+    "checked_at": "2026-06-12T22:56:45Z"
   },
   "last_run_summary": {
     "stale_triage_found": 0,
     "stale_copilot_found": 0,
-    "stale_approved_found": 0,
+    "stale_approved_found": 1,
     "needs_human_closed": 0,
-    "actions_taken": 0,
+    "actions_taken": 1,
     "errors": 0
   },
-  "last_mutation_asserted_at": "2026-06-12T21:16:50Z",
+  "last_mutation_asserted_at": "2026-06-12T22:56:46Z",
   "last_mutation_assertion": {
     "status": "passed",
-    "checked_at": "2026-06-12T21:16:50Z"
+    "checked_at": "2026-06-12T22:56:46Z"
   }
 }
