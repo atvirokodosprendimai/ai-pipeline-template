@@ -135,6 +135,14 @@
       "class": "human",
       "risk_tier": "low",
       "reason": "PR disposition escalated for human review: needs-human-label"
+    },
+    {
+      "timestamp": "2026-06-12T14:28:06Z",
+      "pr_number": 1677,
+      "action": "human",
+      "class": "human",
+      "risk_tier": "low",
+      "reason": "PR disposition escalated for human review: needs-human-label"
     }
   ],
   "acted_fingerprints": [
@@ -148,6 +156,7 @@
     "1499:38bec1d07a7ffbb995a0293de045931b73ba9135:human",
     "1547:8f32b7d965b7361d023f02ac357cd81fe5188de1:human",
     "1624:18bccfde2019b36fc309d67027404588f8f1c848:human",
+    "1677:88e1bc51e2af3004237dc9e4c35f2e0e407cfdef:human",
     "736:d2b5326adfacf1b2c7034f81a2f6af228e98b94b:human",
     "741:2ba8a63a6e620a197ddfa2a8edfd12b03338be88:human",
     "743:2fb8d71977d0fbced39321b9d9446fbb825326a5:human",
