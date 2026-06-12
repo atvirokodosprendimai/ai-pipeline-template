@@ -80,7 +80,8 @@ jobs:
           echo "No gh CLI usage in pipeline runtime code. PASS."
 
   # ---- absorbed from pii-policy-check.yml (U10) ----
-  # NOTE: uses pull_request head/base SHA contexts — GitHub-specific by
+  # NOTE (exception to the portable-subset header above): this job uses
+  # pull_request head/base SHA contexts — GitHub-specific by
   # design; on another forge this job is rewritten with the thin CI file
   # (docs/ci-portability.md). Runs only on pull_request events.
   pii-policy-check:
@@ -288,7 +289,9 @@ jobs:
             echo "No spec file in diff. PASS (nothing to validate)."
             exit 0
           fi
-          bash .github/scripts/validate-spec.sh "$spec" | tee /tmp/validation-results.txt
+          # validate-spec.sh may exit nonzero on FAIL; with pipefail that would
+          # kill the step before the explicit error line — let grep decide.
+          bash .github/scripts/validate-spec.sh "$spec" | tee /tmp/validation-results.txt || true
           if grep -q '|FAIL|' /tmp/validation-results.txt; then
             echo "::error::spec structural validation failed for $spec"
             exit 1
