@@ -111,10 +111,10 @@ class GitHubClient:
                 "per_page": 30,
             },
         )
-        pattern = re.compile(
-            rf"^(?:impl|spec|fix): (?:Issue #{issue_number}(?!\w)|.*\(Issue #{issue_number}\)\s*$)"
-        )
+        from wgmesh_pipeline.forge.gitfacts import resolution_pattern
+
         items = data.get("items") or []
+        pattern = resolution_pattern(issue_number)
         return any(pattern.match(str(item.get("title", ""))) for item in items)
 
     def get_diff(self, pr_number: int) -> str:

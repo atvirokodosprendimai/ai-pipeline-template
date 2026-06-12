@@ -36,7 +36,7 @@ identities (self-approval is rejected on both hosts):
 
 Token mint: Forgejo UI → Settings → Applications, or
 `forgejo admin user generate-access-token` (see
-`tests/conformance/docker-compose.gitea.yml` for exact commands). Scope
+`pipeline/tests/conformance/docker-compose.gitea.yml` for exact commands). Scope
 minimally; per the allowlist-not-denylist lesson, expose only these two
 tokens to the box process.
 
@@ -104,13 +104,13 @@ explicit deferral in the forge-portable plan.)
 ## 7. End-to-end verification checklist (local Forgejo)
 
 Run once per adapter change; the stubbed conformance suite
-(`pytest tests/conformance/ -q`) is the always-on contract, this checklist is
+(`pytest pipeline/tests/conformance/ -q`) is the always-on contract, this checklist is
 the live proof.
 
-1. `docker compose -f tests/conformance/docker-compose.gitea.yml up -d`,
+1. `docker compose -f pipeline/tests/conformance/docker-compose.gitea.yml up -d`,
    bootstrap users/token/repo per the comments in that file.
 2. `GITEA_LIVE=1 GITEA_TOKEN=... GITEA_REPO=conformance/conformance
-   .venv/bin/python -m pytest tests/conformance/ -q` — live contract tests
+   .venv/bin/python -m pytest pipeline/tests/conformance/ -q` — live contract tests
    pass (issue + label round-trip, resolution-PR negative, branch lookup).
 3. **Issue → spec PR:** create an issue labeled `needs-triage`; run the box
    in `spec-only` with `FORGE_KIND=gitea` → spec branch pushed, spec PR

@@ -50,10 +50,21 @@ def ensure_mergeable(client: _ReviewSurface, pr_number: int) -> MergeReadiness:
     has_distinct = any(login and login != author for login in approvals)
 
     if not has_distinct:
-        if client.can_review():
+        if reasons:
+            # Don't burn a reviewer approval on a red build — it would go
+            # stale by the time CI is fixed and pushed.
+            reasons.append("no distinct-principal approval (deferred while ci not green)")
+        elif client.can_review():
             # The reviewer credential is a separate principal from the author
-            # bot by configuration; its approval satisfies the gate.
-            client.approve_pr(pr_number)
+            # bot by configuration; its approval satisfies the gate. A failed
+            # approval (422 same-identity misconfig, expired PAT) must become
+            # a readiness reason, not an exception — otherwise it bypasses
+            # the needs-human escalation path and strands the issue mid-merge.
+            try:
+                client.approve_pr(pr_number)
+            except Exception as exc:
+                log.warning("merge gate: reviewer approval failed for PR #%s: %s", pr_number, exc)
+                reasons.append(f"reviewer approval failed: {exc}")
         else:
             reasons.append("no distinct-principal approval and no reviewer credential")
 

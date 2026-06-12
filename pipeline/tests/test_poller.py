@@ -397,3 +397,46 @@ def test_main_graph_shadow_fixture_halts_at_specced_without_writes(tmp_path, cfg
 
     assert store.get_issue(1).stage == "specced"
     assert client.dry_run_records == []
+
+
+def test_reviewed_issue_records_escalated_when_gate_flips_decision(tmp_path, cfg: Config) -> None:
+    """P0 regression guard: the distinct-principal merge gate can flip the
+    decision merge -> escalate at side-effect time. The poller must record
+    the POST-side-effect outcome — recording the pre-flip decision stored a
+    terminal 'merged' with the PR unmerged (false completion)."""
+
+    class RoutedSession:
+        def __init__(self):
+            self.calls = []
+
+        def request(self, method, url, **kwargs):
+            self.calls.append({"method": method, "url": url, "kwargs": kwargs})
+            if "/check-runs" in url:
+                # CI red -> gate must refuse the merge and escalate.
+                return Response({"check_runs": [{"status": "completed", "conclusion": "failure"}]})
+            if method == "GET" and url.endswith("/reviews"):
+                return Response([])
+            if method == "GET" and "/pulls/" in url:
+                return Response({"number": 321, "user": {"login": "author-bot"}, "head": {"sha": "abc"}})
+            return Response({"ok": True})
+
+    live = Config(target_repo=cfg.target_repo, mode="live", max_files=cfg.max_files)
+    store = StateStore(tmp_path / "state.db")
+    store.upsert_issue(3, "Ready", stage="reviewed", impl_pr=321)
+    session = RoutedSession()
+    client = EmptyClient(live, session=session)
+    p = Poller(config=live, store=store, client=client, graph=Graph())
+    p.scratch[3] = {
+        "diff": "+docs\n",
+        "changed_files": ["docs/readme.md"],
+        "tests_passed": True,
+        "sanitise_ok": True,
+        "review_findings": [],
+        "impl_pr": 321,
+    }
+
+    result = asyncio.run(p.tick())
+
+    assert result is not None
+    assert store.get_issue(3).stage == "escalated"
+    assert not any(c["url"].endswith("/321/merge") for c in session.calls)

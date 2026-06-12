@@ -32,11 +32,17 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Resolve image name and release tag
+        env:
+          # Bind contexts to env vars — interpolating ${{ }} directly into a
+          # run block is the classic Actions script-injection shape (a tag
+          # name is attacker-influenced input on forks).
+          REPO_OWNER: ${{ github.repository_owner }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          OWNER_LC=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          OWNER_LC=$(echo "$REPO_OWNER" | tr '[:upper:]' '[:lower:]')
           echo "IMAGE_NAME=ghcr.io/$OWNER_LC/wgmesh-pipeline" >> "$GITHUB_ENV"
-          echo "RELEASE_TAG=${{ github.ref_name }}" >> "$GITHUB_ENV"
+          echo "RELEASE_TAG=$REF_NAME" >> "$GITHUB_ENV"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -61,14 +67,18 @@ jobs:
         run: docker run --rm "$IMAGE_NAME:test" python -m pytest pipeline/tests/ -q
 
       - name: Run eval gate inside image
-        run: docker run --rm "$IMAGE_NAME:test" python -m evals.run_evals --check
+        # evals/ is repo-level code, not part of the installed wgmesh_pipeline
+        # package — it needs PYTHONPATH=/app/pipeline inside the container,
+        # mirroring ci.yml's PYTHONPATH=pipeline.
+        run: docker run --rm -e PYTHONPATH=/app/pipeline "$IMAGE_NAME:test" python -m evals.run_evals --check
 
-      - name: Push image (release tag + latest)
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: pipeline/deploy/Dockerfile
-          push: true
-          tags: |
-            ${{ env.IMAGE_NAME }}:${{ env.RELEASE_TAG }}
-            ${{ env.IMAGE_NAME }}:latest
+      - name: Push the TESTED image (release tag + latest)
+        # Re-tag and push the exact bytes that passed the gates — a second
+        # build-push-action build is not guaranteed to reproduce the tested
+        # image (no shared cache in the portable subset).
+        run: |
+          set -euo pipefail
+          docker tag "$IMAGE_NAME:test" "$IMAGE_NAME:$RELEASE_TAG"
+          docker tag "$IMAGE_NAME:test" "$IMAGE_NAME:latest"
+          docker push "$IMAGE_NAME:$RELEASE_TAG"
+          docker push "$IMAGE_NAME:latest"

@@ -32,3 +32,23 @@ def test_config_reads_forge_kind_from_env() -> None:
     )
 
     assert config.forge_kind == "gitea"
+
+
+def test_config_reads_gitea_url_from_env() -> None:
+    from wgmesh_pipeline.config import load_config
+
+    config = load_config(
+        {
+            "TARGET_REPO": "o/r",
+            "FORGE_KIND": "gitea",
+            "GITEA_URL": "https://forge.example.com",
+            "DATABASE_MODE": "local",
+        }
+    )
+
+    assert config.gitea_url == "https://forge.example.com"
+
+    from wgmesh_pipeline.forge.factory import make_forge
+
+    forge = make_forge(config)
+    assert forge.api_root == "https://forge.example.com/api/v1"

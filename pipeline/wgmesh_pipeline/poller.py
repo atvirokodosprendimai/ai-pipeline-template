@@ -156,7 +156,6 @@ class Poller:
         if issue.stage == "reviewed":
             result = gate_node(state, max_files=self.config.max_files, apply_side_effects=False)
             self.scratch[issue.number] = dict(result)
-            outcome = "merged" if result["decision"] == "merge" else "escalated"
             # Side-effect BEFORE the terminal transition: if the merge/label
             # network call fails it raises here, the issue stays at 'reviewed'
             # (retried next tick, terminal-failed after max attempts), and we
@@ -167,6 +166,12 @@ class Poller:
             # retry; merge_pr should tolerate an already-merged PR at the API
             # layer to make that fully idempotent.
             apply_gate_side_effects(result)
+            # Outcome AFTER side effects: the distinct-principal merge gate can
+            # flip the decision merge -> escalate at side-effect time (red CI,
+            # no distinct approval). Reading the decision before the flip
+            # recorded terminal 'merged' with the PR unmerged — the
+            # false-completion class this pipeline exists to prevent.
+            outcome = "merged" if result["decision"] == "merge" else "escalated"
             advanced = self.store.transition(issue.number, "reviewed", outcome)
             score_run(result, outcome=outcome)
             return advanced

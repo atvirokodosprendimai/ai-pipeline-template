@@ -253,11 +253,11 @@ def test_add_remove_label_round_trip(kind: str) -> None:
         assert session.calls[0]["kwargs"]["json"] == {"labels": ["needs-triage"]}
         assert session.calls[1]["url"].endswith("/issues/17/labels/needs-triage")
     else:
-        # Gitea addresses labels by numeric id: name -> id lookup before each
-        # mutation, and the id (never the name) goes over the wire.
-        assert [c["method"] for c in session.calls] == ["GET", "POST", "GET", "DELETE"]
+        # Gitea addresses labels by numeric id: one name -> id listing, then
+        # cached per instance — the second mutation must NOT re-list.
+        assert [c["method"] for c in session.calls] == ["GET", "POST", "DELETE"]
         assert session.calls[1]["kwargs"]["json"] == {"labels": [9]}
-        assert session.calls[3]["url"].endswith("/issues/17/labels/9")
+        assert session.calls[2]["url"].endswith("/issues/17/labels/9")
 
 
 def test_gitea_unknown_label_fails_loudly() -> None:
@@ -348,7 +348,10 @@ def test_approve_pr_uses_reviewer_credential_not_author_token(kind: str) -> None
     auth = call["kwargs"]["headers"]["Authorization"]
     assert auth == "Bearer reviewer-pat"
     assert auth != "Bearer author-pat"
-    assert call["kwargs"]["json"] == {"event": "APPROVE"}
+    # Host spelling divergence: GitHub's CreateReview event is "APPROVE",
+    # Gitea's CreatePullReview expects "APPROVED".
+    expected_event = "APPROVE" if kind == GITHUB else "APPROVED"
+    assert call["kwargs"]["json"] == {"event": expected_event}
 
 
 @parametrize_adapters
@@ -514,3 +517,11 @@ class TestGiteaLiveContract:
         self, client: GiteaForge
     ) -> None:
         assert client.find_open_pr_number(f"bot/spec-{uuid.uuid4().hex}") is None
+
+
+@parametrize_adapters
+def test_approve_pr_spec_only_refused(kind: str) -> None:
+    client, _session = make_client(kind, "spec-only", [])
+
+    with pytest.raises(PermissionError, match="approve_pr.*spec-only"):
+        client.approve_pr(7)

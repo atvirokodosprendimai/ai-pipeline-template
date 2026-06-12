@@ -32,7 +32,7 @@ class _ResolutionHost(Protocol):
     def has_merged_resolution_pr(self, issue_number: int) -> bool: ...
 
 
-def _resolution_pattern(issue_number: int) -> re.Pattern[str]:
+def resolution_pattern(issue_number: int) -> re.Pattern[str]:
     # Same exact-match discipline as GitHubClient.has_merged_resolution_pr:
     # leading impl|spec|fix prefix, then either the canonical "Issue #N" form
     # (no alphanumeric continuation) or the Copilot-era "(Issue #N)" suffix —
@@ -67,7 +67,7 @@ def has_merged_resolution_commit(
         raise GitFactsUnavailable(str(exc)) from exc
     if result.returncode != 0:
         raise GitFactsUnavailable(result.stderr.strip()[:200])
-    pattern = _resolution_pattern(issue_number)
+    pattern = resolution_pattern(issue_number)
     return any(pattern.match(line) for line in result.stdout.splitlines())
 
 

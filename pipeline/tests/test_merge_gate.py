@@ -82,3 +82,32 @@ def test_missing_approval_without_reviewer_credential_escalates() -> None:
 
     assert readiness.ready is False
     assert client.approve_calls == []
+
+
+def test_red_ci_with_reviewer_credential_defers_approval() -> None:
+    """Don't burn a reviewer approval on a red build — it goes stale by the
+    time CI is fixed and re-pushed."""
+    client = ReviewClient(checks_green=False, approvals=[], reviewer_credential=True)
+
+    readiness = ensure_mergeable(client, 7)
+
+    assert readiness.ready is False
+    assert client.approve_calls == []
+    assert any("deferred while ci not green" in r for r in readiness.reasons)
+
+
+def test_approve_failure_becomes_readiness_reason_not_exception() -> None:
+    """A 422 (same-identity misconfig) or expired reviewer PAT must surface
+    as not-ready -> escalation, never as an exception that strands the issue
+    mid-merge."""
+
+    class FailingApprove(ReviewClient):
+        def approve_pr(self, pr_number: int):
+            raise RuntimeError("422 Can not approve your own pull request")
+
+    client = FailingApprove(approvals=[], reviewer_credential=True)
+
+    readiness = ensure_mergeable(client, 7)
+
+    assert readiness.ready is False
+    assert any("reviewer approval failed" in r for r in readiness.reasons)

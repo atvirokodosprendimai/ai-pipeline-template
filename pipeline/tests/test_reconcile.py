@@ -276,3 +276,21 @@ def test_label_write_failure_does_not_block_reconcile(tmp_path) -> None:
 
     assert result.queued == 1
     assert store.get_issue(540).stage == "queued"
+
+
+def test_needs_triage_label_failure_does_not_block_reconcile(tmp_path) -> None:
+    """The needs-triage cleanup write is best-effort like its needs-rework
+    sibling — a label-API failure must not abort the tick."""
+
+    class LabelFailClient(Client):
+        def remove_label(self, issue_number: int, label: str, *, spec_pr: bool = False):
+            raise RuntimeError("label API down")
+
+    store = StateStore(tmp_path / "state.db")
+    store.upsert_issue(700, "Mid-flight", stage="specced", status="open")
+    client = LabelFailClient([issue(700, ("needs-triage",), title="Mid-flight")])
+
+    result = reconcile_issues(client, store)
+
+    assert result.seen == 1
+    assert store.get_issue(700).stage == "specced"

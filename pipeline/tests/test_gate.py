@@ -417,3 +417,66 @@ def test_gate_escalates_instead_of_merging_when_ci_red() -> None:
     assert any("ci not green" in r for r in result["risk_reasons"])
     assert not any(c["url"].endswith("/pulls/456/merge") for c in client.session.calls)
     assert any(c["url"].endswith("/issues/9/labels") for c in client.session.calls)
+
+
+class SessionNoApprovals(SessionForPr):
+    def request(self, method: str, url: str, **kwargs):
+        if method == "GET" and url.endswith("/reviews"):
+            self.calls.append({"method": method, "url": url, "kwargs": kwargs})
+            return ResponseForPr([])
+        return super().request(method, url, **kwargs)
+
+
+def test_gate_escalates_when_no_approval_and_no_reviewer_credential() -> None:
+    """Branch B of the merge gate: CI green, nobody approved, box has no
+    reviewer identity -> escalate, never merge."""
+    client = GitHubClient(
+        cfg(mode="live"), session=SessionNoApprovals({"number": 456}), sanitiser=lambda text: True
+    )
+
+    result = gate_node(
+        {
+            "issue": GitHubIssue(number=9, title="Fix relay", labels=(), state="open"),
+            "github": client,
+            "diff": "+docs\n",
+            "changed_files": ["docs/readme.md"],
+            "impl_pr": 456,
+            "tests_passed": True,
+            "sanitise_ok": True,
+            "review_findings": [],
+        },
+        max_files=3,
+    )
+
+    assert result["decision"] == "escalate"
+    assert not any(c["url"].endswith("/pulls/456/merge") for c in client.session.calls)
+
+
+def test_gate_self_serves_reviewer_approval_then_merges() -> None:
+    """Reviewer credential present, no existing approval: the gate approves
+    as the reviewer identity (distinct Bearer token) and proceeds to merge."""
+    config = replace(cfg(mode="live"), reviewer_pat="reviewer-pat")
+    client = GitHubClient(
+        config, session=SessionNoApprovals({"number": 456}), sanitiser=lambda text: True
+    )
+
+    result = gate_node(
+        {
+            "issue": GitHubIssue(number=9, title="Fix relay", labels=(), state="open"),
+            "github": client,
+            "diff": "+docs\n",
+            "changed_files": ["docs/readme.md"],
+            "impl_pr": 456,
+            "tests_passed": True,
+            "sanitise_ok": True,
+            "review_findings": [],
+        },
+        max_files=3,
+    )
+
+    assert result["decision"] == "merge"
+    approve = next(
+        c for c in client.session.calls if c["method"] == "POST" and c["url"].endswith("/reviews")
+    )
+    assert approve["kwargs"]["headers"]["Authorization"] == "Bearer reviewer-pat"
+    assert any(c["url"].endswith("/pulls/456/merge") for c in client.session.calls)
