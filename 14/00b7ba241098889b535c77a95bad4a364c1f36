@@ -1,0 +1,21 @@
+pipeline/tests/fixtures/pipeline_health_state.json
+  s_e572593943375e::t_4477a158a10421 1-94
+pipeline/tests/selfheal_fixtures.py
+  s_e572593943375e::t_4477a158a10421 10-12
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "1400b7ba241098889b535c77a95bad4a364c1f36",
+  "prompts": {},
+  "sessions": {
+    "s_e572593943375e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "73f3e1b0-bc7b-47d7-97f0-2bec21527939",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
