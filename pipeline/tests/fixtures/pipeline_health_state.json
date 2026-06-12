@@ -1,0 +1,94 @@
+{
+  "last_check": "2026-06-12T17:21:49Z",
+  "check_interval_hours": 0.5,
+  "checks_run": 838,
+  "issues_healed_total": 29,
+  "consecutive_no_mutation_runs": 0,
+  "retry_tracker": {
+    "651": {
+      "retries": 2,
+      "last_retry": "2026-06-06T10:04:04Z",
+      "action": "retrigger_triage",
+      "cooldown_until": "2026-06-08T13:02:23Z"
+    },
+    "584": {
+      "retries": 2,
+      "last_retry": "2026-06-06T10:04:08Z",
+      "action": "retrigger_triage",
+      "cooldown_until": "2026-06-07T11:53:01Z"
+    },
+    "573": {
+      "retries": 2,
+      "last_retry": "2026-06-06T10:04:13Z",
+      "action": "retrigger_triage",
+      "cooldown_until": "2026-06-07T11:53:02Z"
+    },
+    "540": {
+      "retries": 2,
+      "last_retry": "2026-06-06T10:04:17Z",
+      "action": "retrigger_triage",
+      "cooldown_until": "2026-06-07T11:53:03Z"
+    },
+    "539": {
+      "retries": 2,
+      "last_retry": "2026-06-06T10:04:22Z",
+      "action": "retrigger_triage",
+      "cooldown_until": "2026-06-07T11:53:04Z"
+    },
+    "652": {
+      "retries": 1,
+      "last_retry": "2026-06-07T11:08:51Z",
+      "action": "retrigger_triage"
+    },
+    "pr-667": {
+      "retries": 2,
+      "last_retry": "2026-06-12T01:56:38Z",
+      "action": "retrigger_goose"
+    },
+    "pr-691": {
+      "retries": 2,
+      "last_retry": "2026-06-12T06:45:56Z",
+      "action": "retrigger_goose"
+    },
+    "pr-702": {
+      "retries": 1,
+      "last_retry": "2026-06-11T19:18:14Z",
+      "action": "retrigger_goose"
+    },
+    "pr-720": {
+      "retries": 1,
+      "last_retry": "2026-06-11T21:34:29Z",
+      "action": "retrigger_goose"
+    },
+    "pr-689": {
+      "retries": 1,
+      "last_retry": "2026-06-12T06:46:02Z",
+      "action": "retrigger_goose"
+    }
+  },
+  "funnel_signals": {
+    "dogfood": true,
+    "presence": true,
+    "endpoint_details": "chimney:ok,cloudroof:ok,coroot:ok,tvcentras:ok",
+    "checked_at": "2026-06-12T17:21:48Z"
+  },
+  "idle_signal": {
+    "idle": false,
+    "open_prs": 6,
+    "active_pipeline_issues": 0,
+    "checked_at": "2026-06-12T17:21:48Z"
+  },
+  "last_run_summary": {
+    "stale_triage_found": 0,
+    "stale_copilot_found": 0,
+    "stale_approved_found": 0,
+    "needs_human_closed": 0,
+    "actions_taken": 0,
+    "errors": 0
+  },
+  "last_mutation_asserted_at": "2026-06-12T17:21:49Z",
+  "last_mutation_assertion": {
+    "status": "passed",
+    "checked_at": "2026-06-12T17:21:49Z"
+  }
+}

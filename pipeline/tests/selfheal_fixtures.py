@@ -7,7 +7,9 @@ from pathlib import Path
 from wgmesh_pipeline.selfheal import SelfHealInputs
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-STATE_FILE = REPO_ROOT / "company" / "pipeline-health-state.json"
+# FROZEN fixture (lesson #1691): the live state file mutates every 30min
+# heal cron; parity pins the recorded copy.
+STATE_FILE = Path(__file__).parent / "fixtures" / "pipeline_health_state.json"
 
 NOW = "2026-06-12T17:21:49Z"
 SIGNALS_NOW = "2026-06-12T17:21:48Z"
