@@ -1,0 +1,25 @@
+pipeline/wgmesh_pipeline/control_loop/__init__.py
+  s_e572593943375e::t_5609c813e66f37 56-59
+  s_e572593943375e::t_2069ab3b198f2e 45
+  s_e572593943375e::t_6855d181303deb 214-231
+pipeline/wgmesh_pipeline/control_loop/executor.py
+  s_e572593943375e::t_03c2d88d27ff2e 1-233
+pipeline/tests/test_control_loop_executor.py
+  s_e572593943375e::t_d81a34f35ba7b8 1-307
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "41954e21b5454bfabd3bdd5014094cac4a5493ee",
+  "prompts": {},
+  "sessions": {
+    "s_e572593943375e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "73f3e1b0-bc7b-47d7-97f0-2bec21527939",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
