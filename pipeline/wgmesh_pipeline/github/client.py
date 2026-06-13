@@ -15,6 +15,10 @@ from wgmesh_pipeline.forge.protocol import ForgeIssue
 API_ROOT = "https://api.github.com"
 SANITISE_SCRIPT = Path(__file__).resolve().parents[3] / "company" / "scripts" / "sanitise.sh"
 GIT_TIMEOUT_SECONDS = 120
+# Ref the workflow_dispatch fires against. The box's retrigger/observation-loop
+# dispatches target the default branch; a constant (not a Config field) keeps
+# this U1 surface minimal — revisit if a non-main dispatch ref is ever needed.
+WORKFLOW_DISPATCH_REF = "main"
 HTTP_TIMEOUT_SECONDS = 30
 SANITISE_TIMEOUT_SECONDS = 120
 Sanitiser = Callable[[str], bool]
@@ -149,6 +153,63 @@ class GitHubClient:
             "POST",
             f"/repos/{self.config.owner}/{self.config.repo}/issues/{issue_number}/comments",
             payload={"body": body},
+        )
+
+    def create_issue(
+        self, *, title: str, body: str, labels: tuple[str, ...] = ()
+    ) -> Any:
+        """Open a new issue. Title + body are LLM/heal-derived, so both pass
+        the sanitise gate inside ``_write`` (LLM-emit lesson). ``labels`` may
+        carry ``needs-human`` — the spec-only safety valve below admits that
+        one creation just as it admits the ``add_label`` valve."""
+        return self._write(
+            "create_issue",
+            "POST",
+            f"/repos/{self.config.owner}/{self.config.repo}/issues",
+            payload={"title": title, "body": body, "labels": list(labels)},
+        )
+
+    def close_issue(
+        self, number: int, reason: str, *, state_reason: str = "not_planned"
+    ) -> Any:
+        """Close an issue with a human-facing rationale comment, then flip its
+        state. The comment carries the LLM/heal reason and is sanitise-gated by
+        ``comment``; the state PATCH carries no free text. ``state_reason`` is
+        ``not planned`` by default — ``completed`` is reserved for the
+        merged-impl-PR closer (observation R5)."""
+        self.comment(number, reason)
+        # Accept the gh-CLI phrasing ("not planned") callers use and send the
+        # REST API form ("not_planned"); valid values: completed|not_planned|reopened.
+        api_state_reason = state_reason.strip().lower().replace(" ", "_")
+        return self._write(
+            "close_issue",
+            "PATCH",
+            f"/repos/{self.config.owner}/{self.config.repo}/issues/{number}",
+            payload={"state": "closed", "state_reason": api_state_reason},
+        )
+
+    def close_pr(self, number: int, comment: str) -> Any:
+        """Comment, then close a pull request. The comment endpoint is shared
+        with issues on GitHub (``/issues/{n}/comments``) and is sanitise-gated;
+        the state PATCH on ``/pulls/{n}`` carries no free text."""
+        self.comment(number, comment)
+        return self._write(
+            "close_pr",
+            "PATCH",
+            f"/repos/{self.config.owner}/{self.config.repo}/pulls/{number}",
+            payload={"state": "closed"},
+        )
+
+    def dispatch_workflow(self, workflow: str, inputs: dict[str, Any]) -> Any:
+        """Trigger a GitHub Actions workflow_dispatch. Host-specific by design
+        (see protocol/seam note); a non-Actions forge overrides this with a
+        no-op-and-warn. The ref defaults to the configured base branch. Goes
+        through ``_write`` so shadow records a dry-run and spec-only refuses."""
+        return self._write(
+            "dispatch_workflow",
+            "POST",
+            f"/repos/{self.config.owner}/{self.config.repo}/actions/workflows/{workflow}/dispatches",
+            payload={"ref": WORKFLOW_DISPATCH_REF, "inputs": dict(inputs)},
         )
 
     def create_pr(
@@ -297,7 +358,16 @@ class GitHubClient:
             self.dry_run_records.append(result)
             return result
         allowed_spec_pr_write = spec_pr and operation in {"push_branch", "create_pr", "remove_label", "add_label"}
-        allowed_safety_write = operation == "add_label" and "needs-human" in payload.get("labels", [])
+        # The needs-human safety valve admits both adding the label and opening
+        # a needs-human issue (escalate/create_needs_human/supervisor_dead/
+        # circuit_breaker plan a creation, not a label add, when no issue exists).
+        admits_needs_human = (
+            operation == "add_label"
+            or operation == "create_issue"
+        )
+        allowed_safety_write = (
+            admits_needs_human and "needs-human" in payload.get("labels", [])
+        )
         if mode == "spec-only" and not (allowed_spec_pr_write or allowed_safety_write):
             raise PermissionError(f"{operation} is not allowed when PIPELINE_MODE=spec-only")
         return self._request(method, path, json=payload)
@@ -329,8 +399,16 @@ class GitHubClient:
         elif operation == "create_pr":
             self._require_clean("create_pr title", str(payload.get("title", "")))
             self._require_clean("create_pr body", str(payload.get("body", "")))
+        elif operation == "create_issue":
+            self._require_clean("create_issue title", str(payload.get("title", "")))
+            self._require_clean("create_issue body", str(payload.get("body", "")))
         elif operation == "update_pr":
             self._require_clean("update_pr body", str(payload.get("body", "")))
+        elif operation == "dispatch_workflow":
+            # workflow_dispatch inputs can carry free text (e.g. a self-heal
+            # idle reason) that lands in a triggered run — gate every value.
+            for key, value in (payload.get("inputs") or {}).items():
+                self._require_clean(f"dispatch_workflow input {key}", str(value))
 
     def _sanitise_spec_files(self, clone_path: Path) -> None:
         specs_dir = clone_path / "specs"

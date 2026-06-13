@@ -22,8 +22,14 @@ import pytest
 
 from wgmesh_pipeline import control_loop as cl
 from wgmesh_pipeline.config import Config, load_config
-from wgmesh_pipeline.control_loop import ControlLoopScheduler
+from wgmesh_pipeline.control_loop import (
+    SELFHEAL_STATE_KEY,
+    SUPERVISOR_STATE_KEY,
+    ControlLoopScheduler,
+)
 from wgmesh_pipeline.selfheal import SelfHealInputs, SelfHealRun
+from wgmesh_pipeline.selfheal.models import HealAction
+from wgmesh_pipeline.state.store import StateStore
 from wgmesh_pipeline.supervisor import RankResult, SupervisorRankRun
 
 
@@ -138,7 +144,10 @@ def test_each_enabled_planner_fires_at_least_once() -> None:
     assert heal.calls >= 1, "selfheal planner never fired"
 
 
-def test_shadow_performs_no_forge_writes_or_store_writes() -> None:
+def test_shadow_performs_no_forge_writes_and_no_state_save_when_immaterial() -> None:
+    # Shadow contract (post-U3): zero FORGE writes always; the box-internal
+    # state store MAY be read (load_control_state), but is NOT written when the
+    # planners report no material change (material_changed=False / no actions).
     forge = SpyForge()
     store = SpyStore()
     sched = ControlLoopScheduler(
@@ -148,7 +157,11 @@ def test_shadow_performs_no_forge_writes_or_store_writes() -> None:
     )
     asyncio.run(_run_briefly(sched))
     assert forge.write_calls == [], f"shadow wrote to forge: {forge.write_calls}"
-    assert store.calls == [], f"shadow persisted to store: {store.calls}"
+    assert "save_control_state" not in store.calls, (
+        f"immaterial cycle persisted state: {store.calls}"
+    )
+    # Reading prior state is expected (closes the previous_state gap).
+    assert set(store.calls) <= {"load_control_state"}
 
 
 def test_one_planner_raising_does_not_stop_siblings_or_scheduler() -> None:
@@ -272,3 +285,105 @@ def test_config_truthy_variants() -> None:
         assert load_config(_base_env(CONTROL_LOOP_ENABLED=raw)).control_loop_enabled is True
     for raw in ("0", "false", "", "no"):
         assert load_config(_base_env(CONTROL_LOOP_ENABLED=raw)).control_loop_enabled is False
+
+
+# --- U3: state persistence (material-change-gated, round-trip) ---------------
+
+
+def _material_rank_run(fingerprint: str = "fp-1") -> SupervisorRankRun:
+    result = RankResult(generated_at="2026-06-13T00:00:00Z", top=(), stage_summary={}, unknown=())
+    state = {"material_fingerprint": fingerprint, "top3": ["wgmesh#727"]}
+    return SupervisorRankRun(result=result, state=state, material_changed=True, rank_changed=True)
+
+
+class CapturingSupervisorSpy:
+    """Records the previous_state passed in; returns a fixed material run."""
+
+    def __init__(self, run: SupervisorRankRun) -> None:
+        self.run = run
+        self.previous_states: list = []
+
+    def __call__(self, *args, previous_state=None, **kwargs):
+        self.previous_states.append(previous_state)
+        return self.run
+
+
+def test_supervisor_material_change_persists_and_round_trips(tmp_path) -> None:
+    db = StateStore(tmp_path / "state.db")
+    sup = CapturingSupervisorSpy(_material_rank_run())
+    sched = ControlLoopScheduler(
+        config=_config(supervisor_interval_seconds=0.01, selfheal_interval_seconds=100,
+                       observation_interval_seconds=100, strategy_audit_interval_seconds=100),
+        forge=SpyForge(), store=db,
+        supervisor_planner=sup, selfheal_planner=Spy(_empty_selfheal_run()),
+    )
+    asyncio.run(_run_briefly(sched, seconds=0.08))
+
+    # Persisted under the supervisor key with the material fingerprint.
+    saved = db.load_control_state(SUPERVISOR_STATE_KEY)
+    assert saved is not None and saved["material_fingerprint"] == "fp-1"
+    # First cycle saw no prior state; a later cycle loaded the persisted copy
+    # (closes the previous_state-not-loaded gap).
+    assert sup.previous_states[0] is None
+    assert any(ps is not None for ps in sup.previous_states[1:]), \
+        "later cycle did not load persisted previous_state"
+
+
+def test_supervisor_immaterial_run_does_not_persist(tmp_path) -> None:
+    db = StateStore(tmp_path / "state.db")
+    sched = ControlLoopScheduler(
+        config=_config(supervisor_interval_seconds=0.01, selfheal_interval_seconds=100,
+                       observation_interval_seconds=100, strategy_audit_interval_seconds=100),
+        forge=SpyForge(), store=db,
+        supervisor_planner=Spy(_empty_rank_run()),  # material_changed=False
+        selfheal_planner=Spy(_empty_selfheal_run()),
+    )
+    asyncio.run(_run_briefly(sched))
+    assert db.load_control_state(SUPERVISOR_STATE_KEY) is None
+
+
+def _selfheal_run_with_action() -> SelfHealRun:
+    action = HealAction(kind="retrigger_triage", number=5,
+                        remove_label="needs-triage", add_label="needs-triage")
+    return SelfHealRun(
+        state={"issues_healed_total": 1, "last_check": "2026-06-13T00:00:00Z"},
+        actions=(action,), audit=(), circuit_breaker_tripped=False, mutation_asserted=True,
+    )
+
+
+def test_selfheal_material_activity_persists(tmp_path) -> None:
+    db = StateStore(tmp_path / "state.db")
+    # SpyForge isn't used for writes here: retrigger calls remove_label/add_label
+    # which the SpyForge RAISES on — so use a tolerant recording forge instead.
+    class TolerantForge(SpyForge):
+        def __getattr__(self, name):
+            def method(*args, **kwargs):
+                self.calls.append(name)
+                if name == "list_open_issues":
+                    return []
+                return None
+            return method
+
+    sched = ControlLoopScheduler(
+        config=_config(selfheal_interval_seconds=0.01, supervisor_interval_seconds=100,
+                       observation_interval_seconds=100, strategy_audit_interval_seconds=100),
+        forge=TolerantForge(), store=db,
+        supervisor_planner=Spy(_empty_rank_run()),
+        selfheal_planner=Spy(_selfheal_run_with_action()),
+    )
+    asyncio.run(_run_briefly(sched))
+    saved = db.load_control_state(SELFHEAL_STATE_KEY)
+    assert saved is not None and saved["issues_healed_total"] == 1
+
+
+def test_selfheal_idle_cycle_does_not_persist(tmp_path) -> None:
+    db = StateStore(tmp_path / "state.db")
+    sched = ControlLoopScheduler(
+        config=_config(selfheal_interval_seconds=0.01, supervisor_interval_seconds=100,
+                       observation_interval_seconds=100, strategy_audit_interval_seconds=100),
+        forge=SpyForge(), store=db,
+        supervisor_planner=Spy(_empty_rank_run()),
+        selfheal_planner=Spy(_empty_selfheal_run()),  # no actions, no breaker
+    )
+    asyncio.run(_run_briefly(sched))
+    assert db.load_control_state(SELFHEAL_STATE_KEY) is None

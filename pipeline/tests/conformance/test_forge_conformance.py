@@ -449,6 +449,228 @@ def test_list_pr_approvals_latest_review_wins(kind: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# U1: create_issue — sanitise-gated, shadow dry-run, spec-only refused,
+# live round-trip (Gitea label-id path), needs-human safety valve
+# ---------------------------------------------------------------------------
+
+
+@parametrize_adapters
+def test_create_issue_shadow_dry_runs_with_no_http_write(kind: str) -> None:
+    client, session = make_client(kind, "shadow", [])
+
+    result = client.create_issue(title="t", body="b", labels=("needs-human",))
+
+    assert isinstance(result, DryRunResult)
+    assert result.operation == "create_issue"
+    assert result.payload["title"] == "t"
+    assert result.payload["labels"] == ["needs-human"]
+    assert session.calls == []
+
+
+@parametrize_adapters
+def test_create_issue_spec_only_refused_without_needs_human(kind: str) -> None:
+    client, session = make_client(kind, "spec-only", [])
+
+    with pytest.raises(PermissionError, match="create_issue.*spec-only"):
+        client.create_issue(title="t", body="b", labels=("bug",))
+
+    assert session.calls == []
+
+
+@parametrize_adapters
+def test_create_issue_needs_human_safety_valve_allowed_in_spec_only(kind: str) -> None:
+    if kind == GITHUB:
+        routes = [("POST", "/repos/o/r/issues", Response({"number": 99}))]
+    else:
+        routes = [
+            ("GET", "/repos/o/r/labels", Response([{"id": 5, "name": "needs-human"}])),
+            ("POST", "/repos/o/r/issues", Response({"number": 99})),
+        ]
+    client, session = make_client(kind, "spec-only", routes)
+
+    client.create_issue(title="esc", body="b", labels=("needs-human",))
+
+    posts = [c for c in session.calls if c["method"] == "POST"]
+    assert len(posts) == 1
+    if kind == GITHUB:
+        assert posts[0]["kwargs"]["json"]["labels"] == ["needs-human"]
+    else:
+        # Gitea: name translated to numeric id before the POST.
+        assert posts[0]["kwargs"]["json"]["labels"] == [5]
+
+
+@parametrize_adapters
+def test_create_issue_live_round_trip(kind: str) -> None:
+    if kind == GITHUB:
+        routes = [("POST", "/repos/o/r/issues", Response({"number": 12}))]
+    else:
+        routes = [
+            ("GET", "/repos/o/r/labels", Response([{"id": 7, "name": "bug"}])),
+            ("POST", "/repos/o/r/issues", Response({"number": 12})),
+        ]
+    client, session = make_client(kind, "live", routes)
+
+    client.create_issue(title="t", body="b", labels=("bug",))
+
+    posts = [c for c in session.calls if c["method"] == "POST" and "/issues" in c["url"]]
+    assert len(posts) == 1
+
+
+def test_create_issue_sanitise_fail_blocks_write() -> None:
+    cfg = Config(target_repo="o/r", mode="shadow", wgmesh_bot_pat="author-pat")
+    session = RoutingSession([])
+    client = GitHubClient(cfg, session=session, sanitiser=lambda _t: False)
+
+    with pytest.raises(Exception):  # SanitiseError
+        client.create_issue(title="leak", body="b")
+
+    assert session.calls == []
+
+
+# ---------------------------------------------------------------------------
+# U1: close_issue — comment (gated) + state PATCH; state_reason GitHub-only
+# ---------------------------------------------------------------------------
+
+
+@parametrize_adapters
+def test_close_issue_shadow_dry_runs_no_http(kind: str) -> None:
+    client, session = make_client(kind, "shadow", [])
+
+    result = client.close_issue(7, "resolved by self-healing")
+
+    assert isinstance(result, DryRunResult)
+    assert result.operation == "close_issue"
+    assert result.payload["state"] == "closed"
+    # Two dry-run records: the gated comment, then the state PATCH.
+    assert [r.operation for r in client.dry_run_records] == ["comment", "close_issue"]
+    assert session.calls == []
+
+
+@parametrize_adapters
+def test_close_issue_spec_only_refused(kind: str) -> None:
+    client, session = make_client(kind, "spec-only", [])
+
+    with pytest.raises(PermissionError):
+        client.close_issue(7, "reason")
+
+    assert session.calls == []
+
+
+@parametrize_adapters
+def test_close_issue_live_comments_then_patches_state(kind: str) -> None:
+    routes = [
+        ("POST", "/issues/7/comments", Response({"id": 1})),
+        ("PATCH", "/issues/7", Response({"number": 7, "state": "closed"})),
+    ]
+    client, session = make_client(kind, "live", routes)
+
+    client.close_issue(7, "done", state_reason="not planned")
+
+    methods = [c["method"] for c in session.calls]
+    assert methods == ["POST", "PATCH"]
+    patch_body = session.calls[1]["kwargs"]["json"]
+    assert patch_body["state"] == "closed"
+    if kind == GITHUB:
+        # state_reason is a GitHub-only field; the adapter sends it.
+        assert patch_body["state_reason"] == "not_planned"
+    else:
+        # Gitea PATCH issue has no state_reason — the seam drops it.
+        assert "state_reason" not in patch_body
+
+
+# ---------------------------------------------------------------------------
+# U1: close_pr — comment (gated) + state PATCH on /pulls/{n}
+# ---------------------------------------------------------------------------
+
+
+@parametrize_adapters
+def test_close_pr_shadow_dry_runs_no_http(kind: str) -> None:
+    client, session = make_client(kind, "shadow", [])
+
+    result = client.close_pr(8, "superseded")
+
+    assert isinstance(result, DryRunResult)
+    assert result.operation == "close_pr"
+    assert [r.operation for r in client.dry_run_records] == ["comment", "close_pr"]
+    assert session.calls == []
+
+
+@parametrize_adapters
+def test_close_pr_spec_only_refused(kind: str) -> None:
+    client, session = make_client(kind, "spec-only", [])
+
+    with pytest.raises(PermissionError):
+        client.close_pr(8, "x")
+
+    assert session.calls == []
+
+
+@parametrize_adapters
+def test_close_pr_live_comments_then_patches_pull_state(kind: str) -> None:
+    routes = [
+        ("POST", "/issues/8/comments", Response({"id": 1})),
+        ("PATCH", "/pulls/8", Response({"number": 8, "state": "closed"})),
+    ]
+    client, session = make_client(kind, "live", routes)
+
+    client.close_pr(8, "superseded")
+
+    methods = [c["method"] for c in session.calls]
+    assert methods == ["POST", "PATCH"]
+    assert session.calls[1]["kwargs"]["json"]["state"] == "closed"
+
+
+# ---------------------------------------------------------------------------
+# U1: dispatch_workflow — GitHub Actions write; Gitea host-seam no-op
+# ---------------------------------------------------------------------------
+
+
+def test_dispatch_workflow_github_shadow_dry_runs() -> None:
+    client, session = make_client(GITHUB, "shadow", [])
+
+    result = client.dispatch_workflow("observation-loop.yml", {"signal": "idle"})
+
+    assert isinstance(result, DryRunResult)
+    assert result.operation == "dispatch_workflow"
+    assert result.payload["inputs"] == {"signal": "idle"}
+    assert session.calls == []
+
+
+def test_dispatch_workflow_github_spec_only_refused() -> None:
+    client, session = make_client(GITHUB, "spec-only", [])
+
+    with pytest.raises(PermissionError, match="dispatch_workflow.*spec-only"):
+        client.dispatch_workflow("observation-loop.yml", {})
+
+    assert session.calls == []
+
+
+def test_dispatch_workflow_github_live_posts_dispatch() -> None:
+    routes = [
+        ("POST", "/actions/workflows/observation-loop.yml/dispatches", Response(None)),
+    ]
+    client, session = make_client(GITHUB, "live", routes)
+
+    client.dispatch_workflow("observation-loop.yml", {"signal": "idle"})
+
+    assert len(session.calls) == 1
+    body = session.calls[0]["kwargs"]["json"]
+    assert body["inputs"] == {"signal": "idle"}
+    assert body["ref"] == "main"
+
+
+def test_dispatch_workflow_gitea_is_host_seam_noop() -> None:
+    # The host seam: Forgejo has no workflow_dispatch the box depends on, so
+    # this no-ops (records a marker, never an HTTP write) on EVERY mode.
+    for mode in ("shadow", "live", "spec-only"):
+        client, session = make_client(GITEA, mode, [])
+        result = client.dispatch_workflow("observation-loop.yml", {"x": "1"})
+        assert isinstance(result, DryRunResult)
+        assert result.payload["unsupported_host"] == "gitea"
+        assert session.calls == []
+
+
+# ---------------------------------------------------------------------------
 # opt-in live Forgejo contract (docker-compose.gitea.yml)
 # ---------------------------------------------------------------------------
 
