@@ -1,0 +1,22 @@
+pipeline/wgmesh_pipeline/selfheal/models.py
+  s_e572593943375e::t_f3d76d38ba0b8c 75-79
+.github/workflows/pipeline-health.yml
+  s_e572593943375e::t_ad61e98b7f9b7d 562-565
+  s_e572593943375e::t_ab6aaf1313a54d 567-568
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "7d160041876294984b306b38306e16e5b5c70244",
+  "prompts": {},
+  "sessions": {
+    "s_e572593943375e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "73f3e1b0-bc7b-47d7-97f0-2bec21527939",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
