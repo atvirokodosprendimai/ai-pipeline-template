@@ -341,5 +341,5 @@
       ]
     }
   ],
-  "last_reported_drift_fingerprint": "metrics=;overdue_milestones=2026-05-31"
+  "last_reported_drift_fingerprint": "metrics=active_stuck_issues;overdue_milestones=2026-05-31"
 }
