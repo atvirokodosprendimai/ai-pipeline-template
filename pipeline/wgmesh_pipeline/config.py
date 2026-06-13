@@ -24,6 +24,16 @@ DEFAULT_GOOSE_PROVIDER = "anthropic"
 DEFAULT_GOOSE_MODEL = "GLM-4.7"
 DEFAULT_MAX_ESCALATION_ATTEMPTS = 2
 
+# Control-loop scheduler (cutover Phase B/C, shadow-first). Per-module cadences
+# mirror the Actions cron rhythms: self-heal every 30m, supervisor-rank every
+# 4h, observation every 8h, strategy-audit daily.
+VALID_CONTROL_LOOP_MODES = frozenset({"shadow", "live"})
+DEFAULT_CONTROL_LOOP_MODE = "shadow"
+DEFAULT_SELFHEAL_INTERVAL_SECONDS = 1800
+DEFAULT_SUPERVISOR_INTERVAL_SECONDS = 14400
+DEFAULT_OBSERVATION_INTERVAL_SECONDS = 28800
+DEFAULT_STRATEGY_AUDIT_INTERVAL_SECONDS = 86400
+
 
 @dataclass(frozen=True)
 class Config:
@@ -54,6 +64,15 @@ class Config:
     model_registry: Mapping[str, ModelProfile] = field(default_factory=dict)
     stage_routing: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
     max_escalation_attempts: int = DEFAULT_MAX_ESCALATION_ATTEMPTS
+    # Control-loop scheduler (shadow-first; only "shadow" is honored in this
+    # unit — "live" is forced back to shadow with a loud warning since the
+    # executor that performs forge writes + state persistence is a follow-up).
+    control_loop_enabled: bool = False
+    control_loop_mode: str = DEFAULT_CONTROL_LOOP_MODE
+    selfheal_interval_seconds: int = DEFAULT_SELFHEAL_INTERVAL_SECONDS
+    supervisor_interval_seconds: int = DEFAULT_SUPERVISOR_INTERVAL_SECONDS
+    observation_interval_seconds: int = DEFAULT_OBSERVATION_INTERVAL_SECONDS
+    strategy_audit_interval_seconds: int = DEFAULT_STRATEGY_AUDIT_INTERVAL_SECONDS
 
     @property
     def owner(self) -> str:
@@ -90,6 +109,15 @@ def load_config(env: Mapping[str, str] | None = None) -> Config:
     turso_token = _get_nonempty(source, "TURSO_AUTH_TOKEN")
     if db_mode == "turso" and not turso_url:
         raise ValueError("DATABASE_MODE=turso requires TURSO_DATABASE_URL")
+
+    control_loop_mode = (
+        _get_nonempty(source, "CONTROL_LOOP_MODE") or DEFAULT_CONTROL_LOOP_MODE
+    ).lower()
+    if control_loop_mode not in VALID_CONTROL_LOOP_MODES:
+        valid = ", ".join(sorted(VALID_CONTROL_LOOP_MODES))
+        raise ValueError(
+            f"CONTROL_LOOP_MODE must be one of: {valid}; got {control_loop_mode!r}"
+        )
 
     goose_provider = _get_nonempty(source, "GOOSE_PROVIDER") or DEFAULT_GOOSE_PROVIDER
     goose_model = _get_nonempty(source, "GOOSE_MODEL") or DEFAULT_GOOSE_MODEL
@@ -131,6 +159,22 @@ def load_config(env: Mapping[str, str] | None = None) -> Config:
             "MAX_ESCALATION_ATTEMPTS",
             DEFAULT_MAX_ESCALATION_ATTEMPTS,
         ),
+        control_loop_enabled=_truthy(_get_nonempty(source, "CONTROL_LOOP_ENABLED")),
+        control_loop_mode=control_loop_mode,
+        selfheal_interval_seconds=_get_int(
+            source, "SELFHEAL_INTERVAL_SECONDS", DEFAULT_SELFHEAL_INTERVAL_SECONDS
+        ),
+        supervisor_interval_seconds=_get_int(
+            source, "SUPERVISOR_INTERVAL_SECONDS", DEFAULT_SUPERVISOR_INTERVAL_SECONDS
+        ),
+        observation_interval_seconds=_get_int(
+            source, "OBSERVATION_INTERVAL_SECONDS", DEFAULT_OBSERVATION_INTERVAL_SECONDS
+        ),
+        strategy_audit_interval_seconds=_get_int(
+            source,
+            "STRATEGY_AUDIT_INTERVAL_SECONDS",
+            DEFAULT_STRATEGY_AUDIT_INTERVAL_SECONDS,
+        ),
     )
 
 
@@ -166,6 +210,10 @@ def _build_routing(
             )
         }
     return registry, routing
+
+
+def _truthy(value: str | None) -> bool:
+    return value is not None and value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _required(env: Mapping[str, str], name: str) -> str:
