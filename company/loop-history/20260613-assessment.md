@@ -1,24 +1,22 @@
 # Assessment: 2026-06-13
 
-**Stage**: Revenue | **Run**: 251
+**Stage**: Revenue | **Run**: 252
 
-Stage 5, day 87. Revenue confirmed with 5 active subscribers and recent paid orders through June 10. Pipeline bottleneck resolved - 6 PRs active but progressing normally. Critical correction: all recent orders flow to product ID 8e8e1c33-cd06-4652-9032-6cb3b49ec6b4 which is NOT in the seed product list, indicating revenue attribution misconfiguration.
+Stage 5, day 87. wgmesh is fully functional (v0.2.1, 19 stars) with extremely healthy pipeline - only 4 needs-human issues, 6 open PRs, 17 merged PRs in past 7 days showing high velocity. Revenue data shows 5 active subscribers with recent paid orders, confirming Stage 5 status. However, seed product subscribers remain 0, indicating revenue comes from non-wgmesh products in the same Polar org. Pipeline is essentially idle with no fn:dev issues.
 
 ## Blockers
-- Polar.sh product configuration error - paid orders attributed to non-seed product, breaking funnel stage tracking
-- Zero subscribers on actual seed products despite confirmed revenue stream
+- Revenue attribution unclear - seed cloudroof products show 0 subscribers despite 5 active subscribers and recent paid orders in same Polar organization, preventing accurate funnel assessment
 
 ## Top Actions
-- **fn:billing**: Audit and fix Polar.sh product configuration to properly map cloudroof orders to seed product bucket (zero)
-- **fn:gtm**: Create comprehensive cloudroof value proposition page with enterprise network admin use cases (zero)
-- **fn:gtm**: Document concrete proof points from 87 days of internal wgmesh dogfood usage with metrics (zero)
+- **fn:gtm**: Create comprehensive internal dogfooding case study documenting team's real wgmesh usage with specific metrics (uptime, peer count, data volume, network problems solved) as social proof for cloudroof.eu (zero)
+- **fn:gtm**: Write cloudroof.eu competitive positioning analysis identifying specific advantages over existing VPN/mesh solutions for network administrators (zero)
+- **fn:billing**: Fix Polar.sh product configuration to correctly attribute cloudroof.eu billing to seed product bucket (zero)
 
 ## Contributions
-- **paying-customers**: 5 active subscribers with recent orders including June 10, proving sustained revenue stream
-- **Marty**: Recent git commits maintaining codebase stability
-- **pupabobas[bot]**: 105 bot commits in past 7 days maintaining pipeline operations
-- **Copilot**: Active spec generation with 6 PRs progressing through pipeline
-- **nycterent**: Multiple implementation PRs advancing development pipeline
+- **Marty**: Recent git commits maintaining wgmesh codebase and project development
+- **pupabobas[bot]**: 108 bot commits in past 7 days driving pipeline operations and CI/CD
+- **Copilot**: Maintaining pipeline velocity with spec generation and code contributions
+- **polar-customers**: 5 active subscribers with consistent payment history maintaining revenue stream
 
 ## Needs Human
-- [soon] Verify Polar.sh organization access and product configuration permissions to fix revenue attribution
+- [soon] Clarify Polar.sh organization structure - which product IDs should be attributed to wgmesh/cloudroof vs other business activities to accurately assess funnel stage
