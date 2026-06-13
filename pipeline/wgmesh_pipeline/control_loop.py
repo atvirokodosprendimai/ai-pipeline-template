@@ -190,7 +190,7 @@ class ControlLoopScheduler:
         run = self.supervisor_planner(
             self.forge,
             taxonomy=taxonomy,
-            repo=self.config.target_repo,
+            repo=self.config.repo,  # short name ("wgmesh") — supervisor IDs are "repo#N" (parity)
             previous_state=None,  # gap: prior state not loaded in shadow
             now=None,
         )
