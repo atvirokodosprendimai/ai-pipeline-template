@@ -42,6 +42,7 @@ def _read_box_config(path: Path = BOX_CONFIG_PATH) -> dict[str, str]:
         log.warning("box-config unreadable (%s): falling back to env/defaults", exc)
         return {}
     if not isinstance(raw, dict):
+        log.warning("box-config is not a JSON object: ignoring")
         return {}
     return {
         k: str(v)
