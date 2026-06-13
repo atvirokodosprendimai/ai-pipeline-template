@@ -26,6 +26,7 @@ inherited unchanged.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import requests
@@ -38,6 +39,8 @@ from wgmesh_pipeline.github.client import (
     Sanitiser,
     _parse_issue,
 )
+
+log = logging.getLogger("wgmesh_pipeline.forge.gitea")
 
 DEFAULT_GITEA_URL = "http://localhost:3000"
 PULLS_PAGE_SIZE = 50
@@ -177,6 +180,79 @@ class GiteaForge(GitHubClient):
 
     def remove_label(self, issue_number: int, label: str, *, spec_pr: bool = False) -> Any:
         return self._label_write("remove_label", issue_number, label, spec_pr=spec_pr)
+
+    def create_issue(
+        self, *, title: str, body: str, labels: tuple[str, ...] = ()
+    ) -> Any:
+        """Open an issue. Gitea addresses labels by numeric id (like
+        ``add_label``), so names are translated to ids before the POST. The
+        sanitise gate runs on the NAME-bearing payload exactly as the GitHub
+        adapter does — shadow records names and never lists ids."""
+        issues_path = f"{self._repo_base}/issues"
+        if self.config.mode == "shadow":
+            return self._write(
+                "create_issue",
+                "POST",
+                issues_path,
+                payload={"title": title, "body": body, "labels": list(labels)},
+            )
+        # Gate on the NAME-bearing payload (so the needs-human safety valve and
+        # sanitise both see real labels) before translating to ids.
+        self._sanitise_write("create_issue", {"title": title, "body": body})
+        admits_needs_human = "needs-human" in labels
+        if self.config.mode == "spec-only" and not admits_needs_human:
+            raise PermissionError(
+                "create_issue is not allowed when PIPELINE_MODE=spec-only"
+            )
+        label_ids = [self._label_id(name) for name in labels]
+        return self._request(
+            "POST", issues_path, json={"title": title, "body": body, "labels": label_ids}
+        )
+
+    def close_issue(
+        self, number: int, reason: str, *, state_reason: str = "not planned"
+    ) -> Any:
+        """Close with a rationale comment then flip state. Gitea's PATCH issue
+        has NO ``state_reason`` field (GitHub-only), so it is dropped on the
+        wire — the seam is absorbed here, callers stay host-neutral."""
+        self.comment(number, reason)
+        return self._write(
+            "close_issue",
+            "PATCH",
+            f"{self._repo_base}/issues/{number}",
+            payload={"state": "closed"},
+        )
+
+    def close_pr(self, number: int, comment: str) -> Any:
+        """Comment then close. Gitea comments on PRs via the shared
+        ``/issues/{n}/comments`` endpoint and closes via PATCH ``/pulls/{n}`` —
+        both byte-identical to GitHub, so only the repo-base prefix differs."""
+        self.comment(number, comment)
+        return self._write(
+            "close_pr",
+            "PATCH",
+            f"{self._repo_base}/pulls/{number}",
+            payload={"state": "closed"},
+        )
+
+    def dispatch_workflow(self, workflow: str, inputs: dict[str, Any]) -> Any:
+        """HOST SEAM: GitHub-Actions ``workflow_dispatch`` has no portable
+        Forgejo equivalent the box relies on. Under the cutover the box's own
+        loop replaces most retriggers, so this is a no-op-and-warn rather than a
+        hard dependency. Returns a ``DryRunResult`` marker (no HTTP) on every
+        mode so callers see the skip without a write."""
+        log.warning(
+            "dispatch_workflow(%r) unsupported on Gitea/Forgejo host — no-op "
+            "(host seam; the box loop is the successor for retriggers)",
+            workflow,
+        )
+        result = DryRunResult(
+            dry_run=True,
+            operation="dispatch_workflow",
+            payload={"unsupported_host": "gitea", "workflow": workflow, "inputs": dict(inputs)},
+        )
+        self.dry_run_records.append(result)
+        return result
 
     def merge_pr(self, pr_number: int, *, commit_title: str | None = None) -> Any:
         payload: dict[str, Any] = {"Do": "squash"}
