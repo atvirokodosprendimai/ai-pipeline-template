@@ -153,6 +153,8 @@ def test_close_issue_routes_with_comment_and_state_reason() -> None:
     name, args, kwargs = forge.calls[0]
     assert args[0] == 7
     assert args[1] == "Closed by observation loop: done"
+    # executor passes the action.close_reason through; close_issue (client)
+    # normalizes "not planned" -> "not_planned" (see conformance test)
     assert kwargs == {"state_reason": "not planned"}
 
 

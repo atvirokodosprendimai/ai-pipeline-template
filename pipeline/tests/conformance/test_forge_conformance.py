@@ -572,7 +572,7 @@ def test_close_issue_live_comments_then_patches_state(kind: str) -> None:
     assert patch_body["state"] == "closed"
     if kind == GITHUB:
         # state_reason is a GitHub-only field; the adapter sends it.
-        assert patch_body["state_reason"] == "not planned"
+        assert patch_body["state_reason"] == "not_planned"
     else:
         # Gitea PATCH issue has no state_reason — the seam drops it.
         assert "state_reason" not in patch_body

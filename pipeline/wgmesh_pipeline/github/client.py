@@ -170,7 +170,7 @@ class GitHubClient:
         )
 
     def close_issue(
-        self, number: int, reason: str, *, state_reason: str = "not planned"
+        self, number: int, reason: str, *, state_reason: str = "not_planned"
     ) -> Any:
         """Close an issue with a human-facing rationale comment, then flip its
         state. The comment carries the LLM/heal reason and is sanitise-gated by
@@ -178,11 +178,14 @@ class GitHubClient:
         ``not planned`` by default — ``completed`` is reserved for the
         merged-impl-PR closer (observation R5)."""
         self.comment(number, reason)
+        # Accept the gh-CLI phrasing ("not planned") callers use and send the
+        # REST API form ("not_planned"); valid values: completed|not_planned|reopened.
+        api_state_reason = state_reason.strip().lower().replace(" ", "_")
         return self._write(
             "close_issue",
             "PATCH",
             f"/repos/{self.config.owner}/{self.config.repo}/issues/{number}",
-            payload={"state": "closed", "state_reason": state_reason},
+            payload={"state": "closed", "state_reason": api_state_reason},
         )
 
     def close_pr(self, number: int, comment: str) -> Any:
@@ -401,6 +404,11 @@ class GitHubClient:
             self._require_clean("create_issue body", str(payload.get("body", "")))
         elif operation == "update_pr":
             self._require_clean("update_pr body", str(payload.get("body", "")))
+        elif operation == "dispatch_workflow":
+            # workflow_dispatch inputs can carry free text (e.g. a self-heal
+            # idle reason) that lands in a triggered run — gate every value.
+            for key, value in (payload.get("inputs") or {}).items():
+                self._require_clean(f"dispatch_workflow input {key}", str(value))
 
     def _sanitise_spec_files(self, clone_path: Path) -> None:
         specs_dir = clone_path / "specs"

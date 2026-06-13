@@ -210,7 +210,7 @@ class GiteaForge(GitHubClient):
         )
 
     def close_issue(
-        self, number: int, reason: str, *, state_reason: str = "not planned"
+        self, number: int, reason: str, *, state_reason: str = "not_planned"
     ) -> Any:
         """Close with a rationale comment then flip state. Gitea's PATCH issue
         has NO ``state_reason`` field (GitHub-only), so it is dropped on the

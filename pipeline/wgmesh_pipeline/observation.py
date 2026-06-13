@@ -301,7 +301,7 @@ def plan_actions(assessment: Mapping[str, Any], inputs: ObservationInputs) -> Ob
             number = None
         if not repo_name or number is None:
             skips.append(ObservationSkip(
-                kind="close_pr", number=number,
+                action="close_pr", code="malformed", number=number,
                 message=f"SKIP close PR: malformed entry (repo={repo_name!r}) — refusing to act blind"))
             continue
         actions.append(ObservationAction(
