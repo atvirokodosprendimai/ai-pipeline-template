@@ -1,9 +1,53 @@
 from __future__ import annotations
 
+import json
+import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Mapping
+
+log = logging.getLogger(__name__)
+
+# GitOps box config: a committed, non-secret JSON file read as a base layer
+# UNDER the environment (env vars override). Lets the box be reconfigured by
+# commit + redeploy instead of SSH-editing the env file. PUBLIC repo, so only
+# this allowlist of operational toggles is honored — any other key (especially
+# secret-shaped: PAT/TOKEN/KEY/PASSWORD/URL) is ignored. Fail-closed against a
+# committed secret (allowlist, not denylist — agent-env lesson).
+BOX_CONFIG_PATH = Path(__file__).resolve().parents[2] / "company" / "box-config.json"
+BOX_CONFIG_ALLOWLIST = frozenset({
+    "CONTROL_LOOP_ENABLED",
+    "CONTROL_LOOP_MODE",
+    "SELFHEAL_INTERVAL_SECONDS",
+    "SUPERVISOR_INTERVAL_SECONDS",
+    "OBSERVATION_INTERVAL_SECONDS",
+    "STRATEGY_AUDIT_INTERVAL_SECONDS",
+    "POLL_INTERVAL_SECONDS",
+    "MAX_FILES",
+    "FORGE_KIND",
+})
+
+
+def _read_box_config(path: Path = BOX_CONFIG_PATH) -> dict[str, str]:
+    """Allowlisted non-secret toggles from the committed box config, or {}.
+
+    A malformed or absent file is non-fatal (logged) — the box falls back to
+    env + defaults, never crashes on a config-file typo."""
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return {}
+    except (OSError, ValueError) as exc:
+        log.warning("box-config unreadable (%s): falling back to env/defaults", exc)
+        return {}
+    if not isinstance(raw, dict):
+        return {}
+    return {
+        k: str(v)
+        for k, v in raw.items()
+        if k in BOX_CONFIG_ALLOWLIST and v is not None
+    }
 
 from wgmesh_pipeline.models import (
     ModelProfile,
@@ -84,7 +128,13 @@ class Config:
 
 
 def load_config(env: Mapping[str, str] | None = None) -> Config:
-    source = os.environ if env is None else env
+    # Runtime path (env is None): layer the committed box-config UNDER the
+    # process environment so a real env var always wins. Tests pass an explicit
+    # `env` and stay hermetic — the committed file never bleeds into them.
+    if env is None:
+        source: Mapping[str, str] = {**_read_box_config(), **os.environ}
+    else:
+        source = env
 
     target_repo = _required(source, "TARGET_REPO")
     mode = _get_nonempty(source, "PIPELINE_MODE") or "shadow"

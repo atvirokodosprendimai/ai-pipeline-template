@@ -178,3 +178,36 @@ def test_wgmesh_checkout_path_env_and_recipes_dir_override() -> None:
 
     assert cfg.repo_path == "/tmp/wgmesh"
     assert cfg.recipes_dir == "/tmp/recipes"
+
+
+def test_read_box_config_allowlist_and_secret_rejection(tmp_path):
+    from wgmesh_pipeline.config import _read_box_config
+    import json as _json
+    p = tmp_path / "box-config.json"
+    p.write_text(_json.dumps({
+        "CONTROL_LOOP_ENABLED": "true",
+        "SELFHEAL_INTERVAL_SECONDS": 900,
+        "_comment": "ignored",
+        "WGMESH_BOT_PAT": "ghp_secret_should_be_ignored",
+        "TURSO_AUTH_TOKEN": "secret",
+    }))
+    cfg = _read_box_config(p)
+    assert cfg == {"CONTROL_LOOP_ENABLED": "true", "SELFHEAL_INTERVAL_SECONDS": "900"}
+    assert "WGMESH_BOT_PAT" not in cfg and "TURSO_AUTH_TOKEN" not in cfg
+
+
+def test_read_box_config_absent_or_malformed(tmp_path):
+    from wgmesh_pipeline.config import _read_box_config
+    assert _read_box_config(tmp_path / "nope.json") == {}
+    bad = tmp_path / "bad.json"
+    bad.write_text("{not json")
+    assert _read_box_config(bad) == {}
+
+
+def test_committed_box_config_enables_shadow_loop():
+    # The real committed file should turn the scheduler on (shadow). Guards the
+    # gitops intent: a commit toggles box behavior.
+    from wgmesh_pipeline.config import _read_box_config
+    cfg = _read_box_config()
+    assert cfg.get("CONTROL_LOOP_ENABLED") == "true"
+    assert cfg.get("CONTROL_LOOP_MODE") == "shadow"
