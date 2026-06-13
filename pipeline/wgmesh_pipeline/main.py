@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 from wgmesh_pipeline.config import load_config
+from wgmesh_pipeline.control_loop import ControlLoopScheduler
 from wgmesh_pipeline.forge.factory import make_forge
 from wgmesh_pipeline.forge.gitfacts import make_resolution_lookup
 from wgmesh_pipeline.goose.runner import GooseRunner
@@ -61,7 +62,16 @@ async def async_main(*, reset_queue: bool = False) -> None:
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, stop.set)
-    await poller.run_forever(stop)
+
+    if config.control_loop_enabled:
+        scheduler = ControlLoopScheduler(config=config, forge=client, store=store)
+        logging.getLogger("wgmesh_pipeline").info(
+            "control loop enabled (mode=%s, shadow-only) — running concurrently with poller",
+            config.control_loop_mode,
+        )
+        await asyncio.gather(poller.run_forever(stop), scheduler.run(stop))
+    else:
+        await poller.run_forever(stop)
 
 
 def main(argv: list[str] | None = None) -> None:
