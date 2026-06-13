@@ -1,0 +1,31 @@
+pipeline/wgmesh_pipeline/state/migrations/0002_control_loop_state.sql
+  s_e572593943375e::t_cf92eb7d296fe7 1-14
+pipeline/wgmesh_pipeline/control_loop/__init__.py
+  s_e572593943375e::t_8e180f3e250d20 38-39
+  s_e572593943375e::t_ae659325aa4da5 213-241
+  s_e572593943375e::t_fc88f4b7c2fcbf 246-248,253,256-261,264,266-267,272-273
+  s_e572593943375e::t_3a620a0ea6b5dc 67-89
+  s_e572593943375e::t_31e0b68495af6b 286-294,298,307
+pipeline/tests/test_control_loop.py
+  s_e572593943375e::t_3fb19f1b0825f4 25-29,31-32
+  s_e572593943375e::t_baa2f6e19d7ee7 147-150,160-164
+pipeline/wgmesh_pipeline/state/store.py
+  s_e572593943375e::t_738a4625535a9b 345-397
+  s_e572593943375e::t_95abd81cfc7fd9 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "bb373494b46b224bc7bbf2907f3745e6d09b0eda",
+  "prompts": {},
+  "sessions": {
+    "s_e572593943375e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "73f3e1b0-bc7b-47d7-97f0-2bec21527939",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
