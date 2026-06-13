@@ -338,6 +338,11 @@ def test_metrics_input_validation() -> None:
 
 
 def test_parse_milestones_reads_real_strategy_md() -> None:
+    # Real-file smoke test. STRATEGY.md is repo-root and NOT copied into the
+    # deploy image (image carries pipeline/ + company/ only); the box reads it
+    # gracefully-or-skips at runtime, so absence is not a failure here.
+    if not STRATEGY_FILE.exists():
+        pytest.skip("STRATEGY.md not present (e.g. inside the deploy image)")
     parsed = parse_milestones(STRATEGY_FILE.read_text(encoding="utf-8"))
     assert len(parsed) >= 1
     for date_part, target in parsed:
