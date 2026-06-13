@@ -1,0 +1,32 @@
+pipeline/tests/test_control_loop.py
+  s_e572593943375e::t_23ea5f496c5b5e 1-274
+pipeline/wgmesh_pipeline/main.py
+  s_e572593943375e::t_db7122597aeab1 65-74
+  s_e572593943375e::t_d89945903321b9 12
+pipeline/wgmesh_pipeline/control_loop.py
+  s_e572593943375e::t_f1530003428896 234
+  s_e572593943375e::t_04e2470e846347 1-30,32-233,235-242
+  s_e572593943375e::t_60b50a70720172 31
+pipeline/wgmesh_pipeline/config.py
+  s_e572593943375e::t_ed762ec8424cf2 27-36
+  s_e572593943375e::t_8f1b73e65f1c76 215-218
+  s_e572593943375e::t_cf790df2805f24 67-75
+  s_e572593943375e::t_da8fcada282e66 113-121
+  s_e572593943375e::t_ce396af4c4ded5 162-177
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "f20e3b2db3382158ac4456161e269435854d5f16",
+  "prompts": {},
+  "sessions": {
+    "s_e572593943375e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "73f3e1b0-bc7b-47d7-97f0-2bec21527939",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
