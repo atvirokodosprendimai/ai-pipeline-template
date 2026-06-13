@@ -559,9 +559,13 @@ jobs:
             reason=""
 
             # Signal 1: Check for linked merged PRs
+            # FALSE-COMPLETION GUARD (2026-06-13): only a merged impl/fix PR resolves
+            # an issue. A merged spec: PR is NOT resolution — counting it closed #539
+            # and #573 on merged specs #576/#574 (issues reopened). Filter the
+            # cross-referenced PR title to ^(impl|fix): before counting.
             merged_prs=$(gh api "repos/$TARGET_REPO/issues/${number}/timeline" \
-              --jq '[.[] | select(.event == "cross-referenced" and .source.issue.pull_request.merged_at != null)] | length' \
-              2>/dev/null || echo "0")
+              --jq "[.[] | select(.event == \"cross-referenced\" and .source.issue.pull_request.merged_at != null and (.source.issue.title | test(\"^(impl|fix):\"; \"i\")))] | length" \
+                2>/dev/null || echo "0")
             if [ "$merged_prs" -gt 0 ] 2>/dev/null; then
               resolved="true"
               reason="Linked PR merged ($merged_prs merged PR(s) found)"

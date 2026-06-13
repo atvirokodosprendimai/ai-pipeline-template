@@ -72,6 +72,11 @@ class SelfHealInputs:
     merged_resolution_issues: frozenset[int] = frozenset()
     open_spec_pr_issues: frozenset[int] = frozenset()
     open_impl_pr_issues: frozenset[int] = frozenset()
+    # Count of merged IMPL/FIX resolution PRs linked to each issue. FALSE-
+    # COMPLETION GUARD: the gather MUST filter cross-referenced PR titles to
+    # ^(impl|fix): — a merged spec:/heal:/loop: PR is NOT resolution. Counting
+    # spec merges falsely closed #539/#573 (legacy pipeline-health bug fixed
+    # 2026-06-13); this contract keeps the on-box gather correct by design.
     linked_merged_pr_counts: Mapping[int, int] = field(default_factory=dict)
     loop_state: Mapping[str, Any] = field(default_factory=dict)
     costs: Mapping[str, Any] = field(default_factory=dict)
