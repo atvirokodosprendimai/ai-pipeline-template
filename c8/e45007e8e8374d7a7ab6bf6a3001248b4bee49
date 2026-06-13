@@ -1,0 +1,32 @@
+pipeline/wgmesh_pipeline/forge/protocol.py
+  s_e572593943375e::t_c098b3ebc980af 49-60
+pipeline/wgmesh_pipeline/forge/gitea.py
+  s_e572593943375e::t_3ba08e4ae8bde9 184-243,249-256
+  s_e572593943375e::t_30bc863bda5a9b 43-44
+  s_e572593943375e::t_6d9725e4e625df 29
+  s_e572593943375e::t_f47792746135ff 244-248
+pipeline/tests/conformance/test_forge_conformance.py
+  s_e572593943375e::t_4d90d5a10723c8 452-672
+pipeline/wgmesh_pipeline/github/client.py
+  s_e572593943375e::t_5626420f4806e7 399-401
+  s_e572593943375e::t_bfc7a94fe62737 358-367
+  s_e572593943375e::t_62fcbf7919ab1c 158-208,210-211
+  s_e572593943375e::t_4bdf2ea1335588 18-21
+  s_e572593943375e::t_e9f15d2468e754 209
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "c8e45007e8e8374d7a7ab6bf6a3001248b4bee49",
+  "prompts": {},
+  "sessions": {
+    "s_e572593943375e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "73f3e1b0-bc7b-47d7-97f0-2bec21527939",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
