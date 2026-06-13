@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -340,6 +341,59 @@ class StateStore:
         )
         self._conn.commit()
         return self.get_issue(number)
+
+    # --- control-loop module state (JSON-doc rows) ----------------------------
+
+    def load_control_state(self, key: str) -> dict[str, Any] | None:
+        """Return the persisted state dict for a control-loop module, or None
+        when nothing has been written yet. Closes the supervisor
+        ``previous_state not loaded`` gap: the next cycle reads its prior copy."""
+        row = self._conn.execute(
+            "SELECT doc FROM control_loop_state WHERE key = ?", (key,)
+        ).fetchone()
+        if row is None:
+            return None
+        return json.loads(str(row["doc"]))
+
+    def control_state_fingerprint(self, key: str) -> str | None:
+        """The stored material fingerprint for a module, or None if unset."""
+        row = self._conn.execute(
+            "SELECT fingerprint FROM control_loop_state WHERE key = ?", (key,)
+        ).fetchone()
+        return None if row is None else str(row["fingerprint"])
+
+    def save_control_state(
+        self,
+        key: str,
+        doc: dict[str, Any],
+        *,
+        fingerprint: str,
+        now: datetime | None = None,
+    ) -> bool:
+        """Upsert a module's state dict, DEDUPED on the material fingerprint:
+        when the stored fingerprint already equals ``fingerprint`` (and is
+        non-empty) nothing is written and False is returned (anti
+        PR-per-run pile-up — the strategy-audit / supervisor material gate).
+        Otherwise the doc is persisted and True is returned. Persistence is
+        box-internal state (not a forge write), so it happens regardless of
+        shadow/live — the caller still pre-gates on the planner's
+        ``material_changed`` sentinel."""
+        existing = self.control_state_fingerprint(key)
+        if fingerprint and existing == fingerprint:
+            return False
+        self._conn.execute(
+            """
+            INSERT INTO control_loop_state (key, fingerprint, doc, updated_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(key) DO UPDATE SET
+              fingerprint=excluded.fingerprint,
+              doc=excluded.doc,
+              updated_at=excluded.updated_at
+            """,
+            (key, fingerprint, json.dumps(doc, sort_keys=True), _iso(_dt(now))),
+        )
+        self._conn.commit()
+        return True
 
 
 class _MappingCursor:

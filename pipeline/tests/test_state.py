@@ -61,7 +61,7 @@ def test_injected_connection_adapter_roundtrip() -> None:
     assert len(db.list_runs()) == 1
     # migrations tracked through the adapter
     versions = [r["version"] for r in db._conn.execute("SELECT version FROM schema_migrations").fetchall()]
-    assert versions == ["0001"]
+    assert versions == ["0001", "0002"]
 
 
 def test_reset_queue_clears_issues_and_runs_idempotently(tmp_path) -> None:
@@ -79,7 +79,7 @@ def test_reset_queue_clears_issues_and_runs_idempotently(tmp_path) -> None:
     assert db.list_issues() == []
     assert db.list_runs() == []
     versions = [r["version"] for r in db._conn.execute("SELECT version FROM schema_migrations").fetchall()]
-    assert versions == ["0001"]
+    assert versions == ["0001", "0002"]
 
 
 def test_upsert_and_transition_persist(tmp_path) -> None:
@@ -102,7 +102,7 @@ def test_migrations_apply_idempotently(tmp_path) -> None:
     assert db.get_issue(1).stage == "queued"
     # schema_migrations records the initial migration exactly once
     versions = [r["version"] for r in db._conn.execute("SELECT version FROM schema_migrations").fetchall()]
-    assert versions == ["0001"]
+    assert versions == ["0001", "0002"]
 
 
 def test_sqlite_connection_uses_wal_and_busy_timeout(tmp_path) -> None:
@@ -227,3 +227,36 @@ def test_error_stats_failed_issue_outside_window_self_clears(tmp_path) -> None:
     db.upsert_issue(2, "recent failure", stage="failed", updated_at=now - timedelta(minutes=5))
     stats2 = db.error_stats(timedelta(minutes=15), now=now)
     assert stats2["failed_issues"] == 1
+
+
+# --- control-loop module state (U3) -----------------------------------------
+
+
+def test_control_state_roundtrip(tmp_path) -> None:
+    db = store(tmp_path)
+    assert db.load_control_state("supervisor-rank-state") is None
+    doc = {"top": [{"id": "wgmesh#727"}], "material_fingerprint": "abc"}
+    assert db.save_control_state("supervisor-rank-state", doc, fingerprint="abc") is True
+    loaded = db.load_control_state("supervisor-rank-state")
+    assert loaded == doc
+
+
+def test_control_state_dedupes_on_fingerprint(tmp_path) -> None:
+    db = store(tmp_path)
+    doc = {"x": 1}
+    assert db.save_control_state("pipeline-health-state", doc, fingerprint="f1") is True
+    # same fingerprint -> no write
+    assert db.save_control_state("pipeline-health-state", {"x": 2}, fingerprint="f1") is False
+    assert db.load_control_state("pipeline-health-state") == {"x": 1}
+    # changed fingerprint -> writes the new doc
+    assert db.save_control_state("pipeline-health-state", {"x": 2}, fingerprint="f2") is True
+    assert db.load_control_state("pipeline-health-state") == {"x": 2}
+
+
+def test_control_state_empty_fingerprint_always_writes(tmp_path) -> None:
+    # An empty fingerprint never dedupes (modules without a material fingerprint
+    # still get the latest copy persisted).
+    db = store(tmp_path)
+    assert db.save_control_state("k", {"a": 1}, fingerprint="") is True
+    assert db.save_control_state("k", {"a": 2}, fingerprint="") is True
+    assert db.load_control_state("k") == {"a": 2}
