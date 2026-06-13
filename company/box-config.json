@@ -1,0 +1,9 @@
+{
+  "_comment": "GitOps box config — non-secret operational toggles, read by load_config as a base layer UNDER the environment (env vars override). NEVER put secrets here (public repo): only the allowlisted operational keys are honored; secret-shaped keys are ignored by the loader. Change a value + merge + redeploy (update-pipeline-box) to reconfigure the box with no SSH.",
+  "CONTROL_LOOP_ENABLED": "true",
+  "CONTROL_LOOP_MODE": "shadow",
+  "SELFHEAL_INTERVAL_SECONDS": "1800",
+  "SUPERVISOR_INTERVAL_SECONDS": "14400",
+  "OBSERVATION_INTERVAL_SECONDS": "28800",
+  "STRATEGY_AUDIT_INTERVAL_SECONDS": "86400"
+}

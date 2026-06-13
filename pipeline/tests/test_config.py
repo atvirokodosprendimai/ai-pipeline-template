@@ -178,3 +178,48 @@ def test_wgmesh_checkout_path_env_and_recipes_dir_override() -> None:
 
     assert cfg.repo_path == "/tmp/wgmesh"
     assert cfg.recipes_dir == "/tmp/recipes"
+
+
+def test_read_box_config_allowlist_and_secret_rejection(tmp_path) -> None:
+    from wgmesh_pipeline.config import _read_box_config
+    import json as _json
+    p = tmp_path / "box-config.json"
+    p.write_text(_json.dumps({
+        "CONTROL_LOOP_ENABLED": "true",
+        "SELFHEAL_INTERVAL_SECONDS": 900,
+        "_comment": "ignored",
+        "WGMESH_BOT_PAT": "ghp_secret_should_be_ignored",
+        "TURSO_AUTH_TOKEN": "secret",
+    }))
+    cfg = _read_box_config(p)
+    assert cfg == {"CONTROL_LOOP_ENABLED": "true", "SELFHEAL_INTERVAL_SECONDS": "900"}
+    assert "WGMESH_BOT_PAT" not in cfg and "TURSO_AUTH_TOKEN" not in cfg
+
+
+def test_read_box_config_absent_or_malformed(tmp_path) -> None:
+    from wgmesh_pipeline.config import _read_box_config
+    assert _read_box_config(tmp_path / "nope.json") == {}
+    bad = tmp_path / "bad.json"
+    bad.write_text("{not json")
+    assert _read_box_config(bad) == {}
+
+
+def test_committed_box_config_is_valid_and_allowlisted() -> None:
+    # Structural guard on the real committed file — NOT its exact values, which
+    # are edited as normal gitops ops (pinning them would churn CI). Asserts:
+    # every honored key is in the allowlist, and any present enum/int toggles
+    # carry loadable values.
+    from wgmesh_pipeline.config import (
+        _read_box_config,
+        BOX_CONFIG_ALLOWLIST,
+        VALID_CONTROL_LOOP_MODES,
+    )
+    cfg = _read_box_config()
+    assert set(cfg).issubset(BOX_CONFIG_ALLOWLIST)
+    if "CONTROL_LOOP_MODE" in cfg:
+        assert cfg["CONTROL_LOOP_MODE"] in VALID_CONTROL_LOOP_MODES
+    if "CONTROL_LOOP_ENABLED" in cfg:
+        assert cfg["CONTROL_LOOP_ENABLED"].lower() in {"true", "false", "1", "0", "yes", "no"}
+    for k in cfg:
+        if k.endswith("_SECONDS") or k == "MAX_FILES":
+            assert int(cfg[k]) > 0
