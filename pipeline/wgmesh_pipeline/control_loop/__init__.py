@@ -42,6 +42,7 @@ from pathlib import Path
 from typing import Any, Callable, Mapping
 
 from wgmesh_pipeline.config import Config
+from wgmesh_pipeline.control_loop.executor import execute_actions
 from wgmesh_pipeline.forge.protocol import Forge
 from wgmesh_pipeline.selfheal import SelfHealInputs, SelfHealRun, run_self_heal
 from wgmesh_pipeline.supervisor import (
@@ -52,9 +53,10 @@ from wgmesh_pipeline.supervisor import (
 
 log = logging.getLogger("wgmesh_pipeline.control_loop")
 
-# Repo root holds company/ (taxonomy) and STRATEGY.md; config.py lives at
-# <root>/pipeline/wgmesh_pipeline/config.py, so parents[2] is the repo root.
-_REPO_ROOT = Path(__file__).resolve().parents[2]
+# Repo root holds company/ (taxonomy) and STRATEGY.md. This module lives at
+# <root>/pipeline/wgmesh_pipeline/control_loop/__init__.py, so parents[3] is
+# the repo root (control_loop/ -> wgmesh_pipeline/ -> pipeline/ -> root).
+_REPO_ROOT = Path(__file__).resolve().parents[3]
 _TAXONOMY_PATH = _REPO_ROOT / "company" / "pipeline-stages.json"
 _STRATEGY_PATH = _REPO_ROOT / "STRATEGY.md"
 
@@ -209,14 +211,24 @@ class ControlLoopScheduler:
         inputs = SelfHealInputs(now=_utc_now_iso())  # forge-derivable only; rest degraded
         run = self.selfheal_planner(self.forge, inputs)
         action_kinds = [a.kind for a in run.actions]
+        # Route every planned action through the single executor. The executor
+        # is mode-neutral: in shadow the forge dry-runs (DryRunResult, zero
+        # HTTP), in live it writes — behind the sanitise wall either way. One
+        # action raising never aborts the batch (fail-closed, per-action).
+        results = execute_actions(self.forge, self.store, run.actions)
+        statuses = [r.status for r in results]
         self.log.info(
-            "control_loop: module=selfheal mode=shadow circuit_breaker_tripped=%s "
+            "control_loop: module=selfheal mode=%s circuit_breaker_tripped=%s "
             "mutation_asserted=%s planned_actions=%s top_actions=%s "
+            "executed=%s result_statuses=%s "
             "(gap: stale-sweep + funnel/idle snapshots empty)",
+            self.config.control_loop_mode,
             run.circuit_breaker_tripped,
             run.mutation_asserted,
             len(run.actions),
             action_kinds[:3],
+            sum(1 for s in statuses if s == "executed"),
+            statuses[:5],
         )
 
     async def _cycle_observation(self) -> None:
