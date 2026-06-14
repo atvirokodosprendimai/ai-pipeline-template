@@ -1,19 +1,19 @@
 {
-  "last_run_at": "2026-06-14T04:02:12Z",
+  "last_run_at": "2026-06-14T14:01:40Z",
   "last_run_top_ids": [
     "atvirokodosprendimai/wgmesh#539",
     "atvirokodosprendimai/ai-pipeline-template#934",
     "atvirokodosprendimai/wgmesh#727"
   ],
-  "rank_changed": true,
-  "run_number": 31,
+  "rank_changed": false,
+  "run_number": 32,
   "issue_number": 934,
   "issue_url": "https://github.com/atvirokodosprendimai/ai-pipeline-template/issues/934",
   "stage_summary": {
     "triage": 1,
     "spec": 0,
     "build": 0,
-    "review": 2,
+    "review": 3,
     "merge": 0,
     "verify": 0,
     "revenue": 0,
@@ -32,7 +32,11 @@
     {
       "id": "atvirokodosprendimai/wgmesh#727",
       "action": "escalate-needs-human"
+    },
+    {
+      "id": "atvirokodosprendimai/ai-pipeline-template#1733",
+      "action": "escalate-needs-human"
     }
   ],
-  "material_fingerprint": "6cd989da37ebeb5333f8f4342441d30cacb741e5691a80ae32c6cd325bd4214b"
+  "material_fingerprint": "2653e4f7465a66010713e52584f6365ddf226336fd220bed7cb915c80f5bc598"
 }
