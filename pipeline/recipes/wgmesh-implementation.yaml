@@ -51,8 +51,8 @@ extensions:
 
 # Pin provider/model like wgmesh-triage-spec.yaml: goose honors recipe settings
 # even when env GOOSE_PROVIDER/GOOSE_MODEL don't take in headless --no-session
-# runs. z.ai is Anthropic-compatible via ANTHROPIC_HOST; glm-4.6 is the current
+# runs. z.ai is Anthropic-compatible via ANTHROPIC_HOST. GLM-5.1 is the current flagship
 # valid model id.
 settings:
   goose_provider: anthropic
-  goose_model: glm-4.6
+  goose_model: GLM-5.1

@@ -66,7 +66,7 @@ DEFAULT_MAX_FILES = 20
 DEFAULT_REPO_PATH = "/opt/wgmesh-checkout"
 DEFAULT_RECIPES_DIR = str(Path(__file__).resolve().parents[1] / "recipes")
 DEFAULT_GOOSE_PROVIDER = "anthropic"
-DEFAULT_GOOSE_MODEL = "GLM-4.7"
+DEFAULT_GOOSE_MODEL = "GLM-5.1"
 DEFAULT_MAX_ESCALATION_ATTEMPTS = 2
 
 # Control-loop scheduler (cutover Phase B/C, shadow-first). Per-module cadences
