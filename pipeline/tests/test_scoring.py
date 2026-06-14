@@ -318,9 +318,11 @@ def test_score_run_never_raises_when_backend_fails() -> None:
 
 
 def test_score_run_handles_missing_issue() -> None:
+    # Missing issue -> recorded with issue=None (Langfuse scorer routes to the
+    # "pipeline-system" session), NOT a junk issue-0 (orphan guard, pulse 06-14).
     rec = _RecordingScorer()
     score_run({}, outcome="failed", scorer=rec)
-    assert rec.calls[0]["issue"] == 0
+    assert rec.calls[0]["issue"] is None
 
 
 def test_score_run_never_raises_on_malformed_state() -> None:
@@ -362,3 +364,30 @@ def test_langfuse_record_reannounces_after_recovery(monkeypatch, capsys) -> None
     err = capsys.readouterr().err
     assert err.count("scoring degraded") == 2
     LangfuseScorer._warned = False
+
+
+def test_score_run_issueless_records_under_system_session() -> None:
+    # Orphan-score guard (pulse 06-14): an issueless run records under None
+    # issue (-> "pipeline-system" session in the Langfuse scorer), NEVER a
+    # junk "issue-0"/None orphan. score_run still records (failure obs).
+    scorer = _RecordingScorer()
+    score_run({"decision": "merge"}, outcome="merged", scorer=scorer)
+    assert scorer.calls[0]["issue"] is None
+
+
+def test_score_run_records_when_issue_present() -> None:
+    from wgmesh_pipeline.github.client import GitHubIssue
+    scorer = _RecordingScorer()
+    state = {"issue": GitHubIssue(number=42, title="t", labels=(), state="open"), "decision": "merge"}
+    score_run(state, outcome="merged", scorer=scorer)
+    assert len(scorer.calls) == 1 and scorer.calls[0]["issue"] == 42
+
+
+def test_langfuse_record_issueless_uses_system_session(monkeypatch) -> None:
+    from wgmesh_pipeline.scoring import SYSTEM_SESSION
+    client = _FakeLangfuse()
+    scorer = _install_fake_langfuse(monkeypatch, client)
+    scorer.record(issue=None, outcome="failed", scores={}, tags={})
+    out = {s["name"]: s for s in client.scores}["pipeline_outcome"]
+    assert out["session_id"] == SYSTEM_SESSION
+    assert out["metadata"]["issue"] == "system"
