@@ -13,12 +13,14 @@ from typing import Any, Protocol
 
 from wgmesh_pipeline.config import Config
 
+SYSTEM_SESSION = "pipeline-system"  # issueless system events (tick failures); never junk issue-0/None
+
 
 class Scorer(Protocol):
     def record(
         self,
         *,
-        issue: int,
+        issue: int | None,
         outcome: str,
         scores: dict[str, Any],
         tags: dict[str, str],
@@ -92,11 +94,14 @@ class LangfuseScorer:
             # session_id groups every score (and trace) for one issue's pipeline
             # lifecycle into a single Langfuse session, AND is the required link:
             # create_score rejects a score with no trace_id/session_id/etc as a
-            # 400 Bad request. issue-keyed session is the natural per-workflow id.
-            session = f"issue-{issue}"
+            # 400 Bad request. issue-keyed session is the natural per-workflow id;
+            # issueless system events (e.g. a reconcile-tick failure) land under
+            # a fixed "pipeline-system" session — never a junk "issue-0"/None
+            # orphan (pulse 06-14).
+            session = f"issue-{issue}" if issue is not None else SYSTEM_SESSION
             common: dict[str, Any] = {
                 "session_id": session,
-                "metadata": {"issue": issue, **scores, **tags},
+                "metadata": {"issue": issue if issue is not None else "system", **scores, **tags},
             }
             if trace_id:
                 common["trace_id"] = trace_id
@@ -202,10 +207,13 @@ def _scores_from_state(state: dict, outcome: str) -> dict[str, Any]:
     }
 
 
-def _issue_number(state: dict) -> int:
+def _issue_number(state: dict) -> int | None:
+    # None (not 0) when the run has no real issue: an issueless score is
+    # unattributable and must be SKIPPED, never collapsed into a junk
+    # "issue-0" catch-all session (the orphan-score crack, pulse 06-14).
     issue = state.get("issue")
     number = getattr(issue, "number", None)
-    return int(number) if number is not None else 0
+    return int(number) if number is not None else None
 
 
 def _tags_from_state(state: dict, outcome: str) -> dict[str, str]:
