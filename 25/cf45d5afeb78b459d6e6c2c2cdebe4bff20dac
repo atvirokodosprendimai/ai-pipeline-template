@@ -1,0 +1,50 @@
+pipeline/wgmesh_pipeline/config.py
+  s_e572593943375e::t_6518e15af16270 26
+  s_e572593943375e::t_9742ffae16a62d 82-84
+  s_e572593943375e::t_5951a781f92f9c 234-236
+  s_e572593943375e::t_27de4195fe0472 125
+pipeline/evals/langfuse_emit.py
+  s_e572593943375e::t_2de1c39ae02ab2 1-163
+pipeline/wgmesh_pipeline/control_loop/__init__.py
+  s_e572593943375e::t_dee32cf868bf1f 63,67-82
+  s_c1946e3966696b::t_fabbbe66f37ee5 148-151
+  s_c1946e3966696b::t_f9df0e5fd9c4cb 235,237-248
+  s_e572593943375e::t_5e8ca84a232705 386-390,396-403
+  s_c1946e3966696b::t_97924d809a060f 195-200
+  s_e572593943375e::t_63b58245e59abe 213-214,220
+  s_e572593943375e::t_a384fdd8ae910a 372-385,391-395,404-417
+  s_e572593943375e::t_5b946cc76994ee 171-175
+  s_e572593943375e::t_558219f83a6f95 41
+pipeline/tests/test_eval_langfuse.py
+  s_e572593943375e::t_b53b4e83b646b8 1-217
+pipeline/tests/test_control_loop.py
+  s_c1946e3966696b::t_4ba97770413bd4 497-517
+pipeline/tests/test_config.py
+  s_c1946e3966696b::t_f03d4c74749adc 199-218
+pipeline/evals/run_evals.py
+  s_e572593943375e::t_4a4d9bf63fc51c 5,7,14-16,23-28,31-43,45,50-61,63-67,76-86
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "25cf45d5afeb78b459d6e6c2c2cdebe4bff20dac",
+  "prompts": {},
+  "sessions": {
+    "s_c1946e3966696b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d5e1aabb-b0d8-42d7-bd89-df20a82e7b61",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    },
+    "s_e572593943375e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "73f3e1b0-bc7b-47d7-97f0-2bec21527939",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
