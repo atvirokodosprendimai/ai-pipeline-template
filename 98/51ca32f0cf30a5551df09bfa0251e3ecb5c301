@@ -1,0 +1,25 @@
+pipeline/recipes/wgmesh-implementation.yaml
+  s_e572593943375e::t_1888ba87ba01ae 54,58
+pipeline/wgmesh_pipeline/config.py
+  s_e572593943375e::t_1888ba87ba01ae 69
+pipeline/tests/test_recipes_exist.py
+  s_e572593943375e::t_b0a36a6465b748 41-44
+pipeline/recipes/wgmesh-triage-spec.yaml
+  s_e572593943375e::t_1888ba87ba01ae 55-58,61
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "9851ca32f0cf30a5551df09bfa0251e3ecb5c301",
+  "prompts": {},
+  "sessions": {
+    "s_e572593943375e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "73f3e1b0-bc7b-47d7-97f0-2bec21527939",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
