@@ -1,0 +1,25 @@
+pipeline/tests/test_scoring.py
+  s_e572593943375e::t_ce96307db5b688 367-368,373,376-383
+  s_e572593943375e::t_839e5c3dfdeee3 374
+  s_e572593943375e::t_0fc4a34bdaf4a9 321-322,325,369-372,375,384-393
+pipeline/wgmesh_pipeline/scoring.py
+  s_e572593943375e::t_e5ee9dba27b078 210-213,216
+  s_e572593943375e::t_ca5488648d3a2f 23,97-101,104
+  s_e572593943375e::t_d4ffaabeebc5ee 16-17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "3a1098bef9e2f08e2b1ebf86594a289b2b7d3df0",
+  "prompts": {},
+  "sessions": {
+    "s_e572593943375e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "73f3e1b0-bc7b-47d7-97f0-2bec21527939",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": null
+    }
+  }
+}
