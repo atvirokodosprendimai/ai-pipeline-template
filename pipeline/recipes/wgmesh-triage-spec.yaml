@@ -52,8 +52,10 @@ extensions:
 
 # Pin provider/model in the recipe (goose honors recipe settings even when env
 # GOOSE_PROVIDER/GOOSE_MODEL don't take in headless --no-session runs). z.ai is
-# Anthropic-compatible via ANTHROPIC_HOST; glm-4.6 is the current valid model id
-# (GLM-4.7 did not exist — goose loaded the recipe then no-opped).
+# Anthropic-compatible via ANTHROPIC_HOST. GLM-5.2 is the current flagship (verified serving 2026-06-14)
+# (per z.ai docs 2026-06-14; marketing announced "GLM-5.2" but it is NOT in
+# the API model list — using an unlisted id silently no-ops, as GLM-4.7 once
+# did). Matches the seed recipes, already on GLM-5.1.
 settings:
   goose_provider: anthropic
-  goose_model: glm-4.6
+  goose_model: GLM-5.2
