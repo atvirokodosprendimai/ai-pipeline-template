@@ -36,9 +36,12 @@ def test_implementation_recipe_declares_node_params() -> None:
 
 
 def test_implementation_recipe_pins_known_good_model() -> None:
-    text = (RECIPES_DIR / "wgmesh-implementation.yaml").read_text()
-    assert "goose_provider: anthropic" in text
-    # Must pin a model that EXISTS on z.ai (an unlisted id silently no-ops —
-    # GLM-4.7 once did). Known-good set per z.ai docs 2026-06-14.
-    KNOWN_GOOD = ("GLM-5.1", "GLM-5", "glm-4.6", "GLM-4.7")
-    assert any(f"goose_model: {m}" in text for m in KNOWN_GOOD)
+    import yaml
+    recipe = yaml.safe_load((RECIPES_DIR / "wgmesh-implementation.yaml").read_text())
+    settings = recipe.get("settings", {})
+    assert settings.get("goose_provider") == "anthropic"
+    # The ACTUAL pinned model (not file text / comments) must EXIST on z.ai —
+    # an unlisted id silently no-ops (GLM-4.7 once did). Current listed flagships
+    # per z.ai docs 2026-06-14.
+    KNOWN_GOOD = {"GLM-5.1", "GLM-5", "glm-4.6"}
+    assert settings.get("goose_model") in KNOWN_GOOD
