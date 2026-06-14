@@ -36,12 +36,14 @@ def test_implementation_recipe_declares_node_params() -> None:
 
 
 def test_implementation_recipe_pins_known_good_model() -> None:
-    import yaml
-    recipe = yaml.safe_load((RECIPES_DIR / "wgmesh-implementation.yaml").read_text())
-    settings = recipe.get("settings", {})
-    assert settings.get("goose_provider") == "anthropic"
-    # The ACTUAL pinned model (not file text / comments) must EXIST on z.ai —
-    # an unlisted id silently no-ops (GLM-4.7 once did). Current listed flagships
-    # per z.ai docs 2026-06-14.
-    KNOWN_GOOD = {"GLM-5.1", "GLM-5", "glm-4.6"}
-    assert settings.get("goose_model") in KNOWN_GOOD
+    # Parse the ACTUAL setting lines (skip comments) — no yaml dep (CI is bare).
+    lines = [
+        l.strip() for l in (RECIPES_DIR / "wgmesh-implementation.yaml").read_text().splitlines()
+        if l.strip() and not l.lstrip().startswith("#")
+    ]
+    provider = next((l.split(":", 1)[1].strip().strip(chr(34)) for l in lines if l.startswith("goose_provider:")), None)
+    model = next((l.split(":", 1)[1].strip().strip(chr(34)) for l in lines if l.startswith("goose_model:")), None)
+    assert provider == "anthropic"
+    # Pinned model must be one z.ai actually serves — an unserved id silently
+    # routes/no-ops. Verified 2026-06-14: requesting GLM-5.x serves glm-5.2.
+    assert model in {"GLM-5.2", "GLM-5.1", "GLM-5", "glm-4.6"}
