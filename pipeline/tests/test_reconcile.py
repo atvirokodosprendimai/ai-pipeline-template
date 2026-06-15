@@ -16,17 +16,24 @@ class Client(GitHubClient):
         *,
         merged_resolution_prs: Iterable[int] = (),
         open_pr_branches: Iterable[str] = (),
+        closed_numbers: Iterable[int] = (),
+        open_numbers: Iterable[int] = (),
         resolution_lookup_error: Exception | None = None,
+        get_issue_error: Exception | None = None,
     ):
         super().__init__(Config(target_repo="atvirokodosprendimai/wgmesh"))
         self._issues = list(issues)
         self._merged_resolution_prs = set(merged_resolution_prs)
         self._open_pr_branches = set(open_pr_branches)
+        self._closed_numbers = set(closed_numbers)
+        self._open_numbers = set(open_numbers)
         self._resolution_lookup_error = resolution_lookup_error
+        self._get_issue_error = get_issue_error
         self.removed_labels: list[tuple[int, str]] = []
         self.removed_label_flags: list[tuple[int, str, bool]] = []
         self.merged_resolution_lookups: list[int] = []
         self.open_pr_lookups: list[str] = []
+        self.issue_lookups: list[int] = []
 
     def list_open_issues(self) -> list[GitHubIssue]:
         return self._issues
@@ -41,6 +48,16 @@ class Client(GitHubClient):
         self.open_pr_lookups.append(head_branch)
         if head_branch in self._open_pr_branches:
             return 9000
+        return None
+
+    def get_issue(self, number: int) -> GitHubIssue | None:
+        self.issue_lookups.append(number)
+        if self._get_issue_error is not None:
+            raise self._get_issue_error
+        if number in self._closed_numbers:
+            return issue(number, (), state="closed")
+        if number in self._open_numbers:
+            return issue(number, (), state="open")
         return None
 
     def remove_label(self, issue_number: int, label: str, *, spec_pr: bool = False):
@@ -67,7 +84,9 @@ class GatedClient(GitHubClient):
         return {"ok": True}
 
 
-def issue(number: int, labels: tuple[str, ...], *, title: str = "title", state: str = "open") -> GitHubIssue:
+def issue(
+    number: int, labels: tuple[str, ...], *, title: str = "title", state: str = "open"
+) -> GitHubIssue:
     return GitHubIssue(number=number, title=title, labels=labels, state=state)
 
 
@@ -96,7 +115,9 @@ def test_merged_upstream_issue_advances_and_is_not_requeued(tmp_path) -> None:
     store = StateStore(tmp_path / "state.db")
     store.upsert_issue(1476, "done", stage="specced")
 
-    reconcile_issues(Client([issue(1476, ("needs-triage", "merged"), state="open")]), store)
+    reconcile_issues(
+        Client([issue(1476, ("needs-triage", "merged"), state="open")]), store
+    )
 
     record = store.get_issue(1476)
     assert record.stage == "merged"
@@ -104,9 +125,13 @@ def test_merged_upstream_issue_advances_and_is_not_requeued(tmp_path) -> None:
     assert store.claim_next(now=datetime.now(timezone.utc)) is None
 
 
-def test_reopened_resolved_issue_without_rework_is_marked_merged_not_queued(tmp_path) -> None:
+def test_reopened_resolved_issue_without_rework_is_marked_merged_not_queued(
+    tmp_path,
+) -> None:
     store = StateStore(tmp_path / "state.db")
-    client = Client([issue(510, (), title="Already fixed")], merged_resolution_prs={510})
+    client = Client(
+        [issue(510, (), title="Already fixed")], merged_resolution_prs={510}
+    )
 
     result = reconcile_issues(client, store)
 
@@ -118,9 +143,13 @@ def test_reopened_resolved_issue_without_rework_is_marked_merged_not_queued(tmp_
     assert client.open_pr_lookups == []
 
 
-def test_reopened_resolved_issue_with_rework_and_no_open_bot_pr_is_requeued_and_label_cleared(tmp_path) -> None:
+def test_reopened_resolved_issue_with_rework_and_no_open_bot_pr_is_requeued_and_label_cleared(
+    tmp_path,
+) -> None:
     store = StateStore(tmp_path / "state.db")
-    client = Client([issue(540, ("needs-rework",), title="Redo")], merged_resolution_prs={540})
+    client = Client(
+        [issue(540, ("needs-rework",), title="Redo")], merged_resolution_prs={540}
+    )
 
     result = reconcile_issues(client, store)
 
@@ -134,7 +163,9 @@ def test_reopened_resolved_issue_with_rework_and_no_open_bot_pr_is_requeued_and_
     assert client.removed_label_flags == [(540, "needs-rework", True)]
 
 
-def test_reopened_resolved_issue_with_rework_and_open_bot_pr_is_left_in_flight(tmp_path) -> None:
+def test_reopened_resolved_issue_with_rework_and_open_bot_pr_is_left_in_flight(
+    tmp_path,
+) -> None:
     store = StateStore(tmp_path / "state.db")
     client = Client(
         [issue(540, ("needs-rework",), title="Redo")],
@@ -151,7 +182,9 @@ def test_reopened_resolved_issue_with_rework_and_open_bot_pr_is_left_in_flight(t
     assert client.removed_labels == []
 
 
-def test_reopened_issue_without_merged_resolution_pr_is_queued_as_before(tmp_path) -> None:
+def test_reopened_issue_without_merged_resolution_pr_is_queued_as_before(
+    tmp_path,
+) -> None:
     store = StateStore(tmp_path / "state.db")
     client = Client([issue(700, (), title="New work")])
 
@@ -164,7 +197,9 @@ def test_reopened_issue_without_merged_resolution_pr_is_queued_as_before(tmp_pat
     assert client.merged_resolution_lookups == [700]
 
 
-def test_mid_flight_issue_with_merged_spec_pr_keeps_stage_and_skips_lookup(tmp_path) -> None:
+def test_mid_flight_issue_with_merged_spec_pr_keeps_stage_and_skips_lookup(
+    tmp_path,
+) -> None:
     """An issue the box is actively working on (non-None stage in store) must
     NOT be marked merged when its spec PR merges mid-flight — the resolution
     lookup is for issues unknown to the store (fresh or post-reset_queue).
@@ -186,7 +221,10 @@ def test_resolution_lookup_error_skips_issue_without_aborting_tick(tmp_path) -> 
     the bug the guard exists to stop). The issue is skipped for this tick."""
     store = StateStore(tmp_path / "state.db")
     client = Client(
-        [issue(510, (), title="Lookup fails"), issue(700, ("needs-triage",), title="Fine")],
+        [
+            issue(510, (), title="Lookup fails"),
+            issue(700, ("needs-triage",), title="Fine"),
+        ],
         resolution_lookup_error=RuntimeError("403 rate limited"),
     )
 
@@ -221,7 +259,10 @@ def test_reconcile_removes_needs_triage_without_raising_in_spec_only(tmp_path) -
 
     reconcile_issues(client, store)  # must not raise
 
-    assert ("DELETE", "/repos/atvirokodosprendimai/wgmesh/issues/42/labels/needs-triage") in client.requests
+    assert (
+        "DELETE",
+        "/repos/atvirokodosprendimai/wgmesh/issues/42/labels/needs-triage",
+    ) in client.requests
     assert store.get_issue(42).stage == "triaged"
 
 
@@ -241,6 +282,58 @@ def test_reconcile_then_claim_returns_only_actionable_issue(tmp_path) -> None:
 
     assert claimed is not None
     assert claimed.number == 2
+
+
+def test_reconcile_keeps_escalation_still_open_upstream(tmp_path) -> None:
+    # Fail-closed guard: an escalation whose issue is STILL open upstream
+    # (present in list_open_issues with needs-human) must NOT be pruned.
+    store = StateStore(tmp_path / "state.db")
+    store.upsert_issue(539, "real needs-human", stage="escalated", status="open")
+
+    reconcile_issues(Client([issue(539, ("needs-human",))]), store)
+
+    assert store.get_issue(539).stage == "escalated"
+
+
+def test_reconcile_prunes_absent_escalation_confirmed_closed_upstream(tmp_path) -> None:
+    store = StateStore(tmp_path / "state.db")
+    store.upsert_issue(726, "ghost needs-human", stage="escalated", status="open")
+    client = Client([], closed_numbers={726})
+
+    result = reconcile_issues(client, store)
+
+    record = store.get_issue(726)
+    assert result.pruned == 1
+    assert client.issue_lookups == [726]
+    assert record.stage == "merged"
+    assert record.status == "closed"
+    assert store.claim_next(now=datetime.now(timezone.utc)) is None
+
+
+def test_reconcile_keeps_absent_escalation_confirmed_open_upstream(tmp_path) -> None:
+    store = StateStore(tmp_path / "state.db")
+    store.upsert_issue(726, "page two needs-human", stage="escalated", status="open")
+    client = Client([], open_numbers={726})
+
+    result = reconcile_issues(client, store)
+
+    record = store.get_issue(726)
+    assert result.pruned == 0
+    assert client.issue_lookups == [726]
+    assert record.stage == "escalated"
+    assert record.status == "open"
+
+
+def test_reconcile_get_issue_error_does_not_abort_or_prune(tmp_path) -> None:
+    store = StateStore(tmp_path / "state.db")
+    store.upsert_issue(728, "lookup flaky", stage="escalated", status="open")
+    client = Client([], get_issue_error=RuntimeError("forge down"))
+
+    result = reconcile_issues(client, store)
+
+    assert result.pruned == 0
+    assert client.issue_lookups == [728]
+    assert store.get_issue(728).stage == "escalated"
 
 
 def test_injected_resolution_lookup_is_used_instead_of_client(tmp_path) -> None:

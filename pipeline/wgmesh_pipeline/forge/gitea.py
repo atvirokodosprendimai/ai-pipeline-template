@@ -32,6 +32,7 @@ from typing import Any
 import requests
 
 from wgmesh_pipeline.config import Config
+from wgmesh_pipeline.forge.gitfacts import resolution_pattern as _resolution_pattern
 from wgmesh_pipeline.forge.protocol import ForgeIssue
 from wgmesh_pipeline.github.client import (
     DryRunResult,
@@ -45,12 +46,6 @@ log = logging.getLogger("wgmesh_pipeline.forge.gitea")
 DEFAULT_GITEA_URL = "http://localhost:3000"
 PULLS_PAGE_SIZE = 50
 LABELS_PAGE_SIZE = 100
-
-
-# Resolution-title matching is shared with gitfacts — one pattern, one
-# divergence surface (the squash "(#N)" suffix group is harmless for PR
-# titles).
-from wgmesh_pipeline.forge.gitfacts import resolution_pattern as _resolution_pattern
 
 
 class GiteaForge(GitHubClient):
@@ -82,7 +77,9 @@ class GiteaForge(GitHubClient):
             f"{self._repo_base}/issues",
             params={"state": "open", "labels": "needs-triage", "type": "issues"},
         )
-        return [_parse_issue(item) for item in data or [] if not item.get("pull_request")]
+        return [
+            _parse_issue(item) for item in data or [] if not item.get("pull_request")
+        ]
 
     def list_open_issues(self) -> list[ForgeIssue]:
         data = self._request(
@@ -96,7 +93,20 @@ class GiteaForge(GitHubClient):
         # spec-of-spec PRs). Unlike GitHub, Gitea includes
         # "pull_request": null on plain issues — filter on truthiness, not
         # key presence.
-        return [_parse_issue(item) for item in data or [] if not item.get("pull_request")]
+        return [
+            _parse_issue(item) for item in data or [] if not item.get("pull_request")
+        ]
+
+    def get_issue(self, number: int) -> ForgeIssue | None:
+        try:
+            item = self._request("GET", f"{self._repo_base}/issues/{number}")
+        except requests.HTTPError as exc:
+            if getattr(exc.response, "status_code", None) == 404:
+                return None
+            raise
+        if item.get("pull_request"):
+            return None
+        return _parse_issue(item)
 
     def find_open_pr_number(self, head_branch: str) -> int | None:
         # Gitea's /pulls has no `head` filter param — list open pulls and
@@ -178,7 +188,9 @@ class GiteaForge(GitHubClient):
     def add_label(self, issue_number: int, label: str, *, spec_pr: bool = False) -> Any:
         return self._label_write("add_label", issue_number, label, spec_pr=spec_pr)
 
-    def remove_label(self, issue_number: int, label: str, *, spec_pr: bool = False) -> Any:
+    def remove_label(
+        self, issue_number: int, label: str, *, spec_pr: bool = False
+    ) -> Any:
         return self._label_write("remove_label", issue_number, label, spec_pr=spec_pr)
 
     def create_issue(
@@ -206,7 +218,9 @@ class GiteaForge(GitHubClient):
             )
         label_ids = [self._label_id(name) for name in labels]
         return self._request(
-            "POST", issues_path, json={"title": title, "body": body, "labels": label_ids}
+            "POST",
+            issues_path,
+            json={"title": title, "body": body, "labels": label_ids},
         )
 
     def close_issue(
@@ -249,7 +263,11 @@ class GiteaForge(GitHubClient):
         result = DryRunResult(
             dry_run=True,
             operation="dispatch_workflow",
-            payload={"unsupported_host": "gitea", "workflow": workflow, "inputs": dict(inputs)},
+            payload={
+                "unsupported_host": "gitea",
+                "workflow": workflow,
+                "inputs": dict(inputs),
+            },
         )
         self.dry_run_records.append(result)
         return result
@@ -279,7 +297,11 @@ class GiteaForge(GitHubClient):
             # Dry-run through the shared write gate, recording the NAME —
             # shadow never touches the network, so no id lookup happens.
             return self._write(
-                operation, "POST", labels_path, payload={"labels": [label]}, spec_pr=spec_pr
+                operation,
+                "POST",
+                labels_path,
+                payload={"labels": [label]},
+                spec_pr=spec_pr,
             )
         # Gate on the label NAME before translating to a Gitea id. This
         # mirrors GitHubClient._write exactly (spec-lane ops plus the
@@ -321,15 +343,21 @@ class GiteaForge(GitHubClient):
         """Gitea's CreatePullReview expects event \"APPROVED\" (GitHub uses
         \"APPROVE\"). Same reviewer-credential semantics as the base class."""
         if not self.config.reviewer_pat:
-            raise RuntimeError("approve_pr requires WGMESH_REVIEWER_PAT (reviewer identity)")
+            raise RuntimeError(
+                "approve_pr requires WGMESH_REVIEWER_PAT (reviewer identity)"
+            )
         if self.config.mode == "shadow":
             result = DryRunResult(
-                dry_run=True, operation="approve_pr", payload={"pr": pr_number, "event": "APPROVED"}
+                dry_run=True,
+                operation="approve_pr",
+                payload={"pr": pr_number, "event": "APPROVED"},
             )
             self.dry_run_records.append(result)
             return result
         if self.config.mode == "spec-only":
-            raise PermissionError("approve_pr is not allowed when PIPELINE_MODE=spec-only")
+            raise PermissionError(
+                "approve_pr is not allowed when PIPELINE_MODE=spec-only"
+            )
         return self._request(
             "POST",
             f"{self._repo_base}/pulls/{pr_number}/reviews",

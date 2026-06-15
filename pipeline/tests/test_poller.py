@@ -62,7 +62,12 @@ class Graph:
 
     def review(self, state):
         self.calls.append("review")
-        return {**state, "tests_passed": True, "sanitise_ok": True, "review_findings": []}
+        return {
+            **state,
+            "tests_passed": True,
+            "sanitise_ok": True,
+            "review_findings": [],
+        }
 
 
 class RecordingScorer:
@@ -70,7 +75,15 @@ class RecordingScorer:
         self.calls: list[dict] = []
 
     def record(self, *, issue, outcome, scores, tags, trace_id=None):
-        self.calls.append({"issue": issue, "outcome": outcome, "scores": scores, "tags": tags, "trace_id": trace_id})
+        self.calls.append(
+            {
+                "issue": issue,
+                "outcome": outcome,
+                "scores": scores,
+                "tags": tags,
+                "trace_id": trace_id,
+            }
+        )
 
 
 @pytest.fixture
@@ -84,7 +97,9 @@ def poller(tmp_path, cfg: Config, graph=None):
     return Poller(config=cfg, store=store, client=client, graph=graph or Graph())
 
 
-def test_tick_advances_queued_issue_to_triaged_and_records_run(tmp_path, cfg: Config) -> None:
+def test_tick_advances_queued_issue_to_triaged_and_records_run(
+    tmp_path, cfg: Config
+) -> None:
     p = poller(tmp_path, cfg)
     p.store.upsert_issue(1, "Fix bug")
 
@@ -97,7 +112,9 @@ def test_tick_advances_queued_issue_to_triaged_and_records_run(tmp_path, cfg: Co
     assert p.store.list_runs()[0]["outcome"] == "ok"
 
 
-def test_spec_only_wont_do_issue_escalates_and_is_not_reclaimed(tmp_path, cfg: Config) -> None:
+def test_spec_only_wont_do_issue_escalates_and_is_not_reclaimed(
+    tmp_path, cfg: Config
+) -> None:
     class WontDoGraph(Graph):
         def triage(self, state):
             self.calls.append("triage")
@@ -107,12 +124,28 @@ def test_spec_only_wont_do_issue_escalates_and_is_not_reclaimed(tmp_path, cfg: C
         def list_open_issues(self):
             return []
 
-    spec_only = Config(target_repo=cfg.target_repo, mode="spec-only", max_files=cfg.max_files)
+        def get_issue(self, number: int):
+            if number == 1:
+                from wgmesh_pipeline.github.client import GitHubIssue
+
+                return GitHubIssue(
+                    number=1, title="Do not build", labels=(), state="open"
+                )
+            return None
+
+    spec_only = Config(
+        target_repo=cfg.target_repo, mode="spec-only", max_files=cfg.max_files
+    )
     session = Session(Response({"ok": True}))
     store = StateStore(tmp_path / "state.db")
     store.upsert_issue(1, "Do not build")
     graph = WontDoGraph()
-    p = Poller(config=spec_only, store=store, client=SpecOnlyClient(spec_only, session=session), graph=graph)
+    p = Poller(
+        config=spec_only,
+        store=store,
+        client=SpecOnlyClient(spec_only, session=session),
+        graph=graph,
+    )
 
     result = asyncio.run(p.tick())
     second = asyncio.run(p.tick())
@@ -146,10 +179,14 @@ def test_live_mode_resumes_spec_opened_issue(tmp_path, cfg: Config) -> None:
 
 
 def test_spec_only_mode_never_claims_spec_opened(tmp_path, cfg: Config) -> None:
-    spec_only = Config(target_repo=cfg.target_repo, mode="spec-only", max_files=cfg.max_files)
+    spec_only = Config(
+        target_repo=cfg.target_repo, mode="spec-only", max_files=cfg.max_files
+    )
     store = StateStore(tmp_path / "state.db")
     store.upsert_issue(12, "Spec already opened", stage="spec_opened", spec_pr=99)
-    p = Poller(config=spec_only, store=store, client=EmptyClient(spec_only), graph=Graph())
+    p = Poller(
+        config=spec_only, store=store, client=EmptyClient(spec_only), graph=Graph()
+    )
 
     result = asyncio.run(p.tick())
 
@@ -167,7 +204,9 @@ def test_tick_no_actionable_issue_is_noop(tmp_path, cfg: Config) -> None:
     assert p.store.list_runs() == []
 
 
-def test_graph_exception_bumps_attempt_and_loop_continues(tmp_path, cfg: Config) -> None:
+def test_graph_exception_bumps_attempt_and_loop_continues(
+    tmp_path, cfg: Config
+) -> None:
     class FailingGraph(Graph):
         def triage(self, state):
             raise RuntimeError("bad issue")
@@ -184,7 +223,9 @@ def test_graph_exception_bumps_attempt_and_loop_continues(tmp_path, cfg: Config)
     assert p.store.list_runs()[0]["outcome"] == "error"
 
 
-def test_reconcile_exception_does_not_halt_tick(tmp_path, cfg: Config, monkeypatch) -> None:
+def test_reconcile_exception_does_not_halt_tick(
+    tmp_path, cfg: Config, monkeypatch
+) -> None:
     p = poller(tmp_path, cfg)
     p.store.upsert_issue(1, "Fix bug")
 
@@ -222,7 +263,9 @@ def test_reconcile_exception_records_failed_score_with_stage_and_truncated_error
     assert len(scorer.calls[0]["tags"]["error"]) == 200
 
 
-def test_advance_exception_records_failed_score_with_node_tag(tmp_path, cfg: Config) -> None:
+def test_advance_exception_records_failed_score_with_node_tag(
+    tmp_path, cfg: Config
+) -> None:
     class FailingGraph(Graph):
         def triage(self, state):
             raise RuntimeError("bad issue")
@@ -253,7 +296,9 @@ def test_success_tick_does_not_record_failure_score(tmp_path, cfg: Config) -> No
     assert [call for call in scorer.calls if call["outcome"] == "failed"] == []
 
 
-def test_reviewed_issue_not_phantom_merged_when_side_effect_fails(tmp_path, cfg: Config) -> None:
+def test_reviewed_issue_not_phantom_merged_when_side_effect_fails(
+    tmp_path, cfg: Config
+) -> None:
     # Side effect (merge) runs BEFORE the terminal transition. A failed merge
     # must NOT leave the issue terminal-'merged' with the PR unmerged — it stays
     # at 'reviewed', retriable.
@@ -294,11 +339,15 @@ def test_reviewed_issue_not_phantom_merged_when_side_effect_fails(tmp_path, cfg:
     assert store.get_issue(2).stage != "merged"
 
 
-def test_restart_mid_flight_resumes_persisted_stage_without_double_work(tmp_path, cfg: Config) -> None:
+def test_restart_mid_flight_resumes_persisted_stage_without_double_work(
+    tmp_path, cfg: Config
+) -> None:
     db_path = tmp_path / "state.db"
     StateStore(db_path).upsert_issue(1, "Already triaged", stage="triaged")
     graph = Graph()
-    restarted = Poller(config=cfg, store=StateStore(db_path), client=EmptyClient(cfg), graph=graph)
+    restarted = Poller(
+        config=cfg, store=StateStore(db_path), client=EmptyClient(cfg), graph=graph
+    )
 
     result = asyncio.run(restarted.tick())
 
@@ -307,7 +356,9 @@ def test_restart_mid_flight_resumes_persisted_stage_without_double_work(tmp_path
     assert graph.calls == ["spec"]
 
 
-def test_advance_one_stage_injects_goose_runner_and_repo_path(tmp_path, cfg: Config) -> None:
+def test_advance_one_stage_injects_goose_runner_and_repo_path(
+    tmp_path, cfg: Config
+) -> None:
     class InspectingGraph(Graph):
         def __init__(self) -> None:
             super().__init__()
@@ -325,7 +376,9 @@ def test_advance_one_stage_injects_goose_runner_and_repo_path(tmp_path, cfg: Con
     def box_ci(forge, pr):
         return BoxCiResult(green=True, failures=())
 
-    spec_only = Config(target_repo=cfg.target_repo, mode="spec-only", repo_path=str(repo_path))
+    spec_only = Config(
+        target_repo=cfg.target_repo, mode="spec-only", repo_path=str(repo_path)
+    )
     store = StateStore(tmp_path / "state.db")
     store.upsert_issue(17, "Already triaged", stage="triaged")
     p = Poller(
@@ -346,8 +399,12 @@ def test_advance_one_stage_injects_goose_runner_and_repo_path(tmp_path, cfg: Con
     assert graph.seen_state["box_ci"] is box_ci
 
 
-def test_specced_issue_opens_spec_pr_then_stops_in_spec_only(tmp_path, cfg: Config) -> None:
-    spec_only = Config(target_repo=cfg.target_repo, mode="spec-only", max_files=cfg.max_files)
+def test_specced_issue_opens_spec_pr_then_stops_in_spec_only(
+    tmp_path, cfg: Config
+) -> None:
+    spec_only = Config(
+        target_repo=cfg.target_repo, mode="spec-only", max_files=cfg.max_files
+    )
     p = poller(tmp_path, spec_only)
     p.store.upsert_issue(1, "Already specced", stage="specced")
 
@@ -365,7 +422,10 @@ def test_spec_opened_terminal_is_scored_in_spec_only(tmp_path, cfg: Config) -> N
     """spec_opened (spec-only terminal) emits a score so the Langfuse Scores
     view reflects spec-only throughput, not just escalate/error/merge."""
     from wgmesh_pipeline.scoring import init_scoring
-    spec_only = Config(target_repo=cfg.target_repo, mode="spec-only", max_files=cfg.max_files)
+
+    spec_only = Config(
+        target_repo=cfg.target_repo, mode="spec-only", max_files=cfg.max_files
+    )
     scorer = RecordingScorer()
     init_scoring(spec_only, scorer=scorer)
     try:
@@ -374,12 +434,16 @@ def test_spec_opened_terminal_is_scored_in_spec_only(tmp_path, cfg: Config) -> N
         asyncio.run(p.tick())
         outcomes = [c["outcome"] for c in scorer.calls]
         assert "spec_opened" in outcomes
-        assert [c for c in scorer.calls if c["outcome"] == "spec_opened"][0]["issue"] == 1
+        assert [c for c in scorer.calls if c["outcome"] == "spec_opened"][0][
+            "issue"
+        ] == 1
     finally:
         init_scoring(Config(target_repo=cfg.target_repo))  # reset module scorer
 
 
-def test_specced_issue_in_shadow_does_not_open_spec_pr_or_advance(tmp_path, cfg: Config) -> None:
+def test_specced_issue_in_shadow_does_not_open_spec_pr_or_advance(
+    tmp_path, cfg: Config
+) -> None:
     p = poller(tmp_path, cfg)
     p.store.upsert_issue(1, "Already specced", stage="specced")
 
@@ -404,8 +468,12 @@ def test_spec_ready_issue_continues_to_implementation(tmp_path, cfg: Config) -> 
     assert p.graph.calls == ["implement"]
 
 
-def test_main_graph_shadow_fixture_halts_at_specced_without_writes(tmp_path, cfg: Config, monkeypatch) -> None:
-    monkeypatch.setattr("wgmesh_pipeline.graph.nodes.review.run_sanitise", lambda text: True)
+def test_main_graph_shadow_fixture_halts_at_specced_without_writes(
+    tmp_path, cfg: Config, monkeypatch
+) -> None:
+    monkeypatch.setattr(
+        "wgmesh_pipeline.graph.nodes.review.run_sanitise", lambda text: True
+    )
     client = EmptyClient(cfg)
     store = StateStore(tmp_path / "state.db")
     store.upsert_issue(1, "Fix docs")
@@ -419,7 +487,9 @@ def test_main_graph_shadow_fixture_halts_at_specced_without_writes(tmp_path, cfg
     assert client.dry_run_records == []
 
 
-def test_reviewed_issue_records_escalated_when_gate_flips_decision(tmp_path, cfg: Config) -> None:
+def test_reviewed_issue_records_escalated_when_gate_flips_decision(
+    tmp_path, cfg: Config
+) -> None:
     """P0 regression guard: the distinct-principal merge gate can flip the
     decision merge -> escalate at side-effect time. The poller must record
     the POST-side-effect outcome — recording the pre-flip decision stored a
@@ -434,7 +504,13 @@ def test_reviewed_issue_records_escalated_when_gate_flips_decision(tmp_path, cfg
             if method == "GET" and url.endswith("/reviews"):
                 return Response([])
             if method == "GET" and "/pulls/" in url:
-                return Response({"number": 321, "user": {"login": "author-bot"}, "head": {"sha": "abc"}})
+                return Response(
+                    {
+                        "number": 321,
+                        "user": {"login": "author-bot"},
+                        "head": {"sha": "abc"},
+                    }
+                )
             return Response({"ok": True})
 
     live = Config(target_repo=cfg.target_repo, mode="live", max_files=cfg.max_files)
@@ -448,7 +524,9 @@ def test_reviewed_issue_records_escalated_when_gate_flips_decision(tmp_path, cfg
         store=store,
         client=client,
         graph=Graph(),
-        box_ci=lambda forge, pr: BoxCiResult(green=False, failures=("box ci: go test failed",)),
+        box_ci=lambda forge, pr: BoxCiResult(
+            green=False, failures=("box ci: go test failed",)
+        ),
     )
     p.scratch[3] = {
         "diff": "+docs\n",
