@@ -1,23 +1,23 @@
 # Assessment: 2026-06-15
 
-**Stage**: Reachable | **Run**: 262
+**Stage**: Revenue | **Run**: 263
 
-Stage 3, day 89. Pipeline completely idle with 0 PRs and minimal open issues. Revenue shows 5 active subscribers and recent paid orders, but critical attribution gap: seed product has 0 subscribers while all_org has 5, indicating customers are paying for other Polar products, not wgmesh/cloudroof. Product remains stable (v0.2.1, 20 stars) with healthy infrastructure.
+Stage 5, day 89. Revenue is confirmed with 5 active subscribers and recent paid orders through June 14. Pipeline is completely idle (0 PRs, 0 active issues) with only 2 stale issues remaining. Critical correction needed: revenue data shows orders flowing to product_id '8e8e1c33-cd06-4652-9032-6cb3b49ec6b4' but seed product tracking shows 0 subscribers - this is a Polar.sh configuration mismatch that needs human attention.
 
 ## Blockers
-- Revenue attribution mismatch: customers paying for other Polar org products while seed product (wgmesh/cloudroof) has 0 subscribers, preventing true Stage 4 advancement
-- No concrete proof of value documented for external prospects despite stable internal usage
+- Polar.sh product attribution misconfigured - paid orders not being counted toward seed product metrics
+- Pipeline completely idle with no development velocity - need customer-driven feature requests
 
 ## Top Actions
-- **fn:gtm**: Create internal dogfooding case study documenting team's actual wgmesh usage with specific metrics, uptime data, peer counts, and problems solved as social proof for cloudroof.eu (zero)
-- **fn:billing**: Fix revenue attribution by identifying which Polar products are generating the 5 subscribers and ensuring cloudroof.eu billing flows to seed_product_bucket (zero)
-- **fn:gtm**: Write network administrator pilot evaluation guide with 30-day trial framework, success metrics checklist, and clear next-steps CTA (zero)
+- **fn:gtm**: Create comprehensive value proposition and case study page for cloudroof.eu targeting enterprise network administrators with concrete internal usage metrics (zero)
+- **fn:gtm**: Document concrete proof points from internal dogfood usage with uptime metrics, cost savings, and performance data (zero)
+- **fn:support**: Create customer feedback collection system to understand why existing 5 subscribers chose cloudroof and what features they need next (zero)
 
 ## Contributions
-- **Marty**: Recent git commits maintaining codebase stability over past 7 days
-- **pupabobas[bot]**: 96 bot commits in past 7 days maintaining pipeline automation and CI/CD operations
-- **polar-customers**: 5 active subscribers with recent paid orders, though attribution to seed product unclear
-- **Copilot**: Recent git commits contributing to codebase development
+- **paying-customers**: 5 active subscribers with recent orders through June 14, proving market fit and revenue sustainability
+- **Marty**: Recent git commits maintaining codebase stability
+- **pupabobas[bot]**: 90 bot commits in past 7 days maintaining pipeline infrastructure
+- **Copilot**: Recent git commits contributing to development workflow
 
 ## Needs Human
-_Nothing this cycle._
+- [soon] Fix Polar.sh product configuration - paid orders are flowing to product_id '8e8e1c33-cd06-4652-9032-6cb3b49ec6b4' but seed product tracking shows 0 subscribers
