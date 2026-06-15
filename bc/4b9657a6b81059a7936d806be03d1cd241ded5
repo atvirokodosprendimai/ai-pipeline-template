@@ -1,0 +1,53 @@
+pipeline/wgmesh_pipeline/github/reconcile.py
+  s_c1946e3966696b::t_b336e82dd385d3 23
+  s_ce9a8df40d9334::t_a768df3ce06d54 26-28,35-40,64-66,69-71,75-77,100-104,108-113,116-119,121-123,129-134,152-154
+  s_c1946e3966696b::t_4b4929f1cd2f88 53
+  s_ce9a8df40d9334::t_e0c2b397b5272a 7
+  s_ce9a8df40d9334::t_afd564b6db32a9 54,57,135-151
+pipeline/tests/conformance/test_forge_conformance.py
+  s_ce9a8df40d9334::t_a768df3ce06d54 93-98,134-136,157-159,173-177,189-191,312-316,455-457,522-524,593-595,795-797,812-814
+  s_ce9a8df40d9334::t_0776908e86b557 22,48-56,152-156,160-172,178-188,192-202
+pipeline/tests/test_reconcile.py
+  s_ce9a8df40d9334::t_a79c2e08dbc199 19-20,22,28-29,31,36,53-62,296-336
+  s_c1946e3966696b::t_5bda20dfd0002e 287-295,337-338
+  s_ce9a8df40d9334::t_a768df3ce06d54 87-89,118-120,128-130,132-134,146-148,150-152,166-168,185-187,200-202,224-227,262-265
+pipeline/wgmesh_pipeline/forge/protocol.py
+  s_ce9a8df40d9334::t_71540999d212c2 35-36
+  s_ce9a8df40d9334::t_a768df3ce06d54 45-47,49-51,75-77
+pipeline/wgmesh_pipeline/github/client.py
+  s_ce9a8df40d9334::t_ef13fec6a51ee0 82-93,95-97
+  s_ce9a8df40d9334::t_8a68c691328017 94
+  s_ce9a8df40d9334::t_844746f16b2e8d 369
+  s_ce9a8df40d9334::t_a768df3ce06d54 14-16,99-101,159-161,285-286,313-315,318-320,325-327,335-337,346-348,350-352,372-374,392-394,397-402,406-408,411-413,416-418,425-427,429-431,470-472,492-494,515-523,525-535,562-564,594-597
+pipeline/wgmesh_pipeline/forge/gitea.py
+  s_ce9a8df40d9334::t_9608463db62b4a 35
+  s_ce9a8df40d9334::t_a768df3ce06d54 80-82,96-98,191-193,221-223,266-270,300-304,346-348,351-353,358-360
+  s_ce9a8df40d9334::t_093c408c6ace55 100-109
+pipeline/tests/test_poller.py
+  s_ce9a8df40d9334::t_a768df3ce06d54 65-70,78-86,100-102,115-117,131-133,136-138,143-148,182-184,187-189,207-209,226-228,266-268,299-301,342-344,348-350,359-361,379-381,402-407,425-428,437-439,444-446,471-476,490-492,507-513,527-529
+  s_ce9a8df40d9334::t_266fd56cb79d5b 127-130,134-135
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "bc4b9657a6b81059a7936d806be03d1cd241ded5",
+  "prompts": {},
+  "sessions": {
+    "s_c1946e3966696b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d5e1aabb-b0d8-42d7-bd89-df20a82e7b61",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    },
+    "s_ce9a8df40d9334": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ec811-ff26-7a62-92d0-be86967b5ad2",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
