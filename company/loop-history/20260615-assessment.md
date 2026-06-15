@@ -1,23 +1,24 @@
 # Assessment: 2026-06-15
 
-**Stage**: Reachable | **Run**: 260
+**Stage**: Reachable | **Run**: 261
 
-Stage 3, day 89. wgmesh remains fully functional (v0.2.1, 20 stars) with completely idle pipeline - only 2 open issues, 0 PRs, 13 merged PRs in 7 days. Critical blocker: 89+ days of 0 seed product subscribers despite functional Polar.sh billing, while 5 active subscribers pay for unrelated org products. Pipeline idle, applying Commercial Idle Policy.
+Stage 3, day 89. wgmesh remains fully functional (v0.2.1, 20 stars) with healthy pipeline (0 open PRs, all infrastructure up). Critical issue persists: seed product has 0 subscribers despite working billing integration, while unattributed product 8e8e1c33 has 5 active subscribers generating revenue. Pipeline is completely idle - applying Commercial Idle Policy to focus on customer acquisition.
 
 ## Blockers
-- Polar.sh billing misconfiguration - seed cloudroof products show 0 subscribers for 89+ days while all_org has 5 active subscribers with recent paid orders, preventing Stage 4 advancement
+- Zero subscribers on cloudroof tier products despite functional billing integration
+- Revenue attribution mismatch - payments flow to unidentified product 8e8e1c33 instead of seed products
+- No clear value proposition connecting wgmesh functionality to customer payment willingness
 
 ## Top Actions
-- **fn:gtm**: Create comprehensive internal wgmesh production usage metrics report documenting team's real deployment statistics, uptime data, peer connectivity success rates, NAT traversal performance, and specific operational benefits for cloudroof.eu social proof (zero)
-- **fn:gtm**: Write network administrator 30-day pilot evaluation framework with success metrics checklist, testing scenarios for mesh reliability, and clear ROI measurement criteria (zero)
-- **fn:billing**: Fix Polar.sh product configuration to correctly attribute cloudroof.eu billing to seed product bucket instead of all_org bucket (zero)
+- **fn:gtm**: Create concrete wgmesh value proposition landing page targeting enterprise network administrators with specific ROI metrics, use cases, and competitive positioning (zero)
+- **fn:gtm**: Document internal dogfood usage metrics as proof points including uptime percentages, connection reliability stats, and cost comparisons vs traditional VPN solutions (zero)
+- **fn:billing**: Investigate Polar product 8e8e1c33 attribution to understand revenue source and fix seed product configuration if needed (zero)
 
 ## Contributions
-- **Marty**: Git commits maintaining wgmesh codebase over past 7 days
-- **pupabobas[bot]**: 99 bot commits in past 7 days driving pipeline operations and CI/CD
-- **Copilot**: Recent git commits contributing to codebase maintenance
-- **polar-customers**: 5 active subscribers maintaining revenue stream with recent paid orders
-- **github-community**: 20 stars and 2 forks indicating growing project interest
+- **Marty**: Recent git commits maintaining codebase stability
+- **pupabobas[bot]**: 99 bot commits in past 7 days maintaining CI/CD pipeline
+- **Copilot**: Recent git commits contributing to development workflow
+- **github-community**: Project reached 20 stars and 2 forks showing organic interest growth
 
 ## Needs Human
-- [blocking] Fix Polar.sh organization configuration to correctly attribute cloudroof.eu product orders to seed_product_bucket instead of all_org_bucket
+- [soon] Clarify which business line corresponds to Polar product ID 8e8e1c33-cd06-4652-9032-6cb3b49ec6b4 generating the revenue, and whether this represents legitimate wgmesh/cloudroof customers or separate unrelated products
