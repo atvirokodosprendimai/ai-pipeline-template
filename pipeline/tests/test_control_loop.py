@@ -1,10 +1,9 @@
-"""Control-Loop scheduler tests (cutover Phase B/C, shadow-only).
+"""Control-Loop scheduler tests.
 
-These pin the zero-blast-radius contract: each enabled module fires on its
-cadence, NO forge writes or store persistence happen in shadow, one planner
-crashing does not stop its siblings or the scheduler, stop cancels promptly,
-the observation/strategy_audit slots log their skip reason, and live mode is
-forced to shadow with a warning.
+These pin the per-module live-gate contract: each enabled module fires on its
+cadence, shadow modules gather and plan without executing, one planner crashing
+does not stop its siblings or the scheduler, and live modules call the injected
+executor at the lowest write boundary.
 
 Planners are injected as spies so tests never hit the real forge/LLM. The
 forge spy records every method call and raises if any *write* method is
@@ -17,10 +16,11 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Sequence
 
 import pytest
 
-from wgmesh_pipeline import control_loop as cl
 from wgmesh_pipeline.config import Config, load_config
 from wgmesh_pipeline.control_loop import (
     SELFHEAL_STATE_KEY,
@@ -28,12 +28,14 @@ from wgmesh_pipeline.control_loop import (
     SUPERVISOR_STATE_KEY,
     ControlLoopScheduler,
 )
+from wgmesh_pipeline.control_loop.executor import ExecutionResult
+from wgmesh_pipeline.forge.protocol import Forge
 from wgmesh_pipeline.observation import (
     ObservationAction,
     ObservationInputs,
     ObservationPlan,
 )
-from wgmesh_pipeline.selfheal import SelfHealInputs, SelfHealRun
+from wgmesh_pipeline.selfheal import SelfHealRun
 from wgmesh_pipeline.selfheal.models import HealAction
 from wgmesh_pipeline.state.store import StateStore
 from wgmesh_pipeline.supervisor import RankResult, SupervisorRankRun
@@ -86,6 +88,37 @@ class SpyStore:
             return None
 
         return method
+
+
+class WriteRaisingForge(SpyForge):
+    """Read methods work; write methods raise so shadow gates must bite."""
+
+    def __getattr__(self, name: str):
+        def method(*args: object, **kwargs: object) -> object:
+            self.calls.append(name)
+            if name == "list_open_issues":
+                return []
+            if name in _WRITE_METHODS or name == "create_issue":
+                self.write_calls.append(name)
+                raise AssertionError(f"forge write {name!r} should be gated")
+            return None
+
+        return method
+
+
+@dataclass
+class ExecutorSpy:
+    calls: list[tuple[Forge, object, tuple[Any, ...]]]
+
+    def __call__(
+        self, forge: Forge, store: object, actions: Sequence[Any]
+    ) -> list[ExecutionResult]:
+        captured = tuple(actions)
+        self.calls.append((forge, store, captured))
+        return [
+            ExecutionResult(kind=str(getattr(action, "kind", "")), status="executed")
+            for action in captured
+        ]
 
 
 def _empty_rank_run() -> SupervisorRankRun:
@@ -241,69 +274,86 @@ def test_stop_event_cancels_all_tasks_promptly() -> None:
     asyncio.run(_run_briefly(sched, seconds=0.02))
 
 
-def test_observation_and_strategy_audit_slots_log_skip_reason(caplog) -> None:
-    class TolerantForge(SpyForge):
-        def __getattr__(self, name):
-            def method(*args, **kwargs):
-                self.calls.append(name)
-                if name == "list_open_issues":
-                    return []
-                if name == "create_issue":
-                    self.write_calls.append(name)
-                    return {"dry_run": True}
-                return None
+def _observation_assessor(inputs: ObservationInputs) -> dict[str, object]:
+    return {"issues_to_create": [{"title": "Control-loop smoke", "body": "b"}]}
 
-            return method
 
-    def assessor(inputs: ObservationInputs):
-        return {"issues_to_create": [{"title": "Control-loop smoke", "body": "b"}]}
-
-    def planner(assessment, inputs):
-        return ObservationPlan(
-            actions=(
-                ObservationAction(
-                    kind="create_issue", title="Control-loop smoke", body="b"
-                ),
+def _observation_planner(
+    assessment: dict[str, object], inputs: ObservationInputs
+) -> ObservationPlan:
+    return ObservationPlan(
+        actions=(
+            ObservationAction(
+                kind="create_issue", title="Control-loop smoke", body="b"
             ),
-            skips=(),
-        )
-
-    sched = ControlLoopScheduler(
-        config=_config(
-            observation_interval_seconds=0.01, strategy_audit_interval_seconds=100
         ),
-        forge=TolerantForge(),
+        skips=(),
+    )
+
+
+def test_observation_shadow_does_not_call_executor_and_logs_plan(caplog) -> None:
+    executor = ExecutorSpy(calls=[])
+    sched = ControlLoopScheduler(
+        config=_config(observation_live=False),
+        forge=WriteRaisingForge(),
         store=SpyStore(),
         supervisor_planner=Spy(_empty_rank_run()),
         selfheal_planner=Spy(_empty_selfheal_run()),
-        observation_assessor=assessor,
-        observation_planner=planner,
+        observation_assessor=_observation_assessor,
+        observation_planner=_observation_planner,
+        action_executor=executor,
     )
     with caplog.at_level(logging.INFO, logger="wgmesh_pipeline.control_loop"):
-        asyncio.run(_run_briefly(sched))
-    text = caplog.text
-    assert "module=observation" in text
-    assert "planned_actions=1" in text
-    assert "executed=1" in text
+        asyncio.run(sched._cycle_observation())
+
+    assert executor.calls == []
+    assert "module=observation mode=shadow" in caplog.text
+    assert "planned_actions=1" in caplog.text
+    assert "executed=0" in caplog.text
+    assert 'reason="module not flipped live"' in caplog.text
 
 
-def test_strategy_audit_cycle_persists_material_change_and_executes_drift_action(
-    tmp_path, caplog
-) -> None:
-    class DriftForge(SpyForge):
-        def __getattr__(self, name):
-            def method(*args, **kwargs):
-                self.calls.append(name)
-                if name == "list_open_issues":
-                    return []
-                if name == "create_issue":
-                    self.write_calls.append(name)
-                    return {"dry_run": True}
-                return None
+def test_observation_live_calls_executor_with_planned_actions(caplog) -> None:
+    executor = ExecutorSpy(calls=[])
+    sched = ControlLoopScheduler(
+        config=_config(observation_live=True),
+        forge=WriteRaisingForge(),
+        store=SpyStore(),
+        supervisor_planner=Spy(_empty_rank_run()),
+        selfheal_planner=Spy(_empty_selfheal_run()),
+        observation_assessor=_observation_assessor,
+        observation_planner=_observation_planner,
+        action_executor=executor,
+    )
+    with caplog.at_level(logging.INFO, logger="wgmesh_pipeline.control_loop"):
+        asyncio.run(sched._cycle_observation())
 
-            return method
+    assert len(executor.calls) == 1
+    assert len(executor.calls[0][2]) == 1
+    assert executor.calls[0][2][0].kind == "create_issue"
+    assert "module=observation mode=live" in caplog.text
+    assert "planned_actions=1" in caplog.text
+    assert "executed=1" in caplog.text
 
-    db = StateStore(tmp_path / "state.db")
+
+def test_observation_shadow_with_write_raising_forge_is_safe(caplog) -> None:
+    sched = ControlLoopScheduler(
+        config=_config(observation_live=False),
+        forge=WriteRaisingForge(),
+        store=SpyStore(),
+        supervisor_planner=Spy(_empty_rank_run()),
+        selfheal_planner=Spy(_empty_selfheal_run()),
+        observation_assessor=_observation_assessor,
+        observation_planner=_observation_planner,
+    )
+    with caplog.at_level(logging.INFO, logger="wgmesh_pipeline.control_loop"):
+        asyncio.run(sched._cycle_observation())
+
+    assert "planned_actions=1" in caplog.text
+    assert "executed=0" in caplog.text
+
+
+def _seed_strategy_drift_baseline(db: StateStore) -> None:
     db.save_control_state(
         STRATEGY_AUDIT_STATE_KEY,
         {
@@ -329,53 +379,107 @@ def test_strategy_audit_cycle_persists_material_change_and_executes_drift_action
         },
         fingerprint="old",
     )
+
+
+def _paid_response() -> object:
+    return type(
+        "R",
+        (),
+        {
+            "text": "Paid subscriber\n1",
+            "raise_for_status": lambda self: None,
+        },
+    )()
+
+
+def test_strategy_audit_shadow_does_not_call_executor_and_logs_plan(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    db = StateStore(tmp_path / "state.db")
+    _seed_strategy_drift_baseline(db)
+    executor = ExecutorSpy(calls=[])
     sched = ControlLoopScheduler(
         config=_config(
-            strategy_audit_interval_seconds=0.01, observation_interval_seconds=100
+            strategy_audit_live=False,
+            strategy_audit_interval_seconds=0.01,
+            observation_interval_seconds=100,
         ),
-        forge=DriftForge(),
+        forge=WriteRaisingForge(),
         store=db,
         supervisor_planner=Spy(_empty_rank_run()),
         selfheal_planner=Spy(_empty_selfheal_run()),
         strategy_text_reader=lambda: "last_updated: 2026-06-15\n\n## Milestones\n",
-        strategy_http_get=lambda url, timeout: type(
-            "R",
-            (),
-            {
-                "text": "Paid subscriber\n1",
-                "raise_for_status": lambda self: None,
-            },
-        )(),
+        strategy_http_get=lambda url, timeout: _paid_response(),
         now_provider=lambda: "2026-06-15T00:00:00Z",
+        action_executor=executor,
     )
     with caplog.at_level(logging.INFO, logger="wgmesh_pipeline.control_loop"):
-        asyncio.run(_run_briefly(sched))
+        asyncio.run(sched._cycle_strategy_audit())
+
+    saved = db.load_control_state(STRATEGY_AUDIT_STATE_KEY)
+    assert saved is not None
+    assert saved["last_reported_drift_fingerprint"] == "old"
+    assert executor.calls == []
+    assert "module=strategy_audit mode=shadow" in caplog.text
+    assert "planned_actions=1" in caplog.text
+    assert "executed=0" in caplog.text
+    assert 'reason="module not flipped live"' in caplog.text
+
+
+def test_strategy_audit_live_calls_executor_and_persists_material_change(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    db = StateStore(tmp_path / "state.db")
+    _seed_strategy_drift_baseline(db)
+    executor = ExecutorSpy(calls=[])
+    sched = ControlLoopScheduler(
+        config=_config(
+            strategy_audit_live=True,
+            strategy_audit_interval_seconds=0.01,
+            observation_interval_seconds=100,
+        ),
+        forge=WriteRaisingForge(),
+        store=db,
+        supervisor_planner=Spy(_empty_rank_run()),
+        selfheal_planner=Spy(_empty_selfheal_run()),
+        strategy_text_reader=lambda: "last_updated: 2026-06-15\n\n## Milestones\n",
+        strategy_http_get=lambda url, timeout: _paid_response(),
+        now_provider=lambda: "2026-06-15T00:00:00Z",
+        action_executor=executor,
+    )
+    with caplog.at_level(logging.INFO, logger="wgmesh_pipeline.control_loop"):
+        asyncio.run(sched._cycle_strategy_audit())
+
     saved = db.load_control_state(STRATEGY_AUDIT_STATE_KEY)
     assert saved is not None
     assert saved["last_reported_drift_fingerprint"] != "old"
-    assert "module=strategy_audit" in caplog.text
+    assert len(executor.calls) == 1
+    assert len(executor.calls[0][2]) == 1
+    assert executor.calls[0][2][0].kind == "create_issue"
+    assert "module=strategy_audit mode=live" in caplog.text
     assert "decision=open_pr" in caplog.text
+    assert "executed=1" in caplog.text
 
 
-def test_live_mode_forced_to_shadow_with_warning_no_writes(caplog) -> None:
-    forge = SpyForge()
-    with caplog.at_level(logging.WARNING, logger="wgmesh_pipeline.control_loop"):
-        sched = ControlLoopScheduler(
-            config=_config(
-                control_loop_mode="live",
-                selfheal_interval_seconds=0.01,
-                supervisor_interval_seconds=0.01,
-            ),
-            forge=forge,
-            store=SpyStore(),
-            supervisor_planner=Spy(_empty_rank_run()),
-            selfheal_planner=Spy(_empty_selfheal_run()),
-            observation_assessor=lambda inputs: {},
-            strategy_text_reader=lambda: None,
-        )
-        asyncio.run(_run_briefly(sched))
-    assert "FORCING shadow" in caplog.text
-    assert forge.write_calls == []
+def test_control_loop_mode_live_does_not_enable_module_gate(caplog) -> None:
+    executor = ExecutorSpy(calls=[])
+    sched = ControlLoopScheduler(
+        config=_config(control_loop_mode="live", selfheal_live=False),
+        forge=WriteRaisingForge(),
+        store=SpyStore(),
+        supervisor_planner=Spy(_empty_rank_run()),
+        selfheal_planner=Spy(_selfheal_run_with_action()),
+        observation_assessor=lambda inputs: {},
+        strategy_text_reader=lambda: None,
+        action_executor=executor,
+    )
+    with caplog.at_level(logging.INFO, logger="wgmesh_pipeline.control_loop"):
+        asyncio.run(sched._cycle_selfheal())
+
+    assert executor.calls == []
+    assert "module=selfheal mode=shadow" in caplog.text
+    assert "planned_actions=1" in caplog.text
+    assert "executed=0" in caplog.text
 
 
 def test_real_planners_are_the_defaults() -> None:
@@ -426,6 +530,10 @@ def test_config_defaults_control_loop_disabled_shadow() -> None:
     assert cfg.supervisor_interval_seconds == 14400
     assert cfg.observation_interval_seconds == 28800
     assert cfg.strategy_audit_interval_seconds == 86400
+    assert cfg.supervisor_live is False
+    assert cfg.selfheal_live is False
+    assert cfg.observation_live is False
+    assert cfg.strategy_audit_live is False
 
 
 def test_config_parses_control_loop_env() -> None:
@@ -437,14 +545,22 @@ def test_config_parses_control_loop_env() -> None:
             SUPERVISOR_INTERVAL_SECONDS="120",
             OBSERVATION_INTERVAL_SECONDS="180",
             STRATEGY_AUDIT_INTERVAL_SECONDS="240",
+            SUPERVISOR_LIVE="true",
+            SELFHEAL_LIVE="true",
+            OBSERVATION_LIVE="true",
+            STRATEGY_AUDIT_LIVE="true",
         )
     )
     assert cfg.control_loop_enabled is True
-    assert cfg.control_loop_mode == "live"  # honored in config; scheduler forces shadow
+    assert cfg.control_loop_mode == "live"
     assert cfg.selfheal_interval_seconds == 60
     assert cfg.supervisor_interval_seconds == 120
     assert cfg.observation_interval_seconds == 180
     assert cfg.strategy_audit_interval_seconds == 240
+    assert cfg.supervisor_live is True
+    assert cfg.selfheal_live is True
+    assert cfg.observation_live is True
+    assert cfg.strategy_audit_live is True
 
 
 def test_config_rejects_bad_control_loop_mode() -> None:
@@ -495,6 +611,7 @@ def test_supervisor_material_change_persists_and_round_trips(tmp_path) -> None:
     sup = CapturingSupervisorSpy(_material_rank_run())
     sched = ControlLoopScheduler(
         config=_config(
+            supervisor_live=True,
             supervisor_interval_seconds=0.01,
             selfheal_interval_seconds=100,
             observation_interval_seconds=100,
@@ -524,6 +641,7 @@ def test_supervisor_immaterial_run_does_not_persist(tmp_path) -> None:
     db = StateStore(tmp_path / "state.db")
     sched = ControlLoopScheduler(
         config=_config(
+            supervisor_live=True,
             supervisor_interval_seconds=0.01,
             selfheal_interval_seconds=100,
             observation_interval_seconds=100,
@@ -573,6 +691,7 @@ def test_selfheal_material_activity_persists(tmp_path) -> None:
 
     sched = ControlLoopScheduler(
         config=_config(
+            selfheal_live=True,
             selfheal_interval_seconds=0.01,
             supervisor_interval_seconds=100,
             observation_interval_seconds=100,
@@ -594,6 +713,7 @@ def test_selfheal_idle_cycle_does_not_persist(tmp_path) -> None:
     db = StateStore(tmp_path / "state.db")
     sched = ControlLoopScheduler(
         config=_config(
+            selfheal_live=True,
             selfheal_interval_seconds=0.01,
             supervisor_interval_seconds=100,
             observation_interval_seconds=100,

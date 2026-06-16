@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import FrozenInstanceError
 from pathlib import Path
 
@@ -32,14 +33,89 @@ def test_full_env_loads_frozen_config_with_shadow_default() -> None:
     assert cfg.repo_path == "/opt/wgmesh-checkout"
     assert Path(cfg.recipes_dir).name == "recipes"
     assert Path(cfg.recipes_dir).parent.name == "pipeline"
+    assert cfg.supervisor_live is False
+    assert cfg.selfheal_live is False
+    assert cfg.observation_live is False
+    assert cfg.strategy_audit_live is False
 
     with pytest.raises(FrozenInstanceError):
         cfg.mode = "live"  # type: ignore[misc]
 
 
+@pytest.mark.parametrize(
+    ("env_name", "field_name"),
+    (
+        ("SUPERVISOR_LIVE", "supervisor_live"),
+        ("SELFHEAL_LIVE", "selfheal_live"),
+        ("OBSERVATION_LIVE", "observation_live"),
+        ("STRATEGY_AUDIT_LIVE", "strategy_audit_live"),
+    ),
+)
+def test_per_module_live_flags_parse_from_env(env_name: str, field_name: str) -> None:
+    cfg = load_config(
+        {
+            "TARGET_REPO": "atvirokodosprendimai/wgmesh",
+            "DATABASE_MODE": "local",
+            env_name: "true",
+        }
+    )
+
+    assert getattr(cfg, field_name) is True
+
+
+@pytest.mark.parametrize(
+    ("env_name", "field_name"),
+    (
+        ("SUPERVISOR_LIVE", "supervisor_live"),
+        ("SELFHEAL_LIVE", "selfheal_live"),
+        ("OBSERVATION_LIVE", "observation_live"),
+        ("STRATEGY_AUDIT_LIVE", "strategy_audit_live"),
+    ),
+)
+def test_per_module_live_flags_parse_from_box_config(
+    tmp_path: Path, env_name: str, field_name: str
+) -> None:
+    from wgmesh_pipeline.config import _read_box_config
+
+    path = tmp_path / "box-config.json"
+    path.write_text(json.dumps({env_name: "true"}), encoding="utf-8")
+
+    cfg = load_config(
+        {
+            **_read_box_config(path),
+            "TARGET_REPO": "atvirokodosprendimai/wgmesh",
+            "DATABASE_MODE": "local",
+        }
+    )
+
+    assert getattr(cfg, field_name) is True
+
+
+@pytest.mark.parametrize(
+    "env_name",
+    (
+        "SUPERVISOR_LIVE",
+        "SELFHEAL_LIVE",
+        "OBSERVATION_LIVE",
+        "STRATEGY_AUDIT_LIVE",
+    ),
+)
+def test_per_module_live_flags_reject_invalid_values(env_name: str) -> None:
+    with pytest.raises(ValueError, match=rf"{env_name} must be 'true' or 'false'"):
+        load_config(
+            {
+                "TARGET_REPO": "atvirokodosprendimai/wgmesh",
+                "DATABASE_MODE": "local",
+                env_name: "yes",
+            }
+        )
+
+
 def test_bogus_mode_lists_valid_modes() -> None:
     with pytest.raises(ValueError, match="PIPELINE_MODE.*live.*shadow.*spec-only"):
-        load_config({"TARGET_REPO": "atvirokodosprendimai/wgmesh", "PIPELINE_MODE": "bogus"})
+        load_config(
+            {"TARGET_REPO": "atvirokodosprendimai/wgmesh", "PIPELINE_MODE": "bogus"}
+        )
 
 
 def test_missing_target_repo_raises_with_var_name() -> None:
@@ -49,13 +125,21 @@ def test_missing_target_repo_raises_with_var_name() -> None:
 
 def test_shadow_allows_missing_pat_live_requires_it() -> None:
     shadow = load_config(
-        {"TARGET_REPO": "atvirokodosprendimai/wgmesh", "PIPELINE_MODE": "shadow", "DATABASE_MODE": "local"}
+        {
+            "TARGET_REPO": "atvirokodosprendimai/wgmesh",
+            "PIPELINE_MODE": "shadow",
+            "DATABASE_MODE": "local",
+        }
     )
     assert shadow.wgmesh_bot_pat is None
 
     with pytest.raises(ValueError, match="WGMESH_BOT_PAT"):
         load_config(
-            {"TARGET_REPO": "atvirokodosprendimai/wgmesh", "PIPELINE_MODE": "live", "DATABASE_MODE": "local"}
+            {
+                "TARGET_REPO": "atvirokodosprendimai/wgmesh",
+                "PIPELINE_MODE": "live",
+                "DATABASE_MODE": "local",
+            }
         )
 
 
@@ -63,17 +147,27 @@ def test_database_mode_explicit_no_silent_fallback() -> None:
     # The mailservice lesson: a misconfigured deploy must fail, not silently
     # write local. DATABASE_MODE is required and validated.
     with pytest.raises(ValueError, match="DATABASE_MODE"):
-        load_config({"TARGET_REPO": "atvirokodosprendimai/wgmesh", "PIPELINE_MODE": "shadow"})
+        load_config(
+            {"TARGET_REPO": "atvirokodosprendimai/wgmesh", "PIPELINE_MODE": "shadow"}
+        )
 
     with pytest.raises(ValueError, match="DATABASE_MODE"):
         load_config(
-            {"TARGET_REPO": "atvirokodosprendimai/wgmesh", "PIPELINE_MODE": "shadow", "DATABASE_MODE": "bogus"}
+            {
+                "TARGET_REPO": "atvirokodosprendimai/wgmesh",
+                "PIPELINE_MODE": "shadow",
+                "DATABASE_MODE": "bogus",
+            }
         )
 
     # turso requires the URL — fail-loud, never fall back to local
     with pytest.raises(ValueError, match="TURSO_DATABASE_URL"):
         load_config(
-            {"TARGET_REPO": "atvirokodosprendimai/wgmesh", "PIPELINE_MODE": "shadow", "DATABASE_MODE": "turso"}
+            {
+                "TARGET_REPO": "atvirokodosprendimai/wgmesh",
+                "PIPELINE_MODE": "shadow",
+                "DATABASE_MODE": "turso",
+            }
         )
 
     cfg = load_config(
@@ -131,7 +225,9 @@ def test_explicit_registry_and_routing_parse_into_config() -> None:
 
 
 def test_max_escalation_attempts_unset_defaults_and_invalid_values_raise() -> None:
-    cfg = load_config({"TARGET_REPO": "atvirokodosprendimai/wgmesh", "DATABASE_MODE": "local"})
+    cfg = load_config(
+        {"TARGET_REPO": "atvirokodosprendimai/wgmesh", "DATABASE_MODE": "local"}
+    )
     assert cfg.max_escalation_attempts == 2
 
     with pytest.raises(ValueError, match="MAX_ESCALATION_ATTEMPTS must be an integer"):
@@ -182,22 +278,32 @@ def test_wgmesh_checkout_path_env_and_recipes_dir_override() -> None:
 
 def test_read_box_config_allowlist_and_secret_rejection(tmp_path) -> None:
     from wgmesh_pipeline.config import _read_box_config
-    import json as _json
+
     p = tmp_path / "box-config.json"
-    p.write_text(_json.dumps({
-        "CONTROL_LOOP_ENABLED": "true",
-        "SELFHEAL_INTERVAL_SECONDS": 900,
-        "_comment": "ignored",
-        "WGMESH_BOT_PAT": "ghp_secret_should_be_ignored",
-        "TURSO_AUTH_TOKEN": "secret",
-    }))
+    p.write_text(
+        json.dumps(
+            {
+                "CONTROL_LOOP_ENABLED": "true",
+                "SELFHEAL_INTERVAL_SECONDS": 900,
+                "OBSERVATION_LIVE": "true",
+                "_comment": "ignored",
+                "WGMESH_BOT_PAT": "ghp_secret_should_be_ignored",
+                "TURSO_AUTH_TOKEN": "secret",
+            }
+        )
+    )
     cfg = _read_box_config(p)
-    assert cfg == {"CONTROL_LOOP_ENABLED": "true", "SELFHEAL_INTERVAL_SECONDS": "900"}
+    assert cfg == {
+        "CONTROL_LOOP_ENABLED": "true",
+        "SELFHEAL_INTERVAL_SECONDS": "900",
+        "OBSERVATION_LIVE": "true",
+    }
     assert "WGMESH_BOT_PAT" not in cfg and "TURSO_AUTH_TOKEN" not in cfg
 
 
 def test_read_box_config_absent_or_malformed(tmp_path) -> None:
     from wgmesh_pipeline.config import _read_box_config
+
     assert _read_box_config(tmp_path / "nope.json") == {}
     bad = tmp_path / "bad.json"
     bad.write_text("{not json")
@@ -214,12 +320,28 @@ def test_committed_box_config_is_valid_and_allowlisted() -> None:
         BOX_CONFIG_ALLOWLIST,
         VALID_CONTROL_LOOP_MODES,
     )
+
     cfg = _read_box_config()
     assert set(cfg).issubset(BOX_CONFIG_ALLOWLIST)
     if "CONTROL_LOOP_MODE" in cfg:
         assert cfg["CONTROL_LOOP_MODE"] in VALID_CONTROL_LOOP_MODES
     if "CONTROL_LOOP_ENABLED" in cfg:
-        assert cfg["CONTROL_LOOP_ENABLED"].lower() in {"true", "false", "1", "0", "yes", "no"}
+        assert cfg["CONTROL_LOOP_ENABLED"].lower() in {
+            "true",
+            "false",
+            "1",
+            "0",
+            "yes",
+            "no",
+        }
+    for k in (
+        "SUPERVISOR_LIVE",
+        "SELFHEAL_LIVE",
+        "OBSERVATION_LIVE",
+        "STRATEGY_AUDIT_LIVE",
+    ):
+        if k in cfg:
+            assert cfg[k].lower() in {"true", "false"}
     for k in cfg:
         if k.endswith("_SECONDS") or k == "MAX_FILES":
             assert int(cfg[k]) > 0

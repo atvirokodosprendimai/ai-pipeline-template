@@ -1,21 +1,11 @@
-"""Box-side Control-Loop scheduler — SHADOW-ONLY (cutover Phase B/C bake).
+"""Box-side Control-Loop scheduler with per-module live gates.
 
 The four control-loop planners (``supervisor.run_supervisor_rank``,
 ``selfheal.run_self_heal``, ``observation.plan_actions``,
-``strategy_audit.run_strategy_audit``) are parity-passive: they gather/return
-state + planned actions but never write. This scheduler wires them into the box
-loop on per-module cadences and, for each cycle, does exactly three things:
-gather inputs, call the planner, and LOG a structured one-line summary. It
-performs ZERO forge writes and ZERO state persistence — the zero-blast-radius
-bake before a later live flip.
-
-The LIVE executor is a separate follow-up unit. It will, behind the
-``company/scripts/sanitise.sh`` wall, publish the planned actions and persist
-the returned state dicts (to Turso / the ``company/*.json`` state files), gated
-on each planner's ``material_changed`` sentinel. None of that lives here.
-
-``control_loop_mode == "live"`` is still shadow-safe until U5: the executor is
-called, but the forge adapter's own mode controls whether writes are dry-runs.
+``strategy_audit.run_strategy_audit``) gather/return state + planned actions.
+Each module is shadow by default and only executes/persists when its own
+``*_LIVE`` config flag is true. ``PIPELINE_MODE`` and ``CONTROL_LOOP_MODE`` are
+not the control-loop write gate.
 
 Per-module gather gaps (honest degradation — these are the follow-up unit's
 TODOs, NOT to be faked here):
@@ -40,10 +30,10 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Mapping
+from typing import TYPE_CHECKING, Any, Callable, Mapping, Sequence
 
 from wgmesh_pipeline.config import Config
-from wgmesh_pipeline.control_loop.executor import execute_actions
+from wgmesh_pipeline.control_loop.executor import ExecutionResult, execute_actions
 from wgmesh_pipeline.forge.protocol import Forge
 from wgmesh_pipeline.observation import ObservationPlan, plan_actions
 from wgmesh_pipeline.selfheal import SelfHealInputs, SelfHealRun, run_self_heal
@@ -75,6 +65,8 @@ _TAXONOMY_PATH = _REPO_ROOT / "company" / "pipeline-stages.json"
 _STRATEGY_PATH = _REPO_ROOT / "STRATEGY.md"
 
 SHADOW = "shadow"
+LIVE = "live"
+SHADOW_REASON = "module not flipped live"
 
 # control_loop_state row keys — one per persisted module. These mirror the
 # committed company/*.json snapshots, which become read-only once a module is
@@ -106,6 +98,7 @@ SupervisorPlanner = Callable[..., SupervisorRankRun]
 SelfHealPlanner = Callable[[Forge, SelfHealInputs], SelfHealRun]
 StrategyTextReader = Callable[[], str | None]
 NowProvider = Callable[[], str]
+ActionExecutor = Callable[[Forge, object, Sequence[Any]], list[ExecutionResult]]
 
 
 def _utc_now_iso() -> str:
@@ -117,6 +110,26 @@ def _read_text(path: Path) -> str | None:
         return path.read_text(encoding="utf-8")
     except OSError:
         return None
+
+
+def _shadow_executor(
+    forge: Forge, store: object, actions: Sequence[Any]
+) -> list[ExecutionResult]:
+    return []
+
+
+@dataclass(frozen=True)
+class _ShadowStore:
+    """Read-only store view for shadow cycles that need prior state as input."""
+
+    store: object
+
+    def load_control_state(self, key: str) -> Mapping[str, Any] | None:
+        loader = getattr(self.store, "load_control_state", None)
+        if loader is None:
+            return None
+        loaded = loader(key)
+        return loaded if isinstance(loaded, Mapping) else None
 
 
 def _load_taxonomy_or_empty() -> Mapping[str, Any]:
@@ -145,7 +158,7 @@ class ModuleTask:
 
 @dataclass
 class ControlLoopScheduler:
-    """Runs each enabled control-loop planner on its own cadence, shadow-only.
+    """Runs each enabled control-loop planner on its own cadence.
 
     Every cycle is wrapped in try/except: one module raising is logged
     (``log.exception``) and the task continues to its next interval — a single
@@ -156,7 +169,7 @@ class ControlLoopScheduler:
 
     config: Config
     forge: Forge
-    store: object  # StateStore — never written in shadow; held for the live unit
+    store: object
     log: logging.Logger = log
     supervisor_planner: SupervisorPlanner = run_supervisor_rank
     selfheal_planner: SelfHealPlanner = run_self_heal
@@ -165,16 +178,10 @@ class ControlLoopScheduler:
     strategy_text_reader: StrategyTextReader = lambda: _read_text(_STRATEGY_PATH)
     strategy_http_get: HttpGet | None = None
     now_provider: NowProvider = _utc_now_iso
+    action_executor: ActionExecutor = execute_actions
     _tasks: list[ModuleTask] = field(default_factory=list, init=False)
 
     def __post_init__(self) -> None:
-        if self.config.control_loop_mode != SHADOW:
-            self.log.warning(
-                "control_loop: CONTROL_LOOP_MODE=%r is not honored in this unit — "
-                "the live executor (forge writes + state persistence) is a "
-                "follow-up; FORCING shadow (zero writes).",
-                self.config.control_loop_mode,
-            )
         self._tasks = [
             ModuleTask(
                 "selfheal", self.config.selfheal_interval_seconds, self._cycle_selfheal
@@ -195,6 +202,12 @@ class ControlLoopScheduler:
                 self._cycle_strategy_audit,
             ),
         ]
+        for task in self._tasks:
+            self.log.info(
+                "control_loop: module=%s startup_mode=%s",
+                task.name,
+                LIVE if self._module_live(task.name) else SHADOW,
+            )
 
     @property
     def tasks(self) -> tuple[ModuleTask, ...]:
@@ -221,6 +234,26 @@ class ControlLoopScheduler:
             for runner in runners:
                 runner.cancel()
             await asyncio.gather(*runners, return_exceptions=True)
+
+    def _module_live(self, module_name: str) -> bool:
+        live_by_module = {
+            "supervisor": self.config.supervisor_live,
+            "selfheal": self.config.selfheal_live,
+            "observation": self.config.observation_live,
+            "strategy_audit": self.config.strategy_audit_live,
+        }
+        try:
+            return live_by_module[module_name]
+        except KeyError as exc:
+            raise ValueError(f"unknown control-loop module {module_name!r}") from exc
+
+    def _module_mode(self, module_name: str) -> str:
+        return LIVE if self._module_live(module_name) else SHADOW
+
+    def _shadow_store(self, module_name: str) -> object:
+        return (
+            self.store if self._module_live(module_name) else _ShadowStore(self.store)
+        )
 
     async def _run_task(self, task: ModuleTask, stop: asyncio.Event) -> None:
         """Periodic loop for one module: run a cycle, then wait the interval
@@ -289,23 +322,36 @@ class ControlLoopScheduler:
             previous_state=previous_state,
             now=None,
         )
+        top_actions = [
+            str(a.get("action")) for a in run.result.top_actions if a.get("action")
+        ]
+        if not self._module_live("supervisor"):
+            self.log.info(
+                "control_loop: module=supervisor mode=shadow material_changed=%s "
+                "rank_changed=%s planned_actions=%s executed=0 "
+                'reason="module not flipped live" top_actions=%s '
+                "previous_state_loaded=%s persisted=false (forge snapshot degraded)",
+                run.material_changed,
+                run.rank_changed,
+                len(top_actions),
+                top_actions[:3],
+                previous_state is not None,
+            )
+            return
         # Persist only on material change (anti PR-per-run pile-up). The
         # supervisor exposes its own material_fingerprint in the state dict.
         persisted = False
         if run.material_changed:
             fingerprint = str(run.state.get("material_fingerprint") or "")
             persisted = self._save_state(SUPERVISOR_STATE_KEY, run.state, fingerprint)
-        top_actions = [
-            str(a.get("action")) for a in run.result.top_actions if a.get("action")
-        ]
         self.log.info(
             "control_loop: module=supervisor mode=%s material_changed=%s "
-            "rank_changed=%s planned_actions=%s top_actions=%s "
+            "rank_changed=%s planned_actions=%s executed=0 top_actions=%s "
             "previous_state_loaded=%s persisted=%s (forge snapshot degraded)",
-            self.config.control_loop_mode,
+            self._module_mode("supervisor"),
             run.material_changed,
             run.rank_changed,
-            len(run.result.top),
+            len(top_actions),
             top_actions[:3],
             previous_state is not None,
             persisted,
@@ -317,11 +363,24 @@ class ControlLoopScheduler:
         )  # forge-derivable only; rest degraded
         run = self.selfheal_planner(self.forge, inputs)
         action_kinds = [a.kind for a in run.actions]
+        if not self._module_live("selfheal"):
+            self.log.info(
+                "control_loop: module=selfheal mode=shadow "
+                "circuit_breaker_tripped=%s mutation_asserted=%s "
+                "planned_actions=%s top_actions=%s executed=0 "
+                'reason="module not flipped live" persisted=false '
+                "(gap: stale-sweep + funnel/idle snapshots empty)",
+                run.circuit_breaker_tripped,
+                run.mutation_asserted,
+                len(run.actions),
+                action_kinds[:3],
+            )
+            return
         # Route every planned action through the single executor. The executor
         # is mode-neutral: in shadow the forge dry-runs (DryRunResult, zero
         # HTTP), in live it writes — behind the sanitise wall either way. One
         # action raising never aborts the batch (fail-closed, per-action).
-        results = execute_actions(self.forge, self.store, run.actions)
+        results = self.action_executor(self.forge, self.store, run.actions)
         statuses = [r.status for r in results]
         # U3: persist the heal state on material activity only. Selfheal exposes
         # no fingerprint of its own, so material = some action planned or the
@@ -339,7 +398,7 @@ class ControlLoopScheduler:
             "mutation_asserted=%s planned_actions=%s top_actions=%s "
             "executed=%s result_statuses=%s persisted=%s "
             "(gap: stale-sweep + funnel/idle snapshots empty)",
-            self.config.control_loop_mode,
+            self._module_mode("selfheal"),
             run.circuit_breaker_tripped,
             run.mutation_asserted,
             len(run.actions),
@@ -363,12 +422,17 @@ class ControlLoopScheduler:
             self.store,
             assessor=assessor,
             planner=self.observation_planner,
+            executor=(
+                self.action_executor
+                if self._module_live("observation")
+                else _shadow_executor
+            ),
         )
         if result.skipped:
             self.log.warning(
                 "control_loop: module=observation mode=%s skipped=%s "
                 "reason=%s planned_actions=0 executed=0",
-                self.config.control_loop_mode,
+                self._module_mode("observation"),
                 result.skipped,
                 result.skip_reason,
             )
@@ -377,10 +441,20 @@ class ControlLoopScheduler:
         planned = (
             len(result.plan.actions) if isinstance(result.plan, ObservationPlan) else 0
         )
+        if not self._module_live("observation"):
+            self.log.info(
+                "control_loop: module=observation mode=shadow "
+                "planned_actions=%s skips=%s executed=0 "
+                'reason="module not flipped live" result_statuses=%s',
+                planned,
+                len(result.plan.skips) if result.plan is not None else 0,
+                statuses[:5],
+            )
+            return
         self.log.info(
             "control_loop: module=observation mode=%s planned_actions=%s "
             "skips=%s executed=%s result_statuses=%s",
-            self.config.control_loop_mode,
+            self._module_mode("observation"),
             planned,
             len(result.plan.skips) if result.plan is not None else 0,
             sum(1 for status in statuses if status == "executed"),
@@ -395,7 +469,7 @@ class ControlLoopScheduler:
             self.log.warning(
                 "control_loop: module=strategy_audit mode=%s skipped=true "
                 "reason=STRATEGY.md unavailable planned_actions=0 executed=0",
-                self.config.control_loop_mode,
+                self._module_mode("strategy_audit"),
             )
             return
         kwargs: dict[str, Any] = {
@@ -405,17 +479,38 @@ class ControlLoopScheduler:
         if self.strategy_http_get is not None:
             kwargs["http_get"] = self.strategy_http_get
         result: StrategyCycleResult = run_strategy_cycle(
-            self.forge, self.store, **kwargs
+            self.forge,
+            self._shadow_store("strategy_audit"),
+            executor=(
+                self.action_executor
+                if self._module_live("strategy_audit")
+                else _shadow_executor
+            ),
+            **kwargs,
         )
+        planned = 1 if result.run.decision.action == "open_pr" else 0
         statuses = [r.status for r in result.execution_results]
+        if not self._module_live("strategy_audit"):
+            self.log.info(
+                "control_loop: module=strategy_audit mode=shadow decision=%s "
+                "material_changed=%s planned_actions=%s executed=0 "
+                'reason="module not flipped live" result_statuses=%s '
+                "persisted=false paid_fetch_status=%s",
+                result.run.decision.action,
+                result.run.material_changed,
+                planned,
+                statuses[:5],
+                result.metrics.paid_fetch_status,
+            )
+            return
         self.log.info(
             "control_loop: module=strategy_audit mode=%s decision=%s "
             "material_changed=%s planned_actions=%s executed=%s "
             "result_statuses=%s persisted=%s paid_fetch_status=%s",
-            self.config.control_loop_mode,
+            self._module_mode("strategy_audit"),
             result.run.decision.action,
             result.run.material_changed,
-            len(result.execution_results),
+            planned,
             sum(1 for status in statuses if status == "executed"),
             statuses[:5],
             result.persisted,
