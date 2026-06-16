@@ -163,12 +163,19 @@ class GooseObservationAssessor:
             output = tmp_path / "assessment.json"
             recipe = tmp_path / "observation-assessment.yaml"
             recipe.write_text(_assessment_recipe(), encoding="utf-8")
+            # Pass the board as a FILE PATH, never inline content: goose
+            # substitutes {{ params }} into the recipe YAML before parsing, so a
+            # multi-line value injected into the `prompt: |` block breaks out of
+            # the literal scalar ("Invalid recipe: did not find expected key").
+            # The committed recipes pass paths (spec_file/diff_file) for this.
+            board_file = tmp_path / "open_board.md"
+            board_file.write_text(_inputs_board(inputs), encoding="utf-8")
             result = GooseRunner(self.config).run_recipe(
                 recipe=recipe,
                 workdir=self.repo_root,
                 params={
                     "assessment_file": str(output),
-                    "open_board": _inputs_board(inputs),
+                    "open_board_file": str(board_file),
                 },
                 expected_output=output,
                 stage="observation",
@@ -226,16 +233,16 @@ parameters:
     input_type: string
     requirement: required
     description: "Absolute path where strict JSON assessment must be written."
-  - key: open_board
+  - key: open_board_file
     input_type: string
     requirement: required
-    description: "Open issue board snapshot."
+    description: "Path to the open issue board snapshot (markdown)."
 prompt: |
   You are the observation loop for wgmesh, a decentralized WireGuard mesh
   networking product with managed ingress.
 
-  Current open board:
-  {{ open_board }}
+  Read the current open issue board (markdown) at this path:
+  {{ open_board_file }}
 
   Write ONLY strict JSON to this exact file path:
   {{ assessment_file }}
