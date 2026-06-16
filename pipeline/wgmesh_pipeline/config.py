@@ -16,17 +16,23 @@ log = logging.getLogger(__name__)
 # secret-shaped: PAT/TOKEN/KEY/PASSWORD/URL) is ignored. Fail-closed against a
 # committed secret (allowlist, not denylist — agent-env lesson).
 BOX_CONFIG_PATH = Path(__file__).resolve().parents[2] / "company" / "box-config.json"
-BOX_CONFIG_ALLOWLIST = frozenset({
-    "CONTROL_LOOP_ENABLED",
-    "CONTROL_LOOP_MODE",
-    "SELFHEAL_INTERVAL_SECONDS",
-    "SUPERVISOR_INTERVAL_SECONDS",
-    "OBSERVATION_INTERVAL_SECONDS",
-    "STRATEGY_AUDIT_INTERVAL_SECONDS",
-    "POLL_INTERVAL_SECONDS",
-    "MAX_FILES",
-    "FORGE_KIND",
-})
+BOX_CONFIG_ALLOWLIST = frozenset(
+    {
+        "CONTROL_LOOP_ENABLED",
+        "CONTROL_LOOP_MODE",
+        "SELFHEAL_INTERVAL_SECONDS",
+        "SUPERVISOR_INTERVAL_SECONDS",
+        "OBSERVATION_INTERVAL_SECONDS",
+        "STRATEGY_AUDIT_INTERVAL_SECONDS",
+        "SUPERVISOR_LIVE",
+        "SELFHEAL_LIVE",
+        "OBSERVATION_LIVE",
+        "STRATEGY_AUDIT_LIVE",
+        "POLL_INTERVAL_SECONDS",
+        "MAX_FILES",
+        "FORGE_KIND",
+    }
+)
 
 
 def _read_box_config(path: Path = BOX_CONFIG_PATH) -> dict[str, str]:
@@ -45,17 +51,15 @@ def _read_box_config(path: Path = BOX_CONFIG_PATH) -> dict[str, str]:
         log.warning("box-config is not a JSON object: ignoring")
         return {}
     return {
-        k: str(v)
-        for k, v in raw.items()
-        if k in BOX_CONFIG_ALLOWLIST and v is not None
+        k: str(v) for k, v in raw.items() if k in BOX_CONFIG_ALLOWLIST and v is not None
     }
+
 
 from wgmesh_pipeline.models import (
     ModelProfile,
     parse_registry,
     parse_stage_routing,
 )
-
 
 VALID_MODES = frozenset({"shadow", "spec-only", "live"})
 VALID_DB_MODES = frozenset({"local", "turso"})
@@ -118,6 +122,10 @@ class Config:
     supervisor_interval_seconds: int = DEFAULT_SUPERVISOR_INTERVAL_SECONDS
     observation_interval_seconds: int = DEFAULT_OBSERVATION_INTERVAL_SECONDS
     strategy_audit_interval_seconds: int = DEFAULT_STRATEGY_AUDIT_INTERVAL_SECONDS
+    supervisor_live: bool = False
+    selfheal_live: bool = False
+    observation_live: bool = False
+    strategy_audit_live: bool = False
 
     @property
     def owner(self) -> str:
@@ -180,7 +188,7 @@ def load_config(env: Mapping[str, str] | None = None) -> Config:
         anthropic_host=anthropic_host,
     )
 
-    return Config(
+    cfg = Config(
         target_repo=target_repo,
         mode=mode,
         wgmesh_bot_pat=pat,
@@ -190,7 +198,9 @@ def load_config(env: Mapping[str, str] | None = None) -> Config:
         forge_kind=_get_nonempty(source, "FORGE_KIND") or "github",
         reviewer_pat=_get_nonempty(source, "WGMESH_REVIEWER_PAT"),
         gitea_url=_get_nonempty(source, "GITEA_URL"),
-        poll_interval_seconds=_get_int(source, "POLL_INTERVAL_SECONDS", DEFAULT_POLL_INTERVAL_SECONDS),
+        poll_interval_seconds=_get_int(
+            source, "POLL_INTERVAL_SECONDS", DEFAULT_POLL_INTERVAL_SECONDS
+        ),
         max_files=_get_int(source, "MAX_FILES", DEFAULT_MAX_FILES),
         repo_path=_get_nonempty(source, "WGMESH_CHECKOUT_PATH") or DEFAULT_REPO_PATH,
         recipes_dir=_get_nonempty(source, "RECIPES_DIR") or DEFAULT_RECIPES_DIR,
@@ -226,7 +236,13 @@ def load_config(env: Mapping[str, str] | None = None) -> Config:
             "STRATEGY_AUDIT_INTERVAL_SECONDS",
             DEFAULT_STRATEGY_AUDIT_INTERVAL_SECONDS,
         ),
+        supervisor_live=_get_bool(source, "SUPERVISOR_LIVE", False),
+        selfheal_live=_get_bool(source, "SELFHEAL_LIVE", False),
+        observation_live=_get_bool(source, "OBSERVATION_LIVE", False),
+        strategy_audit_live=_get_bool(source, "STRATEGY_AUDIT_LIVE", False),
     )
+    _log_control_loop_module_modes(cfg)
+    return cfg
 
 
 # Goose provider id the zero-config fallback profile uses ANTHROPIC_API_KEY for.
@@ -265,6 +281,32 @@ def _build_routing(
 
 def _truthy(value: str | None) -> bool:
     return value is not None and value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _get_bool(env: Mapping[str, str], name: str, default: bool) -> bool:
+    raw = _get_nonempty(env, name)
+    if raw is None:
+        return default
+    lowered = raw.lower()
+    if lowered == "true":
+        return True
+    if lowered == "false":
+        return False
+    raise ValueError(f"{name} must be 'true' or 'false'; got {raw!r}")
+
+
+def _log_control_loop_module_modes(cfg: Config) -> None:
+    for module_name, is_live in (
+        ("supervisor", cfg.supervisor_live),
+        ("selfheal", cfg.selfheal_live),
+        ("observation", cfg.observation_live),
+        ("strategy_audit", cfg.strategy_audit_live),
+    ):
+        log.info(
+            "control_loop: module=%s startup_mode=%s",
+            module_name,
+            "live" if is_live else "shadow",
+        )
 
 
 def _required(env: Mapping[str, str], name: str) -> str:
