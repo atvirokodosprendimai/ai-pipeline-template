@@ -132,3 +132,39 @@ def test_llm_failure_or_junk_loud_skips_without_fabricating_or_writing(
     assert planner_calls == 0
     assert result.execution_results == ()
     assert "skipped" in caplog.text
+
+
+def test_goose_assessor_surfaces_raw_log_on_failure(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    # A goose startup/config failure must surface its raw stdout/stderr, not
+    # just "goose exited N" — otherwise the box's observation loop goes dark
+    # with no diagnosable reason (the bug that hid why the live flip produced
+    # zero work). Reverting the raw_log log makes this RED.
+    from pathlib import Path
+
+    from wgmesh_pipeline import observation_gather as og
+    from wgmesh_pipeline.config import Config
+
+    class _FailResult:
+        ok = False
+        output_path = None
+        raw_log = "GOOSE-RAW: provider config invalid; could not start"
+        error = "goose exited 1"
+
+    class _FakeRunner:
+        def __init__(self, config: Config) -> None:
+            self.config = config
+
+        def run_recipe(self, **kwargs: Any) -> _FailResult:
+            return _FailResult()
+
+    monkeypatch.setattr(og, "GooseRunner", _FakeRunner)
+    assessor = og.GooseObservationAssessor(
+        config=Config(target_repo="atvirokodosprendimai/wgmesh"),
+        repo_root=Path("."),
+    )
+    with caplog.at_level(logging.WARNING, logger="wgmesh_pipeline.observation_gather"):
+        with pytest.raises(RuntimeError):
+            assessor(ObservationInputs())
+    assert "GOOSE-RAW: provider config invalid" in caplog.text
