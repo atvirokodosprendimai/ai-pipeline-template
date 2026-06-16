@@ -19,6 +19,7 @@ import uuid
 from typing import Any
 
 import pytest
+import requests
 
 from wgmesh_pipeline.config import Config
 from wgmesh_pipeline.forge.gitea import GiteaForge
@@ -42,6 +43,15 @@ class Response:
 
     def json(self) -> Any:
         return self._data
+
+
+class ErrorResponse(Response):
+    def __init__(self, status_code: int, text: str = ""):
+        super().__init__(text=text)
+        self.status_code = status_code
+
+    def raise_for_status(self) -> None:
+        raise requests.HTTPError(f"{self.status_code} Error", response=self)
 
 
 class RoutingSession:
@@ -80,7 +90,12 @@ def make_client(
 
 
 def _issues_payload(kind: str) -> list[dict[str, Any]]:
-    real: dict[str, Any] = {"number": 10, "title": "Real issue", "labels": [], "state": "open"}
+    real: dict[str, Any] = {
+        "number": 10,
+        "title": "Real issue",
+        "labels": [],
+        "state": "open",
+    }
     pr: dict[str, Any] = {
         "number": 667,
         "title": "spec: Issue #652 - recursion bait",
@@ -116,7 +131,9 @@ def test_list_needs_triage_requests_label_filter(kind: str) -> None:
     # bug #11 guard; GitHubClient gained the list_needs_triage filter after
     # this suite first caught the asymmetry).
     payload = [item for item in _issues_payload(kind) if not item.get("pull_request")]
-    client, session = make_client(kind, "shadow", [("GET", "/issues", Response(payload))])
+    client, session = make_client(
+        kind, "shadow", [("GET", "/issues", Response(payload))]
+    )
 
     issues = client.list_needs_triage()
 
@@ -130,6 +147,59 @@ def test_gitea_list_needs_triage_filters_pr_objects() -> None:
     )
 
     assert [issue.number for issue in client.list_needs_triage()] == [10]
+
+
+# ---------------------------------------------------------------------------
+# get_issue: direct read with state, missing issues, and PR filtering
+# ---------------------------------------------------------------------------
+
+
+def _issue_payload(
+    kind: str, *, number: int = 10, state: str = "open"
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "number": number,
+        "title": "Direct issue",
+        "labels": [{"name": "needs-human"}],
+        "state": state,
+    }
+    if kind == GITEA:
+        payload["pull_request"] = None
+    return payload
+
+
+@parametrize_adapters
+def test_get_issue_returns_direct_issue_with_state(kind: str) -> None:
+    client, _ = make_client(
+        kind,
+        "shadow",
+        [("GET", "/issues/10", Response(_issue_payload(kind, state="closed")))],
+    )
+
+    got = client.get_issue(10)
+
+    assert got is not None
+    assert got.number == 10
+    assert got.state == "closed"
+    assert got.labels == ("needs-human",)
+
+
+@parametrize_adapters
+def test_get_issue_returns_none_on_missing_issue(kind: str) -> None:
+    client, _ = make_client(
+        kind, "shadow", [("GET", "/issues/404", ErrorResponse(404, "not found"))]
+    )
+
+    assert client.get_issue(404) is None
+
+
+@parametrize_adapters
+def test_get_issue_returns_none_for_host_pr_object(kind: str) -> None:
+    payload = _issue_payload(kind, number=667)
+    payload["pull_request"] = {"url": "https://forge.example/o/r/pulls/667"}
+    client, _ = make_client(kind, "shadow", [("GET", "/issues/667", Response(payload))])
+
+    assert client.get_issue(667) is None
 
 
 # ---------------------------------------------------------------------------
@@ -239,7 +309,11 @@ def test_add_remove_label_round_trip(kind: str) -> None:
                 "/repos/o/r/labels",
                 Response([{"id": 3, "name": "bug"}, {"id": 9, "name": "needs-triage"}]),
             ),
-            ("POST", "/issues/17/labels", Response([{"id": 9, "name": "needs-triage"}])),
+            (
+                "POST",
+                "/issues/17/labels",
+                Response([{"id": 9, "name": "needs-triage"}]),
+            ),
             ("DELETE", "/issues/17/labels/9", Response(None)),
         ]
     client, session = make_client(kind, "live", routes)
@@ -378,7 +452,9 @@ def test_can_review_false_without_reviewer_credential(kind: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _checks_routes(kind: str, checks_response: Response) -> list[tuple[str, str, Response]]:
+def _checks_routes(
+    kind: str, checks_response: Response
+) -> list[tuple[str, str, Response]]:
     pr_route = ("GET", "/pulls/7", Response({"head": {"sha": "abc123"}}))
     if kind == GITHUB:
         return [pr_route, ("GET", "/commits/abc123/check-runs", checks_response)]
@@ -443,7 +519,9 @@ def test_list_pr_approvals_latest_review_wins(kind: str) -> None:
         {"user": {"login": "rev-a"}, "state": rejection},
         {"user": {"login": "rev-b"}, "state": "APPROVED"},
     ]
-    client, _ = make_client(kind, "shadow", [("GET", "/pulls/7/reviews", Response(reviews))])
+    client, _ = make_client(
+        kind, "shadow", [("GET", "/pulls/7/reviews", Response(reviews))]
+    )
 
     assert client.list_pr_approvals(7) == ["rev-b"]
 
@@ -512,7 +590,9 @@ def test_create_issue_live_round_trip(kind: str) -> None:
 
     client.create_issue(title="t", body="b", labels=("bug",))
 
-    posts = [c for c in session.calls if c["method"] == "POST" and "/issues" in c["url"]]
+    posts = [
+        c for c in session.calls if c["method"] == "POST" and "/issues" in c["url"]
+    ]
     assert len(posts) == 1
 
 
@@ -712,7 +792,9 @@ class TestGiteaLiveContract:
         try:
             try:
                 client._request(
-                    "POST", f"{base}/labels", json={"name": "needs-triage", "color": "#ff0000"}
+                    "POST",
+                    f"{base}/labels",
+                    json={"name": "needs-triage", "color": "#ff0000"},
                 )
             except Exception:
                 pass  # label already exists from a prior run
@@ -727,7 +809,9 @@ class TestGiteaLiveContract:
             listed = {i.number: i for i in client.list_open_issues()}
             assert "needs-triage" not in listed[number].labels
         finally:
-            client._request("PATCH", f"{base}/issues/{number}", json={"state": "closed"})
+            client._request(
+                "PATCH", f"{base}/issues/{number}", json={"state": "closed"}
+            )
 
     def test_has_merged_resolution_pr_false_for_unknown_issue(
         self, client: GiteaForge

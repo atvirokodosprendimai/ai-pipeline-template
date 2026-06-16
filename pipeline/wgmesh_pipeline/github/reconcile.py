@@ -4,7 +4,7 @@ import logging
 from dataclasses import dataclass
 from typing import Callable
 
-from wgmesh_pipeline.forge.protocol import Forge, ForgeIssue as GitHubIssue
+from wgmesh_pipeline.forge.protocol import Forge
 from wgmesh_pipeline.state.store import StateStore
 
 log = logging.getLogger(__name__)
@@ -20,16 +20,24 @@ class ReconcileResult:
     queued: int
     escalated: int
     merged: int
+    pruned: int = 0
 
 
-def _label_write_best_effort(fn: Callable[..., object], *args: object, **kwargs: object) -> None:
+def _label_write_best_effort(
+    fn: Callable[..., object], *args: object, **kwargs: object
+) -> None:
     """Labels are mirrors for humans, not gates — the store is authoritative.
     A failed label write must never block reconcile (telemetry-write lesson:
     side-channel writes stay off the convergence path)."""
     try:
         fn(*args, **kwargs)
     except Exception as exc:
-        log.warning("label write failed (non-blocking): %s(%s): %s", getattr(fn, "__name__", fn), args, exc)
+        log.warning(
+            "label write failed (non-blocking): %s(%s): %s",
+            getattr(fn, "__name__", fn),
+            args,
+            exc,
+        )
 
 
 def reconcile_issues(
@@ -42,23 +50,31 @@ def reconcile_issues(
     git-first lookup (forge/gitfacts.py) so resolution is keyed on git facts
     with the host API as freshness fallback."""
     lookup = resolution_lookup or client.has_merged_resolution_pr
-    seen = queued = escalated = merged = 0
+    seen = queued = escalated = merged = pruned = 0
+    open_issue_numbers: set[int] = set()
     for issue in client.list_open_issues():
         seen += 1
+        open_issue_numbers.add(issue.number)
         labels = set(issue.labels)
         current_stage = _current_stage(store, issue.number)
         if current_stage in TERMINAL_STAGES:
             continue
 
         if issue.state == "closed" or labels & MERGED_LABELS:
-            store.upsert_issue(issue.number, issue.title, stage="merged", status="closed")
+            store.upsert_issue(
+                issue.number, issue.title, stage="merged", status="closed"
+            )
             merged += 1
         elif "needs-human" in labels:
-            store.upsert_issue(issue.number, issue.title, stage="escalated", status="open")
+            store.upsert_issue(
+                issue.number, issue.title, stage="escalated", status="open"
+            )
             escalated += 1
         elif "needs-triage" in labels or "copilot-triaging" in labels:
             if current_stage is None:
-                store.upsert_issue(issue.number, issue.title, stage="queued", status="open")
+                store.upsert_issue(
+                    issue.number, issue.title, stage="queued", status="open"
+                )
                 queued += 1
             elif current_stage != "queued" and "needs-triage" in labels:
                 # spec_pr=True: this needs-triage cleanup is a legitimate
@@ -81,23 +97,61 @@ def reconcile_issues(
                     # reconcile on a search rate-limit stalls every claim,
                     # and failing open re-queues a resolved issue — the bug
                     # this guard exists to stop.
-                    log.warning("reconcile: resolution lookup failed for #%s: %s", issue.number, exc)
+                    log.warning(
+                        "reconcile: resolution lookup failed for #%s: %s",
+                        issue.number,
+                        exc,
+                    )
                     continue
                 if resolved:
                     if "needs-rework" not in labels:
-                        store.upsert_issue(issue.number, issue.title, stage="merged", status=issue.state)
+                        store.upsert_issue(
+                            issue.number,
+                            issue.title,
+                            stage="merged",
+                            status=issue.state,
+                        )
                         merged += 1
                         continue
-                    if client.find_open_pr_number(f"bot/impl-{issue.number}") is not None:
+                    if (
+                        client.find_open_pr_number(f"bot/impl-{issue.number}")
+                        is not None
+                    ):
                         continue
-                    store.upsert_issue(issue.number, issue.title, stage="queued", status="open")
+                    store.upsert_issue(
+                        issue.number, issue.title, stage="queued", status="open"
+                    )
                     _label_write_best_effort(
                         client.remove_label, issue.number, "needs-rework", spec_pr=True
                     )
                     queued += 1
                     continue
-            store.upsert_issue(issue.number, issue.title, stage=current_stage or "queued", status="open")
-    return ReconcileResult(seen=seen, queued=queued, escalated=escalated, merged=merged)
+            store.upsert_issue(
+                issue.number,
+                issue.title,
+                stage=current_stage or "queued",
+                status="open",
+            )
+    for record in store.list_issues():
+        if record.stage != "escalated" or record.status != "open":
+            continue
+        if record.number in open_issue_numbers:
+            continue
+        try:
+            upstream = client.get_issue(record.number)
+        except Exception as exc:
+            log.warning("reconcile: get_issue failed for #%s: %s", record.number, exc)
+            continue
+        if upstream is None or upstream.state.lower() == "closed":
+            store.set_stage(record.number, "merged", status="closed")
+            pruned += 1
+            log.info(
+                "reconcile: pruned ghost escalation #%s (closed upstream)",
+                record.number,
+            )
+    return ReconcileResult(
+        seen=seen, queued=queued, escalated=escalated, merged=merged, pruned=pruned
+    )
 
 
 def _current_stage(store: StateStore, number: int) -> str | None:

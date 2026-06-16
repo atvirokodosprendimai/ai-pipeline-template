@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,9 +10,10 @@ import requests
 from wgmesh_pipeline.config import Config
 from wgmesh_pipeline.forge.protocol import ForgeIssue
 
-
 API_ROOT = "https://api.github.com"
-SANITISE_SCRIPT = Path(__file__).resolve().parents[3] / "company" / "scripts" / "sanitise.sh"
+SANITISE_SCRIPT = (
+    Path(__file__).resolve().parents[3] / "company" / "scripts" / "sanitise.sh"
+)
 GIT_TIMEOUT_SECONDS = 120
 # Ref the workflow_dispatch fires against. The box's retrigger/observation-loop
 # dispatches target the default branch; a constant (not a Config field) keeps
@@ -79,8 +79,26 @@ class GitHubClient:
         # titles (bug #11).
         return [_parse_issue(item) for item in data if "pull_request" not in item]
 
+    def get_issue(self, number: int) -> GitHubIssue | None:
+        try:
+            item = self._request(
+                "GET",
+                f"/repos/{self.config.owner}/{self.config.repo}/issues/{number}",
+            )
+        except requests.HTTPError as exc:
+            if getattr(exc.response, "status_code", None) == 404:
+                return None
+            raise
+        # Same PR filter as list_open_issues (bug #11): direct issue reads can
+        # return host PR objects from the shared issues endpoint.
+        if "pull_request" in item:
+            return None
+        return _parse_issue(item)
+
     def get_pr(self, number: int) -> dict[str, Any]:
-        return self._request("GET", f"/repos/{self.config.owner}/{self.config.repo}/pulls/{number}")
+        return self._request(
+            "GET", f"/repos/{self.config.owner}/{self.config.repo}/pulls/{number}"
+        )
 
     def find_open_pr_number(self, head_branch: str) -> int | None:
         """Open PR number for a head branch, or None. Used to make spec PR
@@ -138,7 +156,9 @@ class GitHubClient:
             spec_pr=spec_pr,
         )
 
-    def remove_label(self, issue_number: int, label: str, *, spec_pr: bool = False) -> Any:
+    def remove_label(
+        self, issue_number: int, label: str, *, spec_pr: bool = False
+    ) -> Any:
         return self._write(
             "remove_label",
             "DELETE",
@@ -262,7 +282,8 @@ class GitHubClient:
             return False
         ok = {"success", "neutral", "skipped"}
         return all(
-            run.get("status") == "completed" and run.get("conclusion") in ok for run in runs
+            run.get("status") == "completed" and run.get("conclusion") in ok
+            for run in runs
         )
 
     def list_pr_approvals(self, pr_number: int) -> list[str]:
@@ -289,15 +310,21 @@ class GitHubClient:
         ('Can not approve your own pull request') and would defeat the
         distinct-principal gate anyway."""
         if not self.config.reviewer_pat:
-            raise RuntimeError("approve_pr requires WGMESH_REVIEWER_PAT (reviewer identity)")
+            raise RuntimeError(
+                "approve_pr requires WGMESH_REVIEWER_PAT (reviewer identity)"
+            )
         if self.config.mode == "shadow":
             result = DryRunResult(
-                dry_run=True, operation="approve_pr", payload={"pr": pr_number, "event": "APPROVE"}
+                dry_run=True,
+                operation="approve_pr",
+                payload={"pr": pr_number, "event": "APPROVE"},
             )
             self.dry_run_records.append(result)
             return result
         if self.config.mode == "spec-only":
-            raise PermissionError("approve_pr is not allowed when PIPELINE_MODE=spec-only")
+            raise PermissionError(
+                "approve_pr is not allowed when PIPELINE_MODE=spec-only"
+            )
         return self._request(
             "POST",
             f"/repos/{self.config.owner}/{self.config.repo}/pulls/{pr_number}/reviews",
@@ -305,7 +332,9 @@ class GitHubClient:
             headers={"Authorization": f"Bearer {self.config.reviewer_pat}"},
         )
 
-    def push_branch(self, clone_path: str, branch: str, *, spec_pr: bool = False) -> Any:
+    def push_branch(
+        self, clone_path: str, branch: str, *, spec_pr: bool = False
+    ) -> Any:
         is_spec_branch = spec_pr or branch.startswith("bot/spec-")
         is_force_updated_bot_branch = is_spec_branch or branch.startswith("bot/impl-")
         payload = {"clone_path": clone_path, "branch": branch}
@@ -314,9 +343,13 @@ class GitHubClient:
         else:
             self._sanitise_spec_files(Path(clone_path))
         if self.config.mode == "shadow":
-            return self._write("push_branch", "GIT", "git push", payload=payload, spec_pr=spec_pr)
+            return self._write(
+                "push_branch", "GIT", "git push", payload=payload, spec_pr=spec_pr
+            )
         if self.config.mode == "spec-only" and not spec_pr:
-            return self._write("push_branch", "GIT", "git push", payload=payload, spec_pr=spec_pr)
+            return self._write(
+                "push_branch", "GIT", "git push", payload=payload, spec_pr=spec_pr
+            )
         # bot/spec-* and bot/impl-* branches are exclusively bot-owned and
         # re-authored from the base branch each pass. A prior remote branch can
         # diverge, so force-update the bot branch in place. (force-with-lease
@@ -333,10 +366,12 @@ class GitHubClient:
                 capture_output=True,
                 timeout=GIT_TIMEOUT_SECONDS,
             )
-        except subprocess.TimeoutExpired as exc:
+        except subprocess.TimeoutExpired:
             raise RuntimeError(f"git push timed out after {GIT_TIMEOUT_SECONDS}s")
         if completed.returncode != 0:
-            raise RuntimeError(completed.stderr.strip() or f"git push failed for {branch}")
+            raise RuntimeError(
+                completed.stderr.strip() or f"git push failed for {branch}"
+            )
         return {"ok": True, "stdout": completed.stdout}
 
     def _write(
@@ -354,34 +389,46 @@ class GitHubClient:
             dry_payload = {"path": path, **payload}
             if operation == "create_pr":
                 dry_payload["number"] = _synthetic_pr_number(payload)
-            result = DryRunResult(dry_run=True, operation=operation, payload=dry_payload)
+            result = DryRunResult(
+                dry_run=True, operation=operation, payload=dry_payload
+            )
             self.dry_run_records.append(result)
             return result
-        allowed_spec_pr_write = spec_pr and operation in {"push_branch", "create_pr", "remove_label", "add_label"}
+        allowed_spec_pr_write = spec_pr and operation in {
+            "push_branch",
+            "create_pr",
+            "remove_label",
+            "add_label",
+        }
         # The needs-human safety valve admits both adding the label and opening
         # a needs-human issue (escalate/create_needs_human/supervisor_dead/
         # circuit_breaker plan a creation, not a label add, when no issue exists).
-        admits_needs_human = (
-            operation == "add_label"
-            or operation == "create_issue"
-        )
-        allowed_safety_write = (
-            admits_needs_human and "needs-human" in payload.get("labels", [])
+        admits_needs_human = operation == "add_label" or operation == "create_issue"
+        allowed_safety_write = admits_needs_human and "needs-human" in payload.get(
+            "labels", []
         )
         if mode == "spec-only" and not (allowed_spec_pr_write or allowed_safety_write):
-            raise PermissionError(f"{operation} is not allowed when PIPELINE_MODE=spec-only")
+            raise PermissionError(
+                f"{operation} is not allowed when PIPELINE_MODE=spec-only"
+            )
         return self._request(method, path, json=payload)
 
-    def _request(self, method: str, path: str, *, raw_text: bool = False, **kwargs: Any) -> Any:
+    def _request(
+        self, method: str, path: str, *, raw_text: bool = False, **kwargs: Any
+    ) -> Any:
         headers = dict(kwargs.pop("headers", {}) or {})
         headers.setdefault("Accept", "application/vnd.github+json")
         if self.config.wgmesh_bot_pat:
             headers.setdefault("Authorization", f"Bearer {self.config.wgmesh_bot_pat}")
         kwargs.setdefault("timeout", HTTP_TIMEOUT_SECONDS)
         try:
-            response = self.session.request(method, f"{self.api_root}{path}", headers=headers, **kwargs)
+            response = self.session.request(
+                method, f"{self.api_root}{path}", headers=headers, **kwargs
+            )
         except requests.Timeout as exc:
-            raise RuntimeError(f"GitHub request timed out after {kwargs['timeout']}s") from exc
+            raise RuntimeError(
+                f"GitHub request timed out after {kwargs['timeout']}s"
+            ) from exc
         try:
             response.raise_for_status()
         except requests.HTTPError as exc:
@@ -420,7 +467,9 @@ class GitHubClient:
     def _sanitise_spec_branch_files(self, clone_path: Path, branch: str) -> None:
         expected_spec = _expected_spec_path(branch)
         if expected_spec is None:
-            raise SanitiseError(f"cannot infer expected spec file from branch: {branch}")
+            raise SanitiseError(
+                f"cannot infer expected spec file from branch: {branch}"
+            )
         if not (clone_path / expected_spec).is_file():
             if self.config.mode == "shadow":
                 self._sanitise_spec_files(clone_path)
@@ -440,7 +489,9 @@ class GitHubClient:
             try:
                 text = path.read_text()
             except UnicodeDecodeError as exc:
-                raise SanitiseError(f"cannot sanitise non-text file: {relative_path}") from exc
+                raise SanitiseError(
+                    f"cannot sanitise non-text file: {relative_path}"
+                ) from exc
             self._require_clean(relative_path, text)
 
     def _changed_files(self, clone_path: Path) -> set[str]:
@@ -461,9 +512,27 @@ class GitHubClient:
 
         base = self._merge_base(clone_path)
         if base is not None:
-            changed.update(self._git_lines(clone_path, "diff", "--name-only", "--diff-filter=ACMRT", f"{base}..HEAD"))
+            changed.update(
+                self._git_lines(
+                    clone_path,
+                    "diff",
+                    "--name-only",
+                    "--diff-filter=ACMRT",
+                    f"{base}..HEAD",
+                )
+            )
         else:
-            changed.update(self._git_lines(clone_path, "diff-tree", "--no-commit-id", "--name-only", "--diff-filter=ACMRT", "-r", "HEAD"))
+            changed.update(
+                self._git_lines(
+                    clone_path,
+                    "diff-tree",
+                    "--no-commit-id",
+                    "--name-only",
+                    "--diff-filter=ACMRT",
+                    "-r",
+                    "HEAD",
+                )
+            )
         return changed
 
     def _merge_base(self, clone_path: Path) -> str | None:
@@ -490,7 +559,9 @@ class GitHubClient:
                 timeout=GIT_TIMEOUT_SECONDS,
             )
         except subprocess.TimeoutExpired as exc:
-            raise RuntimeError(f"git {' '.join(args)} timed out after {GIT_TIMEOUT_SECONDS}s") from exc
+            raise RuntimeError(
+                f"git {' '.join(args)} timed out after {GIT_TIMEOUT_SECONDS}s"
+            ) from exc
 
     def _require_clean(self, label: str, text: str) -> None:
         if self._sanitiser is not None:
@@ -520,7 +591,10 @@ class GitHubClient:
 
 
 def _parse_issue(item: dict[str, Any]) -> GitHubIssue:
-    labels = tuple(label["name"] if isinstance(label, dict) else str(label) for label in item.get("labels", []))
+    labels = tuple(
+        label["name"] if isinstance(label, dict) else str(label)
+        for label in item.get("labels", [])
+    )
     return GitHubIssue(
         number=int(item["number"]),
         title=str(item["title"]),
