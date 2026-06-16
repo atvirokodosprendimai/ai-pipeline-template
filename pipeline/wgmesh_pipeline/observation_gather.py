@@ -175,6 +175,18 @@ class GooseObservationAssessor:
                 session_id="control-loop-observation",
             )
             if not result.ok or result.output_path is None:
+                # Surface the raw goose output (head+tail) — otherwise a goose
+                # startup/config failure is invisible (only "goose exited N"
+                # reaches the log), which left the box's observation loop dark
+                # with no way to tell why. (observability-cracks lesson.)
+                raw = result.raw_log or ""
+                log.warning(
+                    "control_loop: observation goose failed (%s) — raw_log "
+                    "head:\n%s\n--- tail:\n%s",
+                    result.error,
+                    raw[:1500],
+                    raw[-1500:],
+                )
                 raise RuntimeError(
                     result.error or "goose observation assessment failed"
                 )
