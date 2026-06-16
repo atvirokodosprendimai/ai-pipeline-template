@@ -168,3 +168,22 @@ def test_goose_assessor_surfaces_raw_log_on_failure(
         with pytest.raises(RuntimeError):
             assessor(ObservationInputs())
     assert "GOOSE-RAW: provider config invalid" in caplog.text
+
+
+def test_assessment_recipe_stays_valid_yaml_after_param_templating() -> None:
+    # goose substitutes {{ params }} into the recipe text BEFORE parsing it, so
+    # every param must be a single-line value (a path) — a multi-line value
+    # injected into the `prompt: |` block breaks out of the literal scalar and
+    # goose rejects the recipe ("Invalid recipe: did not find expected key").
+    # Regression for the live observation flip producing zero work.
+    import yaml
+
+    from wgmesh_pipeline.observation_gather import _assessment_recipe
+
+    recipe = _assessment_recipe()
+    assert "{{ open_board_file }}" in recipe
+    assert "{{ open_board }}" not in recipe  # never inline the multi-line board
+    templated = recipe.replace("{{ open_board_file }}", "/tmp/board.md").replace(
+        "{{ assessment_file }}", "/tmp/assessment.json"
+    )
+    yaml.safe_load(templated)  # raises if a param injection breaks the YAML
