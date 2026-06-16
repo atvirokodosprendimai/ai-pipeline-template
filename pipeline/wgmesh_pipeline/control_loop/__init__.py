@@ -14,9 +14,8 @@ The LIVE executor is a separate follow-up unit. It will, behind the
 the returned state dicts (to Turso / the ``company/*.json`` state files), gated
 on each planner's ``material_changed`` sentinel. None of that lives here.
 
-``control_loop_mode == "live"`` is honored as SHADOW in this unit (forced back
-with a loud warning) because that executor does not exist yet — going live
-without it would write blind.
+``control_loop_mode == "live"`` is still shadow-safe until U5: the executor is
+called, but the forge adapter's own mode controls whether writes are dry-runs.
 
 Per-module gather gaps (honest degradation — these are the follow-up unit's
 TODOs, NOT to be faked here):
@@ -26,10 +25,10 @@ TODOs, NOT to be faked here):
   - selfheal: only the forge-derivable ``needs_human_issues`` is populated; the
     label-filtered stale sweeps + funnel/idle snapshot dicts stay at their
     empty defaults (the protocol cannot feed them yet).
-  - observation: the LLM assessment dict is caller-side and NOT built here — the
-    cycle logs a skip and does nothing (never fabricate an assessment).
-  - strategy_audit: STRATEGY.md is read if present, but live metrics (GitHub /
-    chimney / Polar reads) are not gatherable yet — the cycle logs a skip.
+  - observation: closed issue titles still degrade to ``()`` until the forge
+    protocol grows a closed-title read.
+  - strategy_audit: lead-time/autonomous-ship metrics degrade to ``None`` unless
+    the concrete forge exposes optional recent-merged-PR/timeline reads.
 """
 
 from __future__ import annotations
@@ -41,12 +40,25 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Mapping
+from typing import TYPE_CHECKING, Any, Callable, Mapping
 
 from wgmesh_pipeline.config import Config
 from wgmesh_pipeline.control_loop.executor import execute_actions
 from wgmesh_pipeline.forge.protocol import Forge
+from wgmesh_pipeline.observation import ObservationPlan, plan_actions
 from wgmesh_pipeline.selfheal import SelfHealInputs, SelfHealRun, run_self_heal
+
+# The gather modules import wgmesh_pipeline.control_loop.executor, so importing
+# them at module top creates a circular import (this package's __init__ would
+# re-enter mid-load). Runtime symbols are imported lazily inside the cycle
+# methods; type-only names live in the TYPE_CHECKING block below.
+if TYPE_CHECKING:
+    from wgmesh_pipeline.observation_gather import (
+        ObservationAssessor,
+        ObservationCycleResult,
+        ObservationPlanner,
+    )
+    from wgmesh_pipeline.strategy_gather import HttpGet, StrategyCycleResult
 from wgmesh_pipeline.supervisor import (
     SupervisorRankRun,
     load_taxonomy,
@@ -87,10 +99,13 @@ def _material_fingerprint(doc: Mapping[str, Any], *, exclude: frozenset[str]) ->
     payload = json.dumps(material, sort_keys=True, default=str)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
+
 # Injectable planner callable types (real ones default in ``ControlLoopScheduler``
 # so tests inject spies without touching the forge/LLM).
 SupervisorPlanner = Callable[..., SupervisorRankRun]
 SelfHealPlanner = Callable[[Forge, SelfHealInputs], SelfHealRun]
+StrategyTextReader = Callable[[], str | None]
+NowProvider = Callable[[], str]
 
 
 def _utc_now_iso() -> str:
@@ -145,6 +160,11 @@ class ControlLoopScheduler:
     log: logging.Logger = log
     supervisor_planner: SupervisorPlanner = run_supervisor_rank
     selfheal_planner: SelfHealPlanner = run_self_heal
+    observation_assessor: ObservationAssessor | None = None
+    observation_planner: ObservationPlanner = plan_actions
+    strategy_text_reader: StrategyTextReader = lambda: _read_text(_STRATEGY_PATH)
+    strategy_http_get: HttpGet | None = None
+    now_provider: NowProvider = _utc_now_iso
     _tasks: list[ModuleTask] = field(default_factory=list, init=False)
 
     def __post_init__(self) -> None:
@@ -156,9 +176,19 @@ class ControlLoopScheduler:
                 self.config.control_loop_mode,
             )
         self._tasks = [
-            ModuleTask("selfheal", self.config.selfheal_interval_seconds, self._cycle_selfheal),
-            ModuleTask("supervisor", self.config.supervisor_interval_seconds, self._cycle_supervisor),
-            ModuleTask("observation", self.config.observation_interval_seconds, self._cycle_observation),
+            ModuleTask(
+                "selfheal", self.config.selfheal_interval_seconds, self._cycle_selfheal
+            ),
+            ModuleTask(
+                "supervisor",
+                self.config.supervisor_interval_seconds,
+                self._cycle_supervisor,
+            ),
+            ModuleTask(
+                "observation",
+                self.config.observation_interval_seconds,
+                self._cycle_observation,
+            ),
             ModuleTask(
                 "strategy_audit",
                 self.config.strategy_audit_interval_seconds,
@@ -223,7 +253,9 @@ class ControlLoopScheduler:
         try:
             return loader(key)
         except Exception as exc:  # noqa: BLE001 — never let a store read kill the cycle
-            self.log.warning("control_loop: load_control_state(%s) failed: %s", key, exc)
+            self.log.warning(
+                "control_loop: load_control_state(%s) failed: %s", key, exc
+            )
             return None
 
     def _save_state(self, key: str, doc: Mapping[str, Any], fingerprint: str) -> bool:
@@ -235,8 +267,12 @@ class ControlLoopScheduler:
             return False
         try:
             return bool(saver(key, dict(doc), fingerprint=fingerprint))
-        except Exception as exc:  # noqa: BLE001 — never let a store write kill the cycle
-            self.log.warning("control_loop: save_control_state(%s) failed: %s", key, exc)
+        except (
+            Exception
+        ) as exc:  # noqa: BLE001 — never let a store write kill the cycle
+            self.log.warning(
+                "control_loop: save_control_state(%s) failed: %s", key, exc
+            )
             return False
 
     # --- per-module cycles: gather → plan → log structured summary --------
@@ -259,7 +295,9 @@ class ControlLoopScheduler:
         if run.material_changed:
             fingerprint = str(run.state.get("material_fingerprint") or "")
             persisted = self._save_state(SUPERVISOR_STATE_KEY, run.state, fingerprint)
-        top_actions = [str(a.get("action")) for a in run.result.top_actions if a.get("action")]
+        top_actions = [
+            str(a.get("action")) for a in run.result.top_actions if a.get("action")
+        ]
         self.log.info(
             "control_loop: module=supervisor mode=%s material_changed=%s "
             "rank_changed=%s planned_actions=%s top_actions=%s "
@@ -274,7 +312,9 @@ class ControlLoopScheduler:
         )
 
     async def _cycle_selfheal(self) -> None:
-        inputs = SelfHealInputs(now=_utc_now_iso())  # forge-derivable only; rest degraded
+        inputs = SelfHealInputs(
+            now=_utc_now_iso()
+        )  # forge-derivable only; rest degraded
         run = self.selfheal_planner(self.forge, inputs)
         action_kinds = [a.kind for a in run.actions]
         # Route every planned action through the single executor. The executor
@@ -290,7 +330,9 @@ class ControlLoopScheduler:
         persisted = False
         material = bool(run.actions) or run.circuit_breaker_tripped
         if material:
-            fingerprint = _material_fingerprint(run.state, exclude=_SELFHEAL_VOLATILE_KEYS)
+            fingerprint = _material_fingerprint(
+                run.state, exclude=_SELFHEAL_VOLATILE_KEYS
+            )
             persisted = self._save_state(SELFHEAL_STATE_KEY, run.state, fingerprint)
         self.log.info(
             "control_loop: module=selfheal mode=%s circuit_breaker_tripped=%s "
@@ -308,23 +350,74 @@ class ControlLoopScheduler:
         )
 
     async def _cycle_observation(self) -> None:
-        # The LLM assessment dict is caller-side and not yet wired. Do NOT
-        # fabricate an assessment — log the gap and end the cycle (still a
-        # scheduled slot).
+        from wgmesh_pipeline.observation_gather import (
+            GooseObservationAssessor,
+            run_observation_cycle,
+        )
+
+        assessor = self.observation_assessor or GooseObservationAssessor(
+            self.config, _REPO_ROOT
+        )
+        result: ObservationCycleResult = run_observation_cycle(
+            self.forge,
+            self.store,
+            assessor=assessor,
+            planner=self.observation_planner,
+        )
+        if result.skipped:
+            self.log.warning(
+                "control_loop: module=observation mode=%s skipped=%s "
+                "reason=%s planned_actions=0 executed=0",
+                self.config.control_loop_mode,
+                result.skipped,
+                result.skip_reason,
+            )
+            return
+        statuses = [r.status for r in result.execution_results]
+        planned = (
+            len(result.plan.actions) if isinstance(result.plan, ObservationPlan) else 0
+        )
         self.log.info(
-            "control_loop: module=observation mode=shadow "
-            "skipped: LLM assessment input not yet wired (protocol/gather gap) — "
-            "planned_actions=0"
+            "control_loop: module=observation mode=%s planned_actions=%s "
+            "skips=%s executed=%s result_statuses=%s",
+            self.config.control_loop_mode,
+            planned,
+            len(result.plan.skips) if result.plan is not None else 0,
+            sum(1 for status in statuses if status == "executed"),
+            statuses[:5],
         )
 
     async def _cycle_strategy_audit(self) -> None:
-        strategy_text = _read_text(_STRATEGY_PATH)
-        # Live metrics (GitHub / chimney / Polar reads) are caller-side and not yet
-        # gatherable. Without them the audit cannot run honestly — log the gap
-        # and end the cycle (still a scheduled slot).
+        from wgmesh_pipeline.strategy_gather import run_strategy_cycle
+
+        strategy_text = self.strategy_text_reader()
+        if strategy_text is None:
+            self.log.warning(
+                "control_loop: module=strategy_audit mode=%s skipped=true "
+                "reason=STRATEGY.md unavailable planned_actions=0 executed=0",
+                self.config.control_loop_mode,
+            )
+            return
+        kwargs: dict[str, Any] = {
+            "strategy_text": strategy_text,
+            "now": self.now_provider(),
+        }
+        if self.strategy_http_get is not None:
+            kwargs["http_get"] = self.strategy_http_get
+        result: StrategyCycleResult = run_strategy_cycle(
+            self.forge, self.store, **kwargs
+        )
+        statuses = [r.status for r in result.execution_results]
         self.log.info(
-            "control_loop: module=strategy_audit mode=shadow "
-            "skipped: live metrics gather not yet wired — strategy_text=%s "
-            "planned_actions=0",
-            "present" if strategy_text is not None else "absent",
+            "control_loop: module=strategy_audit mode=%s decision=%s "
+            "material_changed=%s planned_actions=%s executed=%s "
+            "result_statuses=%s persisted=%s paid_fetch_status=%s",
+            self.config.control_loop_mode,
+            result.run.decision.action,
+            result.run.material_changed,
+            len(result.execution_results),
+            sum(1 for status in statuses if status == "executed"),
+            statuses[:5],
+            result.persisted,
+            result.metrics.paid_fetch_status,
         )
