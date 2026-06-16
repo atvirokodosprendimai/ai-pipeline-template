@@ -8,6 +8,6 @@
   "STRATEGY_AUDIT_INTERVAL_SECONDS": "86400",
   "SUPERVISOR_LIVE": "false",
   "SELFHEAL_LIVE": "false",
-  "OBSERVATION_LIVE": "false",
+  "OBSERVATION_LIVE": "true",
   "STRATEGY_AUDIT_LIVE": "false"
 }
