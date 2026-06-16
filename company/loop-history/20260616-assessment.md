@@ -1,21 +1,22 @@
 # Assessment: 2026-06-16
 
-**Stage**: Revenue | **Run**: 265
+**Stage**: Reachable | **Run**: 266
 
-Stage 5, day 90. Major milestone: we have paying customers with 5 active subscribers and 10 recent paid orders, establishing clear Stage 5 advancement. wgmesh product remains fully functional (v0.2.1, 20 stars) with a very clean pipeline (1 fn:dev issue, 0 PRs). All infrastructure endpoints are healthy. Pipeline is definitively idle with only routine maintenance issues remaining.
+Correcting funnel stage: Revenue attribution analysis shows seed products (wgmesh/cloudroof) have 0 subscribers while all_org has 5, indicating revenue comes from other Polar products, not our core product. True stage is 3 (Reachable) - billing works but no customers yet. Pipeline completely idle with 0 PRs, stable v0.2.1 product.
 
 ## Blockers
-- Pipeline is idle - no technical blockers to advancement beyond Stage 5
+- Revenue attribution gap - core wgmesh/cloudroof products have zero paying customers despite org-level revenue from other products
+- No customer acquisition pipeline for core product despite functional billing and stable product
 
 ## Top Actions
-- **fn:gtm**: Write customer retention playbook documenting how to identify at-risk subscribers, renewal touchpoints, and expansion opportunities based on current 5-subscriber base (zero)
-- **fn:gtm**: Create referral program framework with existing customer incentives and tracking system to turn satisfied subscribers into acquisition channel (zero)
-- **fn:dev**: Develop usage analytics dashboard to track subscriber engagement patterns and identify expansion opportunities from current customer data (zero)
+- **fn:gtm**: Create concrete internal dogfooding case study documenting team's actual wgmesh usage with specific metrics (uptime, peer count, data flows, problems solved) as social proof for customer acquisition (zero)
+- **fn:billing**: Fix revenue attribution tracking to separate core product revenue from other Polar org products for accurate funnel progression (zero)
+- **fn:gtm**: Write network administrator pilot evaluation guide with 30-day trial framework and success metrics for enterprise customer acquisition (zero)
 
 ## Contributions
-- **Copilot**: Recent git commits maintaining codebase quality
-- **Marty**: Recent git commits in past 7 days
-- **pupabobas[bot]**: 87 bot commits in past 7 days maintaining pipeline automation
+- **Marty**: Recent git commits maintaining wgmesh codebase over past 7 days
+- **pupabobas[bot]**: 86 bot commits in past 7 days maintaining pipeline automation and CI/CD operations
+- **Copilot**: Recent spec and implementation work on GTM referral program features
 
 ## Needs Human
 _Nothing this cycle._
