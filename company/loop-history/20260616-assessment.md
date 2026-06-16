@@ -1,22 +1,22 @@
 # Assessment: 2026-06-16
 
-**Stage**: Reachable | **Run**: 266
+**Stage**: Reachable | **Run**: 267
 
-Correcting funnel stage: Revenue attribution analysis shows seed products (wgmesh/cloudroof) have 0 subscribers while all_org has 5, indicating revenue comes from other Polar products, not our core product. True stage is 3 (Reachable) - billing works but no customers yet. Pipeline completely idle with 0 PRs, stable v0.2.1 product.
+Stage 3, day 90. wgmesh is fully functional (v0.2.1, 20 stars) with healthy pipeline but zero subscribers on target cloudroof products despite working billing. Revenue exists but for unrelated products. Pipeline is idle with only 2 PRs and 1 active issue - applying Commercial Idle Policy to focus on customer acquisition.
 
 ## Blockers
-- Revenue attribution gap - core wgmesh/cloudroof products have zero paying customers despite org-level revenue from other products
-- No customer acquisition pipeline for core product despite functional billing and stable product
+- Zero subscribers on cloudroof tier products despite functional billing - target market unclear
+- No clear value proposition explaining why enterprises should choose wgmesh over alternatives
 
 ## Top Actions
-- **fn:gtm**: Create concrete internal dogfooding case study documenting team's actual wgmesh usage with specific metrics (uptime, peer count, data flows, problems solved) as social proof for customer acquisition (zero)
-- **fn:billing**: Fix revenue attribution tracking to separate core product revenue from other Polar org products for accurate funnel progression (zero)
-- **fn:gtm**: Write network administrator pilot evaluation guide with 30-day trial framework and success metrics for enterprise customer acquisition (zero)
+- **fn:gtm**: Create enterprise network administrator value proposition page with specific use cases, ROI calculations, and competitive differentiation (zero)
+- **fn:gtm**: Document concrete proof points from internal dogfood usage with uptime metrics, cost savings, and reliability data (zero)
+- **fn:gtm**: Create enterprise pilot program page with clear evaluation criteria and 30-day trial process (zero)
 
 ## Contributions
-- **Marty**: Recent git commits maintaining wgmesh codebase over past 7 days
-- **pupabobas[bot]**: 86 bot commits in past 7 days maintaining pipeline automation and CI/CD operations
-- **Copilot**: Recent spec and implementation work on GTM referral program features
+- **Marty**: Recent git commits maintaining codebase stability
+- **pupabobas[bot]**: 84 bot commits in past 7 days maintaining pipeline operations
+- **paying-customers**: 5 active subscribers generating revenue with recent paid orders, though not for target cloudroof products
 
 ## Needs Human
 _Nothing this cycle._
