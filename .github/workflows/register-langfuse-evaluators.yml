@@ -1,0 +1,45 @@
+name: Register Langfuse Evaluators
+
+# Runs pipeline/evals/setup_langfuse_evaluators.py against the Langfuse instance
+# using the LANGFUSE_* repo secrets. Merging the script does NOT register the
+# evaluators — dispatch this. Run mode=probe FIRST (unstable API: confirms the
+# live variableMapping/filter shape), then mode=apply.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "probe | dry-run | apply"
+        default: "probe"
+
+permissions:
+  contents: read
+
+jobs:
+  register:
+    runs-on: ubuntu-latest
+    env:
+      LANGFUSE_HOST: ${{ secrets.LANGFUSE_HOST }}
+      LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+      LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+      MODE: ${{ github.event.inputs.mode }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate secrets
+        run: |
+          set -euo pipefail
+          : "${LANGFUSE_HOST:?LANGFUSE_HOST secret missing}"
+          : "${LANGFUSE_PUBLIC_KEY:?LANGFUSE_PUBLIC_KEY secret missing}"
+          : "${LANGFUSE_SECRET_KEY:?LANGFUSE_SECRET_KEY secret missing}"
+      - name: Run evaluator setup (stdlib only — no pip install)
+        run: |
+          set -euo pipefail
+          case "${MODE:-probe}" in
+            probe)   python pipeline/evals/setup_langfuse_evaluators.py --probe ;;
+            dry-run) python pipeline/evals/setup_langfuse_evaluators.py --dry-run ;;
+            apply)   python pipeline/evals/setup_langfuse_evaluators.py ;;
+            *) echo "::error::mode must be probe|dry-run|apply"; exit 2 ;;
+          esac
