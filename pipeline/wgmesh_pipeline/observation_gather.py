@@ -286,9 +286,11 @@ prompt: |
     tool can execute end-to-end — never a vague theme.
   - Name the goal link in one line: how it moves trials to paid.
   - Include an acceptance check: what "done" is + the metric it should move.
-  - Carry labels: ["fn:dev"] if the pipeline can implement it as code/product;
+  - Carry EXACTLY ONE label, NEVER both: ["fn:dev"] if a coding agent can
+    implement it as code/product (most landing-page, onboarding, signup, and
+    conversion work) — these flow straight to the build pipeline; OR
     ["needs-human"] ONLY if it truly needs capital, a human decision, or an
-    external account/credential.
+    external account/credential (e.g. manual community outreach, ad spend).
 
   Do NOT: re-create board items; propose internal pipeline/infra busywork (only
   customer-facing, revenue-advancing work); close or escalate needs-human

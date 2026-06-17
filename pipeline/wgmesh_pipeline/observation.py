@@ -45,6 +45,7 @@ from typing import Any, Mapping, Sequence
 ORG = "atvirokodosprendimai"
 TARGET_REPO = f"{ORG}/wgmesh"
 NEEDS_HUMAN_LABEL = "needs-human"
+FN_DEV_LABEL = "fn:dev"  # pipeline-implementable lane (triage->spec->implement)
 CLOSE_REASON_NOT_PLANNED = "not planned"
 MAX_KEYWORDS = 5
 DUPLICATE_MIN_HITS = 2
@@ -189,6 +190,16 @@ def build_open_board(
     return "\n".join(lines) + "\n"
 
 
+def _route_one_lane(labels: tuple[str, ...]) -> tuple[str, ...]:
+    """A proposed create routes to exactly ONE lane. ``fn:dev`` (the pipeline
+    implements it) wins over ``needs-human``, which would gate the issue OUT of
+    the autonomous build lane — so an LLM hedging BOTH labels does not strand
+    implementable work in the human queue."""
+    if FN_DEV_LABEL in labels and NEEDS_HUMAN_LABEL in labels:
+        return tuple(label for label in labels if label != NEEDS_HUMAN_LABEL)
+    return labels
+
+
 def _vet_create(item: Mapping[str, Any], corpus: list[str], *, kind: str,
                 title: str, body: str, labels: tuple[str, ...],
                 skip_message: str) -> tuple[ObservationAction | None, ObservationSkip | None]:
@@ -200,7 +211,9 @@ def _vet_create(item: Mapping[str, Any], corpus: list[str], *, kind: str,
         return None, ObservationSkip(action=kind, code="duplicate",
                                      message=skip_message, title=title)
     corpus.append(title)
-    return ObservationAction(kind=kind, title=title, body=body, labels=labels), None
+    return ObservationAction(
+        kind=kind, title=title, body=body, labels=_route_one_lane(labels)
+    ), None
 
 
 def vet_issue_close(item: Mapping[str, Any],
