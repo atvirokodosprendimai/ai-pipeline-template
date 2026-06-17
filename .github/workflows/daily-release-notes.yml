@@ -1,0 +1,126 @@
+name: Daily Release Notes
+
+# Daily plain-English digest of what shipped (merged PRs in the window),
+# LLM-summarized, emailed to the team. Graceful when unconfigured: a missing
+# email secret logs + skips the send (the digest still prints to the run log)
+# rather than hard-failing — set the secrets to turn email on.
+#
+# Required repo secrets:
+#   OPENROUTER_API_KEY   - already present; used for the LLM summary.
+#   POSTMARK_TOKEN       - Postmark Server API token (X-Postmark-Server-Token).
+#   RELEASE_NOTES_FROM   - verified Postmark sender, e.g. notes@cloudroof.eu
+#   RELEASE_NOTES_TO     - comma-separated recipients (you + lempa).
+# Using SendGrid/SES instead of Postmark? Swap only the "Send email" curl.
+
+on:
+  schedule:
+    - cron: "0 7 * * *"   # 07:00 UTC daily
+  workflow_dispatch:
+    inputs:
+      since_hours:
+        description: "Look back window (hours)"
+        default: "24"
+      dry_run:
+        description: "true = assemble + log, do NOT send"
+        default: "false"
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  release-notes:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      POSTMARK_TOKEN: ${{ secrets.POSTMARK_TOKEN }}
+      RELEASE_NOTES_FROM: ${{ secrets.RELEASE_NOTES_FROM }}
+      RELEASE_NOTES_TO: ${{ secrets.RELEASE_NOTES_TO }}
+      SINCE_HOURS: ${{ github.event.inputs.since_hours || '24' }}
+      DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+    steps:
+      - name: Collect merged PRs in the window
+        run: |
+          set -euo pipefail
+          since=$(date -u -d "${SINCE_HOURS} hours ago" '+%Y-%m-%dT%H:%M:%SZ')
+          echo "window since: $since"
+          # Merged PRs since the cutoff, newest first, as compact JSON lines.
+          gh pr list --repo "$GITHUB_REPOSITORY" --state merged \
+            --search "merged:>=${since}" --limit 100 \
+            --json number,title,author,mergedAt,url,labels \
+            --jq 'sort_by(.mergedAt) | reverse
+                  | map({number, title, author: .author.login,
+                         labels: [.labels[].name], url})' > /tmp/prs.json
+          count=$(jq 'length' /tmp/prs.json)
+          echo "merged PRs in window: $count"
+          echo "PR_COUNT=$count" >> "$GITHUB_ENV"
+          # Compact human list for the prompt + the email tail.
+          jq -r '.[] | "- #\(.number) \(.title) (@\(.author)) \(.url)"' \
+            /tmp/prs.json > /tmp/pr_list.txt
+          cat /tmp/pr_list.txt || true
+
+      - name: Summarize with the LLM
+        if: env.PR_COUNT != '0'
+        run: |
+          set -euo pipefail
+          : "${OPENROUTER_API_KEY:?OPENROUTER_API_KEY missing — cannot summarize}"
+          pr_list=$(cat /tmp/pr_list.txt)
+          # Build the request with jq so the PR text is safely JSON-encoded.
+          jq -n --arg prs "$pr_list" '{
+            model: "anthropic/claude-sonnet-4",
+            messages: [
+              {role: "system", content: "You write a short daily release-notes email for a small founding team. Plain English. Explain WHAT shipped and WHY it matters, grouping related PRs into themes, most impactful first. 4-10 sentences or tight bullets. No preamble, no signature."},
+              {role: "user", content: ("Merged pull requests today:\n\n" + $prs)}
+            ]
+          }' > /tmp/llm_req.json
+          http=$(curl -s -w '%{http_code}' -o /tmp/llm_resp.json \
+            -H "Authorization: Bearer $OPENROUTER_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d @/tmp/llm_req.json \
+            https://openrouter.ai/api/v1/chat/completions)
+          if [ "$http" != "200" ]; then
+            echo "::warning::LLM summary failed (HTTP $http); falling back to PR list only"
+            echo "Here is what merged today:" > /tmp/summary.txt
+          else
+            jq -r '.choices[0].message.content // "Here is what merged today:"' \
+              /tmp/llm_resp.json > /tmp/summary.txt
+          fi
+          cat /tmp/summary.txt
+
+      - name: Assemble + send email
+        run: |
+          set -euo pipefail
+          today=$(date -u '+%Y-%m-%d')
+          if [ "${PR_COUNT}" = "0" ]; then
+            body=$(printf 'No pull requests merged in the last %s hours.\n' "$SINCE_HOURS")
+          else
+            body=$(printf '%s\n\n— Merged PRs —\n%s\n' \
+              "$(cat /tmp/summary.txt)" "$(cat /tmp/pr_list.txt)")
+          fi
+          subject="wgmesh pipeline — what shipped ${today} (${PR_COUNT} PRs)"
+          printf '%s\n' "$body" > /tmp/email_body.txt
+          echo "===== SUBJECT ====="; echo "$subject"
+          echo "===== BODY ====="; cat /tmp/email_body.txt
+
+          if [ "${DRY_RUN}" = "true" ]; then
+            echo "DRY_RUN=true — not sending."; exit 0
+          fi
+          if [ -z "${POSTMARK_TOKEN}" ] || [ -z "${RELEASE_NOTES_FROM}" ] || [ -z "${RELEASE_NOTES_TO}" ]; then
+            echo "::warning::email secrets unset (POSTMARK_TOKEN / RELEASE_NOTES_FROM / RELEASE_NOTES_TO) — digest logged above, skipping send."
+            exit 0
+          fi
+          payload=$(jq -n \
+            --arg from "$RELEASE_NOTES_FROM" \
+            --arg to "$RELEASE_NOTES_TO" \
+            --arg subject "$subject" \
+            --rawfile text /tmp/email_body.txt \
+            '{From:$from, To:$to, Subject:$subject, TextBody:$text, MessageStream:"outbound"}')
+          http=$(curl -s -w '%{http_code}' -o /tmp/postmark_resp.json \
+            -X POST "https://api.postmarkapp.com/email" \
+            -H "Accept: application/json" -H "Content-Type: application/json" \
+            -H "X-Postmark-Server-Token: $POSTMARK_TOKEN" \
+            -d "$payload")
+          echo "Postmark HTTP $http"; cat /tmp/postmark_resp.json || true
+          [ "$http" = "200" ] || { echo "::error::email send failed (HTTP $http)"; exit 1; }
+          echo "sent to: $RELEASE_NOTES_TO"
