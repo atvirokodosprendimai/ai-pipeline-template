@@ -14,10 +14,11 @@ Run (standalone; needs the three LANGFUSE_* env vars except for --dry-run):
     python pipeline/evals/setup_langfuse_evaluators.py --dry-run    # print payloads, no writes
     python pipeline/evals/setup_langfuse_evaluators.py              # create/version evaluators + rules
 
-CAVEAT (unstable API): field names follow the documented camelCase shape. Run
-``--probe`` once against an evaluator you created in the UI to confirm the exact
-``variableMapping`` / ``filter`` shape for this instance, then adjust RULES if a
-POST returns 400 (the full response body is logged on failure).
+Schemas confirmed against the live instance (probe + OpenAPI example): evaluator
+``outputDefinition`` uses ``dataType``+``score``/``reasoning``; rules use
+``target`` (observation/experiment), ``evaluator``{name,scope,type}, ``enabled``,
+``sampling``, ``filter`` [{type,column,operator,value}], ``mapping`` [{variable,
+source}]. ``--probe`` re-dumps the live shape; failures log the full response.
 """
 
 from __future__ import annotations
@@ -101,57 +102,51 @@ EVALUATORS = [
 ]
 
 # --- evaluation rules (WHAT to score) ---------------------------------------
-# target: live observations/traces. filter: which ones (by name). samplingRate
-# 0..1. variableMapping: evaluator variable -> source field on the trace data.
-# NOTE: confirm the exact mapping/filter shape with --probe (unstable API).
+# Schema confirmed from the instance OpenAPI example (CreateEvaluationRule):
+#   target = "observation" | "experiment"   (NOT "trace")
+#   evaluator = {name, scope, type}          (scope filled from create response)
+#   enabled = bool; sampling = 0..1
+#   filter = [{type:"stringOptions", column, operator:"any of", value:[...]}]
+#   mapping = [{variable, source}]
+# Filter starts at type=GENERATION (all LLM generations). NOTE: narrow `filter`
+# to specific traceName(s) once the box's per-stage trace names are confirmed in
+# the UI — otherwise growth_issue_quality also scores non-observation generations.
+_GEN_FILTER = [
+    {
+        "type": "stringOptions",
+        "column": "type",
+        "operator": "any of",
+        "value": ["GENERATION"],
+    }
+]
 
 RULES = [
     {
         "name": "rule_growth_issue_quality",
         "evaluatorName": "growth_issue_quality",
-        "target": "trace",
-        "samplingRate": 1.0,
-        "filter": [{"column": "name", "operator": "contains", "value": "observation"}],
-        "variableMapping": [
-            {
-                "variableName": "output",
-                "langfuseObject": "trace",
-                "selectedColumnId": "output",
-            },
-        ],
+        "target": "observation",
+        "sampling": 1.0,
+        "filter": _GEN_FILTER,
+        "mapping": [{"variable": "output", "source": "output"}],
     },
     {
         "name": "rule_impl_faithfulness",
         "evaluatorName": "impl_faithfulness",
         "target": "observation",
-        "samplingRate": 1.0,
-        "filter": [{"column": "name", "operator": "contains", "value": "implement"}],
-        "variableMapping": [
-            {
-                "variableName": "input",
-                "langfuseObject": "observation",
-                "selectedColumnId": "input",
-            },
-            {
-                "variableName": "output",
-                "langfuseObject": "observation",
-                "selectedColumnId": "output",
-            },
+        "sampling": 0.5,
+        "filter": _GEN_FILTER,
+        "mapping": [
+            {"variable": "input", "source": "input"},
+            {"variable": "output", "source": "output"},
         ],
     },
     {
         "name": "rule_public_safety_pass",
         "evaluatorName": "public_safety_pass",
         "target": "observation",
-        "samplingRate": 1.0,
-        "filter": [{"column": "name", "operator": "contains", "value": "spec_pr"}],
-        "variableMapping": [
-            {
-                "variableName": "output",
-                "langfuseObject": "observation",
-                "selectedColumnId": "output",
-            },
-        ],
+        "sampling": 1.0,
+        "filter": _GEN_FILTER,
+        "mapping": [{"variable": "output", "source": "output"}],
     },
 ]
 
@@ -230,13 +225,24 @@ def apply(dry_run: bool) -> int:
         print(f"evaluator {ev['name']}: {status} {'OK' if ok else payload}")
         ev_fail += 0 if ok else 1
 
-    # Phase 2: rules. Inject the evaluator's real scope when known.
+    # Phase 2: rules. Build the evaluator reference object {name, scope, type}
+    # — scope comes from the create response (custom evaluators are "project").
     rule_fail = 0
     for rule in RULES:
-        body = dict(rule)
-        scope = scope_by_name.get(str(rule.get("evaluatorName")))
-        if scope:
-            body["scope"] = scope
+        ev_name = str(rule["evaluatorName"])
+        body = {
+            "name": rule["name"],
+            "evaluator": {
+                "name": ev_name,
+                "scope": scope_by_name.get(ev_name, "project"),
+                "type": "llm_as_judge",
+            },
+            "target": rule["target"],
+            "enabled": True,
+            "sampling": rule["sampling"],
+            "filter": rule["filter"],
+            "mapping": rule["mapping"],
+        }
         status, payload = _request("POST", f"{_UNSTABLE}/evaluation-rules", body)
         ok = status in (200, 201)
         print(f"rule {rule['name']}: {status} {'OK' if ok else payload}")
