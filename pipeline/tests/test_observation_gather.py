@@ -228,9 +228,15 @@ def test_assessment_recipe_templates_params_as_single_line_paths() -> None:
 
     recipe = _assessment_recipe()
     assert "{{ open_board_file }}" in recipe
+    assert "{{ strategy_file }}" in recipe  # goal-aware, not just board
     assert "{{ open_board }}" not in recipe  # never inline the multi-line board
+    # Customer-acquisition steering (approved 2026-06-17): the loop proposes
+    # paid-customer growth work, not housekeeping.
+    assert "PAID CUSTOMERS" in recipe
     # Templating a param must not add lines (single-line path values only).
-    templated = recipe.replace("{{ open_board_file }}", "/tmp/board.md").replace(
-        "{{ assessment_file }}", "/tmp/assessment.json"
+    templated = (
+        recipe.replace("{{ open_board_file }}", "/tmp/board.md")
+        .replace("{{ assessment_file }}", "/tmp/assessment.json")
+        .replace("{{ strategy_file }}", "/tmp/STRATEGY.md")
     )
     assert recipe.count("\n") == templated.count("\n")
