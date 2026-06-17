@@ -52,6 +52,11 @@ _BOOLEAN = {
     "reasoning": {"description": "One sentence reasoning; name what leaked if any."},
 }
 
+# Judge model: GLM-5.2 via the project's "zai" LLM connection (z.ai, anthropic
+# adapter). `provider` must match a connection from GET /api/public/llm-connections;
+# the connection must offer this `model` (see langfuse-llm-connection workflow).
+_JUDGE_MODEL = {"provider": "zai", "model": "GLM-5.2"}
+
 EVALUATORS = [
     {
         "name": "growth_issue_quality",
@@ -69,7 +74,7 @@ EVALUATORS = [
         ),
         "variables": ["output"],
         "outputDefinition": _NUMERIC,
-        "modelConfig": None,
+        "modelConfig": _JUDGE_MODEL,
     },
     {
         "name": "impl_faithfulness",
@@ -84,7 +89,7 @@ EVALUATORS = [
         ),
         "variables": ["input", "output"],
         "outputDefinition": _NUMERIC,
-        "modelConfig": None,
+        "modelConfig": _JUDGE_MODEL,
     },
     {
         "name": "public_safety_pass",
@@ -97,7 +102,7 @@ EVALUATORS = [
         ),
         "variables": ["output"],
         "outputDefinition": _BOOLEAN,
-        "modelConfig": None,
+        "modelConfig": _JUDGE_MODEL,
     },
 ]
 
