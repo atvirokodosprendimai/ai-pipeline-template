@@ -5,12 +5,15 @@ name: Daily Release Notes
 # email secret logs + skips the send (the digest still prints to the run log)
 # rather than hard-failing — set the secrets to turn email on.
 #
+# Sends through the self-hosted Unsend instance (https://unsend.admin.lt) —
+# dogfooding our own transactional-email product.
+#
 # Required repo secrets:
 #   OPENROUTER_API_KEY   - already present; used for the LLM summary.
-#   POSTMARK_TOKEN       - Postmark Server API token (X-Postmark-Server-Token).
-#   RELEASE_NOTES_FROM   - verified Postmark sender, e.g. notes@cloudroof.eu
+#   UNSEND_API_KEY       - Unsend API token (generate in the Unsend dashboard).
+#   RELEASE_NOTES_FROM   - verified Unsend sender, e.g. notes@admin.lt
 #   RELEASE_NOTES_TO     - comma-separated recipients (you + lempa).
-# Using SendGrid/SES instead of Postmark? Swap only the "Send email" curl.
+#   UNSEND_URL           - (optional) Unsend base URL; defaults to the instance.
 
 on:
   schedule:
@@ -34,7 +37,8 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-      POSTMARK_TOKEN: ${{ secrets.POSTMARK_TOKEN }}
+      UNSEND_API_KEY: ${{ secrets.UNSEND_API_KEY }}
+      UNSEND_URL: ${{ secrets.UNSEND_URL || 'https://unsend.admin.lt' }}
       RELEASE_NOTES_FROM: ${{ secrets.RELEASE_NOTES_FROM }}
       RELEASE_NOTES_TO: ${{ secrets.RELEASE_NOTES_TO }}
       SINCE_HOURS: ${{ github.event.inputs.since_hours || '24' }}
@@ -106,21 +110,26 @@ jobs:
           if [ "${DRY_RUN}" = "true" ]; then
             echo "DRY_RUN=true — not sending."; exit 0
           fi
-          if [ -z "${POSTMARK_TOKEN}" ] || [ -z "${RELEASE_NOTES_FROM}" ] || [ -z "${RELEASE_NOTES_TO}" ]; then
-            echo "::warning::email secrets unset (POSTMARK_TOKEN / RELEASE_NOTES_FROM / RELEASE_NOTES_TO) — digest logged above, skipping send."
+          if [ -z "${UNSEND_API_KEY}" ] || [ -z "${RELEASE_NOTES_FROM}" ] || [ -z "${RELEASE_NOTES_TO}" ]; then
+            echo "::warning::email secrets unset (UNSEND_API_KEY / RELEASE_NOTES_FROM / RELEASE_NOTES_TO) — digest logged above, skipping send."
             exit 0
           fi
+          # Unsend API: POST {UNSEND_URL}/api/v1/emails, Bearer auth, JSON body.
+          # `to` is an array — split the comma-separated recipients.
           payload=$(jq -n \
             --arg from "$RELEASE_NOTES_FROM" \
             --arg to "$RELEASE_NOTES_TO" \
             --arg subject "$subject" \
             --rawfile text /tmp/email_body.txt \
-            '{From:$from, To:$to, Subject:$subject, TextBody:$text, MessageStream:"outbound"}')
-          http=$(curl -s -w '%{http_code}' -o /tmp/postmark_resp.json \
-            -X POST "https://api.postmarkapp.com/email" \
-            -H "Accept: application/json" -H "Content-Type: application/json" \
-            -H "X-Postmark-Server-Token: $POSTMARK_TOKEN" \
+            '{from:$from, to:($to | split(",") | map(gsub("^\\s+|\\s+$";""))),
+              subject:$subject, text:$text}')
+          http=$(curl -s -w '%{http_code}' -o /tmp/unsend_resp.json \
+            -X POST "${UNSEND_URL%/}/api/v1/emails" \
+            -H "Authorization: Bearer $UNSEND_API_KEY" \
+            -H "Content-Type: application/json" \
             -d "$payload")
-          echo "Postmark HTTP $http"; cat /tmp/postmark_resp.json || true
-          [ "$http" = "200" ] || { echo "::error::email send failed (HTTP $http)"; exit 1; }
-          echo "sent to: $RELEASE_NOTES_TO"
+          echo "Unsend HTTP $http"; cat /tmp/unsend_resp.json || true
+          case "$http" in
+            200|201|202) echo "sent to: $RELEASE_NOTES_TO" ;;
+            *) echo "::error::email send failed (HTTP $http)"; exit 1 ;;
+          esac
