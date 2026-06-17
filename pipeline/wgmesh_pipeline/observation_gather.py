@@ -59,6 +59,7 @@ def build_observation_inputs(forge: Forge) -> ObservationInputs:
     ]
     return ObservationInputs(
         open_issue_titles=tuple(str(issue.title) for issue in issues),
+        open_issue_numbers=tuple(int(issue.number) for issue in issues),
         closed_issue_titles=(),
         issue_labels={
             int(issue.number): tuple(str(label) for label in issue.labels)
@@ -138,10 +139,16 @@ def run_observation_cycle(
         )
     results = tuple(executor(forge, store, plan.actions))
     statuses = [result.status for result in results]
+    # Surface WHY proposals were vetoed (code#number) — otherwise a cycle that
+    # plans 0 actions is indistinguishable from one the LLM declined, hiding
+    # close-guard/dedup gaps.
+    skip_detail = [f"{s.code}#{s.number}" for s in plan.skips[:8]]
     log.info(
-        "control_loop: module=observation planned_actions=%s skips=%s executed=%s result_statuses=%s",
+        "control_loop: module=observation planned_actions=%s skips=%s "
+        "skip_detail=%s executed=%s result_statuses=%s",
         len(plan.actions),
         len(plan.skips),
+        skip_detail,
         sum(1 for status in statuses if status == "executed"),
         statuses[:5],
     )
@@ -216,10 +223,18 @@ def _strip_json_fence(text: str) -> str:
 
 
 def _inputs_board(inputs: ObservationInputs) -> str:
+    # Show REAL issue numbers (#N) so the LLM's close/needs-human proposals
+    # reference matchable numbers — sequence indices fail the close guard.
     lines = ["## Open Issues (wgmesh)", ""]
-    for number, title in enumerate(inputs.open_issue_titles, start=1):
-        lines.append(f"- {number}. {title}")
-    if not inputs.open_issue_titles:
+    titles = inputs.open_issue_titles
+    numbers = inputs.open_issue_numbers
+    if numbers and len(numbers) == len(titles):
+        for number, title in zip(numbers, titles):
+            lines.append(f"- #{number}: {title}")
+    else:
+        for title in titles:
+            lines.append(f"- {title}")
+    if not titles:
         lines.append("- (none)")
     return "\n".join(lines)
 

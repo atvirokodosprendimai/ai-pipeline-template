@@ -102,6 +102,10 @@ class ObservationInputs:
     open_issue_titles: tuple[str, ...] = ()
     closed_issue_titles: tuple[str, ...] = ()
     issue_labels: Mapping[int, Sequence[str] | None] = field(default_factory=dict)
+    # Real issue numbers parallel to ``open_issue_titles`` (same order). The
+    # board shown to the LLM must carry REAL numbers, or its close/needs-human
+    # proposals reference unmatchable sequence indices and fail the close guard.
+    open_issue_numbers: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True)
