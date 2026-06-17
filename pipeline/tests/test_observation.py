@@ -176,6 +176,27 @@ def test_duplicate_create_is_skipped():
     assert plan.skips[0].message == "Skipping duplicate: Update burn rate alerts thresholds"
 
 
+def test_create_with_both_labels_routes_to_fn_dev_only():
+    # An LLM that hedges fn:dev + needs-human must NOT strand implementable work
+    # in the human queue: fn:dev wins so it flows to the build pipeline.
+    plan = plan_actions(
+        {"issues_to_create": [
+            {"title": "DevOps VPN SEO landing page", "body": "b",
+             "labels": ["fn:dev", "needs-human"]}]},
+        INPUTS)
+    assert len(plan.actions) == 1
+    assert plan.actions[0].labels == ("fn:dev",)
+
+
+def test_create_with_needs_human_only_is_unchanged():
+    plan = plan_actions(
+        {"issues_to_create": [
+            {"title": "Manual outreach to 50 DevOps communities", "body": "b",
+             "labels": ["needs-human"]}]},
+        INPUTS)
+    assert plan.actions[0].labels == ("needs-human",)
+
+
 def test_fresh_create_is_planned():
     plan = plan_actions(
         {"issues_to_create": [
