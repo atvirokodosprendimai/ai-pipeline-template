@@ -1,0 +1,60 @@
+name: Unsend Email Status
+
+# Diagnostic: GET an Unsend email's delivery status (Delivered/Bounced/etc) from
+# CI, which can reach the Unsend instance (the local sandbox is Cloudflare-1010
+# blocked). HTTP 200 on send only means Unsend QUEUED it — this shows whether SES
+# actually delivered. Dumps the full email object (status field name not assumed).
+
+on:
+  workflow_dispatch:
+    inputs:
+      email_id:
+        description: "Unsend emailId (from the send response)"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  status:
+    runs-on: ubuntu-latest
+    env:
+      UNSEND_API_KEY: ${{ secrets.UNSEND_API_KEY }}
+      UNSEND_URL: ${{ secrets.UNSEND_URL || 'https://unsend.admin.lt' }}
+      EMAIL_ID: ${{ github.event.inputs.email_id }}
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate
+        run: |
+          set -euo pipefail
+          : "${UNSEND_API_KEY:?UNSEND_API_KEY secret missing}"
+          : "${EMAIL_ID:?email_id input required}"
+      - name: Fetch email status
+        run: |
+          python - <<'PY'
+          import os, json, urllib.request, urllib.error
+          base = os.environ["UNSEND_URL"].rstrip("/")
+          eid = os.environ["EMAIL_ID"]
+          url = f"{base}/api/v1/emails/{eid}"
+          req = urllib.request.Request(
+              url, headers={"Authorization": f"Bearer {os.environ['UNSEND_API_KEY']}"}
+          )
+          try:
+              with urllib.request.urlopen(req, timeout=20) as r:
+                  data = json.loads(r.read().decode())
+          except urllib.error.HTTPError as e:
+              print(f"GET {url} -> HTTP {e.code}: {e.read().decode()[:600]}")
+              raise SystemExit(1)
+          # Surface the obvious status fields, then the full object (small).
+          for k in ("id", "to", "from", "subject", "status", "lastEvent", "latestStatus"):
+              if k in data:
+                  print(f"{k}: {data[k]}")
+          if isinstance(data.get("emailEvents"), list):
+              print("--- events ---")
+              for ev in data["emailEvents"]:
+                  print(f"  {ev.get('status') or ev.get('type')} @ {ev.get('createdAt')}  {ev.get('data') or ''}")
+          print("--- full ---")
+          print(json.dumps(data, indent=2)[:3000])
+          PY
