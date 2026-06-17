@@ -1,0 +1,19 @@
+.github/workflows/daily-release-notes.yml
+  s_c1946e3966696b::t_9a79a2cc61aa62 1-126
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.7",
+  "base_commit_sha": "aa6dab0898268fd7de6850f4a749e133e34cd939",
+  "prompts": {},
+  "sessions": {
+    "s_c1946e3966696b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d5e1aabb-b0d8-42d7-bd89-df20a82e7b61",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
