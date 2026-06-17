@@ -1,0 +1,22 @@
+pipeline/evals/setup_langfuse_evaluators.py
+  s_c1946e3966696b::t_7c2ba81e17046c 105-114,121,127-130,136-140,147-149
+  s_c1946e3966696b::t_413720334d9093 228-229,232-245
+  s_c1946e3966696b::t_25a19aec8032e5 115-120
+  s_c1946e3966696b::t_9477131150d363 17-21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "addbabffd334a9d6e504d35c13b968a6a537b0a0",
+  "prompts": {},
+  "sessions": {
+    "s_c1946e3966696b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d5e1aabb-b0d8-42d7-bd89-df20a82e7b61",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
