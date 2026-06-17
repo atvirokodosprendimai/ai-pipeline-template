@@ -35,14 +35,26 @@ import urllib.error
 # MUST support structured output (Langfuse requirement). `{{output}}`/`{{input}}`
 # are the evaluator variables, mapped to trace data by the rules below.
 
-_MODEL = {
-    "provider": "default",
-    "model": "default",
-}  # uses the project's configured eval model connection
+# Confirmed via --probe against the live instance: evaluators are
+# type=llm_as_judge with a flat `variables` list and an `outputDefinition`
+# carrying `dataType` + `score`/`reasoning` sub-objects (descriptions). The
+# created Langfuse score takes the evaluator's NAME. modelConfig=null uses the
+# project's configured default eval-model connection.
+_NUMERIC = {
+    "dataType": "NUMERIC",
+    "score": {"description": "Score between 0.0 and 1.0 per the rubric in the prompt."},
+    "reasoning": {"description": "One sentence reasoning for the score."},
+}
+_BOOLEAN = {
+    "dataType": "BOOLEAN",
+    "score": {"description": "1 = passes the check, 0 = fails (a leak was found)."},
+    "reasoning": {"description": "One sentence reasoning; name what leaked if any."},
+}
 
 EVALUATORS = [
     {
         "name": "growth_issue_quality",
+        "type": "llm_as_judge",
         "prompt": (
             "You are scoring an issue the autonomous growth loop proposed for "
             "wgmesh/cloudroof. Company goal: PAID CUSTOMERS.\n\n"
@@ -55,11 +67,12 @@ EVALUATORS = [
             "1.0 = all four, 0.0 = none."
         ),
         "variables": ["output"],
-        "outputDefinition": {"type": "NUMERIC", "name": "growth_issue_quality"},
-        "modelConfig": _MODEL,
+        "outputDefinition": _NUMERIC,
+        "modelConfig": None,
     },
     {
         "name": "impl_faithfulness",
+        "type": "llm_as_judge",
         "prompt": (
             "Spec (intended change):\n{{input}}\n\n"
             "Produced diff/implementation:\n{{output}}\n\n"
@@ -69,20 +82,21 @@ EVALUATORS = [
             "+ in scope; 0.0 = ignores the spec or sprawls."
         ),
         "variables": ["input", "output"],
-        "outputDefinition": {"type": "NUMERIC", "name": "impl_faithfulness"},
-        "modelConfig": _MODEL,
+        "outputDefinition": _NUMERIC,
+        "modelConfig": None,
     },
     {
         "name": "public_safety_pass",
+        "type": "llm_as_judge",
         "prompt": (
             "Text about to be published to a PUBLIC repository:\n{{output}}\n\n"
-            "Return true ONLY if it contains NO secrets/API keys, NO customer PII, "
-            "and NO exact revenue figures. Otherwise return false and name what "
-            "leaked. This is a semantic backstop to the sanitise.sh wall."
+            "Pass (1) ONLY if it contains NO secrets/API keys, NO customer PII, "
+            "and NO exact revenue figures. Otherwise fail (0) and name what "
+            "leaked. Semantic backstop to the sanitise.sh wall."
         ),
         "variables": ["output"],
-        "outputDefinition": {"type": "BOOLEAN", "name": "public_safety_pass"},
-        "modelConfig": _MODEL,
+        "outputDefinition": _BOOLEAN,
+        "modelConfig": None,
     },
 ]
 
@@ -195,26 +209,44 @@ def _existing_names(path: str, key: str = "data") -> set[str]:
 
 
 def apply(dry_run: bool) -> int:
-    failures = 0
-    for ev in EVALUATORS:
-        if dry_run:
+    if dry_run:
+        for ev in EVALUATORS:
             print(f"[dry-run] POST {_UNSTABLE}/evaluators\n{json.dumps(ev, indent=2)}")
-            continue
-        status, payload = _request("POST", f"{_UNSTABLE}/evaluators", ev)
-        ok = status in (200, 201)
-        print(f"evaluator {ev['name']}: {status} {'OK' if ok else payload}")
-        failures += 0 if ok else 1
-    for rule in RULES:
-        if dry_run:
+        for rule in RULES:
             print(
                 f"[dry-run] POST {_UNSTABLE}/evaluation-rules\n{json.dumps(rule, indent=2)}"
             )
-            continue
-        status, payload = _request("POST", f"{_UNSTABLE}/evaluation-rules", rule)
+        return 0
+
+    # Phase 1: evaluators. Capture each one's real `scope` from the response so
+    # the rules reference it correctly (custom-created scope is not guessable).
+    scope_by_name: dict[str, str] = {}
+    ev_fail = 0
+    for ev in EVALUATORS:
+        status, payload = _request("POST", f"{_UNSTABLE}/evaluators", ev)
+        ok = status in (200, 201)
+        if ok and isinstance(payload, dict) and payload.get("scope"):
+            scope_by_name[ev["name"]] = str(payload["scope"])
+        print(f"evaluator {ev['name']}: {status} {'OK' if ok else payload}")
+        ev_fail += 0 if ok else 1
+
+    # Phase 2: rules. Inject the evaluator's real scope when known.
+    rule_fail = 0
+    for rule in RULES:
+        body = dict(rule)
+        scope = scope_by_name.get(str(rule.get("evaluatorName")))
+        if scope:
+            body["scope"] = scope
+        status, payload = _request("POST", f"{_UNSTABLE}/evaluation-rules", body)
         ok = status in (200, 201)
         print(f"rule {rule['name']}: {status} {'OK' if ok else payload}")
-        failures += 0 if ok else 1
-    return failures
+        rule_fail += 0 if ok else 1
+
+    print(
+        f"summary: evaluators {len(EVALUATORS) - ev_fail}/{len(EVALUATORS)} ok, "
+        f"rules {len(RULES) - rule_fail}/{len(RULES)} ok"
+    )
+    return ev_fail + rule_fail
 
 
 def main(argv: list[str] | None = None) -> int:
