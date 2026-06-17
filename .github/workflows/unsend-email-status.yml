@@ -38,8 +38,15 @@ jobs:
           base = os.environ["UNSEND_URL"].rstrip("/")
           eid = os.environ["EMAIL_ID"]
           url = f"{base}/api/v1/emails/{eid}"
+          # Unsend is behind Cloudflare, which 1010-blocks urllib's default
+          # User-Agent — send a browser-like UA (curl passes, so does this).
           req = urllib.request.Request(
-              url, headers={"Authorization": f"Bearer {os.environ['UNSEND_API_KEY']}"}
+              url,
+              headers={
+                  "Authorization": f"Bearer {os.environ['UNSEND_API_KEY']}",
+                  "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) ci-email-status",
+                  "Accept": "application/json",
+              },
           )
           try:
               with urllib.request.urlopen(req, timeout=20) as r:
