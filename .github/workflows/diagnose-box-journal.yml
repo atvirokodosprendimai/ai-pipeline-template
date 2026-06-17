@@ -1,0 +1,79 @@
+name: Diagnose Box Journal
+
+# Read-only: SSH to the pipeline box and dump the recent systemd journal,
+# WITHOUT restarting the service. The deploy/provision Report steps snapshot
+# the journal seconds after a restart, which misses anything slow (e.g. a
+# control-loop goose call that takes seconds to complete). This surfaces those.
+
+on:
+  workflow_dispatch:
+    inputs:
+      server_name:
+        description: 'Hetzner server name'
+        default: 'wgmesh-pipeline'
+      lines:
+        description: 'journal lines to tail'
+        default: '400'
+      grep:
+        description: 'optional extended-regex filter (empty = all)'
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  journal:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate secrets
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+        run: |
+          set -euo pipefail
+          : "${DEPLOY_SSH_KEY:?DEPLOY_SSH_KEY secret missing}"
+          : "${HCLOUD_TOKEN:?HCLOUD_TOKEN secret missing (org)}"
+
+      - name: Install hcloud CLI
+        run: |
+          set -euo pipefail
+          curl -fsSL https://github.com/hetznercloud/cli/releases/latest/download/hcloud-linux-amd64.tar.gz \
+            | tar xz hcloud
+          sudo mv hcloud /usr/local/bin/
+
+      - name: Resolve box IP
+        env:
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+        run: |
+          set -euo pipefail
+          IP=$(hcloud server ip "${{ github.event.inputs.server_name }}")
+          echo "BOX_IP=$IP" >> "$GITHUB_ENV"
+
+      - name: Dump journal (no restart)
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          LINES: ${{ github.event.inputs.lines }}
+          GREP: ${{ github.event.inputs.grep }}
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$RUNNER_TEMP/deploy_key"
+          SSH_LINES=$(printf '%q' "$LINES")
+          SSH_GREP=$(printf '%q' "$GREP")
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              -o ConnectTimeout=15 -i "$RUNNER_TEMP/deploy_key" root@"$BOX_IP" \
+              "LINES=$SSH_LINES GREP=$SSH_GREP bash -se" <<'REMOTE'
+          set -euo pipefail
+          echo '===== systemctl is-active ====='
+          systemctl is-active wgmesh-pipeline || true
+          echo "===== journalctl -n ${LINES} ====="
+          if [ -n "${GREP}" ]; then
+            journalctl -u wgmesh-pipeline -n "${LINES}" --no-pager | grep -E "${GREP}" || echo "(no lines matched ${GREP})"
+          else
+            journalctl -u wgmesh-pipeline -n "${LINES}" --no-pager
+          fi
+          REMOTE
+
+      - name: Cleanup
+        if: always()
+        run: rm -f "$RUNNER_TEMP/deploy_key"
