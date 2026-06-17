@@ -291,6 +291,10 @@ prompt: |
     conversion work) — these flow straight to the build pipeline; OR
     ["needs-human"] ONLY if it truly needs capital, a human decision, or an
     external account/credential (e.g. manual community outreach, ad spend).
+  - If it is a landing page, signup, or trial-flow task, REQUIRE in its
+    acceptance criteria: a lead-capture form (email at minimum) AND a web
+    analytics/tracking snippet — so every visitor becomes a trackable lead the
+    nurture system can follow up. A page that cannot capture a lead is not done.
 
   Do NOT: re-create board items; propose internal pipeline/infra busywork (only
   customer-facing, revenue-advancing work); close or escalate needs-human
