@@ -1,0 +1,21 @@
+pipeline/wgmesh_pipeline/observation_gather.py
+  s_c1946e3966696b::t_b1f1f2eeb078af 294-297
+pipeline/tests/test_observation_gather.py
+  s_c1946e3966696b::t_9801d42cdc0b11 236
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.7",
+  "base_commit_sha": "7feb12405a7f711b8b9aab3df62d7ceccb3cce24",
+  "prompts": {},
+  "sessions": {
+    "s_c1946e3966696b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d5e1aabb-b0d8-42d7-bd89-df20a82e7b61",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
