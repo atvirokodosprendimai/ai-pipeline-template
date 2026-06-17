@@ -72,7 +72,7 @@ jobs:
           pr_list=$(cat /tmp/pr_list.txt)
           # Build the request with jq so the PR text is safely JSON-encoded.
           jq -n --arg prs "$pr_list" '{
-            model: "anthropic/claude-sonnet-4",
+            model: "z-ai/glm-5.2",
             messages: [
               {role: "system", content: "You write a short daily release-notes email for a small founding team. Plain English. Explain WHAT shipped and WHY it matters, grouping related PRs into themes, most impactful first. 4-10 sentences or tight bullets. No preamble, no signature."},
               {role: "user", content: ("Merged pull requests today:\n\n" + $prs)}
