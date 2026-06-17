@@ -55,9 +55,56 @@ def test_build_observation_inputs_from_open_issue_snapshot() -> None:
 
     assert inputs == ObservationInputs(
         open_issue_titles=("Ship CLI onboarding", "Blocked deploy"),
+        open_issue_numbers=(1, 2),
         closed_issue_titles=(),
         issue_labels={1: ("fn:dev", "needs-triage"), 2: ("needs-human",)},
     )
+
+
+def test_inputs_board_shows_real_issue_numbers() -> None:
+    # The board the LLM sees must carry REAL numbers (#726), not sequence
+    # indices — its close/needs-human proposals reference these, and a sequence
+    # index fails the close guard (issue_labels is keyed by real number).
+    from wgmesh_pipeline.observation_gather import _inputs_board
+
+    board = _inputs_board(
+        ObservationInputs(
+            open_issue_titles=("Stuck deploy", "VPN start/stop"),
+            open_issue_numbers=(727, 539),
+        )
+    )
+    assert "- #727: Stuck deploy" in board
+    assert "- #539: VPN start/stop" in board
+
+
+def test_observation_cycle_logs_skip_detail_codes(caplog) -> None:
+    # A vetoed cycle must surface WHY (code#number), so a 0-action cycle is not
+    # mistaken for the LLM declining.
+    from wgmesh_pipeline.observation import ObservationSkip
+
+    def planner(
+        assessment: Mapping[str, Any], inputs: ObservationInputs
+    ) -> ObservationPlan:
+        return ObservationPlan(
+            actions=(),
+            skips=(
+                ObservationSkip(
+                    action="close_issue",
+                    code="label_fetch_failed",
+                    message="x",
+                    number=42,
+                ),
+            ),
+        )
+
+    with caplog.at_level(logging.INFO, logger="wgmesh_pipeline.observation_gather"):
+        run_observation_cycle(
+            ShadowForge(),
+            Store(),
+            assessor=lambda _inputs: {"issues_to_close": [{"number": 42}]},
+            planner=planner,
+        )
+    assert "label_fetch_failed#42" in caplog.text
 
 
 def test_valid_llm_assessment_plans_and_executes_shadow_dry_run(caplog) -> None:
