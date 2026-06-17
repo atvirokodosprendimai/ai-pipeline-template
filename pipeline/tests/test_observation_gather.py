@@ -233,6 +233,7 @@ def test_assessment_recipe_templates_params_as_single_line_paths() -> None:
     # Customer-acquisition steering (approved 2026-06-17): the loop proposes
     # paid-customer growth work, not housekeeping.
     assert "PAID CUSTOMERS" in recipe
+    assert "lead-capture form" in recipe  # pre-wires the nurture/Mautic handoff
     # Templating a param must not add lines (single-line path values only).
     templated = (
         recipe.replace("{{ open_board_file }}", "/tmp/board.md")
