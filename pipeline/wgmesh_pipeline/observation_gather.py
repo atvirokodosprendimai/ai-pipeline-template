@@ -177,12 +177,16 @@ class GooseObservationAssessor:
             # The committed recipes pass paths (spec_file/diff_file) for this.
             board_file = tmp_path / "open_board.md"
             board_file.write_text(_inputs_board(inputs), encoding="utf-8")
+            # Feed the company goal/strategy (single-line path) so the LLM
+            # proposes goal-advancing work, not housekeeping the stale board.
+            strategy_file = self.repo_root / "STRATEGY.md"
             result = GooseRunner(self.config).run_recipe(
                 recipe=recipe,
                 workdir=self.repo_root,
                 params={
                     "assessment_file": str(output),
                     "open_board_file": str(board_file),
+                    "strategy_file": str(strategy_file),
                 },
                 expected_output=output,
                 stage="observation",
@@ -241,8 +245,8 @@ def _inputs_board(inputs: ObservationInputs) -> str:
 
 def _assessment_recipe() -> str:
     return """version: "1.0.0"
-title: "wgmesh Observation Assessment"
-description: "Assess current company signals and emit strict JSON actions."
+title: "wgmesh Growth Observation"
+description: "Propose the next customer-acquisition work as strict JSON actions."
 parameters:
   - key: assessment_file
     input_type: string
@@ -252,24 +256,54 @@ parameters:
     input_type: string
     requirement: required
     description: "Path to the open issue board snapshot (markdown)."
+  - key: strategy_file
+    input_type: string
+    requirement: required
+    description: "Path to the company strategy + target metrics (STRATEGY.md)."
 prompt: |
-  You are the observation loop for wgmesh, a decentralized WireGuard mesh
-  networking product with managed ingress.
+  You are the growth loop for the autonomous company behind wgmesh (a
+  self-hostable WireGuard mesh-VPN with managed ingress) and its hosted offering
+  cloudroof. The company's ONE goal is PAID CUSTOMERS — turning traffic and
+  trials into recurring revenue. You are not a bug tracker. Each cycle you
+  propose the next concrete work that moves the company toward paid customers.
 
-  Read the current open issue board (markdown) at this path:
-  {{ open_board_file }}
+  Inputs:
+  - Open issue board — do NOT re-propose anything already here (dedupe by
+    intent, not just wording): {{ open_board_file }}
+  - Company strategy + target metrics: {{ strategy_file }}
 
-  Write ONLY strict JSON to this exact file path:
-  {{ assessment_file }}
+  Bias HARD toward issues_to_create with net-new go-to-market work. Strong
+  issues:
+  - A landing/pricing page or trial/signup-flow change that lifts conversion.
+  - Lead capture + an email nurture sequence for cloudroof trial traffic.
+  - SEO/content targeting a specific buyer search intent (one page/post).
+  - Outreach to a NAMED, reachable segment (state the list/source).
+  - A "time-to-first-mesh" onboarding fix that cuts trial drop-off.
+  - A pricing/packaging experiment with a measurable hypothesis.
 
-  The JSON object MUST contain exactly these four keys, each an array:
+  Every issue you create MUST:
+  - Be ONE concrete, shippable task a coding agent OR a marketing-automation
+    tool can execute end-to-end — never a vague theme.
+  - Name the goal link in one line: how it moves trials to paid.
+  - Include an acceptance check: what "done" is + the metric it should move.
+  - Carry labels: ["fn:dev"] if the pipeline can implement it as code/product;
+    ["needs-human"] ONLY if it truly needs capital, a human decision, or an
+    external account/credential.
+
+  Do NOT: re-create board items; propose internal pipeline/infra busywork (only
+  customer-facing, revenue-advancing work); close or escalate needs-human
+  issues. Leave issues_to_close / prs_to_close empty unless an item is clearly
+  obsolete and safe to close.
+
+  Write ONLY strict JSON to this exact path: {{ assessment_file }}
+  Four keys, each an array:
   - issues_to_create: objects with title, body, labels
   - issues_to_close: objects with number, reason
   - needs_human: objects with request, urgency, reason
   - prs_to_close: objects with repo, number, reason
 
-  If no action is justified, write empty arrays. Never include secrets,
-  customer PII, or exact revenue figures.
+  If no NEW customer-acquisition work is justified, write empty arrays. Never
+  include secrets, customer PII, or exact revenue figures.
 extensions:
   - type: builtin
     name: developer
