@@ -1,4 +1,4 @@
-"""Tests for the Executor protocol and build_executor factory (U1)."""
+"""Tests for the Executor protocol and build_executor factory."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import pytest
 from wgmesh_pipeline.executor import Executor, build_executor
 from wgmesh_pipeline.goose.runner import GooseRunner
 from wgmesh_pipeline.config import load_config
+from wgmesh_pipeline.langchain_agent.runner import LangchainAgentRunner
 
 # ---------------------------------------------------------------------------
 # Minimal env dict that satisfies load_config's required fields.
@@ -50,11 +51,11 @@ def test_explicit_goose_with_fake_runner() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_langchain_raises_not_implemented() -> None:
-    """config.executor == 'langchain' → NotImplementedError (U2 not yet landed)."""
+def test_langchain_returns_langchain_runner() -> None:
+    """config.executor == 'langchain' → build_executor returns LangchainAgentRunner."""
     cfg = _cfg(EXECUTOR="langchain")
-    with pytest.raises(NotImplementedError, match="langchain"):
-        build_executor(cfg)
+    result = build_executor(cfg)
+    assert isinstance(result, LangchainAgentRunner)
 
 
 def test_unknown_executor_raises_value_error() -> None:
