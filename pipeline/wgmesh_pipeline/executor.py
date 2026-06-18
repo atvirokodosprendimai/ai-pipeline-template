@@ -4,8 +4,7 @@ Defines the ``Executor`` protocol (matching ``GooseRunner.run_recipe``) and
 ``build_executor(config)`` which selects the concrete implementation via
 ``config.executor`` (populated from the ``EXECUTOR`` env var, default "goose").
 
-LangChain executor (U2) is not yet implemented — selecting it raises
-``NotImplementedError``.  Any unknown value fails closed with ``ValueError``.
+Any unknown value fails closed with ``ValueError``.
 """
 
 from __future__ import annotations
@@ -45,7 +44,7 @@ def build_executor(
     """Return an ``Executor`` selected by ``config.executor``.
 
     * ``"goose"``    → :class:`~wgmesh_pipeline.goose.runner.GooseRunner`
-    * ``"langchain"``→ raises :exc:`NotImplementedError` (U2)
+    * ``"langchain"``→ :class:`~wgmesh_pipeline.langchain_agent.runner.LangchainAgentRunner`
     * anything else  → raises :exc:`ValueError` (fail-closed)
 
     ``runner`` is forwarded to ``GooseRunner.__init__`` for test injection.
@@ -54,5 +53,7 @@ def build_executor(
     if executor_name == "goose":
         return GooseRunner(config, runner=runner)  # type: ignore[arg-type]
     if executor_name == "langchain":
-        raise NotImplementedError("langchain executor lands in U2")
+        from wgmesh_pipeline.langchain_agent.runner import LangchainAgentRunner
+
+        return LangchainAgentRunner(config)  # type: ignore[arg-type]
     raise ValueError(f"unknown executor: {executor_name!r}")
