@@ -1,0 +1,19 @@
+docs/research/2026-06-18-langfuse-cookbook-patterns.md
+  s_ee5d170b65795e::t_9607149f620b1e 1-102
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "b2ffbd567300d0cd0f11c9a6db7cc56157c497c6",
+  "prompts": {},
+  "sessions": {
+    "s_ee5d170b65795e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "135e0f00-8a77-44af-ba87-de6eb16656bb",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
