@@ -57,6 +57,21 @@ _BOOLEAN = {
 # the connection must offer this `model` (see langfuse-llm-connection workflow).
 _JUDGE_MODEL = {"provider": "zai", "model": "GLM-5.2"}
 
+_PIKAPODS_SNAPSHOT = """PikaPods self-hosts these open-source apps (non-exhaustive):
+- Zapier / IFTTT -> Activepieces, Automatisch
+- Airtable -> Baserow, NocoDB
+- Sentry -> Bugsink, GlitchTip
+- Google Analytics -> Umami, Matomo
+- Slack / Teams -> Mattermost
+- Mailchimp / marketing automation -> Mautic, Listmonk
+- Salesforce / HubSpot -> Twenty CRM
+- Confluence / Notion -> Docmost, BookStack
+- Intercom / community support -> Answer
+- status / uptime monitoring -> Uptime Kuma
+- 1Password / Bitwarden -> Vaultwarden
+- Firebase -> Pocketbase, Directus
+"""
+
 EVALUATORS = [
     {
         "name": "growth_issue_quality",
@@ -104,6 +119,29 @@ EVALUATORS = [
         "outputDefinition": _BOOLEAN,
         "modelConfig": _JUDGE_MODEL,
     },
+    {
+        "name": "open_source_default",
+        "type": "llm_as_judge",
+        "prompt": (
+            "You are scoring a box-PROPOSED ISSUE on whether it defaults to "
+            "open-source / self-hostable tooling instead of proprietary SaaS.\n\n"
+            f"{_PIKAPODS_SNAPSHOT}\n"
+            "Proposed issue:\n{{output}}\n\n"
+            "Rule of thumb: if PikaPods has it, we can use it.\n\n"
+            "Score 0.0-1.0 with these anchors: 1.0 = proposal adopts NO "
+            "third-party tool/service (NOT APPLICABLE), OR proposes an open-"
+            "source/self-hostable tool, OR names a PikaPods app; ~0.5 = "
+            "proposes a proprietary SaaS but with explicit justification that "
+            "the OSS/PikaPods equivalent cannot meet the need; 0.0 = proposes "
+            "a proprietary SaaS where a PikaPods/OSS equivalent plainly exists "
+            "(e.g. Intercom->Answer, Zapier->Activepieces), with no "
+            "justification. Reasoning: one sentence naming the proprietary "
+            "tool and the OSS alternative."
+        ),
+        "variables": ["output"],
+        "outputDefinition": _NUMERIC,
+        "modelConfig": _JUDGE_MODEL,
+    },
 ]
 
 # --- evaluation rules (WHAT to score) ---------------------------------------
@@ -148,6 +186,14 @@ RULES = [
     {
         "name": "rule_public_safety_pass",
         "evaluatorName": "public_safety_pass",
+        "target": "observation",
+        "sampling": 1.0,
+        "filter": _GEN_FILTER,
+        "mapping": [{"variable": "output", "source": "output"}],
+    },
+    {
+        "name": "rule_open_source_default",
+        "evaluatorName": "open_source_default",
         "target": "observation",
         "sampling": 1.0,
         "filter": _GEN_FILTER,
