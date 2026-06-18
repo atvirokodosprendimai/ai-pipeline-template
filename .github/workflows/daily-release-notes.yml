@@ -45,11 +45,12 @@ jobs:
       DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
       DIGEST_REPOS: ${{ secrets.DIGEST_REPOS }}
       DIGEST_EXCLUDE: ${{ vars.DIGEST_EXCLUDE || '.github,homebrew-tap' }}
+      FUNNEL_STAT_TEXT: ${{ vars.FUNNEL_STAT_TEXT }}
       ORG: ${{ github.repository_owner }}
     steps:
       - name: Collect merged PRs in the window
         run: |
-          set -uo pipefail
+          set -euo pipefail
           since=$(date -u -d "${SINCE_HOURS} hours ago" '+%Y-%m-%dT%H:%M:%SZ')
           echo "window since: $since"
 
@@ -135,12 +136,13 @@ jobs:
           set -euo pipefail
           : "${OPENROUTER_API_KEY:?OPENROUTER_API_KEY missing — cannot summarize}"
           pr_list=$(cat /tmp/pr_list.txt)
+          prs_json=$(cat /tmp/prs.json)
           # Build the request with jq so the PR text is safely JSON-encoded.
-          jq -n --arg prs "$pr_list" '{
+          jq -n --arg prs "$pr_list" --arg prs_json "$prs_json" '{
             model: "z-ai/glm-5.2",
             messages: [
-              {role: "system", content: "You write a short daily release-notes email for a small founding team that ships across multiple repositories. Plain English. Group by repository. Lead with customer- and product-facing repos (e.g. wgmesh, chimney, cloudroof-eu, webmail) and keep pipeline/template/CI plumbing brief and last. For each group explain WHAT shipped and WHY it matters, most impactful first. If a repo shipped only internal/CI/housekeeping work, say so in one line rather than dressing it up. 6-14 sentences or tight bullets. No preamble, no signature."},
-              {role: "user", content: ("Merged pull requests today:\n\n" + $prs)}
+              {role: "system", content: "You are formatting a release-notes digest for a small founding team. Input: a list of merged PRs (number, title, author, repo). Output STRICT JSON ONLY, no prose, no code fence, matching exactly:\n{\"subline\":\"<=8 words, e.g. AI Pipeline\",\"themes\":[{\"emoji\":\"<one emoji>\",\"title\":\"<short Title Case theme>\",\"accent\":\"<hex like #16a34a>\",\"badge\":\"<UPGRADED|NEW|null>\",\"bullets\":[{\"text\":\"<plain sentence, no markdown>\",\"prs\":[<pr numbers>]}]}],\"footer\":\"<one upbeat sentence>\"}\nRules: group the PRs into 3-6 themes by what they accomplish (NOT by repo). Lead with customer/product-facing themes; put ALL routine bot work (heal/health-check/supervisor-rank/daily-assessment/audit) into ONE final theme titled Routine Automated Housekeeping with emoji 📋 and a single bullet summarizing it (you may omit its PR numbers or list a few). Pick a distinct accent hex per theme from this palette in order: #7c3aed,#16a34a,#2563eb,#4f46e5,#ea580c,#64748b. badge only for notable upgrades/new features else null. Every non-housekeeping bullet should cite its PR number(s) in prs. Keep titles/bullets short."},
+              {role: "user", content: ("Merged pull requests today:\n\n" + $prs + "\n\nStructured PR JSON:\n" + $prs_json)}
             ]
           }' > /tmp/llm_req.json
           http=$(curl -s -w '%{http_code}' -o /tmp/llm_resp.json \
@@ -150,10 +152,31 @@ jobs:
             https://openrouter.ai/api/v1/chat/completions)
           if [ "$http" != "200" ]; then
             echo "::warning::LLM summary failed (HTTP $http); falling back to PR list only"
+            echo "THEMED=0" >> "$GITHUB_ENV"
             echo "Here is what merged today:" > /tmp/summary.txt
           else
             jq -r '.choices[0].message.content // "Here is what merged today:"' \
-              /tmp/llm_resp.json > /tmp/summary.txt
+              /tmp/llm_resp.json > /tmp/llm_raw.txt
+            sed -e '1s/^```json[[:space:]]*$//' \
+              -e '1s/^```[[:space:]]*$//' \
+              -e '$s/^```[[:space:]]*$//' \
+              /tmp/llm_raw.txt > /tmp/llm.json
+            if jq -e '.themes and (.themes|type=="array") and (.themes|length>0)' /tmp/llm.json > /dev/null; then
+              echo "THEMED=1" >> "$GITHUB_ENV"
+              jq -r '
+                (.themes // [])[]
+                | (.title // "Updates") as $title
+                | ($title + ":"),
+                  ((.bullets // [])[] | "- " + (.text // ""))
+              ' /tmp/llm.json > /tmp/summary.txt
+            else
+              echo "::warning::LLM themed JSON invalid; falling back to PR list only"
+              echo "THEMED=0" >> "$GITHUB_ENV"
+              cp /tmp/llm_raw.txt /tmp/summary.txt
+              if [ ! -s /tmp/summary.txt ]; then
+                echo "Here is what merged today:" > /tmp/summary.txt
+              fi
+            fi
           fi
           cat /tmp/summary.txt
 
@@ -163,6 +186,27 @@ jobs:
           today=$(date -u '+%Y-%m-%d')
           if [ "${PR_COUNT}" = "0" ]; then
             body=$(printf 'No pull requests merged in the last %s hours.\n' "$SINCE_HOURS")
+          elif [ "${THEMED:-0}" = "1" ]; then
+            python3 - <<'PY' > /tmp/summary_text.txt
+          import json
+
+          with open("/tmp/llm.json", encoding="utf-8") as fh:
+              data = json.load(fh)
+
+          for theme in data.get("themes", []):
+              title = theme.get("title") or "Updates"
+              print(f"{title}:")
+              for bullet in theme.get("bullets", []):
+                  text = bullet.get("text") or ""
+                  prs = bullet.get("prs") or []
+                  suffix = ""
+                  if prs:
+                      suffix = " " + " ".join(f"(#{pr})" for pr in prs)
+                  print(f"- {text}{suffix}")
+              print()
+          PY
+            body=$(printf '%s\n\n— Merged PRs —\n%s\n' \
+              "$(cat /tmp/summary_text.txt)" "$(cat /tmp/pr_list.txt)")
           else
             body=$(printf '%s\n\n— Merged PRs —\n%s\n' \
               "$(cat /tmp/summary.txt)" "$(cat /tmp/pr_list.txt)")
@@ -174,28 +218,99 @@ jobs:
             python3 -c 'import html, sys; print(html.escape(sys.stdin.read(), quote=True), end="")'
           }
 
-          org_html=$(printf '%s' "$ORG" | html_escape)
           today_html=$(printf '%s' "$today" | html_escape)
-          count_line_html=$(printf '%s PRs · %s repos · last %sh' "$PR_COUNT" "$REPO_COUNT" "$SINCE_HOURS" | html_escape)
+          subline="AI Pipeline"
+          footer_text="Steady progress on the pipeline."
+          if [ "${THEMED:-0}" = "1" ]; then
+            subline=$(jq -r '.subline // "AI Pipeline"' /tmp/llm.json)
+            footer_text=$(jq -r '.footer // "Steady progress on the pipeline."' /tmp/llm.json)
+          fi
+          subline_html=$(printf '%s' "$subline" | html_escape)
+          pr_count_html=$(printf '%s' "$PR_COUNT" | html_escape)
+          repo_count_html=$(printf '%s' "$REPO_COUNT" | html_escape)
           since_hours_html=$(printf '%s' "$SINCE_HOURS" | html_escape)
+          footer_html=$(printf '%s' "$footer_text" | html_escape)
+          funnel_stat_html=$(printf '%s' "${FUNNEL_STAT_TEXT:-}" | html_escape)
 
           {
             cat <<HTML
           <!doctype html>
-          <html>
-          <body style="margin:0;padding:0;background:#ffffff;">
-          <div style="max-width:640px;margin:0 auto;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1a1a1a;line-height:1.5;padding:24px;">
-            <div style="border-bottom:1px solid #eee;padding-bottom:16px;margin-bottom:20px;">
-              <div style="font-size:22px;font-weight:700;">${org_html}</div>
-              <div style="color:#666;font-size:13px;">${today_html} · ${count_line_html}</div>
-            </div>
+          <html><body style="margin:0;padding:0;background:#eef0f6;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;"><tr><td align="center" style="padding:24px 0;"><table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;background:#fff;border-radius:8px;overflow:hidden;">
+            <tr><td style="background:#0a0e27;padding:28px 24px;">
+              <span style="font-size:26px;font-weight:800;color:#fff;">🕸 wgmesh</span>
+              <div style="font-size:22px;font-weight:800;color:#fff;margin-top:6px;">What shipped</div>
+              <div style="color:#9aa4d6;font-size:13px;margin-top:4px;">${subline_html} · ${today_html} · ${pr_count_html} PRs · ${repo_count_html} repos</div>
+            </td></tr>
           HTML
+
+            if [ -n "${FUNNEL_STAT_TEXT:-}" ]; then
+              cat <<HTML
+            <tr><td style="background:#f5f3ff;padding:16px 24px;color:#312e81;font-size:14px;">📊 ${funnel_stat_html}</td></tr>
+          HTML
+            fi
 
             if [ "${PR_COUNT}" = "0" ]; then
               cat <<HTML
-            <p style="color:#666;">No pull requests merged in the last ${since_hours_html} hours.</p>
+            <tr><td style="padding:24px;color:#666;font-size:15px;">No pull requests merged in the last ${since_hours_html} hours.</td></tr>
           HTML
+            elif [ "${THEMED:-0}" = "1" ]; then
+              python3 - <<'PY'
+          import html
+          import json
+          import re
+          with open("/tmp/llm.json", encoding="utf-8") as fh:
+              digest = json.load(fh)
+          with open("/tmp/prs.json", encoding="utf-8") as fh:
+              prs = json.load(fh)
+
+          pr_urls = {str(pr.get("number")): str(pr.get("url") or "") for pr in prs}
+          accent_re = re.compile(r"^#[0-9a-fA-F]{6}$")
+
+          def esc(value):
+              return html.escape(str(value or ""), quote=True)
+
+          def safe_accent(value):
+              value = str(value or "")
+              return value if accent_re.match(value) else "#64748b"
+
+          for theme in digest.get("themes", []):
+              accent = safe_accent(theme.get("accent"))
+              emoji = esc(theme.get("emoji") or "")
+              title = esc(theme.get("title") or "Updates")
+              badge = theme.get("badge")
+              print('            <tr><td style="padding:14px 20px;background:#eef0f6;">')
+              print('              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border-collapse:collapse;"><tr>')
+              print(f'                <td style="border-left:4px solid {accent};padding:16px 20px;">')
+              heading = f'{emoji} <span style="font-weight:700;font-size:16px;color:#111;">{title}</span>'
+              if badge is not None:
+                  heading += f' <span style="background:{accent};color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:8px;">{esc(badge)}</span>'
+              print(f'                  <div style="margin:0 0 10px 0;">{heading}</div>')
+              print('                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">')
+              for bullet in theme.get("bullets", []):
+                  text = esc(bullet.get("text") or "")
+                  links = []
+                  for pr in bullet.get("prs") or []:
+                      num = str(pr)
+                      label = f"(#{esc(num)})"
+                      url = pr_urls.get(num)
+                      if url:
+                          links.append(f'<a href="{esc(url)}" style="color:{accent};text-decoration:none;font-weight:600;font-size:13px;">{label}</a>')
+                      else:
+                          links.append(f'<span style="color:#64748b;font-weight:600;font-size:13px;">{label}</span>')
+                  suffix = " ".join(links)
+                  if suffix:
+                      suffix = " " + suffix
+                  print(f'                    <tr><td style="padding:5px 0;color:#333;font-size:14px;line-height:1.45;">&bull; {text}{suffix}</td></tr>')
+              print('                  </table>')
+              print('                </td>')
+              print('              </tr></table>')
+              print('            </td></tr>')
+          PY
             else
+              cat <<HTML
+            <tr><td style="padding:20px 24px 4px 24px;color:#1a1a1a;line-height:1.5;">
+          HTML
+
               python3 - <<'PY' /tmp/summary.txt
           import html
           import re
@@ -266,13 +381,18 @@ jobs:
                   ),
                   "</div>"
               ' /tmp/prs.json
+
+              cat <<HTML
+            </td></tr>
+          HTML
             fi
 
             cat <<HTML
-            <div style="margin-top:24px;padding-top:16px;border-top:1px solid #eee;color:#999;font-size:12px;">Generated by the wgmesh pipeline · ${today_html}</div>
-          </div>
-          </body>
-          </html>
+            <tr><td style="background:#0a0e27;padding:20px 24px;color:#fff;font-size:14px;">
+              🚀 <span style="font-weight:700;">${footer_html}</span>
+              <div style="color:#9aa4d6;font-size:12px;margin-top:8px;">Generated by the wgmesh pipeline · ${today_html}</div>
+            </td></tr>
+          </table></td></tr></table></body></html>
           HTML
           } > /tmp/email_body.html
 
