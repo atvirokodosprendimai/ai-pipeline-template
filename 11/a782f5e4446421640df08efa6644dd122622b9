@@ -1,0 +1,25 @@
+pipeline/pyproject.toml
+  s_093645dd2900df::t_2451e6a2aaacda 14
+pipeline/wgmesh_pipeline/langchain_agent/runner.py
+  s_093645dd2900df::t_2451e6a2aaacda 12,50-54,60,72,75
+pipeline/tests/test_langchain_agent_prompts.py
+  s_093645dd2900df::t_e35b3a4c8d24bb 1-104
+pipeline/wgmesh_pipeline/langchain_agent/prompts.py
+  s_093645dd2900df::t_2451e6a2aaacda 1-54
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "11a782f5e4446421640df08efa6644dd122622b9",
+  "prompts": {},
+  "sessions": {
+    "s_093645dd2900df": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019edc51-f718-76d0-b9e3-212737412914",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
