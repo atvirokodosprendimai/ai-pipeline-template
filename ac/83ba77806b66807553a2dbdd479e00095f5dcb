@@ -1,0 +1,29 @@
+.github/workflows/daily-release-notes.yml
+  s_13011e5b1b29af::t_1f95d4f06e23d5 67-68,75
+  s_2601eb706e5fe3::t_d2793cebd6398f 57,73
+  s_2601eb706e5fe3::t_bbb144313abf18 38,46-48,52,55-56,58-66,69-72,74,76-110,114-128,142,170
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "ac83ba77806b66807553a2dbdd479e00095f5dcb",
+  "prompts": {},
+  "sessions": {
+    "s_13011e5b1b29af": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019edb4d-8785-7753-b980-d14c2e1eaf74",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    },
+    "s_2601eb706e5fe3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019edb4d-14dd-7d00-b953-b34dc97044ad",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
