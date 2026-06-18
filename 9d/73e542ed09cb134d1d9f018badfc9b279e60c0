@@ -1,0 +1,19 @@
+.github/workflows/daily-release-notes.yml
+  s_e9686a00f00ee8::t_3b2aebb1b2909d 48-51,187-215
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "9d73e542ed09cb134d1d9f018badfc9b279e60c0",
+  "prompts": {},
+  "sessions": {
+    "s_e9686a00f00ee8": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019edbee-1c53-7e12-badd-5a98e179cd78",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
