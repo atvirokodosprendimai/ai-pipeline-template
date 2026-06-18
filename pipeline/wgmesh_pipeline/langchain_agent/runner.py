@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import re
 import time
 from pathlib import Path
 from typing import Any, Callable, Mapping
@@ -10,6 +9,7 @@ from wgmesh_pipeline import tracing
 from wgmesh_pipeline.config import DEFAULT_GOOSE_MODEL, DEFAULT_GOOSE_PROVIDER, Config
 from wgmesh_pipeline.goose.runner import GooseResult
 from wgmesh_pipeline.goose.usage import UsageTotals
+from wgmesh_pipeline.langchain_agent import prompts
 from wgmesh_pipeline.langchain_agent.tools import build_tools, resolve_workspace_path
 from wgmesh_pipeline.models import (
     ModelProfile,
@@ -20,7 +20,6 @@ from wgmesh_pipeline.models import (
 ClientFactory = Callable[[ModelProfile, Config], Any]
 MAX_ITERATIONS = 25
 WALL_CLOCK_LIMIT_SECONDS = 1800
-_PLACEHOLDER_RE = re.compile(r"{{\s*([A-Za-z0-9_-]+)\s*}}")
 
 
 class LangchainAgentRunner:
@@ -48,14 +47,17 @@ class LangchainAgentRunner:
             root = Path(workdir).resolve()
             output_path = resolve_workspace_path(root, expected_output)
             profile = self._resolve_profile(stage, tier)
-            prompt = _render_prompt(recipe, root, params)
-            if isinstance(prompt, _PromptError):
+            try:
+                rendered_prompt = prompts.render_recipe_prompt(
+                    recipe, params, workdir=root
+                )
+            except prompts.PromptRenderError as exc:
                 return _result(
                     ok=False,
                     output_path=output_path,
                     started=started,
                     raw_log=raw_log,
-                    error=prompt.message,
+                    error=str(exc),
                     profile=profile,
                     usage=usage,
                 )
@@ -67,10 +69,10 @@ class LangchainAgentRunner:
             HumanMessage, SystemMessage, ToolMessage = _message_classes()
             messages: list[Any] = [
                 SystemMessage(content=_system_prompt()),
-                HumanMessage(content=prompt),
+                HumanMessage(content=rendered_prompt),
             ]
             raw_log.append(f"system: {_system_prompt()}")
-            raw_log.append(f"human: {prompt}")
+            raw_log.append(f"human: {rendered_prompt}")
 
             iterations = 0
             while iterations < MAX_ITERATIONS:
@@ -209,51 +211,6 @@ def _system_prompt() -> str:
         "inspect and modify files. Keep all work inside the workspace, and write "
         "the requested expected output before finishing."
     )
-
-
-class _PromptError:
-    def __init__(self, message: str):
-        self.message = message
-
-
-def _render_prompt(
-    recipe: str | Path, workdir: Path, params: Mapping[str, str]
-) -> str | _PromptError:
-    recipe_path = Path(recipe)
-    if not recipe_path.is_absolute():
-        recipe_path = workdir / recipe_path
-    try:
-        prompt = _extract_top_level_prompt(recipe_path.read_text(encoding="utf-8"))
-    except OSError as exc:
-        return _PromptError(f"could not read recipe {recipe_path}: {exc}")
-    except ValueError as exc:
-        return _PromptError(str(exc))
-
-    missing = sorted(
-        {key for key in _PLACEHOLDER_RE.findall(prompt) if key not in params}
-    )
-    if missing:
-        return _PromptError(f"missing required recipe params: {', '.join(missing)}")
-    for key, value in params.items():
-        prompt = re.sub(r"{{\s*" + re.escape(key) + r"\s*}}", str(value), prompt)
-    return prompt
-
-
-def _extract_top_level_prompt(text: str) -> str:
-    lines = text.splitlines()
-    for index, line in enumerate(lines):
-        if line == "prompt: |" or line == "prompt: |-":
-            block: list[str] = []
-            for candidate in lines[index + 1 :]:
-                if candidate and not candidate.startswith((" ", "\t")):
-                    break
-                block.append(
-                    candidate[2:] if candidate.startswith("  ") else candidate.lstrip()
-                )
-            return "\n".join(block).rstrip() + "\n"
-        if line.startswith("prompt: "):
-            return line.removeprefix("prompt: ").strip().strip("\"'")
-    raise ValueError("recipe missing top-level prompt")
 
 
 def _tool_call_parts(call: Any) -> tuple[str, dict[str, Any], str]:
