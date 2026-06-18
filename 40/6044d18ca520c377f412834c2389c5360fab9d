@@ -1,0 +1,19 @@
+docs/runbooks/box-langgraph-cutover.md
+  s_ee5d170b65795e::t_33e99d3fecd8ef 1-91
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "406044d18ca520c377f412834c2389c5360fab9d",
+  "prompts": {},
+  "sessions": {
+    "s_ee5d170b65795e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "135e0f00-8a77-44af-ba87-de6eb16656bb",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
