@@ -10,6 +10,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
   "langchain-anthropic>=0.2",
+  "langgraph>=0.2",
   "pytest>=8.0",
   "pyyaml>=6",
   "requests>=2.32",
@@ -20,7 +21,6 @@ dev = [
   "pytest>=8.0",
 ]
 graph = [
-  "langgraph>=0.2",
   "langsmith>=0.1",
 ]
 eval = [
