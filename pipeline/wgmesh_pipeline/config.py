@@ -126,6 +126,9 @@ class Config:
     selfheal_live: bool = False
     observation_live: bool = False
     strategy_audit_live: bool = False
+    # Executor backend: 'goose' (default) or 'langchain' (U2).
+    # Selected via EXECUTOR env var; factory in executor.py fails closed on unknown values.
+    executor: str = "goose"
 
     @property
     def owner(self) -> str:
@@ -240,6 +243,7 @@ def load_config(env: Mapping[str, str] | None = None) -> Config:
         selfheal_live=_get_bool(source, "SELFHEAL_LIVE", False),
         observation_live=_get_bool(source, "OBSERVATION_LIVE", False),
         strategy_audit_live=_get_bool(source, "STRATEGY_AUDIT_LIVE", False),
+        executor=(_get_nonempty(source, "EXECUTOR") or "goose").strip().lower(),
     )
     _log_control_loop_module_modes(cfg)
     return cfg

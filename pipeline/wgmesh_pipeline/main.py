@@ -12,7 +12,8 @@ from wgmesh_pipeline.config import load_config
 from wgmesh_pipeline.control_loop import ControlLoopScheduler
 from wgmesh_pipeline.forge.factory import make_forge
 from wgmesh_pipeline.forge.gitfacts import make_resolution_lookup
-from wgmesh_pipeline.goose.runner import GooseRunner
+from wgmesh_pipeline.executor import build_executor
+from wgmesh_pipeline.goose.runner import GooseRunner  # noqa: F401 — kept for downstream compat
 from wgmesh_pipeline.graph.build import build_graph
 from wgmesh_pipeline.poller import Poller
 from wgmesh_pipeline.scoring import init_scoring
@@ -33,8 +34,8 @@ async def async_main(*, reset_queue: bool = False) -> None:
     )
     config = load_config()
     logging.getLogger("wgmesh_pipeline").info(
-        "starting: mode=%s database_mode=%s poll_interval=%ss",
-        config.mode, config.database_mode, config.poll_interval_seconds,
+        "starting: mode=%s database_mode=%s poll_interval=%ss executor=%s",
+        config.mode, config.database_mode, config.poll_interval_seconds, config.executor,
     )
     init_tracing(config)
     init_scoring(config)
@@ -55,7 +56,7 @@ async def async_main(*, reset_queue: bool = False) -> None:
         client=client,
         resolution_lookup=make_resolution_lookup(config.repo_path, client),
         graph=build_graph(config),
-        goose_runner=GooseRunner(config),
+        goose_runner=build_executor(config),
     )
 
     stop = asyncio.Event()
