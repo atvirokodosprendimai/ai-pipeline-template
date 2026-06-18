@@ -87,7 +87,12 @@ class CompiledGraph:
         return self.gate(state, max_files=self.config.max_files)
 
 
-def build_graph(config: Config) -> CompiledGraph:
+def build_graph(config: Config) -> object:
+    if getattr(config, "graph_impl", "legacy") == "langgraph":
+        from wgmesh_pipeline.graph.build_lg import build_state_graph
+
+        return build_state_graph(config)
+
     return CompiledGraph(
         config=config,
         triage=trace_node("triage", triage_node),

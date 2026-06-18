@@ -7,6 +7,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Mapping
 
+from wgmesh_pipeline.models import (
+    ModelProfile,
+    parse_registry,
+    parse_stage_routing,
+)
+
 log = logging.getLogger(__name__)
 
 # GitOps box config: a committed, non-secret JSON file read as a base layer
@@ -54,12 +60,6 @@ def _read_box_config(path: Path = BOX_CONFIG_PATH) -> dict[str, str]:
         k: str(v) for k, v in raw.items() if k in BOX_CONFIG_ALLOWLIST and v is not None
     }
 
-
-from wgmesh_pipeline.models import (
-    ModelProfile,
-    parse_registry,
-    parse_stage_routing,
-)
 
 VALID_MODES = frozenset({"shadow", "spec-only", "live"})
 VALID_DB_MODES = frozenset({"local", "turso"})
@@ -129,6 +129,9 @@ class Config:
     # Executor backend: 'goose' (default) or 'langchain' (U2).
     # Selected via EXECUTOR env var; factory in executor.py fails closed on unknown values.
     executor: str = "goose"
+    # Graph backend: 'legacy' (default) or 'langgraph' (U4).
+    # Selected via GRAPH_IMPL env var; build_graph dispatches on this value.
+    graph_impl: str = "legacy"
 
     @property
     def owner(self) -> str:
@@ -244,6 +247,7 @@ def load_config(env: Mapping[str, str] | None = None) -> Config:
         observation_live=_get_bool(source, "OBSERVATION_LIVE", False),
         strategy_audit_live=_get_bool(source, "STRATEGY_AUDIT_LIVE", False),
         executor=(_get_nonempty(source, "EXECUTOR") or "goose").strip().lower(),
+        graph_impl=(_get_nonempty(source, "GRAPH_IMPL") or "legacy").strip().lower(),
     )
     _log_control_loop_module_modes(cfg)
     return cfg
