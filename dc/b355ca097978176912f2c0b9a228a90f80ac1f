@@ -1,0 +1,49 @@
+pipeline/tests/test_langchain_agent_runner.py
+  s_780a5398981049::t_31e7226f1a8551 1-51,53-73,79-82,88-102,106-108,112-130,136-139,145-177,183-212,218-234,238-267,273-307
+  s_780a5398981049::t_1d4cee1339e992 52,74-78,83-87,103-105,109-111,131-135,140-144,178-182,213-217,235-237,268-272
+pipeline/wgmesh_pipeline/executor.py
+  s_780a5398981049::t_31e7226f1a8551 7,47,56-58
+pipeline/tests/test_executor_factory.py
+  s_780a5398981049::t_31e7226f1a8551 1,10,54-55,57-58
+pipeline/wgmesh_pipeline/langchain_agent/runner.py
+  s_780a5398981049::t_aa2857044313e2 78-83,120-122
+  s_780a5398981049::t_31e7226f1a8551 1-13,19-77,84-117,119,123-132,136-218,222-231,235-249,253-263,270-314,318-328,332-352
+  s_780a5398981049::t_9a0bc6500f4d98 118
+  s_780a5398981049::t_1d4cee1339e992 14-18,133-135,219-221,232-234,250-252,264-269,315-317,329-331
+pipeline/pyproject.toml
+  s_780a5398981049::t_31e7226f1a8551 12
+pipeline/wgmesh_pipeline/langchain_agent/tools.py
+  s_ee5d170b65795e::t_69e5a87f3ed0ba 36
+  s_780a5398981049::t_31e7226f1a8551 1-2,4-7,10,21-35,37-65,67-82,84-181
+  s_ee5d170b65795e::t_6104f810c4f30d 3,8-9,11-20
+  s_ee5d170b65795e::t_7d561f0cac1330 66
+  s_ee5d170b65795e::t_88c139121fee54 83
+pipeline/tests/test_langchain_agent_tools.py
+  s_780a5398981049::t_31e7226f1a8551 1-32
+pipeline/wgmesh_pipeline/langchain_agent/__init__.py
+  s_780a5398981049::t_31e7226f1a8551 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "dcb355ca097978176912f2c0b9a228a90f80ac1f",
+  "prompts": {},
+  "sessions": {
+    "s_780a5398981049": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019edb78-82bf-7d42-8003-763ad9fe765d",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    },
+    "s_ee5d170b65795e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "135e0f00-8a77-44af-ba87-de6eb16656bb",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
