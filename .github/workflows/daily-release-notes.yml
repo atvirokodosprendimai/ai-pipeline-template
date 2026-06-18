@@ -198,11 +198,20 @@ jobs:
             else
               python3 - <<'PY' /tmp/summary.txt
           import html
+          import re
           import sys
 
           path = sys.argv[1]
           with open(path, encoding="utf-8") as fh:
               lines = fh.read().splitlines()
+
+          def fmt(text):
+              # escape first (neutralises real HTML), then render the only
+              # markdown markers the LLM emits: **bold** and *italic*.
+              esc = html.escape(text, quote=True)
+              esc = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", esc)
+              esc = re.sub(r"(?<!\*)\*(?!\*)([^*]+?)\*(?!\*)", r"<em>\1</em>", esc)
+              return esc
 
           print('  <div style="font-size:15px;">')
           paragraph = []
@@ -228,14 +237,14 @@ jobs:
                   if not in_list:
                       print('    <ul style="margin:0 0 12px 20px;padding:0;">')
                       in_list = True
-                  item = html.escape(line[2:].strip(), quote=True)
+                  item = fmt(line[2:].strip())
                   print(f'      <li style="margin:4px 0;">{item}</li>')
                   continue
 
               if in_list:
                   print("    </ul>")
                   in_list = False
-              paragraph.append(html.escape(line, quote=True))
+              paragraph.append(fmt(line))
 
           flush_paragraph()
           if in_list:
