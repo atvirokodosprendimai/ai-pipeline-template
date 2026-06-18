@@ -1,0 +1,114 @@
+name: Set Pipeline Box Env
+
+# Upsert simple KEY=VALUE flags into /etc/wgmesh-pipeline/env over SSH and
+# restart the service — WITHOUT a 13-minute provision/server-recreate. Use for
+# flag flips like GRAPH_IMPL / EXECUTOR / PIPELINE_MODE during the box
+# Goose->LangGraph cutover (docs/runbooks/box-langgraph-cutover.md).
+#
+# Scope guard: keys must match ^[A-Z_][A-Z0-9_]*$ and values a safe flag charset
+# (^[A-Za-z0-9_./:-]+$) — this is for FLAGS, not JSON blobs (MODEL_REGISTRY /
+# STAGE_ROUTING or new secrets still go through full provision). Values are NOT
+# printed to logs. Code itself reaches the box via "Update Pipeline Box".
+#
+# Auth: DEPLOY_SSH_KEY secret (same deploy keypair as deploy/update workflows).
+
+on:
+  workflow_dispatch:
+    inputs:
+      server_name:
+        description: 'Hetzner server name'
+        default: 'wgmesh-pipeline'
+      env_set:
+        description: 'Comma-separated KEY=VALUE flags (e.g. GRAPH_IMPL=langgraph,PIPELINE_MODE=shadow)'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  set-env:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate secrets
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+        run: |
+          set -euo pipefail
+          : "${DEPLOY_SSH_KEY:?DEPLOY_SSH_KEY secret missing}"
+          : "${HCLOUD_TOKEN:?HCLOUD_TOKEN secret missing (org)}"
+
+      - name: Install hcloud CLI
+        run: |
+          set -euo pipefail
+          curl -fsSL https://github.com/hetznercloud/cli/releases/latest/download/hcloud-linux-amd64.tar.gz \
+            | tar xz hcloud
+          sudo mv hcloud /usr/local/bin/
+
+      - name: Resolve box IP
+        env:
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+        run: |
+          set -euo pipefail
+          IP=$(hcloud server ip "${{ github.event.inputs.server_name }}")
+          echo "BOX_IP=$IP" >> "$GITHUB_ENV"
+
+      - name: Upsert env + restart
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          ENV_SET: ${{ github.event.inputs.env_set }}
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$RUNNER_TEMP/deploy_key"
+          SSH_ENV_SET=$(printf '%q' "$ENV_SET")
+          # UserKnownHostsFile=/dev/null: provision rotates the host key; the
+          # deploy key is the real gate.
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              -o ConnectTimeout=15 -i "$RUNNER_TEMP/deploy_key" root@"$BOX_IP" \
+              "ENV_SET=$SSH_ENV_SET bash -se" <<'REMOTE'
+          set -euo pipefail
+          ENV_FILE=/etc/wgmesh-pipeline/env
+          [ -f "$ENV_FILE" ] || { echo "::error::$ENV_FILE missing — run full provision first"; exit 1; }
+
+          IFS=',' read -ra PAIRS <<< "$ENV_SET"
+          for pair in "${PAIRS[@]}"; do
+            key="${pair%%=*}"
+            val="${pair#*=}"
+            if [ "$key" = "$pair" ] || [ -z "$key" ]; then
+              echo "::error::malformed pair (expected KEY=VALUE)"; exit 2
+            fi
+            if ! printf '%s' "$key" | grep -Eq '^[A-Z_][A-Z0-9_]*$'; then
+              echo "::error::illegal key (charset)"; exit 2
+            fi
+            if ! printf '%s' "$val" | grep -Eq '^[A-Za-z0-9_./:-]+$'; then
+              echo "::error::illegal value for ${key} (flags only — JSON/secret goes through provision)"; exit 2
+            fi
+            if grep -q "^${key}=" "$ENV_FILE"; then
+              # Replace in place; '#' delimiter is safe (value charset excludes it).
+              sed -i "s#^${key}=.*#${key}=${val}#" "$ENV_FILE"
+              echo "updated ${key}"
+            else
+              printf '%s=%s\n' "$key" "$val" >> "$ENV_FILE"
+              echo "appended ${key}"
+            fi
+          done
+
+          restart_ts=$(date "+%Y-%m-%d %H:%M:%S")
+          systemctl restart wgmesh-pipeline
+          sleep 10
+          if ! systemctl is-active --quiet wgmesh-pipeline; then
+            echo "::error::service not active after restart"
+            journalctl -u wgmesh-pipeline -n 30 --no-pager
+            exit 1
+          fi
+          if journalctl -u wgmesh-pipeline --since "$restart_ts" --no-pager | grep -q "tick"; then
+            echo "healthy: tick observed after restart"
+          else
+            echo "::warning::service active but no tick yet — check journal"
+            journalctl -u wgmesh-pipeline -n 30 --no-pager
+          fi
+          REMOTE
+
+      - name: Report
+        run: echo "Box $BOX_IP env flags applied; service restarted."
