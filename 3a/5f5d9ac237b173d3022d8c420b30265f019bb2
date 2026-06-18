@@ -1,0 +1,25 @@
+pipeline/wgmesh_pipeline/tracing.py
+  s_8e184a9ab0f9d7::t_04a054a55a5fe1 6
+  s_8e184a9ab0f9d7::t_b667f6a4d5ba47 8,14-15,161-177,214-216,221,272-277
+  s_8e184a9ab0f9d7::t_2ea92c7bf4965a 48-54,58,63-69,108-110,121-124,126-132,187-191,205-207,225-227,234-236,246-249,268-271,278-281
+pipeline/wgmesh_pipeline/graph/build_lg.py
+  s_8e184a9ab0f9d7::t_5439a00c45876a 4,16-20,33-35,38-53,56,58,63,131,141-142,146,148-149,151-152
+pipeline/tests/test_callback_handler_tracing.py
+  s_8e184a9ab0f9d7::t_06ac4863583205 1-135
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "3a5f5d9ac237b173d3022d8c420b30265f019bb2",
+  "prompts": {},
+  "sessions": {
+    "s_8e184a9ab0f9d7": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019edcaf-d392-7932-a69e-fbe113612bc1",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
