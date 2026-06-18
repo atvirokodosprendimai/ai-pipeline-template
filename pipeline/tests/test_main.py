@@ -29,7 +29,9 @@ class DummyPoller:
 def test_async_main_honors_reset_queue_env_before_polling(monkeypatch, capsys) -> None:
     DummyPoller.instances = []
     store = Store()
-    cfg = Config(target_repo="atvirokodosprendimai/wgmesh", mode="shadow", database_mode="local")
+    cfg = Config(
+        target_repo="atvirokodosprendimai/wgmesh", mode="shadow", database_mode="local"
+    )
     goose_runner = object()
 
     monkeypatch.setenv("RESET_QUEUE", "1")
@@ -39,7 +41,9 @@ def test_async_main_honors_reset_queue_env_before_polling(monkeypatch, capsys) -
     monkeypatch.setattr(main, "open_state_store", lambda config: store)
     monkeypatch.setattr(main, "make_forge", lambda config: object())
     monkeypatch.setattr(main, "build_graph", lambda config: object())
-    monkeypatch.setattr(main, "GooseRunner", lambda config: goose_runner, raising=False)
+    monkeypatch.setattr(
+        main, "build_executor", lambda config: goose_runner, raising=False
+    )
     monkeypatch.setattr(main, "Poller", DummyPoller)
 
     asyncio.run(main.async_main())
