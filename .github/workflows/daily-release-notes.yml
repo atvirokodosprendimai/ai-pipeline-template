@@ -323,7 +323,7 @@ jobs:
               badge = theme.get("badge")
               icon_url = CATEGORY_ICONS.get(theme.get("category", ""))
               if icon_url:
-                  heading_icon = f'<img src="{icon_url}" alt="{emoji}" width="32" height="32" style="vertical-align:middle;border:0;margin-right:8px;border-radius:6px;" />'
+                  heading_icon = f'<img src="{icon_url}" alt="{emoji}" width="48" height="48" style="vertical-align:middle;border:0;margin-right:10px;border-radius:8px;" />'
               else:
                   heading_icon = emoji + " "
               print('            <tr><td style="padding:14px 20px;background:#eef0f6;">')
