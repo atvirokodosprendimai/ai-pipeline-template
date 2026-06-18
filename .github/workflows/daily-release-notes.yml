@@ -141,7 +141,7 @@ jobs:
           jq -n --arg prs "$pr_list" --arg prs_json "$prs_json" '{
             model: "z-ai/glm-5.2",
             messages: [
-              {role: "system", content: "You are formatting a release-notes digest for a small founding team. Input: a list of merged PRs (number, title, author, repo). Output STRICT JSON ONLY, no prose, no code fence, matching exactly:\n{\"subline\":\"<=8 words, e.g. AI Pipeline\",\"themes\":[{\"emoji\":\"<one emoji>\",\"title\":\"<short Title Case theme>\",\"accent\":\"<hex like #16a34a>\",\"badge\":\"<UPGRADED|NEW|null>\",\"bullets\":[{\"text\":\"<plain sentence, no markdown>\",\"prs\":[<pr numbers>]}]}],\"footer\":\"<one upbeat sentence>\"}\nRules: group the PRs into 3-6 themes by what they accomplish (NOT by repo). Lead with customer/product-facing themes; put ALL routine bot work (heal/health-check/supervisor-rank/daily-assessment/audit) into ONE final theme titled Routine Automated Housekeeping with emoji 📋 and a single bullet summarizing it (you may omit its PR numbers or list a few). Pick a distinct accent hex per theme from this palette in order: #7c3aed,#16a34a,#2563eb,#4f46e5,#ea580c,#64748b. badge only for notable upgrades/new features else null. Every non-housekeeping bullet should cite its PR number(s) in prs. Keep titles/bullets short."},
+              {role: "system", content: "You are formatting a release-notes digest for a small founding team. Input: a list of merged PRs (number, title, author, repo). Output STRICT JSON ONLY, no prose, no code fence, matching exactly:\n{\"subline\":\"<=8 words, e.g. AI Pipeline\",\"themes\":[{\"emoji\":\"<one emoji>\",\"title\":\"<short Title Case theme>\",\"category\":\"<growth|digest|evals|model|observability|housekeeping|other>\",\"accent\":\"<hex like #16a34a>\",\"badge\":\"<UPGRADED|NEW|null>\",\"bullets\":[{\"text\":\"<plain sentence, no markdown>\",\"prs\":[<pr numbers>]}]}],\"footer\":\"<one upbeat sentence>\"}\nRules: group the PRs into 3-6 themes by what they accomplish (NOT by repo). Lead with customer/product-facing themes; put ALL routine bot work (heal/health-check/supervisor-rank/daily-assessment/audit) into ONE final theme titled Routine Automated Housekeeping with emoji 📋 and a single bullet summarizing it (you may omit its PR numbers or list a few). Also tag each theme with the single closest category from: growth (customer/landing/marketing/revenue), digest (release-notes/email/reporting), evals (testing/langfuse/judges/quality), model (LLM/executor/routing/model-config), observability (control-loop/telemetry/monitoring/health visibility), housekeeping (routine bot work — heal/supervisor-rank/daily-assessment/audit), other (anything else). The routine housekeeping theme MUST use category housekeeping. Pick a distinct accent hex per theme from this palette in order: #7c3aed,#16a34a,#2563eb,#4f46e5,#ea580c,#64748b. badge only for notable upgrades/new features else null. Every non-housekeeping bullet should cite its PR number(s) in prs. Keep titles/bullets short."},
               {role: "user", content: ("Merged pull requests today:\n\n" + $prs + "\n\nStructured PR JSON:\n" + $prs_json)}
             ]
           }' > /tmp/llm_req.json
@@ -236,6 +236,7 @@ jobs:
             cat <<HTML
           <!doctype html>
           <html><body style="margin:0;padding:0;background:#eef0f6;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;"><tr><td align="center" style="padding:24px 0;"><table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;background:#fff;border-radius:8px;overflow:hidden;">
+            <tr><td><img src="https://assets.buttondown.email/images/056112d0-c65e-4108-bc49-a260cdccb80f.png" alt="wgmesh" width="640" style="display:block;width:100%;max-width:640px;height:auto;border:0;" /></td></tr>
             <tr><td style="background:#0a0e27;padding:28px 24px;">
               <span style="font-size:26px;font-weight:800;color:#fff;">🕸 wgmesh</span>
               <div style="font-size:22px;font-weight:800;color:#fff;margin-top:6px;">What shipped</div>
@@ -265,6 +266,14 @@ jobs:
 
           pr_urls = {str(pr.get("number")): str(pr.get("url") or "") for pr in prs}
           accent_re = re.compile(r"^#[0-9a-fA-F]{6}$")
+          CATEGORY_ICONS = {
+              "growth": "https://assets.buttondown.email/images/e817eef6-da25-44e2-91b4-4f5041321ede.png",
+              "digest": "https://assets.buttondown.email/images/ec20f2b7-9236-4ec5-b2f6-b230259f993a.png",
+              "evals": "https://assets.buttondown.email/images/77637d74-4c2c-4783-83b7-ad75061b6d20.png",
+              "model": "https://assets.buttondown.email/images/341919a1-b58a-42ef-a22e-9059d8f0508c.png",
+              "observability": "https://assets.buttondown.email/images/1b7e7d17-7ee1-4291-86ad-5552f14c51c4.png",
+              "housekeeping": "https://assets.buttondown.email/images/86fc25ff-a646-44d6-af8d-c0da607fd2b5.png",
+          }
 
           def esc(value):
               return html.escape(str(value or ""), quote=True)
@@ -278,10 +287,15 @@ jobs:
               emoji = esc(theme.get("emoji") or "")
               title = esc(theme.get("title") or "Updates")
               badge = theme.get("badge")
+              icon_url = CATEGORY_ICONS.get(theme.get("category", ""))
+              if icon_url:
+                  heading_icon = f'<img src="{icon_url}" alt="{emoji}" width="32" height="32" style="vertical-align:middle;border:0;margin-right:8px;border-radius:6px;" />'
+              else:
+                  heading_icon = emoji + " "
               print('            <tr><td style="padding:14px 20px;background:#eef0f6;">')
               print('              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border-collapse:collapse;"><tr>')
               print(f'                <td style="border-left:4px solid {accent};padding:16px 20px;">')
-              heading = f'{emoji} <span style="font-weight:700;font-size:16px;color:#111;">{title}</span>'
+              heading = f'{heading_icon}<span style="font-weight:700;font-size:16px;color:#111;vertical-align:middle;">{title}</span>'
               if badge is not None:
                   heading += f' <span style="background:{accent};color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:8px;">{esc(badge)}</span>'
               print(f'                  <div style="margin:0 0 10px 0;">{heading}</div>')
