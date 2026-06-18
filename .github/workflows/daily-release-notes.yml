@@ -35,7 +35,7 @@ jobs:
   release-notes:
     runs-on: ubuntu-latest
     env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_TOKEN: ${{ secrets.WGMESH_BOT_PAT || secrets.GITHUB_TOKEN }}
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
       UNSEND_API_KEY: ${{ secrets.UNSEND_API_KEY }}
       UNSEND_URL: ${{ secrets.UNSEND_URL || 'https://unsend.admin.lt' }}
@@ -43,24 +43,89 @@ jobs:
       RELEASE_NOTES_TO: ${{ secrets.RELEASE_NOTES_TO }}
       SINCE_HOURS: ${{ github.event.inputs.since_hours || '24' }}
       DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+      DIGEST_REPOS: ${{ secrets.DIGEST_REPOS }}
+      DIGEST_EXCLUDE: ${{ vars.DIGEST_EXCLUDE || '.github,homebrew-tap' }}
+      ORG: ${{ github.repository_owner }}
     steps:
       - name: Collect merged PRs in the window
         run: |
-          set -euo pipefail
+          set -uo pipefail
           since=$(date -u -d "${SINCE_HOURS} hours ago" '+%Y-%m-%dT%H:%M:%SZ')
           echo "window since: $since"
-          # Merged PRs since the cutoff, newest first, as compact JSON lines.
-          gh pr list --repo "$GITHUB_REPOSITORY" --state merged \
-            --search "merged:>=${since}" --limit 100 \
-            --json number,title,author,mergedAt,url,labels \
-            --jq 'sort_by(.mergedAt) | reverse
-                  | map({number, title, author: .author.login,
-                         labels: [.labels[].name], url})' > /tmp/prs.json
+
+          if [ -n "${DIGEST_REPOS:-}" ]; then
+            printf '%s' "$DIGEST_REPOS" | tr ',' '\n' | while IFS= read -r raw || [ -n "$raw" ]; do
+              name=$(printf '%s' "$raw" | xargs)
+              [ -z "$name" ] && continue
+              case "$name" in
+                */*) printf '%s\n' "$name" ;;
+                *) printf '%s/%s\n' "$ORG" "$name" ;;
+              esac
+            done > /tmp/repo_list_raw.txt
+          else
+            if ! gh repo list "$ORG" --source --no-archived --limit 200 --json name --jq '.[].name' > /tmp/repo_names.txt; then
+              echo "::error::repo enumeration failed for $ORG"
+              exit 1
+            fi
+            awk -v org="$ORG" 'NF {print org "/" $0}' /tmp/repo_names.txt > /tmp/repo_list_raw.txt
+          fi
+
+          printf '%s' "${DIGEST_EXCLUDE:-}" | tr ',' '\n' | while IFS= read -r raw || [ -n "$raw" ]; do
+            name=$(printf '%s' "$raw" | xargs)
+            [ -n "$name" ] && printf '%s\n' "${name##*/}"
+          done > /tmp/repo_exclude.txt
+
+          while IFS= read -r repo; do
+            [ -z "$repo" ] && continue
+            bare="${repo##*/}"
+            if grep -Fxq "$bare" /tmp/repo_exclude.txt; then
+              continue
+            fi
+            printf '%s\n' "$repo"
+          done < /tmp/repo_list_raw.txt > /tmp/repo_list.txt
+
+          : > /tmp/pr_arrays.jsonl
+          while IFS= read -r repo; do
+            [ -z "$repo" ] && continue
+            echo "collecting merged PRs for $repo"
+            safe=$(printf '%s' "$repo" | tr '/:' '__')
+            repo_prs="/tmp/prs_${safe}.json"
+            if ! gh pr list --repo "$repo" --state merged \
+              --search "merged:>=${since}" --limit 100 \
+              --json number,title,author,mergedAt,url,labels \
+              --jq 'map({number, title, author: .author.login, mergedAt,
+                         labels: [.labels[].name], url, repo: "'"$repo"'"})' > "$repo_prs"; then
+              echo "::warning::pr list failed for $repo"
+              continue
+            fi
+            cat "$repo_prs" >> /tmp/pr_arrays.jsonl
+            printf '\n' >> /tmp/pr_arrays.jsonl
+          done < /tmp/repo_list.txt
+
+          if [ -s /tmp/pr_arrays.jsonl ]; then
+            jq -s 'add | sort_by(.mergedAt) | reverse' /tmp/pr_arrays.jsonl > /tmp/prs.json
+          else
+            echo '[]' > /tmp/prs.json
+          fi
+
           count=$(jq 'length' /tmp/prs.json)
           echo "merged PRs in window: $count"
           echo "PR_COUNT=$count" >> "$GITHUB_ENV"
-          # Compact human list for the prompt + the email tail.
-          jq -r '.[] | "- #\(.number) \(.title) (@\(.author)) \(.url)"' \
+
+          repo_count=$(jq -r '[.[].repo] | unique | length' /tmp/prs.json)
+          echo "repos with merged PRs in window: $repo_count"
+          echo "REPO_COUNT=$repo_count" >> "$GITHUB_ENV"
+
+          jq -r '
+            . as $prs
+            | (reduce $prs[] as $pr ([]; if index($pr.repo) then . else . + [$pr.repo] end)) as $repos
+            | (reduce $prs[] as $pr ({}; .[$pr.repo] = ((.[$pr.repo] // []) + [$pr]))) as $groups
+            | $repos[]
+            | . as $repo
+            | "### \($repo | split("/")[-1])",
+              ($groups[$repo][] | "- #\(.number) \(.title) (@\(.author)) \(.url)"),
+              ""
+          ' \
             /tmp/prs.json > /tmp/pr_list.txt
           cat /tmp/pr_list.txt || true
 
@@ -74,7 +139,7 @@ jobs:
           jq -n --arg prs "$pr_list" '{
             model: "z-ai/glm-5.2",
             messages: [
-              {role: "system", content: "You write a short daily release-notes email for a small founding team. Plain English. Explain WHAT shipped and WHY it matters, grouping related PRs into themes, most impactful first. 4-10 sentences or tight bullets. No preamble, no signature."},
+              {role: "system", content: "You write a short daily release-notes email for a small founding team that ships across multiple repositories. Plain English. Group by repository. Lead with customer- and product-facing repos (e.g. wgmesh, chimney, cloudroof-eu, webmail) and keep pipeline/template/CI plumbing brief and last. For each group explain WHAT shipped and WHY it matters, most impactful first. If a repo shipped only internal/CI/housekeeping work, say so in one line rather than dressing it up. 6-14 sentences or tight bullets. No preamble, no signature."},
               {role: "user", content: ("Merged pull requests today:\n\n" + $prs)}
             ]
           }' > /tmp/llm_req.json
@@ -102,7 +167,7 @@ jobs:
             body=$(printf '%s\n\n— Merged PRs —\n%s\n' \
               "$(cat /tmp/summary.txt)" "$(cat /tmp/pr_list.txt)")
           fi
-          subject="wgmesh pipeline — what shipped ${today} (${PR_COUNT} PRs)"
+          subject="${ORG} — what shipped ${today} (${PR_COUNT} PRs · ${REPO_COUNT} repos)"
           printf '%s\n' "$body" > /tmp/email_body.txt
           echo "===== SUBJECT ====="; echo "$subject"
           echo "===== BODY ====="; cat /tmp/email_body.txt
