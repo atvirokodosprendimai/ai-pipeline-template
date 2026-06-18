@@ -254,6 +254,25 @@ def _existing_names(path: str, key: str = "data") -> set[str]:
     return {str(i.get("name")) for i in items if isinstance(i, dict) and i.get("name")}
 
 
+def _existing_rule_ids() -> dict[str, str]:
+    status, payload = _request("GET", f"{_UNSTABLE}/evaluation-rules")
+    if status != 200 or not isinstance(payload, dict):
+        return {}
+    items = (
+        payload.get("data")
+        or payload.get("evaluators")
+        or payload.get("evaluationRules")
+        or []
+    )
+    if not isinstance(items, list):
+        return {}
+    return {
+        str(item["name"]): str(item["id"])
+        for item in items
+        if isinstance(item, dict) and item.get("name") and item.get("id")
+    }
+
+
 def apply(dry_run: bool) -> int:
     if dry_run:
         for ev in EVALUATORS:
@@ -279,6 +298,7 @@ def apply(dry_run: bool) -> int:
     # Phase 2: rules. Build the evaluator reference object {name, scope, type}
     # — scope comes from the create response (custom evaluators are "project").
     rule_fail = 0
+    existing_rule_ids = _existing_rule_ids()
     for rule in RULES:
         ev_name = str(rule["evaluatorName"])
         body = {
@@ -294,9 +314,19 @@ def apply(dry_run: bool) -> int:
             "filter": rule["filter"],
             "mapping": rule["mapping"],
         }
-        status, payload = _request("POST", f"{_UNSTABLE}/evaluation-rules", body)
-        ok = status in (200, 201)
-        print(f"rule {rule['name']}: {status} {'OK' if ok else payload}")
+        rule_id = existing_rule_ids.get(str(rule["name"]))
+        if rule_id:
+            status, payload = _request(
+                "PATCH", f"{_UNSTABLE}/evaluation-rules/{rule_id}", body
+            )
+        else:
+            status, payload = _request("POST", f"{_UNSTABLE}/evaluation-rules", body)
+        exists_ok = status == 409 and (
+            "name_conflict" in str(payload) or "already exists" in str(payload)
+        )
+        ok = status in (200, 201) or exists_ok
+        result = "exists (idempotent ok)" if exists_ok else ("OK" if ok else payload)
+        print(f"rule {rule['name']}: {status} {result}")
         rule_fail += 0 if ok else 1
 
     print(
