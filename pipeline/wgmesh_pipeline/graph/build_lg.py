@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import inspect
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from wgmesh_pipeline.config import Config
@@ -13,7 +13,11 @@ from wgmesh_pipeline.graph.nodes.spec_pr import spec_pr_node
 from wgmesh_pipeline.graph.nodes.triage import triage_node
 from wgmesh_pipeline.graph.state import GraphState
 from wgmesh_pipeline.models import ladder_length_for
-from wgmesh_pipeline.tracing import trace_node
+from wgmesh_pipeline.tracing import (
+    _session_id_ctx,
+    build_callback_handler,
+    trace_node,
+)
 
 
 @dataclass
@@ -26,19 +30,37 @@ class StateGraphWrapper:
     implement: Callable[[GraphState], GraphState]
     review: Callable[[GraphState], GraphState]
     gate: Callable[..., GraphState]
+    raw_gate: Callable[..., GraphState]
+    _callback_handler: object | None = field(default=None, init=False, repr=False)
+    _callback_handler_initialized: bool = field(default=False, init=False, repr=False)
 
     def invoke(self, state: GraphState) -> GraphState:
-        return self.compiled.invoke(state)
+        issue = state.get("issue")
+        issue_number = getattr(issue, "number", None)
+        session_id = f"issue-{issue_number}" if issue_number is not None else None
+        handler = self._callback_handler_for_invoke()
+        cfg = {"callbacks": [handler]} if handler is not None else None
+        with _session_id_ctx(session_id):
+            return self.compiled.invoke(state, config=cfg)
+
+    def _callback_handler_for_invoke(self) -> object | None:
+        if not self._callback_handler_initialized:
+            self._callback_handler_initialized = True
+            try:
+                self._callback_handler = build_callback_handler(self.config)
+            except Exception:
+                self._callback_handler = None
+        return self._callback_handler
 
     def evaluate_gate(self, state: GraphState) -> GraphState:
-        parameters = inspect.signature(self.gate).parameters
+        parameters = inspect.signature(self.raw_gate).parameters
         if "apply_side_effects" in parameters:
-            return self.gate(
+            return self.raw_gate(
                 state,
                 max_files=self.config.max_files,
                 apply_side_effects=False,
             )
-        return self.gate(state, max_files=self.config.max_files)
+        return self.raw_gate(state, max_files=self.config.max_files)
 
     def ladder_prep(self, state: GraphState) -> GraphState:
         current = dict(state)
@@ -106,6 +128,7 @@ def build_state_graph(config: Config) -> StateGraphWrapper:
     spec_pr = trace_node("spec_pr", spec_pr_node)
     implement = trace_node("implement", implement_node)
     review = trace_node("review", review_node)
+    gate = trace_node("gate", gate_node)
 
     wrapper = StateGraphWrapper(
         config=config,
@@ -115,17 +138,18 @@ def build_state_graph(config: Config) -> StateGraphWrapper:
         spec_pr=spec_pr,
         implement=implement,
         review=review,
-        gate=gate_node,
+        gate=gate,
+        raw_gate=gate_node,
     )
 
     graph = StateGraph(GraphState)
-    graph.add_node("triage", wrapper.triage)
+    graph.add_node("triage", triage_node)
     graph.add_node("escalate", wrapper.escalate)
-    graph.add_node("spec", wrapper.spec)
-    graph.add_node("spec_pr", wrapper.spec_pr)
+    graph.add_node("spec", spec_node)
+    graph.add_node("spec_pr", spec_pr_node)
     graph.add_node("ladder_prep", wrapper.ladder_prep)
-    graph.add_node("implement", wrapper.implement)
-    graph.add_node("review", wrapper.review)
+    graph.add_node("implement", implement_node)
+    graph.add_node("review", review_node)
     graph.add_node("gate", wrapper.evaluate_gate)
     graph.add_node("ladder_retry", wrapper.ladder_retry)
     graph.add_node("side_effects", wrapper.side_effects)

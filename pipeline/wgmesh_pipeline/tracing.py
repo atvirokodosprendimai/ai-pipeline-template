@@ -3,15 +3,16 @@ from __future__ import annotations
 import logging
 import sys
 import time
-from contextlib import AbstractContextManager, nullcontext
+from contextlib import nullcontext
 from dataclasses import dataclass
-from typing import Any, Callable, Protocol, TypeVar
+from typing import Any, Callable, ParamSpec, Protocol, TypeVar
 
 from wgmesh_pipeline.config import Config
 
 log = logging.getLogger("wgmesh_pipeline.tracing")
 
-T = TypeVar("T")
+P = ParamSpec("P")
+R = TypeVar("R")
 
 
 def _session_ctx(issue: str | None):
@@ -44,18 +45,28 @@ def _session_id_ctx(session_id: str | None):
 
 
 class Span(Protocol):
-    def end(self, *, outputs: Any = None, error: BaseException | None = None, latency_seconds: float = 0.0) -> None:
-        ...
+    def end(
+        self,
+        *,
+        outputs: Any = None,
+        error: BaseException | None = None,
+        latency_seconds: float = 0.0,
+    ) -> None: ...
 
 
 class Tracer(Protocol):
-    def start_span(self, *, name: str, inputs: Any, tags: dict[str, str]) -> Span:
-        ...
+    def start_span(self, *, name: str, inputs: Any, tags: dict[str, str]) -> Span: ...
 
 
 @dataclass
 class NoopSpan:
-    def end(self, *, outputs: Any = None, error: BaseException | None = None, latency_seconds: float = 0.0) -> None:
+    def end(
+        self,
+        *,
+        outputs: Any = None,
+        error: BaseException | None = None,
+        latency_seconds: float = 0.0,
+    ) -> None:
         return None
 
 
@@ -94,7 +105,9 @@ class _LangfuseSpan:
             # issue's session context so all its stage spans group together.
             with _session_ctx(tags.get("issue")):
                 if hasattr(lf, "start_observation"):
-                    self._span = lf.start_observation(name=name, as_type="span", input=inputs, metadata=tags)
+                    self._span = lf.start_observation(
+                        name=name, as_type="span", input=inputs, metadata=tags
+                    )
                 else:
                     self._span = lf.start_span(name=name, input=inputs, metadata=tags)
         except Exception as exc:  # never raise into the loop
@@ -105,9 +118,18 @@ class _LangfuseSpan:
     def _announce(cls, exc: BaseException) -> None:
         if not cls._warned:
             cls._warned = True
-            print(f"[tracing] langfuse span creation failed, tracing degraded: {exc!r}", file=sys.stderr)
+            print(
+                f"[tracing] langfuse span creation failed, tracing degraded: {exc!r}",
+                file=sys.stderr,
+            )
 
-    def end(self, *, outputs: Any = None, error: BaseException | None = None, latency_seconds: float = 0.0) -> None:
+    def end(
+        self,
+        *,
+        outputs: Any = None,
+        error: BaseException | None = None,
+        latency_seconds: float = 0.0,
+    ) -> None:
         try:
             if self._span is not None:
                 if error is not None:
@@ -136,6 +158,23 @@ class LangfuseTracer:
 
 _tracer: Tracer = NoopTracer()
 _generation_warned = False
+_callback_handler_warned = False
+
+
+def build_callback_handler(config: Config) -> object | None:
+    if not (
+        config.langfuse_host
+        and config.langfuse_public_key
+        and config.langfuse_secret_key
+    ):
+        return None
+    try:
+        from langfuse.langchain import CallbackHandler
+
+        return CallbackHandler()
+    except Exception as exc:
+        _announce_cb_handler_error(exc)
+        return None
 
 
 def init_tracing(config: Config, *, tracer: Tracer | None = None) -> Tracer:
@@ -145,7 +184,11 @@ def init_tracing(config: Config, *, tracer: Tracer | None = None) -> Tracer:
     global _tracer
     if tracer is not None:
         _tracer = tracer
-    elif config.langfuse_host and config.langfuse_public_key and config.langfuse_secret_key:
+    elif (
+        config.langfuse_host
+        and config.langfuse_public_key
+        and config.langfuse_secret_key
+    ):
         try:
             _tracer = LangfuseTracer(config)
         except Exception:
@@ -159,31 +202,38 @@ def init_tracing(config: Config, *, tracer: Tracer | None = None) -> Tracer:
     else:
         log.info(
             "tracing: Langfuse env incomplete (host=%s public_key=%s secret_key=%s) — NoopTracer",
-            bool(config.langfuse_host), bool(config.langfuse_public_key), bool(config.langfuse_secret_key),
+            bool(config.langfuse_host),
+            bool(config.langfuse_public_key),
+            bool(config.langfuse_secret_key),
         )
         _tracer = NoopTracer()
     log.info("tracing: active tracer=%s", type(_tracer).__name__)
     return _tracer
 
 
-def trace_node(name: str, fn: Callable[[T], T]) -> Callable[[T], T]:
-    def wrapped(state: T) -> T:
+def trace_node(name: str, fn: Callable[P, R]) -> Callable[P, R]:
+    def wrapped(*args: P.args, **kwargs: P.kwargs) -> R:
+        state = args[0] if args else kwargs.get("state")
         tags = _tags_for_state(state, name)
         span = _tracer.start_span(name=name, inputs=_safe_state(state), tags=tags)
         started = time.monotonic()
         try:
-            result = fn(state)
+            result = fn(*args, **kwargs)
         except BaseException as exc:
             span.end(error=exc, latency_seconds=time.monotonic() - started)
             raise
-        span.end(outputs=_safe_state(result), latency_seconds=time.monotonic() - started)
+        span.end(
+            outputs=_safe_state(result), latency_seconds=time.monotonic() - started
+        )
         return result
 
     wrapped.__name__ = getattr(fn, "__name__", name)
     return wrapped
 
 
-def emit_generation(*, session_id: str | None, stage: str | None, model: str, usage) -> None:
+def emit_generation(
+    *, session_id: str | None, stage: str | None, model: str, usage
+) -> None:
     if not isinstance(_tracer, LangfuseTracer):
         return
     try:
@@ -193,7 +243,10 @@ def emit_generation(*, session_id: str | None, stage: str | None, model: str, us
                 name=f"{stage or 'goose'}-llm",
                 as_type="generation",
                 model=model,
-                usage_details={"input": usage.input_tokens, "output": usage.output_tokens},
+                usage_details={
+                    "input": usage.input_tokens,
+                    "output": usage.output_tokens,
+                },
             )
             observation.end()
         lf.flush()
@@ -212,7 +265,20 @@ def _announce_generation(exc: BaseException) -> None:
     global _generation_warned
     if not _generation_warned:
         _generation_warned = True
-        print(f"[tracing] langfuse generation creation failed, tracing degraded: {exc!r}", file=sys.stderr)
+        print(
+            f"[tracing] langfuse generation creation failed, tracing degraded: {exc!r}",
+            file=sys.stderr,
+        )
+
+
+def _announce_cb_handler_error(exc: BaseException) -> None:
+    global _callback_handler_warned
+    if not _callback_handler_warned:
+        _callback_handler_warned = True
+        print(
+            f"[tracing] langfuse CallbackHandler init failed, tracing degraded: {exc!r}",
+            file=sys.stderr,
+        )
 
 
 def _tags_for_state(state: Any, stage: str) -> dict[str, str]:
