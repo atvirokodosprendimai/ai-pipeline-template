@@ -45,6 +45,10 @@ jobs:
       DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
       DIGEST_REPOS: ${{ secrets.DIGEST_REPOS }}
       DIGEST_EXCLUDE: ${{ vars.DIGEST_EXCLUDE || '.github,homebrew-tap' }}
+      OPENPANEL_CLIENT_ID: ${{ secrets.OPENPANEL_CLIENT_ID }}
+      OPENPANEL_CLIENT_SECRET: ${{ secrets.OPENPANEL_CLIENT_SECRET }}
+      OPENPANEL_BASE: ${{ vars.OPENPANEL_BASE || 'https://counter.hackrsvalv.com/api' }}
+      FUNNEL_DOMAIN: ${{ vars.FUNNEL_DOMAIN || 'polar.sh' }}
       FUNNEL_STAT_TEXT: ${{ vars.FUNNEL_STAT_TEXT }}
       ORG: ${{ github.repository_owner }}
     steps:
@@ -179,6 +183,36 @@ jobs:
             fi
           fi
           cat /tmp/summary.txt
+
+      - name: Funnel stat (OpenPanel, best-effort)
+        run: |
+          set -uo pipefail
+          if [[ -z "${OPENPANEL_CLIENT_ID:-}" || -z "${OPENPANEL_CLIENT_SECRET:-}" ]]; then
+            echo "::notice::OPENPANEL_CLIENT_ID or OPENPANEL_CLIENT_SECRET not set — keeping static FUNNEL_STAT_TEXT"
+            exit 0
+          fi
+          start=$(date -u -d "${SINCE_HOURS} hours ago" '+%Y-%m-%dT%H:%M:%S.000Z')
+          end=$(date -u '+%Y-%m-%dT%H:%M:%S.000Z')
+          url="${OPENPANEL_BASE%/}/export/events?event=link_out&includes=properties&start=${start}&end=${end}&limit=1000"
+          http=$(curl -s -m 25 -o /tmp/funnel.json -w '%{http_code}' \
+            -H "openpanel-client-id: ${OPENPANEL_CLIENT_ID}" \
+            -H "openpanel-client-secret: ${OPENPANEL_CLIENT_SECRET}" \
+            -H "User-Agent: Mozilla/5.0" \
+            "$url")
+          if [[ "$http" != "200" ]]; then
+            echo "::warning::OpenPanel fetch HTTP $http — keeping static funnel text"
+            exit 0
+          fi
+          export FUNNEL_DOMAIN
+          polar=$(jq -r --arg d "$FUNNEL_DOMAIN" '[.data[] | select((.properties.href // "") | test($d))] | length' /tmp/funnel.json 2>/dev/null || echo "")
+          total=$(jq -r '.data | length' /tmp/funnel.json 2>/dev/null || echo "")
+          if [[ -z "$polar" || ! "$polar" =~ ^[0-9]+$ ]]; then
+            echo "::warning::Could not parse polar click count from OpenPanel response — keeping static funnel text"
+            exit 0
+          fi
+          stat="Polar CTA · ${polar} click(s) · ${total} outbound links · last ${SINCE_HOURS}h"
+          echo "FUNNEL_STAT_TEXT=${stat}" >> "$GITHUB_ENV"
+          echo "funnel: $stat"
 
       - name: Assemble + send email
         run: |
