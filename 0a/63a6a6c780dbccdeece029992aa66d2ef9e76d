@@ -1,0 +1,21 @@
+docs/brainstorms/2026-06-19-wgmesh-social-drip-requirements.md
+  s_0f2179e2b25e06::t_e5cb50e2d8b9de 1-69
+docs/plans/2026-06-19-001-feat-wgmesh-social-drip-plan.md
+  s_0f2179e2b25e06::t_9b94516053438d 1-157
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "0a63a6a6c780dbccdeece029992aa66d2ef9e76d",
+  "prompts": {},
+  "sessions": {
+    "s_0f2179e2b25e06": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "43cf9b01-b5a0-403c-83b7-786c601ba571",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
