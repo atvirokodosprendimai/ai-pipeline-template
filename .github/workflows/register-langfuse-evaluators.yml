@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "probe | dry-run | apply"
+        description: "probe | dry-run | apply | verify"
         default: "probe"
 
 permissions:
@@ -41,5 +41,6 @@ jobs:
             probe)   python pipeline/evals/setup_langfuse_evaluators.py --probe ;;
             dry-run) python pipeline/evals/setup_langfuse_evaluators.py --dry-run ;;
             apply)   python pipeline/evals/setup_langfuse_evaluators.py ;;
-            *) echo "::error::mode must be probe|dry-run|apply"; exit 2 ;;
+            verify)  python pipeline/evals/setup_langfuse_evaluators.py --verify ;;
+            *) echo "::error::mode must be probe|dry-run|apply|verify"; exit 2 ;;
           esac
