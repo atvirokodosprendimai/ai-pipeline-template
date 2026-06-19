@@ -1,0 +1,19 @@
+.github/workflows/wgmesh-social-drip.yml
+  s_0f2179e2b25e06::t_74413c4fa63bc6 177
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "3c16d5b4e1fb9db52991bfd332952ab13f83de3e",
+  "prompts": {},
+  "sessions": {
+    "s_0f2179e2b25e06": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "43cf9b01-b5a0-403c-83b7-786c601ba571",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
