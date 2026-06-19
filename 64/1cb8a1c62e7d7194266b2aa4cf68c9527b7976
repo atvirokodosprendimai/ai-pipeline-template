@@ -1,0 +1,21 @@
+pipeline/evals/eval_gate.py
+  s_9026ad746b0255::t_282eeade858fa9 27-29,74-81
+pipeline/wgmesh_pipeline/graph/nodes/gate.py
+  s_9026ad746b0255::t_282eeade858fa9 61-63,133-135,138-140
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "641cb8a1c62e7d7194266b2aa4cf68c9527b7976",
+  "prompts": {},
+  "sessions": {
+    "s_9026ad746b0255": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019edf4c-2f18-7023-a36d-2f0ff620987d",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
