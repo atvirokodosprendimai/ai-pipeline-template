@@ -1,0 +1,21 @@
+CONCEPTS.md
+  s_0f2179e2b25e06::t_d9d6f4590dd899 76-80
+docs/solutions/design-decisions/llm-bounded-content-no-truncation.md
+  s_0f2179e2b25e06::t_3c8a48d967d722 1-60
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "46958f1e43ea7b1bb23b5c22d4f09d9ec717560e",
+  "prompts": {},
+  "sessions": {
+    "s_0f2179e2b25e06": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "43cf9b01-b5a0-403c-83b7-786c601ba571",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
