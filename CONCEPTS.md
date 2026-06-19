@@ -89,6 +89,13 @@ The share of seeded Specs that reach merge and deploy with zero human interventi
 ### MSC
 The count of paying subscribers across seeded products — the project's lagging revenue north-star, tracked on the dashboard and excluding subscriptions from unrelated products.
 
+### No component paywall
+The product value that no shipped product component may gate functionality on payment, license key, account state, trial/time limit, or remote authorization. Every component ships AGPL and full-functionality; a self-hoster gets 100% of the software, offline, forever. Monetization attaches only to the **managed-service layer**, never to withholding capability — "open product, paid hosting," not open-core.
+*Avoid:* no-paywall (state the full principle; it binds every seeded product, not one feature).
+
+### Component vs managed-service layer
+The boundary that monetization attaches to. A **component** is anything shipped to or run on a user's machine, or constituting the product's core capability (e.g. the wgmesh daemon, CLI, dashboard, libraries) — never paywalled. The **managed-service layer** is the infrastructure the company operates on the user's behalf (cloudroof.eu: hosting, ingress, support, SLA) — the only paid surface. A trial ending stops the operated service; it never disables software the user runs themselves.
+
 ### Hollow-green
 A passing test suite that proves nothing about the real behavior, because the asserted path is satisfied by a stub, fake, or mock rather than the production code — so a green run coexists with a live failure. The recurring shape in this project: a safety guard or agent-output path is mocked to always cooperate, so the actual failure mode never executes until production.
 *Avoid:* false green.
