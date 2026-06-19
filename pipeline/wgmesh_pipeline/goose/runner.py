@@ -315,7 +315,9 @@ class GooseRunner:
         except subprocess.TimeoutExpired as exc:
             duration = time.monotonic() - started
             usage = _collect_usage_safely(logs_dir, usage_snapshot)
-            _emit_usage_safely(session_id=session_id, stage=stage, model=resolved_model, usage=usage)
+            _emit_usage_safely(
+                session_id=session_id, stage=stage, model=resolved_model, usage=usage
+            )
             return GooseResult(
                 ok=False,
                 output_path=None,
@@ -327,10 +329,15 @@ class GooseRunner:
             )
         duration = time.monotonic() - started
         usage = _collect_usage_safely(logs_dir, usage_snapshot)
-        _emit_usage_safely(session_id=session_id, stage=stage, model=resolved_model, usage=usage)
         raw_log = _join_log(completed.stdout, completed.stderr)
 
         if completed.returncode != 0:
+            _emit_usage_safely(
+                session_id=session_id,
+                stage=stage,
+                model=resolved_model,
+                usage=usage,
+            )
             return GooseResult(
                 ok=False,
                 output_path=None,
@@ -355,6 +362,12 @@ class GooseRunner:
                     output_path.parent.mkdir(parents=True, exist_ok=True)
                     output_path.write_text(salvaged, encoding="utf-8")
                 except OSError as exc:
+                    _emit_usage_safely(
+                        session_id=session_id,
+                        stage=stage,
+                        model=resolved_model,
+                        usage=usage,
+                    )
                     return GooseResult(
                         ok=False,
                         output_path=output_path,
@@ -366,6 +379,12 @@ class GooseRunner:
                     )
 
         if not output_path.exists() or output_path.stat().st_size == 0:
+            _emit_usage_safely(
+                session_id=session_id,
+                stage=stage,
+                model=resolved_model,
+                usage=usage,
+            )
             return GooseResult(
                 ok=False,
                 output_path=output_path,
@@ -376,6 +395,14 @@ class GooseRunner:
                 usage=usage,
             )
 
+        deliverable = _read_deliverable_safely(output_path)
+        _emit_usage_safely(
+            session_id=session_id,
+            stage=stage,
+            model=resolved_model,
+            usage=usage,
+            output=deliverable,
+        )
         return GooseResult(
             ok=True,
             output_path=output_path,
@@ -442,6 +469,13 @@ def _decode_timeout_output(value: str | bytes | None) -> str | None:
     return value
 
 
+def _read_deliverable_safely(output_path: Path, limit: int = 8000) -> str | None:
+    try:
+        return output_path.read_text(encoding="utf-8")[:limit]
+    except OSError:
+        return None
+
+
 def _resolved_model(config: Config, profile: ModelProfile | None) -> str:
     if profile is not None:
         return profile.model
@@ -464,10 +498,13 @@ def _emit_usage_safely(
     stage: str | None,
     model: str,
     usage: UsageTotals | None,
+    output: str | None = None,
 ) -> None:
     if usage is None or usage.total_tokens <= 0:
         return
-    tracing.emit_generation(session_id=session_id, stage=stage, model=model, usage=usage)
+    tracing.emit_generation(
+        session_id=session_id, stage=stage, model=model, usage=usage, output=output
+    )
 
 
 def _warn_usage_once(phase: str, exc: BaseException) -> None:

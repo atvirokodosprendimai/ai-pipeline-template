@@ -162,6 +162,7 @@ def test_emit_generation_called_with_stage_model_and_usage(
             "stage": "implement",
             "model": cfg().goose_model,
             "usage": result.usage,
+            "output": "finished",
         }
     ]
 

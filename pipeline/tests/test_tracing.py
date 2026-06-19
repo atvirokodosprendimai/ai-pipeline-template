@@ -6,7 +6,13 @@ from wgmesh_pipeline.config import Config
 from wgmesh_pipeline.github.client import GitHubIssue
 from wgmesh_pipeline.goose.usage import UsageTotals
 from wgmesh_pipeline import tracing
-from wgmesh_pipeline.tracing import _LangfuseSpan, LangfuseTracer, NoopTracer, init_tracing, trace_node
+from wgmesh_pipeline.tracing import (
+    _LangfuseSpan,
+    LangfuseTracer,
+    NoopTracer,
+    init_tracing,
+    trace_node,
+)
 
 
 class _FakeSdkSpan:
@@ -30,7 +36,9 @@ class _FakeLangfuseV4:
         self.flushed = False
 
     def start_observation(self, *, name, as_type, input, metadata):
-        self.record.update({"name": name, "as_type": as_type, "input": input, "metadata": metadata})
+        self.record.update(
+            {"name": name, "as_type": as_type, "input": input, "metadata": metadata}
+        )
         return _FakeSdkSpan(self.record)
 
     def flush(self):
@@ -109,13 +117,18 @@ class FakeTracer:
 
 def test_key_set_with_mocked_tracer_emits_span_with_tags() -> None:
     tracer = FakeTracer()
-    init_tracing(Config(target_repo="atvirokodosprendimai/wgmesh", langsmith_api_key="key"), tracer=tracer)
+    init_tracing(
+        Config(target_repo="atvirokodosprendimai/wgmesh", langsmith_api_key="key"),
+        tracer=tracer,
+    )
 
     def node(state):
         return {**state, "classification": "fix"}
 
     wrapped = trace_node("triage", node)
-    result = wrapped({"issue": GitHubIssue(number=12, title="Fix", labels=(), state="open")})
+    result = wrapped(
+        {"issue": GitHubIssue(number=12, title="Fix", labels=(), state="open")}
+    )
 
     assert result["classification"] == "fix"
     assert tracer.records[0]["name"] == "triage"
@@ -129,10 +142,11 @@ def test_key_unset_noop_still_runs_node_normally() -> None:
     def node(state):
         return {**state, "classification": "feature"}
 
-    result = trace_node("triage", node)({"issue": GitHubIssue(number=13, title="Feature", labels=(), state="open")})
+    result = trace_node("triage", node)(
+        {"issue": GitHubIssue(number=13, title="Feature", labels=(), state="open")}
+    )
 
     assert result["classification"] == "feature"
-
 
 
 def test_langfuse_span_groups_into_issue_session(monkeypatch) -> None:
@@ -141,6 +155,7 @@ def test_langfuse_span_groups_into_issue_session(monkeypatch) -> None:
     session (the issue's pipeline lifecycle)."""
     import contextlib
     import pytest
+
     lf_mod = pytest.importorskip("langfuse")
 
     calls = {}
@@ -152,13 +167,16 @@ def test_langfuse_span_groups_into_issue_session(monkeypatch) -> None:
 
     monkeypatch.setattr(lf_mod, "propagate_attributes", fake_propagate, raising=False)
 
-    _LangfuseSpan(_FakeLangfuseV4(), "triage", {"x": 1}, {"stage": "triage", "issue": "584"})
+    _LangfuseSpan(
+        _FakeLangfuseV4(), "triage", {"x": 1}, {"stage": "triage", "issue": "584"}
+    )
     assert calls.get("session_id") == "issue-584"
 
 
 def test_langfuse_span_no_issue_uses_no_session(monkeypatch) -> None:
     import contextlib
     import pytest
+
     lf_mod = pytest.importorskip("langfuse")
 
     calls = {"used": False}
@@ -179,7 +197,10 @@ def test_safe_state_strips_config_secrets_from_trace(monkeypatch) -> None:
     """config carries zai_api_key/wgmesh_bot_pat in plaintext — it must never be
     serialized into a Langfuse trace input/output (bug #13 secret leak)."""
     tracer = FakeTracer()
-    init_tracing(Config(target_repo="atvirokodosprendimai/wgmesh", langsmith_api_key="key"), tracer=tracer)
+    init_tracing(
+        Config(target_repo="atvirokodosprendimai/wgmesh", langsmith_api_key="key"),
+        tracer=tracer,
+    )
 
     class _Cfg:
         zai_api_key = "secret-zai-key"
@@ -211,13 +232,17 @@ def test_emit_generation_noop_tracer_is_silent_noop(caplog) -> None:
             session_id="issue-21",
             stage="spec",
             model="GLM-4.7",
-            usage=UsageTotals(input_tokens=1, output_tokens=2, total_tokens=3, requests=1, skipped=0),
+            usage=UsageTotals(
+                input_tokens=1, output_tokens=2, total_tokens=3, requests=1, skipped=0
+            ),
         )
 
     assert "generation emitted" not in caplog.text
 
 
-def test_emit_generation_langfuse_tracer_starts_generation_observation(monkeypatch) -> None:
+def test_emit_generation_langfuse_tracer_starts_generation_observation(
+    monkeypatch,
+) -> None:
     class _FakeGeneration:
         def __init__(self, record):
             self.record = record
@@ -246,12 +271,118 @@ def test_emit_generation_langfuse_tracer_starts_generation_observation(monkeypat
         session_id="issue-22",
         stage="implement",
         model="openai/gpt-5-mini",
-        usage=UsageTotals(input_tokens=10, output_tokens=4, total_tokens=14, requests=1, skipped=0),
+        usage=UsageTotals(
+            input_tokens=10, output_tokens=4, total_tokens=14, requests=1, skipped=0
+        ),
     )
 
     assert fake_lf.record["name"] == "implement-llm"
     assert fake_lf.record["as_type"] == "generation"
     assert fake_lf.record["model"] == "openai/gpt-5-mini"
     assert fake_lf.record["usage_details"] == {"input": 10, "output": 4}
+    assert fake_lf.record["metadata"] == {"source": "box", "stage": "implement"}
     assert fake_lf.record["ended"] is True
     assert fake_lf.flushed is True
+
+
+def test_emit_generation_langfuse_tracer_passes_output_text(monkeypatch) -> None:
+    class _FakeGeneration:
+        def __init__(self, record):
+            self.record = record
+
+        def end(self):
+            self.record["ended"] = True
+
+    class _FakeLf:
+        def __init__(self):
+            self.record = {}
+
+        def start_observation(self, **kwargs):
+            self.record.update(kwargs)
+            return _FakeGeneration(self.record)
+
+        def flush(self):
+            pass
+
+    fake_lf = _FakeLf()
+    tracer = object.__new__(LangfuseTracer)
+    tracer._lf = fake_lf
+    monkeypatch.setattr(tracing, "_tracer", tracer)
+
+    tracing.emit_generation(
+        session_id="issue-23",
+        stage="spec",
+        model="GLM-4.7",
+        usage=UsageTotals(
+            input_tokens=3, output_tokens=5, total_tokens=8, requests=1, skipped=0
+        ),
+        input="prompt text",
+        output="some text",
+    )
+
+    assert fake_lf.record["input"] == "prompt text"
+    assert fake_lf.record["output"] == "some text"
+    assert fake_lf.record["metadata"] == {"source": "box", "stage": "spec"}
+
+
+def test_emit_generation_langfuse_tracer_without_text_omits_output_kwarg(
+    monkeypatch,
+) -> None:
+    class _FakeGeneration:
+        def __init__(self, record):
+            self.record = record
+
+        def end(self):
+            self.record["ended"] = True
+
+    class _FakeLf:
+        def __init__(self):
+            self.record = {}
+
+        def start_observation(self, **kwargs):
+            self.record.update(kwargs)
+            return _FakeGeneration(self.record)
+
+        def flush(self):
+            pass
+
+    fake_lf = _FakeLf()
+    tracer = object.__new__(LangfuseTracer)
+    tracer._lf = fake_lf
+    monkeypatch.setattr(tracing, "_tracer", tracer)
+
+    tracing.emit_generation(
+        session_id="issue-24",
+        stage="implement",
+        model="openai/gpt-5-mini",
+        usage=UsageTotals(
+            input_tokens=7, output_tokens=11, total_tokens=18, requests=1, skipped=0
+        ),
+    )
+
+    assert "output" not in fake_lf.record
+    assert "input" not in fake_lf.record
+    assert fake_lf.record["usage_details"] == {"input": 7, "output": 11}
+    assert fake_lf.record["metadata"] == {"source": "box", "stage": "implement"}
+    assert fake_lf.record["ended"] is True
+
+
+def test_emit_generation_langfuse_tracer_swallows_start_observation_error(
+    monkeypatch,
+) -> None:
+    class _BrokenLf:
+        def start_observation(self, **kwargs):
+            raise RuntimeError("langfuse unavailable")
+
+    tracer = object.__new__(LangfuseTracer)
+    tracer._lf = _BrokenLf()
+    monkeypatch.setattr(tracing, "_tracer", tracer)
+
+    tracing.emit_generation(
+        session_id="issue-25",
+        stage="spec",
+        model="GLM-4.7",
+        usage=UsageTotals(
+            input_tokens=1, output_tokens=1, total_tokens=2, requests=1, skipped=0
+        ),
+    )

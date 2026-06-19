@@ -75,6 +75,7 @@ class LangchainAgentRunner:
             raw_log.append(f"human: {rendered_prompt}")
 
             iterations = 0
+            completion_text: str | None = None
             while iterations < MAX_ITERATIONS:
                 if time.monotonic() - started > WALL_CLOCK_LIMIT_SECONDS:
                     _emit_usage(
@@ -82,6 +83,7 @@ class LangchainAgentRunner:
                         stage=stage,
                         model=profile.model,
                         usage=usage,
+                        output=completion_text,
                     )
                     return _result(
                         ok=False,
@@ -96,7 +98,8 @@ class LangchainAgentRunner:
                 ai_message = llm.invoke(messages)
                 messages.append(ai_message)
                 usage = _add_usage(usage, getattr(ai_message, "usage_metadata", None))
-                raw_log.append(f"assistant: {_message_content(ai_message)}")
+                completion_text = _message_content(ai_message)
+                raw_log.append(f"assistant: {completion_text}")
 
                 tool_calls = list(getattr(ai_message, "tool_calls", None) or [])
                 if not tool_calls:
@@ -120,7 +123,11 @@ class LangchainAgentRunner:
                     )
             else:
                 _emit_usage(
-                    session_id=session_id, stage=stage, model=profile.model, usage=usage
+                    session_id=session_id,
+                    stage=stage,
+                    model=profile.model,
+                    usage=usage,
+                    output=completion_text,
                 )
                 return _result(
                     ok=False,
@@ -133,7 +140,11 @@ class LangchainAgentRunner:
                 )
 
             _emit_usage(
-                session_id=session_id, stage=stage, model=profile.model, usage=usage
+                session_id=session_id,
+                stage=stage,
+                model=profile.model,
+                usage=usage,
+                output=completion_text,
             )
             if output_path.exists():
                 return _result(
@@ -280,11 +291,12 @@ def _emit_usage(
     stage: str | None,
     model: str,
     usage: UsageTotals,
+    output: str | None = None,
 ) -> None:
     if usage.total_tokens <= 0:
         return
     tracing.emit_generation(
-        session_id=session_id, stage=stage, model=model, usage=usage
+        session_id=session_id, stage=stage, model=model, usage=usage, output=output
     )
 
 

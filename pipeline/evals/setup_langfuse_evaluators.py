@@ -214,16 +214,29 @@ EVALUATORS = [
 #   enabled = bool; sampling = 0..1
 #   filter = [{type:"stringOptions", column, operator:"any of", value:[...]}]
 #   mapping = [{variable, source}]
-# Filter starts at type=GENERATION (all LLM generations). NOTE: narrow `filter`
-# to specific traceName(s) once the box's per-stage trace names are confirmed in
-# the UI — otherwise growth_issue_quality also scores non-observation generations.
+# Filter to type=GENERATION AND exclude the eval worker's own judge LLM calls.
+# The judges (LLM-as-judge via langchain) surface as GENERATION observations named
+# `ChatAnthropic`; without excluding them the rules RE-SCORE each other's calls
+# (recursive feedback, confirmed live 06-19). Box generations are named
+# `<stage>-llm` (triage-llm, spec-llm, implement-llm, ...) by emit_generation, so a
+# single `name none of ["ChatAnthropic"]` condition excludes the judge calls while
+# keeping every box stage. Filter conditions are ANDed.
+# (If the unstable API rejects `none of` / `name`, the 400 body enumerates the
+# valid operators/columns — fall back to a `name any of [<stage>-llm...]` allowlist
+# or a metadata `source=box` match; box generations carry metadata.source=box.)
 _GEN_FILTER = [
     {
         "type": "stringOptions",
         "column": "type",
         "operator": "any of",
         "value": ["GENERATION"],
-    }
+    },
+    {
+        "type": "stringOptions",
+        "column": "name",
+        "operator": "none of",
+        "value": ["ChatAnthropic"],
+    },
 ]
 
 RULES = [
@@ -349,6 +362,23 @@ def verify() -> int:
         print(f"  output={json.dumps(g0.get('output'))[:200]}")
         print(f"  input={json.dumps(g0.get('input'))[:200]}")
         print(f"  usageDetails={json.dumps(g0.get('usageDetails') or g0.get('usage'))[:200]}")
+
+    # U4: box generations (name `<stage>-llm`, emit_generation) must carry deliverable
+    # text after the enrich fix (U1/U2). Judge self-calls are named `ChatAnthropic`
+    # and are now filtered out of scoring (U3). Distinguish "enrichment live" from
+    # "box still emitting empty output" (fix not deployed to the box yet).
+    box_gens = [
+        g for g in gens if isinstance(g, dict) and str(g.get("name", "")).endswith("-llm")
+    ]
+    enriched = [g for g in box_gens if g.get("output")]
+    print(
+        f"box generations (<stage>-llm): {len(box_gens)}, with non-empty output: {len(enriched)}"
+    )
+    if box_gens and not enriched:
+        print(
+            "DIAG box generations carry EMPTY output — enrichment (U1/U2) not yet live on "
+            "the box; the judges still score nothing until the box deploys this fix."
+        )
 
     # All recent scores, tallied by evaluator name — distinguishes "redo rule
     # just hasn't seen a post-registration generation yet" (other evaluators ARE
