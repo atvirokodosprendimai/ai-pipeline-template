@@ -90,6 +90,19 @@ def test_redo_of_shipped_capability_rule_shape() -> None:
 
 
 @pytest.mark.unit
+def test_gen_filter_excludes_judge_self_calls() -> None:
+    # type=GENERATION plus a name-exclusion of the eval worker's own ChatAnthropic
+    # judge calls (recursive-scoring fix).
+    type_cond = [c for c in _GEN_FILTER if c["column"] == "type"]
+    name_cond = [c for c in _GEN_FILTER if c["column"] == "name"]
+
+    assert type_cond and type_cond[0]["value"] == ["GENERATION"]
+    assert name_cond, "filter must exclude judge self-calls by name"
+    assert name_cond[0]["operator"] == "none of"
+    assert "ChatAnthropic" in name_cond[0]["value"]
+
+
+@pytest.mark.unit
 def test_rules_reference_existing_evaluators() -> None:
     evaluator_names = {ev["name"] for ev in EVALUATORS}
 
