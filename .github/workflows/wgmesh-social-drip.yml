@@ -174,11 +174,10 @@ jobs:
               json.dump(payload, fh, ensure_ascii=False)
           PY
 
-          http=$(curl -sS -m 60 -w '%{http_code}' -o /tmp/social_drip_llm_resp.json \
+          http=$(curl -sS -m 180 -w '%{http_code}' -o /tmp/social_drip_llm_resp.json \
             -X POST "https://openrouter.ai/api/v1/chat/completions" \
             -H "Authorization: Bearer ${OPENROUTER_API_KEY}" \
             -H "Content-Type: application/json" \
-            -H "User-Agent: Mozilla/5.0" \
             -d @/tmp/social_drip_llm_req.json) || http="000"
 
           if [ "$http" != "200" ]; then
