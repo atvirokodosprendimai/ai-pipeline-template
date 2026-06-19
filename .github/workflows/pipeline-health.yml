@@ -96,6 +96,8 @@ jobs:
             cutoff=$(date -u -d '24 hours ago' '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || \
                      date -u -v-24H '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || echo "")
           fi
+          recent_cutoff=$(date -u -d '6 hours ago' '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || \
+                          date -u -v-6H '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || echo "")
 
           if [ -z "$cutoff" ]; then
             echo "::warning::Could not compute 24h cutoff — skipping stale triage sweep"
@@ -106,7 +108,7 @@ jobs:
 
           if ! gh issue list --repo "$TARGET_REPO" --state open \
             --label "needs-triage" --limit 50 \
-            --json number,title,createdAt,labels \
+            --json number,title,createdAt,updatedAt,labels \
             --jq ".[] | select(.createdAt < \"$cutoff\") | @json" \
             > /tmp/stale_triage.json; then
             echo "::error::stale needs-triage detection query failed"
@@ -145,6 +147,12 @@ jobs:
               --jq "[.[] | select(.title | test(\"Issue #${number}\\\\b\"))] | length" 2>/dev/null || echo 0)
             if [ "${merged_pr:-0}" -gt 0 ]; then
               echo "Skipping #${number} — completed (merged spec/impl PR exists), not stuck"
+              continue
+            fi
+
+            updated=$(echo "$issue" | jq -r '.updatedAt // .updated_at // empty')
+            if [ -n "$recent_cutoff" ] && [ -n "$updated" ] && [ "$updated" '>' "$recent_cutoff" ]; then
+              echo "Skipping #${number} — recent activity ($updated > $recent_cutoff); box is working it"
               continue
             fi
 
@@ -268,6 +276,8 @@ jobs:
             cutoff=$(date -u -d '48 hours ago' '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || \
                      date -u -v-48H '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || echo "")
           fi
+          recent_cutoff=$(date -u -d '6 hours ago' '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || \
+                          date -u -v-6H '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || echo "")
 
           if [ -z "$cutoff" ]; then
             echo "::warning::Could not compute 48h cutoff — skipping stale copilot sweep"
@@ -278,7 +288,7 @@ jobs:
 
           if ! gh issue list --repo "$TARGET_REPO" --state open \
             --label "copilot-triaging" --limit 50 \
-            --json number,title,createdAt,labels \
+            --json number,title,createdAt,updatedAt,labels \
             --jq ".[] | select(.createdAt < \"$cutoff\") | @json" \
             > /tmp/stale_copilot.json; then
             echo "::error::stale copilot-triaging detection query failed"
@@ -305,6 +315,12 @@ jobs:
 
             if [ -n "$spec_pr" ]; then
               echo "Skipping #${number} — spec PR #${spec_pr} in progress"
+              continue
+            fi
+
+            updated=$(echo "$issue" | jq -r '.updatedAt // .updated_at // empty')
+            if [ -n "$recent_cutoff" ] && [ -n "$updated" ] && [ "$updated" '>' "$recent_cutoff" ]; then
+              echo "Skipping #${number} — recent activity ($updated > $recent_cutoff); box is working it"
               continue
             fi
 
