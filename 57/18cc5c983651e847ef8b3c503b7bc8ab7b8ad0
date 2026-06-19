@@ -1,0 +1,23 @@
+company/system-prompt.md
+  s_2530e74cd22199::t_3efa84bf868582 285
+  s_2530e74cd22199::t_448bd92fe91961 260-261
+  s_2530e74cd22199::t_765a348a4fffea 102
+  s_2530e74cd22199::t_8781bb612fe673 65-78
+  s_2530e74cd22199::t_7195733b3f5592 109
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "5718cc5c983651e847ef8b3c503b7bc8ab7b8ad0",
+  "prompts": {},
+  "sessions": {
+    "s_2530e74cd22199": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "880cb85e-5a13-4d30-bcdf-520099c54268",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
