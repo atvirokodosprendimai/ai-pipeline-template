@@ -1,0 +1,19 @@
+.github/workflows/pipeline-health.yml
+  s_9391692ea56c68::t_73564c2977266c 99-100,111,153-158,279-280,291,321-323
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "24d40c7d1fd4659cc6ef70b513ab64af4bb24b52",
+  "prompts": {},
+  "sessions": {
+    "s_9391692ea56c68": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ee1b8-63f0-7831-92ee-642188502538",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
