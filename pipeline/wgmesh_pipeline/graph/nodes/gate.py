@@ -58,7 +58,9 @@ def decide_gate(
     return GateDecision(decision="merge", risk_tier="low", reasons=(), retryable=False)
 
 
-def gate_node(state: GraphState, *, max_files: int, apply_side_effects: bool = True) -> GraphState:
+def gate_node(
+    state: GraphState, *, max_files: int, apply_side_effects: bool = True
+) -> GraphState:
     next_state = dict(state)
     _visit(next_state, "gate")
     diff = next_state.get("diff", "")
@@ -128,10 +130,14 @@ def apply_gate_side_effects(state: GraphState) -> None:
                     "; ".join(readiness.reasons),
                 )
                 state["decision"] = "escalate"
-                state["risk_reasons"] = list(state.get("risk_reasons", [])) + list(readiness.reasons)
+                state["risk_reasons"] = list(state.get("risk_reasons", [])) + list(
+                    readiness.reasons
+                )
                 client.add_label(state["issue"].number, "needs-human")
                 return
-        client.merge_pr(int(impl_pr), commit_title=f"Merge issue #{state['issue'].number}")
+        client.merge_pr(
+            int(impl_pr), commit_title=f"Merge issue #{state['issue'].number}"
+        )
     else:
         client.add_label(state["issue"].number, "needs-human")
 
