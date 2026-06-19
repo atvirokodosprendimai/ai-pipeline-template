@@ -17,6 +17,7 @@ from evals.setup_langfuse_evaluators import (  # noqa: E402
     _JUDGE_MODEL,
     _NUMERIC,
     _PIKAPODS_SNAPSHOT,
+    _SHIPPED_SNAPSHOT,
     main,
 )
 
@@ -53,6 +54,41 @@ def test_open_source_default_rule_shape() -> None:
 
 
 @pytest.mark.unit
+def test_redo_of_shipped_capability_evaluator_shape_and_prompt() -> None:
+    matches = [
+        ev for ev in EVALUATORS if ev["name"] == "redo_of_shipped_capability"
+    ]
+
+    assert len(matches) == 1
+    evaluator = matches[0]
+    assert evaluator["type"] == "llm_as_judge"
+    assert evaluator["variables"] == ["output"]
+    assert evaluator["outputDefinition"] is _NUMERIC
+    assert evaluator["modelConfig"] is _JUDGE_MODEL
+    assert "{{output}}" in evaluator["prompt"]
+    assert "REDO" in evaluator["prompt"]
+    assert "OpenPanel" in evaluator["prompt"]
+    assert "not applicable" in evaluator["prompt"].lower()
+    assert "downstream consumer" in evaluator["prompt"].lower()
+    assert "OpenPanel" in _SHIPPED_SNAPSHOT
+    assert "Buttondown" in _SHIPPED_SNAPSHOT
+
+
+@pytest.mark.unit
+def test_redo_of_shipped_capability_rule_shape() -> None:
+    matches = [
+        rule for rule in RULES if rule["name"] == "rule_redo_of_shipped_capability"
+    ]
+
+    assert len(matches) == 1
+    rule = matches[0]
+    assert rule["evaluatorName"] == "redo_of_shipped_capability"
+    assert rule["target"] == "observation"
+    assert rule["filter"] is _GEN_FILTER
+    assert rule["mapping"] == [{"variable": "output", "source": "output"}]
+
+
+@pytest.mark.unit
 def test_rules_reference_existing_evaluators() -> None:
     evaluator_names = {ev["name"] for ev in EVALUATORS}
 
@@ -61,8 +97,8 @@ def test_rules_reference_existing_evaluators() -> None:
 
 @pytest.mark.unit
 def test_setup_langfuse_evaluator_counts() -> None:
-    assert len(EVALUATORS) == 4
-    assert len(RULES) == 4
+    assert len(EVALUATORS) == 5
+    assert len(RULES) == 5
 
 
 @pytest.mark.unit
@@ -72,6 +108,8 @@ def test_dry_run_prints_open_source_default(capsys) -> None:
     captured = capsys.readouterr()
     assert "open_source_default" in captured.out
     assert "rule_open_source_default" in captured.out
+    assert "redo_of_shipped_capability" in captured.out
+    assert "rule_redo_of_shipped_capability" in captured.out
 
 
 @pytest.mark.unit
