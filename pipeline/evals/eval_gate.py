@@ -7,7 +7,6 @@ from typing import Callable, Iterable
 
 from wgmesh_pipeline.graph.nodes.gate import GateDecision, decide_gate
 
-
 GateFunc = Callable[..., GateDecision]
 
 
@@ -25,7 +24,9 @@ class GateMetrics:
 
 
 def load_cases(path: str | Path) -> list[dict]:
-    return [json.loads(line) for line in Path(path).read_text().splitlines() if line.strip()]
+    return [
+        json.loads(line) for line in Path(path).read_text().splitlines() if line.strip()
+    ]
 
 
 def evaluate_gate(
@@ -51,6 +52,7 @@ def evaluate_gate(
             max_files=max_files,
             tests_passed=case.get("tests_passed", True),
             sanitise_ok=case.get("sanitise_ok", True),
+            paywall_ok=case.get("paywall_ok", True),
             review_findings=case.get("review_findings", []),
         ).decision
         if expected == "merge":
@@ -69,8 +71,14 @@ def evaluate_gate(
     precision = true_auto / predicted_auto if predicted_auto else 1.0
     auto_recall = true_auto / actual_auto if actual_auto else 1.0
     escalate_recall = true_escalate / actual_escalate if actual_escalate else 1.0
-    metrics = GateMetrics(total, precision, auto_recall, escalate_recall, tuple(failures))
-    if raise_on_failure and (precision < min_auto_merge_precision or escalate_recall < min_escalate_recall or failures):
+    metrics = GateMetrics(
+        total, precision, auto_recall, escalate_recall, tuple(failures)
+    )
+    if raise_on_failure and (
+        precision < min_auto_merge_precision
+        or escalate_recall < min_escalate_recall
+        or failures
+    ):
         raise EvalFailure(
             "gate eval failed: "
             f"auto_merge_precision={precision:.3f}, escalate_recall={escalate_recall:.3f}, failures={failures}"

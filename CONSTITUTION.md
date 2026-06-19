@@ -1,6 +1,6 @@
 # Project Constitution
 
-> **Version:** 2.0.0 | **Last Updated:** 2026-03-22
+> **Version:** 3.0.0 | **Last Updated:** 2026-06-19
 > **Project Type:** GitHub Actions automation pipeline
 
 This constitution defines the enforceable rules for the ai-pipeline-template project.
@@ -43,6 +43,57 @@ fi
 ```
 
 **This principle supersedes QUAL-5.** The old "soft-fail" rule permitted `|| true`. Under Andon, every suppressed failure must produce a visible signal (warning annotation + error counter + audit entry). Silent suppression is prohibited.
+
+---
+
+## Product Values
+
+These rules bind every product the autonomous company builds — present (wgmesh) and future — not only this control-plane repo's engineering. The pipeline is the company's brain; its constitution is the company's constitution. The monetization boundary is drawn at the **deployment layer, not the feature layer**: shipped software is free and whole; money attaches only to the service the company operates on a user's behalf.
+
+### PROD-1: Components ship AGPL with full functionality
+
+```yaml
+level: L1
+check: "Every shipped product component (daemon, CLI, dashboard, library) is licensed AGPL (or a compatible strong copyleft) and delivers full functionality. No feature is reserved for, or unlocked by, payment."
+scope: "seeded product repos (TARGET_REPO, e.g. atvirokodosprendimai/wgmesh)"
+message: "Product components must be AGPL and feature-complete. There is no 'pro' build, no withheld tier. The AGPL build is the whole product."
+```
+
+AGPL is load-bearing, not incidental: it closes the SaaS loophole, so the managed layer running modified components must offer its source. This makes "paid hosting" reinforce openness instead of eroding it.
+
+### PROD-2: No component may gate functionality
+
+```yaml
+level: L1
+check: "No shipped component gates functionality on payment, license key, account state, trial/time limit, or remote authorization. Self-hosted software runs fully, offline, indefinitely. Enforced by the no_component_paywall Langfuse judge wired into decide_gate and the .github/workflows/values-audit.yml CI gate (company/scripts/values-audit.sh)."
+scope: "seeded product repos + pipeline spec/impl gates"
+pattern: "trial_expired|expire-trial|kill.?switch|license.?check|feature.?gate"
+message: "A component must never gate functionality on payment, license key, account state, trial/time limit, or remote authorization. No phone-home, no remote disable, no kill-switch in shipped software."
+```
+
+Evidence: `atvirokodosprendimai/wgmesh#766` ("Build trial expiration paywall: upgrade modal + mesh pause on day 14") specified an `expire-trial` API and mesh daemons that **stop routing when the account expires** — a license kill-switch in AGPL software a user runs on their own machine. It was generated autonomously with no human intent and no rule vetoing it. The `no_component_paywall` judge and the values-audit CI gate are the practiced enforcement that now rejects this class of work to `needs-human`.
+
+### PROD-3: Monetize the managed-service layer only
+
+```yaml
+level: L1
+check: "Monetization (billing, trials, subscriptions) attaches only to the managed-service layer (cloudroof.eu: hosting, managed ingress, support, SLA). A trial or subscription ending may cease company-operated service for that account; it may never alter, disable, or degrade software the user runs themselves."
+scope: "company/system-prompt.md funnel stages + fn:billing/fn:gtm work"
+message: "Revenue attaches to operation, never to withholding capability. 'Open product, paid hosting' — not open-core."
+```
+
+The system-prompt funnel (Stage 3 "billing live", Stage 5 "invoice paid") and `fn:billing`/`fn:gtm` are re-scoped to the managed layer so the loop pursues revenue without gating components.
+
+### PROD-4: Component vs managed-service-layer boundary
+
+```yaml
+level: L1
+check: "Plans, specs, and code distinguish a 'component' (anything shipped to or run on a user's machine, or constituting the product's core capability) from the 'managed-service layer' (infrastructure the company operates on the user's behalf). The boundary decides where monetization may attach."
+scope: "seeded product repos + planning/spec artifacts"
+message: "Component = never paywalled. Managed-service layer = the only paid surface. #766's mesh-pause-on-expiry is the worked counter-example: stopping a company-operated node is allowed; disabling the user's own daemon is not."
+```
+
+A cloudroof.eu trial ending stops cloudroof-operated nodes/ingress for that account. The wgmesh binary the user self-hosts keeps routing unconditionally — it never phones home, checks a license, or reads account state.
 
 ---
 
@@ -433,3 +484,4 @@ Evidence at both test scripts around lines 20-21. Hardcoded poll intervals and u
 | 1.1.0 | 2026-03-22 | Address issue #65: fix QUAL-5 tension, scope ARCH-4, add QUAL-8/ARCH-9, add amendment process |
 | 1.2.0 | 2026-03-22 | Add Andon principle as foundational rule. Upgrade QUAL-5 to L1: no silent errors, every failure must signal. Remove loop-automerge.yml (PR #67) |
 | 2.0.0 | 2026-03-22 | ARCH-4: replace path-based scoping with guardrail-based protection (pr-review-merge.sh). The goal is protected, not the file paths. L1 rule changed → major version bump. |
+| 3.0.0 | 2026-06-19 | Add Product Values domain (PROD-1..4, all L1): components ship AGPL + full functionality, no component paywall, monetize the managed-service layer only. Motivated by autobox-generated wgmesh #766 (trial kill-switch in AGPL daemon). New L1 rules → major version bump. |

@@ -1,0 +1,112 @@
+name: Values Audit
+
+# Runs on EVERY PR (no path filter). When configured as a required status
+# check, GitHub waits for *some* completion before allowing merge. A
+# path-filtered workflow that doesn't trigger on a given PR will leave the
+# status indefinitely "expected" and block merge. The in-script check below
+# exits 0 immediately when no values-audit relevant paths are touched.
+on:
+  pull_request:
+  schedule:
+    - cron: '17 10 * * *'
+  workflow_dispatch:
+    inputs:
+      target_repo:
+        description: 'Repo to audit (default: atvirokodosprendimai/wgmesh)'
+        required: false
+        default: 'atvirokodosprendimai/wgmesh'
+
+permissions:
+  contents: read
+
+jobs:
+  values-audit-pr:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          # Explicit head SHA (not the synthetic merge ref). On
+          # `pull_request` events the default checkout is the merge of
+          # base+head, which makes commit-range calculations inconsistent
+          # vs. what the user actually pushed.
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Scan values audit across ALL commits in PR range
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: bash company/scripts/values-audit.sh
+
+  values-audit-sweep:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          fetch-depth: 0
+
+      - name: Sweep open target-repo PRs
+        env:
+          GH_TOKEN: ${{ secrets.PUSH_TOKEN }}
+          TARGET_REPO: ${{ inputs.target_repo || 'atvirokodosprendimai/wgmesh' }}
+        run: |
+          set -euo pipefail
+
+          tmpdir="$(mktemp -d)"
+          trap 'rm -rf "$tmpdir"' EXIT
+
+          prs_json="$tmpdir/prs.json"
+          if ! gh pr list \
+            --repo "$TARGET_REPO" \
+            --state open \
+            --limit 100 \
+            --json number,baseRefOid \
+            > "$prs_json"; then
+            echo "::error::failed to list open PRs for ${TARGET_REPO}"
+            exit 1
+          fi
+
+          pr_count="$(jq 'length' "$prs_json")"
+          if [ "$pr_count" -eq 0 ]; then
+            echo "No open PRs in ${TARGET_REPO}. PASS."
+            exit 0
+          fi
+
+          gh repo clone "$TARGET_REPO" "$tmpdir/target" -- --no-tags
+          cd "$tmpdir/target"
+
+          fail=0
+          while IFS= read -r pr; do
+            number="$(jq -r '.number' <<< "$pr")"
+            base_sha="$(jq -r '.baseRefOid' <<< "$pr")"
+
+            if [ -z "$number" ] || [ -z "$base_sha" ] || [ "$base_sha" = "null" ]; then
+              echo "::error::PR metadata from ${TARGET_REPO} was incomplete"
+              fail=1
+              continue
+            fi
+
+            git fetch --no-tags --quiet origin "$base_sha" "pull/${number}/head:refs/remotes/values-audit/pr-${number}"
+            head_sha="$(git rev-parse "refs/remotes/values-audit/pr-${number}")"
+
+            echo "Auditing ${TARGET_REPO}#${number}"
+            if ! BASE_SHA="$base_sha" HEAD_SHA="$head_sha" bash "$GITHUB_WORKSPACE/company/scripts/values-audit.sh"; then
+              fail=1
+            fi
+          done < <(jq -c '.[]' "$prs_json")
+
+          if [ "$fail" -ne 0 ]; then
+            exit 1
+          fi
