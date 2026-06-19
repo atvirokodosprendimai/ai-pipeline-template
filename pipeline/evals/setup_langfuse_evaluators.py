@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+from datetime import datetime, timezone
 import json
 import os
 import sys
@@ -294,6 +295,12 @@ RULES = [
 ]
 
 _UNSTABLE = "/api/public/unstable"
+_REDO_RULE_NAME = "rule_redo_of_shipped_capability"
+_RULE_TIMESTAMP_KEYS = (
+    "createdAt",
+    "created_at",
+    "timestamp",
+)
 
 
 def _auth_header() -> str:
@@ -340,6 +347,104 @@ def _get_list(path: str) -> list:
         return []
     data = payload.get("data")
     return data if isinstance(data, list) else []
+
+
+def _parse_langfuse_time(value: object) -> datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    text = value.strip()
+    if text.endswith("Z"):
+        text = f"{text[:-1]}+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
+def _post_registration_enriched_gen(
+    enriched: list, registered_at: str | None
+) -> object | None:
+    scoreable = [
+        gen
+        for gen in enriched
+        if isinstance(gen, dict)
+        and str(gen.get("name", "")).endswith("-llm")
+    ]
+    if not scoreable:
+        return None
+    if registered_at is None:
+        return scoreable[0]
+    registered = _parse_langfuse_time(registered_at)
+    if registered is None:
+        return scoreable[0]
+    for gen in scoreable:
+        started = _parse_langfuse_time(gen.get("startTime"))
+        if started is not None and started >= registered:
+            return gen
+    return None
+
+
+def _has_post_registration_enriched_box_generation(
+    enriched: list, registered_at: str | None
+) -> bool:
+    return _post_registration_enriched_gen(enriched, registered_at) is not None
+
+
+_VERIFY_EXIT_CODES = {"PASS": 0, "WAIT": 0, "FAIL": 1}
+
+
+def _verify_exit_code(verdict: str) -> int:
+    return _VERIFY_EXIT_CODES[verdict]
+
+
+def _classify_verify(
+    *,
+    gens_count: int,
+    box_gens: list,
+    enriched: list,
+    redo_scores: int,
+    other_eval_scores: int,
+    post_registration_enriched_gen: object | None,
+) -> tuple[str, str]:
+    if not gens_count:
+        return (
+            "FAIL",
+            "VERIFY: NO GENERATION observations in Langfuse — the box is not emitting "
+            "generation traces, so the evaluator has nothing to score (wired but off the "
+            "execution path). Instrument the box's LLM calls before this eval can fire.",
+        )
+    if redo_scores > 0:
+        return (
+            "PASS",
+            f"VERIFY: PASS — {redo_scores} redo_of_shipped_capability score(s) on real "
+            "generations. Evaluator is firing end-to-end.",
+        )
+    if other_eval_scores > 0:
+        if post_registration_enriched_gen:
+            return (
+                "FAIL",
+                f"VERIFY: FAIL — the score pipeline is ALIVE ({other_eval_scores} score(s) from sibling "
+                "evaluators), and a post-registration enriched box generation exists, but "
+                "redo_of_shipped_capability still has zero scores. The redo rule's "
+                "GENERATION filter appears broken; inspect the rule filter/mapping before "
+                "trusting this evaluator.",
+            )
+        return (
+            "WAIT",
+            f"VERIFY: WAIT — the score pipeline is ALIVE ({other_eval_scores} score(s) "
+            "from sibling evaluators), but no redo score yet. This is a non-failing "
+            "awaiting-the-first-post-registration-generation state; re-run verify after "
+            "the next box generation.",
+        )
+    return (
+        "FAIL",
+        "VERIFY: FAIL — box generations exist but NO evaluator (redo or sibling) has any "
+        "score. The eval-rule -> score path is not firing at all; fix that before trusting "
+        "any judge. Check the Langfuse default eval-model connection and rule enablement.",
+    )
 
 
 def verify() -> int:
@@ -415,34 +520,20 @@ def verify() -> int:
     print(f"redo_of_shipped_capability scores: {redo_scores}")
 
     print("---")
-    if not gens:
-        print(
-            "VERIFY: NO GENERATION observations in Langfuse — the box is not emitting "
-            "generation traces, so the evaluator has nothing to score (wired but off the "
-            "execution path). Instrument the box's LLM calls before this eval can fire."
-        )
-        return 1
-    if redo_scores > 0:
-        print(
-            f"VERIFY: PASS — {redo_scores} redo_of_shipped_capability score(s) on real "
-            "generations. Evaluator is firing end-to-end."
-        )
-        return 0
-    if other_eval_scores > 0:
-        print(
-            f"VERIFY: WAIT — the score pipeline is ALIVE ({other_eval_scores} score(s) "
-            "from sibling evaluators), but no redo score yet. Langfuse rules score only "
-            "generations created AFTER the rule was registered; re-run verify after the "
-            "next box generation. If it stays zero while siblings keep scoring, the redo "
-            "rule's GENERATION filter is the suspect."
-        )
-        return 1
-    print(
-        "VERIFY: FAIL — box generations exist but NO evaluator (redo or sibling) has any "
-        "score. The eval-rule -> score path is not firing at all; fix that before trusting "
-        "any judge. Check the Langfuse default eval-model connection and rule enablement."
+    redo_registered_at = _redo_rule_registered_at()
+    post_registration_enriched_gen = _post_registration_enriched_gen(
+        enriched, redo_registered_at
     )
-    return 1
+    verdict, message = _classify_verify(
+        gens_count=len(gens),
+        box_gens=box_gens,
+        enriched=enriched,
+        redo_scores=redo_scores,
+        other_eval_scores=other_eval_scores,
+        post_registration_enriched_gen=post_registration_enriched_gen,
+    )
+    print(message)
+    return _verify_exit_code(verdict)
 
 
 def _existing_names(path: str, key: str = "data") -> set[str]:
@@ -458,10 +549,10 @@ def _existing_names(path: str, key: str = "data") -> set[str]:
     return {str(i.get("name")) for i in items if isinstance(i, dict) and i.get("name")}
 
 
-def _existing_rule_ids() -> dict[str, str]:
+def _existing_rule_items() -> list:
     status, payload = _request("GET", f"{_UNSTABLE}/evaluation-rules")
     if status != 200 or not isinstance(payload, dict):
-        return {}
+        return []
     items = (
         payload.get("data")
         or payload.get("evaluators")
@@ -469,12 +560,32 @@ def _existing_rule_ids() -> dict[str, str]:
         or []
     )
     if not isinstance(items, list):
+        return []
+    return items
+
+
+def _existing_rule_ids() -> dict[str, str]:
+    items = _existing_rule_items()
+    if not items:
         return {}
     return {
         str(item["name"]): str(item["id"])
         for item in items
         if isinstance(item, dict) and item.get("name") and item.get("id")
     }
+
+
+def _redo_rule_registered_at() -> str | None:
+    for item in _existing_rule_items():
+        if (
+            isinstance(item, dict)
+            and str(item.get("name", "")) == _REDO_RULE_NAME
+        ):
+            for key in _RULE_TIMESTAMP_KEYS:
+                value = item.get(key)
+                if value:
+                    return str(value)
+    return None
 
 
 def apply(dry_run: bool) -> int:
