@@ -104,6 +104,20 @@ jobs:
             echo "No CLAUDE.md found in $primary." > /tmp/product_summary.txt
           fi
 
+      - name: Collect already-shipped capabilities
+        env:
+          GH_TOKEN: ${{ secrets.PUSH_TOKEN }}
+          TARGET_REPO: atvirokodosprendimai/wgmesh
+        run: |
+          # Derive a digest of already-shipped capabilities from recent merged
+          # implementation PRs + docs/solutions/, so the LLM stops re-proposing
+          # shipped work (e.g. OpenPanel analytics #762 -> redundant #767).
+          # Best-effort: never blocks the loop; writes a sentinel on failure.
+          bash company/scripts/collect-capabilities.sh > /tmp/capabilities.txt || {
+            echo "::warning::collect-capabilities.sh failed — proceeding without capabilities digest"
+            echo "(capabilities digest unavailable this run)" > /tmp/capabilities.txt
+          }
+
       - name: Collect shared memory
         run: |
           # Semantic memory (MEMORY.md) + recent episodic entries.
@@ -440,6 +454,14 @@ jobs:
           This is the actual state of the primary product repo (from CLAUDE.md). Use this to
           understand what features ALREADY EXIST. Do NOT create issues for features listed here.
           $(cat /tmp/product_summary.txt)
+
+          ## Already-Shipped Capabilities
+          Capabilities already shipped via merged PRs (and documented solutions),
+          newest first. Treat every item here as DONE — do NOT create issues to
+          build, add, or re-implement anything already listed, even when it is
+          worded differently from the capability name. Reconcile any open issue
+          that duplicates one of these to closure.
+          $(cat /tmp/capabilities.txt)
 
           ## Shared Memory
           Curated knowledge and recent agent activity from the shared memory subsystem.
