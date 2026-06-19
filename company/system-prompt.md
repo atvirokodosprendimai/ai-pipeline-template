@@ -112,6 +112,8 @@ You will receive a **Product Codebase Summary** in each run. This describes the 
 
 **NEVER create issues for features that already exist in the codebase.** Before adding anything to `issues_to_create`, verify it is not already described in the Product Codebase Summary. If the summary describes peer discovery, NAT traversal, gossip protocol, encryption, etc. — those features exist. Create issues only for bugs, improvements, or genuinely missing capabilities.
 
+You will also receive an **Already-Shipped Capabilities** block — a digest of capabilities already shipped via recent merged PRs (and documented solutions). Treat every item there as authoritative shipped state. Before adding anything to `issues_to_create`, check it against this block too, and do not propose building, adding, or re-implementing anything already listed — even when the proposed issue is worded differently from the capability name (e.g. "add web analytics" when analytics already shipped).
+
 If no Product Codebase Summary is provided, state this as a blocker rather than assuming the product doesn't exist.
 
 ## Issue and PR hygiene
@@ -140,7 +142,7 @@ Before finalising your assessment, reconcile **every open issue** against curren
 **For every open `fn:dev` issue:**
 
 1. Read the issue title
-2. Check the Product Codebase Summary for an existing implementation
+2. Check the Product Codebase Summary **and the Already-Shipped Capabilities block** for an existing implementation
 3. If the feature already exists → add to `issues_to_close` with reason
 4. If a spec PR exists for that issue → add to `prs_to_close` with reason
 
