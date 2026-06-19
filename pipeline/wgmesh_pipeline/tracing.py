@@ -232,22 +232,34 @@ def trace_node(name: str, fn: Callable[P, R]) -> Callable[P, R]:
 
 
 def emit_generation(
-    *, session_id: str | None, stage: str | None, model: str, usage
+    *,
+    session_id: str | None,
+    stage: str | None,
+    model: str,
+    usage,
+    input: Any = None,
+    output: Any = None,
 ) -> None:
     if not isinstance(_tracer, LangfuseTracer):
         return
     try:
         lf = _tracer._lf
         with _session_id_ctx(session_id):
-            observation = lf.start_observation(
-                name=f"{stage or 'goose'}-llm",
-                as_type="generation",
-                model=model,
-                usage_details={
+            kwargs = {
+                "name": f"{stage or 'goose'}-llm",
+                "as_type": "generation",
+                "model": model,
+                "usage_details": {
                     "input": usage.input_tokens,
                     "output": usage.output_tokens,
                 },
-            )
+                "metadata": {"source": "box", "stage": stage},
+            }
+            if input is not None:
+                kwargs["input"] = input
+            if output is not None:
+                kwargs["output"] = output
+            observation = lf.start_observation(**kwargs)
             observation.end()
         lf.flush()
         log.info(
