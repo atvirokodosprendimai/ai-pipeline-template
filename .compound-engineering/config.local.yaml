@@ -49,13 +49,31 @@ pulse_lookback_default: 24h
 #                           Open PRs are not "processed"; they are work-in-flight or dwell.
 #   pr_dwell_violations   = open PRs older than pulse_pr_processing_sla_days with no
 #                           review/merge action — the unprocessed-defect count.
-pulse_metric_sources: paid_customers=chimney-html,autonomous_ship_rate=seed-repo-pr-data,lead_time_hours=seed-repo-pr-data,spec_coverage=seed-repo-pr-data,self_heal_rate=company/pipeline-health-state.json,active_stuck_issues=seed-repo-issues,cycle_time_to_revenue=polar,supervisor_rank_state=company/supervisor-rank-state.json,pr_processing_rate=meta-repo-pr-data,pr_dwell_violations=meta-repo-pr-data
+#   aged_open_items       = open issues AND open PRs whose age (now - createdAt) exceeds
+#                           pulse_open_age_sla_hours, in EITHER repo, with no terminal
+#                           action. The unprocessed-defect count at 48h granularity —
+#                           tighter than pr_dwell_violations (7d, PRs only) and also
+#                           covers issues. Target 0.
+pulse_metric_sources: paid_customers=chimney-html,autonomous_ship_rate=seed-repo-pr-data,lead_time_hours=seed-repo-pr-data,spec_coverage=seed-repo-pr-data,self_heal_rate=company/pipeline-health-state.json,active_stuck_issues=seed-repo-issues,cycle_time_to_revenue=polar,supervisor_rank_state=company/supervisor-rank-state.json,pr_processing_rate=meta-repo-pr-data,pr_dwell_violations=meta-repo-pr-data,aged_open_items=both-repos-issues-and-prs
 pulse_pending_metrics: cycle_time_to_revenue,spec_coverage
 # --- PR-processing KPI (added 2026-06-05) ---
 # Intent: open PRs must be ACTED ON per the goal, never bulk-closed to clear backlog.
 # Every disposition needs a goal-aligned reason. Dwelling = defect, not idle.
 pulse_pr_processing_kpi: enabled
 pulse_pr_processing_sla_days: 7
+
+# --- Open-item aging KPI (added 2026-06-20) ---
+# Every OPEN issue AND OPEN pull request must reach a terminal action (merge, or
+# close-with-goal-reason) within 48h of creation. Anything open and aged > 48h is a
+# tracked breach to drive to zero — never normalised as backlog. SCOPE = BOTH repos
+# (meta-repo AND seed via pulse_seed_product_repo), mirroring the action-success KPI
+# scope so a seed-repo pileup can't hide behind a healthy meta-repo. Age uses createdAt
+# (not updatedAt — a bumped label must not reset the clock). A window is clean only when
+# aged_open_items == 0; if > 0, the pulse lists each aged item with a disposition.
+pulse_open_age_kpi: enabled
+pulse_open_age_sla_hours: 48
+pulse_open_age_target: 0
+pulse_open_age_scope: meta-repo,seed-repo
 
 # --- Action-success KPI (added 2026-06-06) ---
 # Andon/jidoka: EVERY autonomous action the pipeline attempts must succeed.
