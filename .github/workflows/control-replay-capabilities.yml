@@ -126,23 +126,58 @@ jobs:
           call_llm /tmp/msg_B.txt /tmp/assessment_B.json
 
           titles() { jq -r '(.issues_to_create // []) | map(.title) | .[]' "$1" 2>/dev/null || true; }
-          ANALYTICS='analytic|tracking|plausible|posthog|openpanel|web.?analytics|measure.*conversion'
-
           a_titles=$(titles /tmp/assessment_A.json); b_titles=$(titles /tmp/assessment_B.json)
           echo "::group::Arm A (real digest) issues_to_create"; echo "${a_titles:-<none>}"; echo "::endgroup::"
           echo "::group::Arm B (empty digest) issues_to_create"; echo "${b_titles:-<none>}"; echo "::endgroup::"
 
-          a_hit=$(echo "$a_titles" | grep -ciE "$ANALYTICS" || true)
-          b_hit=$(echo "$b_titles" | grep -ciE "$ANALYTICS" || true)
+          # LLM-judge — keyword matching cannot tell a redo ("add web analytics
+          # tracking" when OpenPanel #762 already ships it) from legitimate
+          # build-on-existing work ("dashboard on the data OpenPanel collects").
+          # Ask the model to classify each arm against the shipped capability.
+          JUDGE_SYS='You are a strict classifier. Reply ONLY with compact JSON: {"redo": true|false, "which": "<title or none>", "why": "<one short line>"}. No prose, no code fence.'
+          judge() {
+            local arm_titles="$1" out="$2" jmsg jc
+            jmsg=$(cat <<JEOF
+          Already-shipped capability (do not re-implement): "OpenPanel analytics — track Polar CTA clicks (PR #762)". Web analytics / event tracking is LIVE on the cloudroof.eu landing pages via OpenPanel (self-hosted).
 
-          echo "Arm A analytics proposals: $a_hit"
-          echo "Arm B analytics proposals: $b_hit"
+          Proposed issue titles:
+          ${arm_titles:-<none>}
+
+          Does ANY proposed issue re-add or re-implement that already-shipped web-analytics/tracking capability — e.g. adding a tracking tool, web analytics, Plausible/PostHog, or instrumenting tracking? Building a downstream consumer such as a dashboard or report ON TOP of the data the existing tracker already collects is NOT a redo. Reply with the JSON schema.
+          JEOF
+          )
+            jq -n --arg system "$JUDGE_SYS" --arg user "$jmsg" '{
+              model: "anthropic/claude-sonnet-4", max_tokens: 512,
+              messages: [{role:"system",content:$system},{role:"user",content:$user}]
+            }' > /tmp/jreq.json
+            jc=$(curl -s -w '%{http_code}' -o /tmp/jresp.json \
+              -H "Authorization: Bearer $OBSERVER_API_KEY" -H "content-type: application/json" \
+              -d @/tmp/jreq.json https://openrouter.ai/api/v1/chat/completions)
+            if [ "$jc" -lt 200 ] || [ "$jc" -ge 300 ]; then
+              echo "::error::judge HTTP $jc: $(jq -r '.error.message // "?"' /tmp/jresp.json 2>/dev/null)"; exit 1
+            fi
+            jq -r '.choices[0].message.content' /tmp/jresp.json \
+              | sed -n '/{/,/}/p' | jq . > "$out" 2>/dev/null || echo '{"redo":null}' > "$out"
+          }
+
+          judge "$a_titles" /tmp/judge_A.json
+          judge "$b_titles" /tmp/judge_B.json
+          a_redo=$(jq -r '.redo' /tmp/judge_A.json); b_redo=$(jq -r '.redo' /tmp/judge_B.json)
+          echo "::group::Judge A (digest present)"; cat /tmp/judge_A.json; echo "::endgroup::"
+          echo "::group::Judge B (digest empty)"; cat /tmp/judge_B.json; echo "::endgroup::"
+          echo "Arm A redo (digest present): $a_redo"
+          echo "Arm B redo (digest empty):   $b_redo"
           echo "---"
-          if [ "$a_hit" -eq 0 ] && [ "$b_hit" -ge 1 ]; then
-            echo "VERDICT: PASS — digest suppresses the analytics proposal (A=0) that the empty arm makes (B=$b_hit). Mechanism bites."
-          elif [ "$a_hit" -ge 1 ]; then
-            echo "VERDICT: FAIL — analytics still proposed with the digest present (A=$a_hit). Grounding did not suppress."
+          if [ "$a_redo" = "false" ]; then
+            if [ "$b_redo" = "true" ]; then
+              echo "VERDICT: PASS (clean) — digest suppressed the redo (A=false) the empty arm made (B=true). Mechanism bites."
+            else
+              echo "VERDICT: PASS (weak) — digest arm did not redo (A=false), but the empty arm also did not (B=$b_redo); contrast not demonstrated this run."
+            fi
+          elif [ "$a_redo" = "true" ]; then
+            echo "VERDICT: FAIL — digest present but the loop still re-proposed the shipped capability (A=true)."
             exit 1
           else
-            echo "VERDICT: INCONCLUSIVE — empty arm did not elicit analytics (B=0); control did not exercise the behavior. Re-run with a sharper snapshot."
+            echo "VERDICT: ERROR — judge returned no boolean for arm A ($a_redo)."
+            exit 1
           fi
