@@ -1,0 +1,22 @@
+pipeline/evals/setup_langfuse_evaluators.py
+  s_5d878ef6fac03d::t_8d80adb0815ca2 145-160
+  s_5d878ef6fac03d::t_e62ed4acc25e52 258-264,371-374,377-378
+pipeline/evals/test_setup_langfuse_evaluators.py
+  s_5d878ef6fac03d::t_93b5c88fecb1d6 1-191
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "11d556076b3121323f9d7066cee91f415fe38a40",
+  "prompts": {},
+  "sessions": {
+    "s_5d878ef6fac03d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019edf45-6351-7030-8bef-191c134cfde9",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
