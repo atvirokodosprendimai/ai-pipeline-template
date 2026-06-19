@@ -87,11 +87,24 @@ digest works" from "the loop happened not to re-file"; the two-arm control can.
   rich body context: `OpenPanel analytics — track Polar CTA clicks (PR #762) — Adds the OpenPanel
   tracker (self-hosted at counter.hackrsvalv.com) to the 4 landing pages...` (34 capability lines,
   clean run). The grounding the LLM needs to make the #767 match is present and well-formed.
-- **Control replay, semantic arm — pending.** The two-arm LLM call (digest present → analytics not
-  proposed; digest empty → proposed) requires the loop model (`anthropic/claude-sonnet-4` via
-  OpenRouter, `OBSERVER_API_KEY`) and spends metered budget; run via a dispatch-only replay or
-  the next live tick observed against the control. Record the two arms here when run.
-- Disposition of the live #767 / #769: pending operator authorization (public seed repo).
+- **Control replay, semantic arm — ran 2026-06-19, PASS (weak), no failure.** A dispatch-only
+  read-only workflow (`.github/workflows/control-replay-capabilities.yml`) runs the real loop
+  model on two arms differing only in the capabilities block, then an LLM-judge classifies each
+  arm's `issues_to_create` against the shipped capability ("does any proposal re-add the analytics
+  tracking OpenPanel #762 already ships? a dashboard on existing data is NOT a redo"). Result: the
+  **digest arm did not redo** (judge: *"All proposals build dashboards/content on top of existing
+  OpenPanel data, not re-implementing tracking"*). But the **empty arm also did not redo** this run,
+  so the control could not demonstrate causal contrast — a hand-built snapshot does not reliably
+  reproduce the full live state that induced the original #767 redo. Conclusion: no failure observed
+  and digest-arm behavior is correct, but causal proof is not obtainable from a synthetic replay.
+  A first pass with a keyword-regex judge mislabeled "conversion funnel analytics dashboard" as a
+  redo (false FAIL); the regex was replaced with the LLM-judge because keyword matching cannot
+  distinguish a redo from build-on-existing — itself a lesson (see below).
+- **Durable verification = production eval, not synthetic replay.** The right instrument is a
+  Langfuse LLM-judge evaluator scoring "redo of an already-shipped capability?" over real loop
+  runs, where the actual #767-inducing state recurs. Deferred (see Scope Boundaries in the plan).
+- **Live #767 / #769 dispositioned (2026-06-19).** Both closed citing #762 as the existing
+  implementation (R7 / AE3).
 
 ## Residual risks
 
