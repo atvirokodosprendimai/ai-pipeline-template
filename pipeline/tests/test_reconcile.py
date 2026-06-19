@@ -249,6 +249,54 @@ def test_needs_human_label_escalates_and_excludes_from_claim(tmp_path) -> None:
     assert store.claim_next(now=datetime.now(timezone.utc)) is None
 
 
+def test_escalated_issue_requeues_when_needs_human_removed(tmp_path) -> None:
+    store = StateStore(tmp_path / "state.db")
+    store.upsert_issue(539, "was escalated", stage="escalated", status="open")
+
+    result = reconcile_issues(
+        Client([issue(539, ("copilot-triaging",), title="Back to triage")]), store
+    )
+
+    record = store.get_issue(539)
+    assert result.queued == 1
+    assert record.stage == "queued"
+    assert record.status == "open"
+
+
+def test_escalated_issue_stays_escalated_while_needs_human_remains(tmp_path) -> None:
+    store = StateStore(tmp_path / "state.db")
+    store.upsert_issue(539, "still needs human", stage="escalated", status="open")
+
+    result = reconcile_issues(
+        Client([issue(539, ("copilot-triaging", "needs-human"))]), store
+    )
+
+    assert result.queued == 0
+    assert store.get_issue(539).stage == "escalated"
+
+
+def test_escalated_issue_without_triage_label_stays_escalated(tmp_path) -> None:
+    store = StateStore(tmp_path / "state.db")
+    store.upsert_issue(539, "no triage label", stage="escalated", status="open")
+
+    result = reconcile_issues(Client([issue(539, ("fn:dev",))]), store)
+
+    assert result.queued == 0
+    assert store.get_issue(539).stage == "escalated"
+
+
+def test_merged_issue_with_triage_label_stays_terminal(tmp_path) -> None:
+    store = StateStore(tmp_path / "state.db")
+    store.upsert_issue(539, "already merged", stage="merged", status="closed")
+
+    result = reconcile_issues(Client([issue(539, ("copilot-triaging",))]), store)
+
+    record = store.get_issue(539)
+    assert result.queued == 0
+    assert record.stage == "merged"
+    assert record.status == "closed"
+
+
 def test_reconcile_removes_needs_triage_without_raising_in_spec_only(tmp_path) -> None:
     # Regression: in spec-only the write-gate blocks remove_label unless
     # spec_pr=True. reconcile omitting the flag raised PermissionError every
