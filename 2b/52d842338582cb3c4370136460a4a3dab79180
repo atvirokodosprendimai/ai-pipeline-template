@@ -1,0 +1,23 @@
+pipeline/tests/test_poller_stage_tracing.py
+  s_b4919756b51147::t_6f4e3c0133e925 17-23,46
+  s_b4919756b51147::t_3fd8d4652a69ab 1-16,24-45,47-146
+pipeline/wgmesh_pipeline/graph/build_lg.py
+  s_b4919756b51147::t_480f4fc5a78706 71,84
+  s_b4919756b51147::t_3ec1ac0b6b1f0f 4,35,57-70,72-83,85,159-165,169-173,177-188
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "2b52d842338582cb3c4370136460a4a3dab79180",
+  "prompts": {},
+  "sessions": {
+    "s_b4919756b51147": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019edebe-3881-7421-b11a-9bce3cb7e389",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
