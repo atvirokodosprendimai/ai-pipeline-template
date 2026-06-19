@@ -1,0 +1,36 @@
+pipeline/evals/setup_langfuse_evaluators.py
+  s_2fa4612b0ff87d::t_4b4969acfd16fd 394-395,403-425,435-437,441-449,527-532,535
+  s_09db058b895cc9::t_26ed65bf2336da 299-303,370-376,379,382-383
+  s_2fa4612b0ff87d::t_d4fd493886f48e 390-393,396-402,426-434,438-440,523-525,533,536
+  s_2fa4612b0ff87d::t_774af6427dbefc 28,298,352-369,377-378,380-381,384-389,552,555,563-569,578-588
+pipeline/tests/test_setup_langfuse_evaluators.py
+  s_09db058b895cc9::t_837e92c466be28 517-537,544-546,548-580
+  s_2fa4612b0ff87d::t_b91cb491a9f278 21,23,385-474
+  s_09db058b895cc9::t_9b4b741f22a3c1 248,256,263,273,277,284,293,297,304,311-313,315,319,323-345,349,359,363-367,374,378-384
+  s_2fa4612b0ff87d::t_bd0385548ae1e4 17,255,257-262,264-272,274-276,278-283,285-292,294-296,298-303,305-310,314,316-318,320-322,346-348,350-358,360-362,368-373,375-377
+  s_2fa4612b0ff87d::t_24f774bb55dcfe 242,249,538-543
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "3f1cc6797da19442fb5bebba7cd5676c730addde",
+  "prompts": {},
+  "sessions": {
+    "s_09db058b895cc9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ee1fa-0ae0-7a83-b2d2-da0d6c47215d",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    },
+    "s_2fa4612b0ff87d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ee1f9-8ae4-7890-ac48-67d5e3b615d5",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
