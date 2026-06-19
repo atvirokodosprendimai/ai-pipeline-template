@@ -363,6 +363,23 @@ def verify() -> int:
         print(f"  input={json.dumps(g0.get('input'))[:200]}")
         print(f"  usageDetails={json.dumps(g0.get('usageDetails') or g0.get('usage'))[:200]}")
 
+    # U4: box generations (name `<stage>-llm`, emit_generation) must carry deliverable
+    # text after the enrich fix (U1/U2). Judge self-calls are named `ChatAnthropic`
+    # and are now filtered out of scoring (U3). Distinguish "enrichment live" from
+    # "box still emitting empty output" (fix not deployed to the box yet).
+    box_gens = [
+        g for g in gens if isinstance(g, dict) and str(g.get("name", "")).endswith("-llm")
+    ]
+    enriched = [g for g in box_gens if g.get("output")]
+    print(
+        f"box generations (<stage>-llm): {len(box_gens)}, with non-empty output: {len(enriched)}"
+    )
+    if box_gens and not enriched:
+        print(
+            "DIAG box generations carry EMPTY output — enrichment (U1/U2) not yet live on "
+            "the box; the judges still score nothing until the box deploys this fix."
+        )
+
     # All recent scores, tallied by evaluator name — distinguishes "redo rule
     # just hasn't seen a post-registration generation yet" (other evaluators ARE
     # scoring → pipeline alive) from "no evaluator has ever scored" (score
