@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import sys
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
@@ -31,6 +32,7 @@ class StateGraphWrapper:
     review: Callable[[GraphState], GraphState]
     gate: Callable[..., GraphState]
     raw_gate: Callable[..., GraphState]
+    _stage_graphs: dict[str, Any] = field(default_factory=dict, init=False, repr=False)
     _callback_handler: object | None = field(default=None, init=False, repr=False)
     _callback_handler_initialized: bool = field(default=False, init=False, repr=False)
 
@@ -51,6 +53,35 @@ class StateGraphWrapper:
             except Exception:
                 self._callback_handler = None
         return self._callback_handler
+
+    def _run_stage(self, name: str, state: GraphState) -> GraphState:
+        stage_graph = self._stage_graphs[name]
+        issue = state.get("issue")
+        issue_number = getattr(issue, "number", None)
+        session_id = f"issue-{issue_number}" if issue_number is not None else None
+        try:
+            handler = self._callback_handler_for_invoke()
+            cfg = {"callbacks": [handler]} if handler is not None else None
+            session_ctx = _session_id_ctx(session_id)
+            session_ctx.__enter__()
+        except Exception:
+            return stage_graph.invoke(state)
+
+        try:
+            result = stage_graph.invoke(state, config=cfg)
+        except BaseException:
+            exc_info = sys.exc_info()
+            try:
+                session_ctx.__exit__(*exc_info)
+            except Exception:
+                pass
+            raise
+        else:
+            try:
+                session_ctx.__exit__(None, None, None)
+            except Exception:
+                pass
+            return result
 
     def evaluate_gate(self, state: GraphState) -> GraphState:
         parameters = inspect.signature(self.raw_gate).parameters
@@ -123,24 +154,38 @@ class StateGraphWrapper:
 def build_state_graph(config: Config) -> StateGraphWrapper:
     from langgraph.graph import END, StateGraph
 
-    triage = trace_node("triage", triage_node)
-    spec = trace_node("spec", spec_node)
-    spec_pr = trace_node("spec_pr", spec_pr_node)
-    implement = trace_node("implement", implement_node)
-    review = trace_node("review", review_node)
     gate = trace_node("gate", gate_node)
+
+    def _compile_single(name: str, fn: Callable[[GraphState], GraphState]) -> Any:
+        graph = StateGraph(GraphState)
+        graph.add_node(name, fn)
+        graph.set_entry_point(name)
+        graph.add_edge(name, END)
+        return graph.compile()
 
     wrapper = StateGraphWrapper(
         config=config,
         compiled=None,
-        triage=triage,
-        spec=spec,
-        spec_pr=spec_pr,
-        implement=implement,
-        review=review,
+        triage=lambda state: state,
+        spec=lambda state: state,
+        spec_pr=lambda state: state,
+        implement=lambda state: state,
+        review=lambda state: state,
         gate=gate,
         raw_gate=gate_node,
     )
+    wrapper._stage_graphs = {
+        "triage": _compile_single("triage", triage_node),
+        "spec": _compile_single("spec", spec_node),
+        "spec_pr": _compile_single("spec_pr", spec_pr_node),
+        "implement": _compile_single("implement", implement_node),
+        "review": _compile_single("review", review_node),
+    }
+    wrapper.triage = lambda state: wrapper._run_stage("triage", state)
+    wrapper.spec = lambda state: wrapper._run_stage("spec", state)
+    wrapper.spec_pr = lambda state: wrapper._run_stage("spec_pr", state)
+    wrapper.implement = lambda state: wrapper._run_stage("implement", state)
+    wrapper.review = lambda state: wrapper._run_stage("review", state)
 
     graph = StateGraph(GraphState)
     graph.add_node("triage", triage_node)
