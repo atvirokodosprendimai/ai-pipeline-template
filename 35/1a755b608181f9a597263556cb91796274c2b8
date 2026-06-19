@@ -1,0 +1,23 @@
+.compound-engineering/config.local.yaml
+  s_623d97065e20a1::t_5387d55e8e5bfe 65-77
+  s_623d97065e20a1::t_82c28bc2045468 52-57
+docs/pulse-reports/2026-06-20_00-10.md
+  s_623d97065e20a1::t_429f2b2fc582bc 1-29,38-44
+  s_623d97065e20a1::t_8a1b378f2e124e 30-37
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "351a755b608181f9a597263556cb91796274c2b8",
+  "prompts": {},
+  "sessions": {
+    "s_623d97065e20a1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4f69d3fc-bb89-4527-ac98-5195e026eaf9",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
