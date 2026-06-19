@@ -1,0 +1,21 @@
+pipeline/tests/test_reconcile.py
+  s_8286bcabad7ca9::t_c4ea6d3c55ad4c 252-299
+pipeline/wgmesh_pipeline/github/reconcile.py
+  s_8286bcabad7ca9::t_7c6e3f15e5c6eb 61-70
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "3c76d9f51f3c024683549904d07ecacd187d2b10",
+  "prompts": {},
+  "sessions": {
+    "s_8286bcabad7ca9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ee161-ef08-74f2-8249-834d6bd7e11a",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
