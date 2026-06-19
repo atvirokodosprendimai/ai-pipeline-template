@@ -1,0 +1,44 @@
+pipeline/wgmesh_pipeline/paywall.py
+  s_5e6cc8ec9e9842::t_17bdfa39018c98 1-16,21-23,28-29,31,38-45,47,58-67,71
+  s_5e6cc8ec9e9842::t_218d6777db61a0 18,35-37,53-57
+  s_5e6cc8ec9e9842::t_4f51db6221f2e4 34
+  s_5e6cc8ec9e9842::t_1ceebeae87a3d5 68-70
+  s_9026ad746b0255::t_5671a2e42fe8ff 17,19-20,24-27,30,32-33,46,48-52
+pipeline/tests/test_gate.py
+  s_9026ad746b0255::t_52f334cb2236e0 359,590-594,596,600-602
+  s_9026ad746b0255::t_5671a2e42fe8ff 379-382,384
+  s_9026ad746b0255::t_21c58adc42fb49 127-129,152-156,159-161,173-175,193-195,199-201,222-227,239-246,250-252,272-274,278-280,344-346,376-378,402-404,450-452,466-468,489-494,504-506,509-511,515-517,526-533,536-542,561-563,566-570,630-632,667-669,714-716,747-749,771-773,777-779
+  s_9026ad746b0255::t_705e03181cd36b 7,321-343,347-358,360-375,383,385-401,405-449,453-462,588-589,595,597-599,603-612
+pipeline/evals/eval_gate.py
+  s_5e6cc8ec9e9842::t_17bdfa39018c98 54
+pipeline/wgmesh_pipeline/graph/nodes/gate.py
+  s_5e6cc8ec9e9842::t_f9fa4e44a653ba 31
+  s_5e6cc8ec9e9842::t_17bdfa39018c98 9,49,64-77,79-80,84
+  s_9026ad746b0255::t_0646b66944dbac 39-40
+pipeline/tests/test_paywall.py
+  s_9026ad746b0255::t_705e03181cd36b 1-44
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "60947589569b6d8af0d134b80a06c9e1e795348d",
+  "prompts": {},
+  "sessions": {
+    "s_5e6cc8ec9e9842": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019edf4c-9787-7fa2-aa86-28e3f76aba33",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    },
+    "s_9026ad746b0255": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019edf4c-2f18-7023-a36d-2f0ff620987d",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
