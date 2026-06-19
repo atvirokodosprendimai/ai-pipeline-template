@@ -72,6 +72,28 @@ _PIKAPODS_SNAPSHOT = """PikaPods self-hosts these open-source apps (non-exhausti
 - Firebase -> Pocketbase, Directus
 """
 
+# Coarse advisory snapshot of capabilities already shipped for wgmesh/cloudroof,
+# for measuring the redo class the in-loop capabilities digest prevents (the box
+# re-proposing already-built work, e.g. "add web analytics" when OpenPanel ships).
+# This static list WILL drift; the live authority is the auto-derived digest in
+# `.github/workflows/observation-loop.yml` (the `## Already-Shipped Capabilities`
+# block from `company/scripts/collect-capabilities.sh`). This evaluator is an
+# advisory measurement signal, not a gate.
+_SHIPPED_SNAPSHOT = """Capabilities already shipped (non-exhaustive); re-proposing
+any of these is a REDO:
+- Web analytics / event / conversion tracking -> OpenPanel, self-hosted at
+  counter.hackrsvalv.com, on the cloudroof.eu landing pages (wgmesh PR #762)
+- Email capture / newsletter signup form -> Buttondown ("meshletter") form on the
+  landing pages (wgmesh PR #764)
+- Transactional / outreach email sending -> Unsend
+- Payments / checkout / subscription -> Polar checkout CTAs on the landing pages
+- Outreach assets (stargazer list, send-ready copy) -> shipped docs (wgmesh PR #763)
+- Core product (wgmesh): WireGuard mesh, peer discovery, NAT traversal, gossip,
+  encryption, managed ingress
+Building a downstream consumer ON TOP of a shipped capability (e.g. a dashboard or
+report over data OpenPanel already collects) is NOT a redo.
+"""
+
 EVALUATORS = [
     {
         "name": "growth_issue_quality",
@@ -142,6 +164,30 @@ EVALUATORS = [
         "outputDefinition": _NUMERIC,
         "modelConfig": _JUDGE_MODEL,
     },
+    {
+        "name": "redo_of_shipped_capability",
+        "type": "llm_as_judge",
+        "prompt": (
+            "You are scoring a box-PROPOSED ISSUE on whether it RE-PROPOSES a "
+            "capability that already shipped — the redo class the Observation "
+            "Loop's capabilities digest exists to prevent.\n\n"
+            f"{_SHIPPED_SNAPSHOT}\n"
+            "Proposed issue:\n{{output}}\n\n"
+            "Score 0.0-1.0 with these anchors: 1.0 = proposes genuinely new work, "
+            "OR builds a downstream consumer on top of an existing capability, OR "
+            "names no capability in the shipped list (NOT APPLICABLE); ~0.5 = "
+            "overlaps a shipped capability but plausibly extends or replaces it "
+            "for a stated reason; 0.0 = re-proposes adding/implementing a "
+            "capability that already ships (e.g. 'add web analytics tracking' when "
+            "OpenPanel already tracks, 'add an email signup form' when Buttondown "
+            "is live), with no justification. Lower is worse (more of a redo). "
+            "Reasoning: one sentence naming the proposed capability and the shipped "
+            "one it duplicates, or 'not applicable'."
+        ),
+        "variables": ["output"],
+        "outputDefinition": _NUMERIC,
+        "modelConfig": _JUDGE_MODEL,
+    },
 ]
 
 # --- evaluation rules (WHAT to score) ---------------------------------------
@@ -194,6 +240,14 @@ RULES = [
     {
         "name": "rule_open_source_default",
         "evaluatorName": "open_source_default",
+        "target": "observation",
+        "sampling": 1.0,
+        "filter": _GEN_FILTER,
+        "mapping": [{"variable": "output", "source": "output"}],
+    },
+    {
+        "name": "rule_redo_of_shipped_capability",
+        "evaluatorName": "redo_of_shipped_capability",
         "target": "observation",
         "sampling": 1.0,
         "filter": _GEN_FILTER,
