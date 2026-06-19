@@ -4,7 +4,7 @@ from dataclasses import replace
 
 from wgmesh_pipeline.config import Config
 from wgmesh_pipeline.github.client import GitHubClient, GitHubIssue
-from wgmesh_pipeline.graph.build import build_graph
+from wgmesh_pipeline.graph.build import CompiledGraph, build_graph
 from wgmesh_pipeline.graph.nodes.gate import decide_gate, gate_node
 from wgmesh_pipeline.graph.nodes.implement import implement_node
 from wgmesh_pipeline.graph.nodes.review import review_node
@@ -124,7 +124,9 @@ def test_gate_escalates_high_risk_path_even_when_green() -> None:
 def test_implement_derives_changed_files_from_existing_diff_for_gate() -> None:
     result = implement_node(
         {
-            "issue": GitHubIssue(number=7, title="Fix keys", labels=("needs-triage",), state="open"),
+            "issue": GitHubIssue(
+                number=7, title="Fix keys", labels=("needs-triage",), state="open"
+            ),
             "diff": """diff --git a/internal/crypto/key.go b/internal/crypto/key.go
 --- a/internal/crypto/key.go
 +++ b/internal/crypto/key.go
@@ -147,10 +149,16 @@ def test_implement_derives_changed_files_from_existing_diff_for_gate() -> None:
 
 
 def test_implement_created_pr_number_is_merged_by_gate() -> None:
-    client = GitHubClient(cfg(mode="live"), session=SessionForPr({"number": 456}), sanitiser=lambda text: True)
+    client = GitHubClient(
+        cfg(mode="live"),
+        session=SessionForPr({"number": 456}),
+        sanitiser=lambda text: True,
+    )
     implemented = implement_node(
         {
-            "issue": GitHubIssue(number=9, title="Fix relay", labels=("needs-triage",), state="open"),
+            "issue": GitHubIssue(
+                number=9, title="Fix relay", labels=("needs-triage",), state="open"
+            ),
             "github": client,
             "diff": """diff --git a/docs/readme.md b/docs/readme.md
 --- a/docs/readme.md
@@ -162,7 +170,9 @@ def test_implement_created_pr_number_is_merged_by_gate() -> None:
 
     result = gate_node(
         {
-            "issue": GitHubIssue(number=9, title="Fix relay", labels=("needs-triage",), state="open"),
+            "issue": GitHubIssue(
+                number=9, title="Fix relay", labels=("needs-triage",), state="open"
+            ),
             "github": client,
             "diff": implemented["diff"],
             "changed_files": implemented["changed_files"],
@@ -180,11 +190,15 @@ def test_implement_created_pr_number_is_merged_by_gate() -> None:
 
 
 def test_review_failed_verification_escalates_at_gate(monkeypatch) -> None:
-    monkeypatch.setattr("wgmesh_pipeline.graph.nodes.review.run_sanitise", lambda text: True)
+    monkeypatch.setattr(
+        "wgmesh_pipeline.graph.nodes.review.run_sanitise", lambda text: True
+    )
 
     reviewed = review_node(
         {
-            "issue": GitHubIssue(number=8, title="Fix docs", labels=("needs-triage",), state="open"),
+            "issue": GitHubIssue(
+                number=8, title="Fix docs", labels=("needs-triage",), state="open"
+            ),
             "diff": "+docs\n",
             "changed_files": ["docs/readme.md"],
             "verification": {"tests_passed": False},
@@ -205,8 +219,12 @@ def test_review_failed_verification_escalates_at_gate(monkeypatch) -> None:
     assert decision.retryable is True
 
 
-def test_live_review_uses_verification_result_and_gate_can_merge(monkeypatch, tmp_path) -> None:
-    monkeypatch.setattr("wgmesh_pipeline.graph.nodes.review.run_sanitise", lambda text: True)
+def test_live_review_uses_verification_result_and_gate_can_merge(
+    monkeypatch, tmp_path
+) -> None:
+    monkeypatch.setattr(
+        "wgmesh_pipeline.graph.nodes.review.run_sanitise", lambda text: True
+    )
     calls = []
 
     def fake_run_verification(repo_path, branch):
@@ -218,12 +236,20 @@ def test_live_review_uses_verification_result_and_gate_can_merge(monkeypatch, tm
             "output_tail": "",
         }
 
-    monkeypatch.setattr("wgmesh_pipeline.graph.nodes.review.run_verification", fake_run_verification)
-    client = GitHubClient(cfg(mode="live"), session=SessionForPr({"number": 456}), sanitiser=lambda text: True)
+    monkeypatch.setattr(
+        "wgmesh_pipeline.graph.nodes.review.run_verification", fake_run_verification
+    )
+    client = GitHubClient(
+        cfg(mode="live"),
+        session=SessionForPr({"number": 456}),
+        sanitiser=lambda text: True,
+    )
 
     reviewed = review_node(
         {
-            "issue": GitHubIssue(number=11, title="Fix docs", labels=("needs-triage",), state="open"),
+            "issue": GitHubIssue(
+                number=11, title="Fix docs", labels=("needs-triage",), state="open"
+            ),
             "github": client,
             "goose_runner": object(),
             "repo_path": tmp_path,
@@ -243,11 +269,15 @@ def test_live_review_uses_verification_result_and_gate_can_merge(monkeypatch, tm
 
 
 def test_non_live_review_keeps_tests_passed_fallback(monkeypatch) -> None:
-    monkeypatch.setattr("wgmesh_pipeline.graph.nodes.review.run_sanitise", lambda text: True)
+    monkeypatch.setattr(
+        "wgmesh_pipeline.graph.nodes.review.run_sanitise", lambda text: True
+    )
 
     reviewed = review_node(
         {
-            "issue": GitHubIssue(number=12, title="Fix docs", labels=("needs-triage",), state="open"),
+            "issue": GitHubIssue(
+                number=12, title="Fix docs", labels=("needs-triage",), state="open"
+            ),
             "goose_runner": object(),
             "diff": "+docs\n",
             "verification": {"tests_passed": True},
@@ -288,10 +318,154 @@ def test_gate_escalates_sanitise_failure() -> None:
     assert decision.retryable is False
 
 
+def test_gate_component_paywall_is_non_retryable() -> None:
+    decision = decide_gate(
+        changed_files=["internal/billing/trial.go"],
+        diff="+if trial_expired(account) { stop_routing() }\n",
+        max_files=3,
+        tests_passed=True,
+        sanitise_ok=True,
+        paywall_ok=False,
+        review_findings=[],
+    )
+
+    assert decision.decision == "escalate"
+    assert "component paywall" in decision.reasons
+    assert decision.retryable is False
+
+
+def test_gate_node_blocks_component_paywall_and_labels_needs_human() -> None:
+    """Bite check: removing the paywall_ok branch in decide_gate makes this
+    #766-shaped fixture merge instead of labeling needs-human."""
+
+    client = CapturingGitHub()
+    result = gate_node(
+        {
+            "issue": GitHubIssue(
+                number=766, title="Add trial expiry", labels=(), state="open"
+            ),
+            "github": client,
+            "diff": """diff --git a/internal/trial/api.go b/internal/trial/api.go
+--- a/internal/trial/api.go
++++ b/internal/trial/api.go
++func expire_trial(accountID string) {
++    if is_trial_expired(accountID) {
++        stop_routing()
++    }
++}
+""",
+            "changed_files": ["internal/trial/api.go"],
+            "spec_content": "When trial expires, mesh daemons stop routing if expired.",
+            "impl_pr": 456,
+            "tests_passed": True,
+            "sanitise_ok": True,
+            "review_findings": [],
+        },
+        max_files=3,
+    )
+
+    assert result["decision"] == "escalate"
+    assert "component paywall" in result["risk_reasons"]
+    assert result["retryable"] is False
+    assert client.labels == [(766, "needs-human")]
+
+
+def test_gate_node_clean_managed_layer_change_does_not_add_paywall_reason() -> None:
+    result = gate_node(
+        {
+            "issue": GitHubIssue(
+                number=767, title="Add billing docs", labels=(), state="open"
+            ),
+            "diff": """diff --git a/docs/cloudroof-signup.md b/docs/cloudroof-signup.md
+--- a/docs/cloudroof-signup.md
++++ b/docs/cloudroof-signup.md
++Cloudroof signup stores invoice contact details for managed ingress.
+""",
+            "changed_files": ["docs/cloudroof-signup.md"],
+            "spec_content": "Add signup and invoice collection for cloudroof managed ingress.",
+            "tests_passed": True,
+            "sanitise_ok": True,
+            "review_findings": [],
+        },
+        max_files=3,
+        apply_side_effects=False,
+    )
+
+    assert result["decision"] == "merge"
+    assert "component paywall" not in result["risk_reasons"]
+
+
+def test_gate_node_paywall_detection_exception_fails_closed(monkeypatch) -> None:
+    def explode(diff: str, changed_files: list[str], spec_content: str = ""):
+        raise RuntimeError("detector crashed")
+
+    monkeypatch.setattr(
+        "wgmesh_pipeline.graph.nodes.gate.detect_component_paywall", explode
+    )
+    result = gate_node(
+        {
+            "issue": GitHubIssue(number=768, title="Fix docs", labels=(), state="open"),
+            "diff": "+docs\n",
+            "changed_files": ["docs/readme.md"],
+            "tests_passed": True,
+            "sanitise_ok": True,
+            "review_findings": [],
+        },
+        max_files=3,
+        apply_side_effects=False,
+    )
+
+    assert result["decision"] == "escalate"
+    assert "component paywall" in result["risk_reasons"]
+    assert result["retryable"] is False
+
+
+def test_component_paywall_does_not_retry_model_ladder() -> None:
+    client = GitHubClient(
+        Config(
+            target_repo="atvirokodosprendimai/wgmesh",
+            mode="shadow",
+            max_files=3,
+            stage_routing={"implement": ("cheap", "capable")},
+            max_escalation_attempts=2,
+        )
+    )
+    graph = CompiledGraph(
+        config=client.config,
+        triage=_node("triage", classification="fix"),
+        spec=_node("spec", spec_path="specs/issue-766-spec.md"),
+        spec_pr=_node("spec_pr", spec_pr=101),
+        implement=_node(
+            "implement",
+            diff="+if trial_expired(account) { stop_routing() }\n",
+            changed_files=["internal/trial/api.go"],
+            impl_pr=123,
+        ),
+        review=_node("review", tests_passed=True, sanitise_ok=True, review_findings=[]),
+        gate=gate_node,
+    )
+
+    result = graph.invoke(
+        {
+            "issue": GitHubIssue(
+                number=766, title="Add trial expiry", labels=(), state="open"
+            ),
+            "github": client,
+        }
+    )
+
+    assert result["decision"] == "escalate"
+    assert result["retryable"] is False
+    assert result["escalation_history"] == [0]
+    assert [record.operation for record in client.dry_run_records] == ["add_label"]
+
+
 def test_gate_node_surfaces_retryable_in_state() -> None:
     result = gate_node(
         {
-            "issue": GitHubIssue(number=10, title="Fix docs", labels=("needs-triage",), state="open"),
+            "issue": GitHubIssue(
+                number=10, title="Fix docs", labels=("needs-triage",), state="open"
+            ),
             "diff": "+docs\n",
             "changed_files": ["docs/readme.md"],
             "tests_passed": False,
@@ -312,7 +486,12 @@ def test_graph_wont_do_routes_to_escalate_and_skips_spec_implement() -> None:
 
     result = graph.invoke(
         {
-            "issue": GitHubIssue(number=5, title="wont fix old path", labels=("needs-triage",), state="open"),
+            "issue": GitHubIssue(
+                number=5,
+                title="wont fix old path",
+                labels=("needs-triage",),
+                state="open",
+            ),
             "github": client,
         }
     )
@@ -322,14 +501,20 @@ def test_graph_wont_do_routes_to_escalate_and_skips_spec_implement() -> None:
     assert [record.operation for record in client.dry_run_records] == ["add_label"]
 
 
-def test_graph_full_fix_path_reaches_gate_with_diff_and_shadow_has_no_network_writes(monkeypatch) -> None:
+def test_graph_full_fix_path_reaches_gate_with_diff_and_shadow_has_no_network_writes(
+    monkeypatch,
+) -> None:
     client = GitHubClient(cfg())
     graph = build_graph(cfg())
-    monkeypatch.setattr("wgmesh_pipeline.graph.nodes.review.run_sanitise", lambda text: True)
+    monkeypatch.setattr(
+        "wgmesh_pipeline.graph.nodes.review.run_sanitise", lambda text: True
+    )
 
     result = graph.invoke(
         {
-            "issue": GitHubIssue(number=6, title="Fix docs", labels=("needs-triage",), state="open"),
+            "issue": GitHubIssue(
+                number=6, title="Fix docs", labels=("needs-triage",), state="open"
+            ),
             "github": client,
             "diff": "+docs only\n",
             "changed_files": ["docs/readme.md"],
@@ -338,10 +523,23 @@ def test_graph_full_fix_path_reaches_gate_with_diff_and_shadow_has_no_network_wr
         }
     )
 
-    assert result["visited"] == ["triage", "spec", "spec_pr", "implement", "review", "gate"]
+    assert result["visited"] == [
+        "triage",
+        "spec",
+        "spec_pr",
+        "implement",
+        "review",
+        "gate",
+    ]
     assert result["decision"] == "merge"
     assert result["diff"] == "+docs only\n"
-    assert [record.operation for record in client.dry_run_records] == ["push_branch", "create_pr", "remove_label", "add_label", "merge_pr"]
+    assert [record.operation for record in client.dry_run_records] == [
+        "push_branch",
+        "create_pr",
+        "remove_label",
+        "add_label",
+        "merge_pr",
+    ]
 
 
 class SessionForPr:
@@ -360,10 +558,16 @@ class SessionForPr:
                 {"check_runs": [{"status": "completed", "conclusion": "success"}]}
             )
         if url.endswith("/reviews") and method == "GET":
-            return ResponseForPr([{"user": {"login": "reviewer-bot"}, "state": "APPROVED"}])
+            return ResponseForPr(
+                [{"user": {"login": "reviewer-bot"}, "state": "APPROVED"}]
+            )
         if method == "GET" and "/pulls/" in url:
             return ResponseForPr(
-                {**self.create_response, "user": {"login": "author-bot"}, "head": {"sha": "abc"}}
+                {
+                    **self.create_response,
+                    "user": {"login": "author-bot"},
+                    "head": {"sha": "abc"},
+                }
             )
         return ResponseForPr({"merged": True})
 
@@ -381,6 +585,33 @@ class ResponseForPr:
         return self._data
 
 
+class CapturingGitHub:
+    def __init__(self):
+        self.config = Config(
+            target_repo="atvirokodosprendimai/wgmesh",
+            mode="shadow",
+            max_files=3,
+        )
+        self.labels: list[tuple[int, str]] = []
+        self.merges: list[int] = []
+
+    def add_label(self, issue_number: int, label: str) -> None:
+        self.labels.append((issue_number, label))
+
+    def merge_pr(self, pr_number: int, commit_title: str) -> None:
+        self.merges.append(pr_number)
+
+
+def _node(name: str, **updates):
+    def run(state):
+        next_state = dict(state)
+        next_state.setdefault("visited", []).append(name)
+        next_state.update(updates)
+        return next_state
+
+    return run
+
+
 class SessionRedCi(SessionForPr):
     def request(self, method: str, url: str, **kwargs):
         if "/check-runs" in url:
@@ -396,7 +627,9 @@ def test_gate_escalates_instead_of_merging_when_ci_red() -> None:
     merge call, decision flipped to escalate. The box never merges past a
     red check run."""
     client = GitHubClient(
-        cfg(mode="live"), session=SessionRedCi({"number": 456}), sanitiser=lambda text: True
+        cfg(mode="live"),
+        session=SessionRedCi({"number": 456}),
+        sanitiser=lambda text: True,
     )
 
     result = gate_node(
@@ -431,7 +664,9 @@ def test_gate_escalates_when_no_approval_and_no_reviewer_credential() -> None:
     """Branch B of the merge gate: CI green, nobody approved, box has no
     reviewer identity -> escalate, never merge."""
     client = GitHubClient(
-        cfg(mode="live"), session=SessionNoApprovals({"number": 456}), sanitiser=lambda text: True
+        cfg(mode="live"),
+        session=SessionNoApprovals({"number": 456}),
+        sanitiser=lambda text: True,
     )
 
     result = gate_node(
@@ -476,7 +711,9 @@ def test_gate_self_serves_reviewer_approval_then_merges() -> None:
 
     assert result["decision"] == "merge"
     approve = next(
-        c for c in client.session.calls if c["method"] == "POST" and c["url"].endswith("/reviews")
+        c
+        for c in client.session.calls
+        if c["method"] == "POST" and c["url"].endswith("/reviews")
     )
     assert approve["kwargs"]["headers"]["Authorization"] == "Bearer reviewer-pat"
     assert any(c["url"].endswith("/pulls/456/merge") for c in client.session.calls)
@@ -507,7 +744,9 @@ def test_gate_red_box_ci_blocks_merge_without_any_actions_run() -> None:
     from wgmesh_pipeline.forge.box_ci import BoxCiResult
 
     client = GitHubClient(
-        cfg(mode="live"), session=SessionForPr({"number": 456}), sanitiser=lambda text: True
+        cfg(mode="live"),
+        session=SessionForPr({"number": 456}),
+        sanitiser=lambda text: True,
     )
     ci_calls: list[int] = []
 
@@ -529,11 +768,15 @@ def test_gate_green_box_ci_merges_without_actions_check_runs() -> None:
     from wgmesh_pipeline.forge.box_ci import BoxCiResult
 
     client = GitHubClient(
-        cfg(mode="live"), session=SessionForPr({"number": 456}), sanitiser=lambda text: True
+        cfg(mode="live"),
+        session=SessionForPr({"number": 456}),
+        sanitiser=lambda text: True,
     )
 
     result = gate_node(
-        _u9_state(client, box_ci=lambda forge, pr: BoxCiResult(green=True, failures=())),
+        _u9_state(
+            client, box_ci=lambda forge, pr: BoxCiResult(green=True, failures=())
+        ),
         max_files=3,
     )
 

@@ -51,6 +51,7 @@ def evaluate_gate(
             max_files=max_files,
             tests_passed=case.get("tests_passed", True),
             sanitise_ok=case.get("sanitise_ok", True),
+            paywall_ok=case.get("paywall_ok", True),
             review_findings=case.get("review_findings", []),
         ).decision
         if expected == "merge":

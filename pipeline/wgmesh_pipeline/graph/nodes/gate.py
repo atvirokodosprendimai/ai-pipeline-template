@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from wgmesh_pipeline.forge.box_ci import BoxCiResult
 from wgmesh_pipeline.forge.merge_gate import ensure_mergeable
 from wgmesh_pipeline.graph.state import Decision, GraphState
+from wgmesh_pipeline.paywall import detect_component_paywall
 from wgmesh_pipeline.risk import classify_risk
 
 log = logging.getLogger(__name__)
@@ -27,6 +28,7 @@ def decide_gate(
     tests_passed: bool,
     sanitise_ok: bool,
     review_findings: list[dict],
+    paywall_ok: bool = True,
 ) -> GateDecision:
     risk = classify_risk(changed_files, diff, max_files=max_files)
     reasons = list(risk.reasons)
@@ -34,6 +36,8 @@ def decide_gate(
         reasons.append("tests failed")
     if not sanitise_ok:
         reasons.append("sanitise failed")
+    if not paywall_ok:
+        reasons.append("component paywall")
     if any(finding.get("blocking", False) for finding in review_findings):
         reasons.append("blocking review finding")
 
@@ -42,6 +46,7 @@ def decide_gate(
         retryable = (
             risk.tier == "low"
             and sanitise_ok
+            and paywall_ok
             and set(reasons).issubset(retryable_reasons)
         )
         return GateDecision(
@@ -56,12 +61,27 @@ def decide_gate(
 def gate_node(state: GraphState, *, max_files: int, apply_side_effects: bool = True) -> GraphState:
     next_state = dict(state)
     _visit(next_state, "gate")
+    diff = next_state.get("diff", "")
+    changed_files = list(next_state.get("changed_files", []))
+    try:
+        paywall_ok, paywall_reasons = detect_component_paywall(
+            diff=diff,
+            changed_files=changed_files,
+            spec_content=next_state.get("spec_content", ""),
+        )
+    except Exception:
+        log.warning("gate: component paywall detection failed closed", exc_info=True)
+        paywall_ok = False
+        paywall_reasons = ["component paywall detector failed"]
+    if not paywall_ok and paywall_reasons:
+        next_state["paywall_reasons"] = paywall_reasons
     decision = decide_gate(
-        changed_files=list(next_state.get("changed_files", [])),
-        diff=next_state.get("diff", ""),
+        changed_files=changed_files,
+        diff=diff,
         max_files=max_files,
         tests_passed=bool(next_state.get("tests_passed", False)),
         sanitise_ok=bool(next_state.get("sanitise_ok", False)),
+        paywall_ok=paywall_ok,
         review_findings=list(next_state.get("review_findings", [])),
     )
     next_state["decision"] = decision.decision
