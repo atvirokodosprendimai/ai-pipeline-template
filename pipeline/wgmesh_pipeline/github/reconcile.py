@@ -58,6 +58,16 @@ def reconcile_issues(
         labels = set(issue.labels)
         current_stage = _current_stage(store, issue.number)
         if current_stage in TERMINAL_STAGES:
+            if (
+                current_stage == "escalated"
+                and issue.state != "closed"
+                and "needs-human" not in labels
+                and labels & {"needs-triage", "copilot-triaging"}
+            ):
+                store.upsert_issue(
+                    issue.number, issue.title, stage="queued", status="open"
+                )
+                queued += 1
             continue
 
         if issue.state == "closed" or labels & MERGED_LABELS:
