@@ -339,6 +339,17 @@ def verify() -> int:
         if isinstance(g, dict):
             print(f"  - {g.get('startTime')} name={g.get('name')} trace={g.get('traceId')}")
 
+    # DIAGNOSTIC: the eval rules map {{output}} <- observation.output. If real box
+    # generations carry no text output (only token-count usage), the judges score
+    # an empty field. Dump the first generation's input/output + a few score
+    # reasonings to confirm what the judge actually sees.
+    if gens and isinstance(gens[0], dict):
+        g0 = gens[0]
+        print("DIAG first GENERATION observation fields:")
+        print(f"  output={json.dumps(g0.get('output'))[:200]}")
+        print(f"  input={json.dumps(g0.get('input'))[:200]}")
+        print(f"  usageDetails={json.dumps(g0.get('usageDetails') or g0.get('usage'))[:200]}")
+
     # All recent scores, tallied by evaluator name — distinguishes "redo rule
     # just hasn't seen a post-registration generation yet" (other evaluators ARE
     # scoring → pipeline alive) from "no evaluator has ever scored" (score
@@ -346,6 +357,15 @@ def verify() -> int:
     all_scores = _get_list("/api/public/scores?limit=100") or _get_list(
         "/api/public/v2/scores?limit=100"
     )
+    # DIAGNOSTIC: dump a few score reasonings. If the judge saw an empty {{output}},
+    # the reasoning reads generic / "not applicable" and NUMERIC values default high.
+    print("DIAG sample score reasonings:")
+    for s in all_scores[:6]:
+        if isinstance(s, dict):
+            print(
+                f"  - {s.get('name')} value={s.get('value')} "
+                f"comment={json.dumps(s.get('comment'))[:160]}"
+            )
     by_name: dict[str, int] = {}
     for s in all_scores:
         if isinstance(s, dict) and s.get("name"):
