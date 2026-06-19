@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -21,7 +22,11 @@ GIT_TIMEOUT_SECONDS = 120
 WORKFLOW_DISPATCH_REF = "main"
 HTTP_TIMEOUT_SECONDS = 30
 SANITISE_TIMEOUT_SECONDS = 120
+OPEN_ISSUES_PAGE_SIZE = 100
+OPEN_ISSUES_MAX_PAGES = 50
 Sanitiser = Callable[[str], bool]
+
+log = logging.getLogger("wgmesh_pipeline.github.client")
 
 
 class SanitiseError(RuntimeError):
@@ -68,16 +73,34 @@ class GitHubClient:
         return [_parse_issue(item) for item in data if not item.get("pull_request")]
 
     def list_open_issues(self) -> list[GitHubIssue]:
-        data = self._request(
-            "GET",
-            f"/repos/{self.config.owner}/{self.config.repo}/issues",
-            params={"state": "open"},
-        )
         # GitHub's issues endpoint returns pull requests too (they carry a
         # "pull_request" key). Skip them — reconciling the box's own spec PRs
         # as issues caused a runaway: spec-of-spec PRs with exploding chained
         # titles (bug #11).
-        return [_parse_issue(item) for item in data if "pull_request" not in item]
+        issues: list[GitHubIssue] = []
+        for page in range(1, OPEN_ISSUES_MAX_PAGES + 1):
+            data = self._request(
+                "GET",
+                f"/repos/{self.config.owner}/{self.config.repo}/issues",
+                params={
+                    "state": "open",
+                    "per_page": OPEN_ISSUES_PAGE_SIZE,
+                    "page": page,
+                },
+            )
+            issues.extend(
+                _parse_issue(item) for item in data if "pull_request" not in item
+            )
+            if len(data) < OPEN_ISSUES_PAGE_SIZE:
+                break
+        else:
+            log.warning(
+                "list_open_issues pagination truncated after %s pages for %s/%s",
+                OPEN_ISSUES_MAX_PAGES,
+                self.config.owner,
+                self.config.repo,
+            )
+        return issues
 
     def get_issue(self, number: int) -> GitHubIssue | None:
         try:

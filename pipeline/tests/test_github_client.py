@@ -33,6 +33,18 @@ class Session:
         return self.response
 
 
+class SequenceSession:
+    def __init__(self, responses: list[Response]):
+        self.responses = list(responses)
+        self.calls: list[dict[str, Any]] = []
+
+    def request(self, method: str, url: str, **kwargs: Any) -> Response:
+        self.calls.append({"method": method, "url": url, "kwargs": kwargs})
+        if not self.responses:
+            raise AssertionError(f"unexpected request: {method} {url}")
+        return self.responses.pop(0)
+
+
 class ErrorResponse(Response):
     def __init__(self, status_code: int, text: str):
         super().__init__(text=text)
@@ -44,7 +56,9 @@ class ErrorResponse(Response):
 
 @pytest.fixture
 def cfg() -> Config:
-    return Config(target_repo="atvirokodosprendimai/wgmesh", mode="shadow", wgmesh_bot_pat="pat")
+    return Config(
+        target_repo="atvirokodosprendimai/wgmesh", mode="shadow", wgmesh_bot_pat="pat"
+    )
 
 
 def test_list_needs_triage_returns_parsed_issues(cfg: Config) -> None:
@@ -70,7 +84,9 @@ def test_list_needs_triage_returns_parsed_issues(cfg: Config) -> None:
 
 
 def test_request_http_error_includes_response_body(cfg: Config) -> None:
-    body = '{"message":"Validation Failed","errors":[{"message":"Head does not exist"}]}'
+    body = (
+        '{"message":"Validation Failed","errors":[{"message":"Head does not exist"}]}'
+    )
     session = Session(ErrorResponse(422, body))
     client = GitHubClient(cfg, session=session)
 
@@ -85,7 +101,9 @@ def test_shadow_create_pr_dry_runs_with_no_network_write(cfg: Config) -> None:
     session = Session(Response({"number": 1}))
     client = GitHubClient(cfg, session=session)
 
-    result = client.create_pr(title="spec: Issue #17 - Fix", head="bot/spec-17", base="main", body="body")
+    result = client.create_pr(
+        title="spec: Issue #17 - Fix", head="bot/spec-17", base="main", body="body"
+    )
 
     assert isinstance(result, DryRunResult)
     assert result.dry_run is True
@@ -97,16 +115,25 @@ def test_shadow_create_pr_dry_runs_with_no_network_write(cfg: Config) -> None:
 
 def test_create_pr_refuses_unsanitisable_body_even_in_shadow(cfg: Config) -> None:
     session = Session(Response({"number": 1}))
-    client = GitHubClient(cfg, session=session, sanitiser=lambda text: "SECRET" not in text)
+    client = GitHubClient(
+        cfg, session=session, sanitiser=lambda text: "SECRET" not in text
+    )
 
     with pytest.raises(RuntimeError, match="create_pr body"):
-        client.create_pr(title="spec: Issue #17 - Fix", head="bot/spec-17", base="main", body="SECRET_KEY=abc123")
+        client.create_pr(
+            title="spec: Issue #17 - Fix",
+            head="bot/spec-17",
+            base="main",
+            body="SECRET_KEY=abc123",
+        )
 
     assert session.calls == []
     assert client.dry_run_records == []
 
 
-def test_push_branch_refuses_unsanitisable_spec_even_in_shadow(tmp_path, cfg: Config) -> None:
+def test_push_branch_refuses_unsanitisable_spec_even_in_shadow(
+    tmp_path, cfg: Config
+) -> None:
     spec = tmp_path / "specs" / "issue-17-spec.md"
     spec.parent.mkdir()
     spec.write_text("SECRET_KEY=abc123")
@@ -124,13 +151,17 @@ def test_spec_branch_refuses_nonmatching_spec_path(tmp_path, cfg: Config) -> Non
     spec.write_text("## Spec\nsafe\n")
     client = GitHubClient(replace(cfg, mode="spec-only"), sanitiser=lambda text: True)
 
-    with pytest.raises(RuntimeError, match="expected spec file missing: specs/issue-17-spec.md"):
+    with pytest.raises(
+        RuntimeError, match="expected spec file missing: specs/issue-17-spec.md"
+    ):
         client.push_branch(str(tmp_path), "bot/spec-17", spec_pr=True)
 
     assert client.dry_run_records == []
 
 
-def test_spec_branch_sanitises_changed_files_outside_issue_spec_glob(tmp_path, cfg: Config) -> None:
+def test_spec_branch_sanitises_changed_files_outside_issue_spec_glob(
+    tmp_path, cfg: Config
+) -> None:
     spec = tmp_path / "specs" / "issue-17-spec.md"
     spec.parent.mkdir()
     spec.write_text("## Spec\nsafe\n")
@@ -211,12 +242,18 @@ def test_spec_only_create_pr_requires_explicit_spec_pr_authority(cfg: Config) ->
     assert session.calls == []
 
 
-def test_spec_only_allows_spec_branch_push_and_label_swap(cfg: Config, tmp_path, monkeypatch) -> None:
+def test_spec_only_allows_spec_branch_push_and_label_swap(
+    cfg: Config, tmp_path, monkeypatch
+) -> None:
     spec = tmp_path / "specs" / "issue-17-spec.md"
     spec.parent.mkdir()
-    spec.write_text("## Classification\nfix\n\n## Problem Analysis\nbug\n\n## Proposed Approach\nfix it\n")
+    spec.write_text(
+        "## Classification\nfix\n\n## Problem Analysis\nbug\n\n## Proposed Approach\nfix it\n"
+    )
     session = Session(Response({"ok": True}))
-    client = GitHubClient(replace(cfg, mode="spec-only"), session=session, sanitiser=lambda text: True)
+    client = GitHubClient(
+        replace(cfg, mode="spec-only"), session=session, sanitiser=lambda text: True
+    )
     pushes: list[tuple[list[str], str]] = []
 
     def fake_run(command, *, cwd, check, text, capture_output, timeout):
@@ -231,11 +268,15 @@ def test_spec_only_allows_spec_branch_push_and_label_swap(cfg: Config, tmp_path,
 
     # bot/spec-* push is force (bug #12: re-spec after reset diverges from the
     # prior run's remote branch -> plain push rejected non-fast-forward).
-    assert pushes == [(["git", "push", "--force", "origin", "bot/spec-17"], str(tmp_path))]
+    assert pushes == [
+        (["git", "push", "--force", "origin", "bot/spec-17"], str(tmp_path))
+    ]
     assert [call["method"] for call in session.calls] == ["DELETE", "POST"]
 
 
-def test_live_impl_branch_push_is_force_updated(cfg: Config, tmp_path, monkeypatch) -> None:
+def test_live_impl_branch_push_is_force_updated(
+    cfg: Config, tmp_path, monkeypatch
+) -> None:
     client = GitHubClient(replace(cfg, mode="live"), sanitiser=lambda text: True)
     pushes: list[tuple[list[str], str]] = []
 
@@ -247,35 +288,83 @@ def test_live_impl_branch_push_is_force_updated(cfg: Config, tmp_path, monkeypat
 
     client.push_branch(str(tmp_path), "bot/impl-17")
 
-    assert pushes == [(["git", "push", "--force", "origin", "bot/impl-17"], str(tmp_path))]
+    assert pushes == [
+        (["git", "push", "--force", "origin", "bot/impl-17"], str(tmp_path))
+    ]
 
 
-def test_list_open_issues_filters_out_pull_requests(cfg: Config) -> None:
+def _issue_payload(number: int, *, pull_request: bool = False) -> dict[str, Any]:
+    item: dict[str, Any] = {
+        "number": number,
+        "title": f"Issue {number}",
+        "labels": [],
+        "state": "open",
+    }
+    if pull_request:
+        item["pull_request"] = {"url": f"https://api.github.com/.../pulls/{number}"}
+    return item
+
+
+def test_list_open_issues_paginates_and_filters_out_pull_requests(cfg: Config) -> None:
     """GitHub's issues endpoint returns PRs too (they carry a pull_request
     key). They must be filtered, else the box reconciles its own spec PRs as
     issues and recurses into spec-of-spec PRs (bug #11)."""
-    session = Session(
-        Response(
-            [
-                {"number": 10, "title": "Real issue", "labels": [], "state": "open"},
-                {
-                    "number": 667,
-                    "title": "spec: Issue #652 - ...",
-                    "labels": [],
-                    "state": "open",
-                    "pull_request": {"url": "https://api.github.com/.../pulls/667"},
-                },
-            ]
-        )
+    first_page = [_issue_payload(number) for number in range(1, 91)] + [
+        _issue_payload(number, pull_request=True) for number in range(1000, 1010)
+    ]
+    second_page = [_issue_payload(number) for number in range(91, 96)] + [
+        _issue_payload(2000, pull_request=True)
+    ]
+    session = SequenceSession(
+        [
+            Response(first_page),
+            Response(second_page),
+        ]
+    )
+
+    issues = GitHubClient(cfg, session=session).list_open_issues()
+
+    assert [i.number for i in issues] == list(range(1, 96))
+    assert len(session.calls) == 2
+    assert session.calls[0]["kwargs"]["params"] == {
+        "state": "open",
+        "per_page": 100,
+        "page": 1,
+    }
+    assert session.calls[1]["kwargs"]["params"] == {
+        "state": "open",
+        "per_page": 100,
+        "page": 2,
+    }
+
+
+def test_list_open_issues_stops_after_single_short_page(cfg: Config) -> None:
+    session = SequenceSession(
+        [
+            Response(
+                [
+                    _issue_payload(10),
+                    _issue_payload(667, pull_request=True),
+                ]
+            ),
+        ]
     )
 
     issues = GitHubClient(cfg, session=session).list_open_issues()
 
     assert [i.number for i in issues] == [10]
+    assert len(session.calls) == 1
+    assert session.calls[0]["kwargs"]["params"] == {
+        "state": "open",
+        "per_page": 100,
+        "page": 1,
+    }
 
 
 def _search_response(*titles: str) -> Response:
-    return Response({"total_count": len(titles), "items": [{"title": t} for t in titles]})
+    return Response(
+        {"total_count": len(titles), "items": [{"title": t} for t in titles]}
+    )
 
 
 def test_has_merged_resolution_pr_matches_exact_prefix_title(cfg: Config) -> None:
@@ -311,7 +400,9 @@ def test_has_merged_resolution_pr_rejects_number_prefix_match(cfg: Config) -> No
     assert GitHubClient(cfg, session=session).has_merged_resolution_pr(540) is False
 
 
-def test_has_merged_resolution_pr_rejects_alphanumeric_continuation(cfg: Config) -> None:
+def test_has_merged_resolution_pr_rejects_alphanumeric_continuation(
+    cfg: Config,
+) -> None:
     session = Session(_search_response("impl: Issue #540A - other work"))
 
     assert GitHubClient(cfg, session=session).has_merged_resolution_pr(540) is False
@@ -325,7 +416,13 @@ def test_list_needs_triage_filters_out_pull_requests(cfg: Config) -> None:
         Response(
             [
                 {"number": 10, "title": "Real issue", "labels": [], "state": "open"},
-                {"number": 11, "title": "Null pr key", "labels": [], "state": "open", "pull_request": None},
+                {
+                    "number": 11,
+                    "title": "Null pr key",
+                    "labels": [],
+                    "state": "open",
+                    "pull_request": None,
+                },
                 {
                     "number": 667,
                     "title": "spec: Issue #652 - ...",
