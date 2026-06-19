@@ -474,7 +474,11 @@ jobs:
       - name: Update state + commit via PR
         run: |
           set -uo pipefail
-          if [ "${DRY_RUN}" = "true" ] || [ "${SKIP_REMAINDER:-false}" = "true" ]; then
+          # Only evergreen weeks rotate angles; ship-news weeks have nothing to
+          # persist, so skip the state commit entirely (no empty/no-op PR).
+          if [ "${DRY_RUN}" = "true" ] || [ "${SKIP_REMAINDER:-false}" = "true" ] \
+             || [ "${SHIP_NEWS:-0}" = "1" ] || [ -z "${CHOSEN_ANGLE:-}" ]; then
+            echo "No evergreen angle to persist; skipping state commit."
             exit 0
           fi
 
