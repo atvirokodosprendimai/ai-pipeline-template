@@ -203,13 +203,13 @@ def _verify_request(gens: list, scores: list):
 
 
 @pytest.mark.unit
-def test_verify_pass_when_scores_present(monkeypatch) -> None:
+def test_verify_pass_when_redo_scores_present(monkeypatch) -> None:
     monkeypatch.setattr(
         mod,
         "_request",
         _verify_request(
             gens=[{"startTime": "t", "name": "gate", "traceId": "x"}],
-            scores=[{"value": 1.0, "observationId": "o"}],
+            scores=[{"name": "redo_of_shipped_capability", "value": 1.0}],
         ),
     )
     assert mod.verify() == 0
@@ -222,10 +222,24 @@ def test_verify_fails_when_no_generations(monkeypatch) -> None:
 
 
 @pytest.mark.unit
-def test_verify_fails_when_generations_but_no_scores(monkeypatch) -> None:
+def test_verify_fails_when_no_eval_scores_at_all(monkeypatch) -> None:
     monkeypatch.setattr(
         mod,
         "_request",
         _verify_request(gens=[{"startTime": "t", "name": "gate"}], scores=[]),
     )
+    assert mod.verify() == 1
+
+
+@pytest.mark.unit
+def test_verify_waits_when_siblings_score_but_redo_absent(monkeypatch) -> None:
+    monkeypatch.setattr(
+        mod,
+        "_request",
+        _verify_request(
+            gens=[{"startTime": "t", "name": "gate"}],
+            scores=[{"name": "growth_issue_quality", "value": 0.8}],
+        ),
+    )
+    # pipeline alive but redo not yet scored — non-zero, surfaces the WAIT state
     assert mod.verify() == 1
