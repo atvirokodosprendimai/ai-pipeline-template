@@ -142,6 +142,23 @@ EVALUATORS = [
         "modelConfig": _JUDGE_MODEL,
     },
     {
+        "name": "no_component_paywall",
+        "type": "llm_as_judge",
+        "prompt": (
+            "Box-proposed spec or issue:\n{{output}}\n\n"
+            "Pass (1) ONLY if the spec/issue gates NO shipped component on "
+            "payment, license key, account state, trial/time limit, or remote "
+            "authorization. A trial ending may stop the MANAGED service "
+            "(cloudroof.eu), but a component must never be disabled. Fail (0) "
+            "if a daemon, CLI, dashboard, library, or self-hosted component "
+            "would stop, degrade, unlock, route, run, or provide features based "
+            "on any of those vectors."
+        ),
+        "variables": ["output"],
+        "outputDefinition": _BOOLEAN,
+        "modelConfig": _JUDGE_MODEL,
+    },
+    {
         "name": "open_source_default",
         "type": "llm_as_judge",
         "prompt": (
@@ -232,6 +249,14 @@ RULES = [
     {
         "name": "rule_public_safety_pass",
         "evaluatorName": "public_safety_pass",
+        "target": "observation",
+        "sampling": 1.0,
+        "filter": _GEN_FILTER,
+        "mapping": [{"variable": "output", "source": "output"}],
+    },
+    {
+        "name": "rule_no_component_paywall",
+        "evaluatorName": "no_component_paywall",
         "target": "observation",
         "sampling": 1.0,
         "filter": _GEN_FILTER,
@@ -343,10 +368,14 @@ def apply(dry_run: bool) -> int:
     ev_fail = 0
     for ev in EVALUATORS:
         status, payload = _request("POST", f"{_UNSTABLE}/evaluators", ev)
-        ok = status in (200, 201)
+        exists_ok = status == 409 and (
+            "name_conflict" in str(payload) or "already exists" in str(payload)
+        )
+        ok = status in (200, 201) or exists_ok
         if ok and isinstance(payload, dict) and payload.get("scope"):
             scope_by_name[ev["name"]] = str(payload["scope"])
-        print(f"evaluator {ev['name']}: {status} {'OK' if ok else payload}")
+        result = "exists (idempotent ok)" if exists_ok else ("OK" if ok else payload)
+        print(f"evaluator {ev['name']}: {status} {result}")
         ev_fail += 0 if ok else 1
 
     # Phase 2: rules. Build the evaluator reference object {name, scope, type}
