@@ -189,3 +189,43 @@ def test_apply_keeps_genuine_rule_failure(monkeypatch) -> None:
     monkeypatch.setattr(mod, "_request", fake_request)
 
     assert mod.apply(dry_run=False) > 0
+
+
+def _verify_request(gens: list, scores: list):
+    def fake_request(method: str, path: str, body=None) -> tuple[int, object]:
+        if "observations" in path:
+            return 200, {"data": gens}
+        if "scores" in path:
+            return 200, {"data": scores}
+        return 200, {"data": []}
+
+    return fake_request
+
+
+@pytest.mark.unit
+def test_verify_pass_when_scores_present(monkeypatch) -> None:
+    monkeypatch.setattr(
+        mod,
+        "_request",
+        _verify_request(
+            gens=[{"startTime": "t", "name": "gate", "traceId": "x"}],
+            scores=[{"value": 1.0, "observationId": "o"}],
+        ),
+    )
+    assert mod.verify() == 0
+
+
+@pytest.mark.unit
+def test_verify_fails_when_no_generations(monkeypatch) -> None:
+    monkeypatch.setattr(mod, "_request", _verify_request(gens=[], scores=[]))
+    assert mod.verify() == 1
+
+
+@pytest.mark.unit
+def test_verify_fails_when_generations_but_no_scores(monkeypatch) -> None:
+    monkeypatch.setattr(
+        mod,
+        "_request",
+        _verify_request(gens=[{"startTime": "t", "name": "gate"}], scores=[]),
+    )
+    assert mod.verify() == 1

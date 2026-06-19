@@ -295,6 +295,61 @@ def probe() -> None:
         )
 
 
+def _get_list(path: str) -> list:
+    status, payload = _request("GET", path)
+    if status != 200 or not isinstance(payload, dict):
+        print(f"  GET {path} -> {status} {str(payload)[:200]}")
+        return []
+    data = payload.get("data")
+    return data if isinstance(data, list) else []
+
+
+def verify() -> int:
+    """End-to-end check that the redo evaluator is actually scoring real box
+    generations: are there GENERATION observations at all, and are
+    redo_of_shipped_capability scores landing on them? Registered != firing."""
+    gens = _get_list("/api/public/observations?type=GENERATION&limit=50")
+    print(f"GENERATION observations (latest 50 sampled): {len(gens)}")
+    for g in gens[:5]:
+        if isinstance(g, dict):
+            print(f"  - {g.get('startTime')} name={g.get('name')} trace={g.get('traceId')}")
+
+    scores = _get_list(
+        "/api/public/scores?name=redo_of_shipped_capability&limit=50"
+    ) or _get_list(
+        "/api/public/v2/scores?name=redo_of_shipped_capability&limit=50"
+    )
+    print(f"redo_of_shipped_capability scores: {len(scores)}")
+    for s in scores[:5]:
+        if isinstance(s, dict):
+            print(
+                f"  - {s.get('timestamp')} value={s.get('value')} "
+                f"obs={s.get('observationId')} comment={str(s.get('comment'))[:80]}"
+            )
+
+    print("---")
+    if not gens:
+        print(
+            "VERIFY: NO GENERATION observations in Langfuse — the box is not emitting "
+            "generation traces, so the evaluator has nothing to score (wired but off the "
+            "execution path). Instrument the box's LLM calls before this eval can fire."
+        )
+        return 1
+    if not scores:
+        print(
+            "VERIFY: box generations exist but ZERO redo scores. Evaluation rules score "
+            "NEW observations after registration only — either no box run since apply, or "
+            "the GENERATION filter does not match the box's observation type. Re-run verify "
+            "after the next box generation; if still zero, inspect the rule filter."
+        )
+        return 1
+    print(
+        f"VERIFY: PASS — {len(scores)} redo_of_shipped_capability score(s) on real "
+        "generations. Evaluator is firing end-to-end."
+    )
+    return 0
+
+
 def _existing_names(path: str, key: str = "data") -> set[str]:
     status, payload = _request("GET", path)
     if status != 200 or not isinstance(payload, dict):
@@ -400,6 +455,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--dry-run", action="store_true", help="print payloads, do not write"
     )
+    parser.add_argument(
+        "--verify",
+        action="store_true",
+        help="check the redo evaluator is scoring real box generations end-to-end",
+    )
     args = parser.parse_args(argv)
     if not args.dry_run:  # dry-run prints payloads only, never hits the API
         for key in ("LANGFUSE_HOST", "LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY"):
@@ -409,6 +469,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.probe:
         probe()
         return 0
+    if args.verify:
+        return verify()
     failures = apply(args.dry_run)
     if failures:
         print(
