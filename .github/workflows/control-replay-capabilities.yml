@@ -1,0 +1,148 @@
+name: Control Replay — Capabilities Grounding
+
+# Falsifiable R6 verification for the capabilities digest (PR #1849).
+# Runs the real Observation Loop model on two arms that differ ONLY in the
+# Already-Shipped Capabilities block:
+#   arm A (real digest)  -> expect: analytics NOT proposed
+#   arm B (empty digest) -> expect: analytics proposed
+# A single non-occurrence proves nothing; the contrast is the proof.
+#
+# Read-only by construction: no `issues: write`, no create-issues step.
+# Mutates nothing. Costs two metered OpenRouter calls per run.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  replay:
+    name: Two-arm control replay
+    runs-on: ubuntu-latest
+    env:
+      TARGET_REPO: atvirokodosprendimai/wgmesh
+      GH_TOKEN: ${{ secrets.PUSH_TOKEN }}
+      OBSERVER_API_KEY: ${{ secrets.OBSERVER_API_KEY }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build shared grounding (identical across arms)
+        run: |
+          # Product Codebase Summary — same source the loop uses.
+          claude_md=$(gh api "repos/$TARGET_REPO/contents/CLAUDE.md" --jq '.content' 2>/dev/null | base64 -d 2>/dev/null || echo "")
+          if [ -n "$claude_md" ]; then
+            echo "$claude_md" | sed -n '1,/^## Code Conventions/p' | head -n -1 > /tmp/product_summary.txt
+          else
+            echo "No CLAUDE.md found in $TARGET_REPO." > /tmp/product_summary.txt
+          fi
+
+          # Arm A: real capabilities digest. Arm B: empty (sentinel).
+          bash company/scripts/collect-capabilities.sh --limit 200 > /tmp/cap_real.txt || \
+            echo "(capabilities digest unavailable this run)" > /tmp/cap_real.txt
+          echo "(no capabilities digest)" > /tmp/cap_empty.txt
+
+          echo "::group::Arm A digest (real)"; cat /tmp/cap_real.txt; echo "::endgroup::"
+          if ! grep -qi "openpanel" /tmp/cap_real.txt; then
+            echo "::warning::Arm A digest does not contain OpenPanel — deterministic precondition weak."
+          fi
+
+      - name: Run both arms and judge
+        run: |
+          set -euo pipefail
+
+          # A representative GTM state that reproduces the #767-generating
+          # conditions: the funnel is being built and the loop is asked for the
+          # highest-leverage acquisition action. The ONLY difference between arms
+          # is the capabilities block, so any behavior delta is attributable to it.
+          build_message() {
+            local cap_file="$1"
+            cat <<MSGEOF
+          Here is the current state snapshot for your assessment:
+
+          ## State Snapshot
+          {
+            "funnel_stage": 3,
+            "stage_name": "Acquisition",
+            "product": "wgmesh / cloudroof.eu",
+            "notes": "Landing pages live with Polar CTAs. GTM funnel being built: comparison pages, pricing experiment, nurture flows. Measuring visitor -> trial -> paid conversion is a live concern.",
+            "open_gtm_issues": ["#732 nurture flow", "#745 comparison page", "#736 pricing experiment"]
+          }
+
+          ## Product Codebase Summary
+          This is the actual state of the primary product repo (from CLAUDE.md). Use this to
+          understand what features ALREADY EXIST. Do NOT create issues for features listed here.
+          $(cat /tmp/product_summary.txt)
+
+          ## Already-Shipped Capabilities
+          Capabilities already shipped via merged PRs (and documented solutions),
+          newest first. Treat every item here as DONE — do NOT create issues to
+          build, add, or re-implement anything already listed, even when it is
+          worded differently from the capability name. Reconcile any open issue
+          that duplicates one of these to closure.
+          $(cat "$cap_file")
+
+          ## Open Issues & PRs
+          - #732 Design nurture flow for trial signups
+          - #745 Create cloudroof vs Tailscale comparison page
+          - #736 Run pricing page experiment
+
+          ## Additional instruction
+          Propose the highest-leverage GTM acquisition actions as issues_to_create.
+          We are building the funnel and want to know what is moving the needle.
+
+          Please provide your assessment as a JSON object per the output format in your system prompt.
+          MSGEOF
+          }
+
+          call_llm() {
+            local msg_file="$1" out="$2"
+            jq -n --rawfile system company/system-prompt.md --rawfile user "$msg_file" '{
+              model: "anthropic/claude-sonnet-4",
+              max_tokens: 4096,
+              messages: [{role: "system", content: $system}, {role: "user", content: $user}]
+            }' > /tmp/request.json
+            local code
+            code=$(curl -s -w '%{http_code}' -o /tmp/resp.json \
+              -H "Authorization: Bearer $OBSERVER_API_KEY" \
+              -H "content-type: application/json" \
+              -d @/tmp/request.json \
+              https://openrouter.ai/api/v1/chat/completions)
+            if [ "$code" -lt 200 ] || [ "$code" -ge 300 ]; then
+              echo "::error::OpenRouter HTTP $code: $(jq -r '.error.message // "?"' /tmp/resp.json 2>/dev/null)"
+              exit 1
+            fi
+            local content
+            content=$(jq -r '.choices[0].message.content' /tmp/resp.json)
+            # shellcheck disable=SC2016  # the $ in the fence regex is an anchor, not a variable
+            echo "$content" | sed -n '/^```json/,/^```$/p' | sed '1d;$d' > "$out"
+            [ -s "$out" ] || echo "$content" | jq . > "$out" 2>/dev/null || echo "$content" > "$out"
+          }
+
+          build_message /tmp/cap_real.txt  > /tmp/msg_A.txt
+          build_message /tmp/cap_empty.txt > /tmp/msg_B.txt
+
+          call_llm /tmp/msg_A.txt /tmp/assessment_A.json
+          call_llm /tmp/msg_B.txt /tmp/assessment_B.json
+
+          titles() { jq -r '(.issues_to_create // []) | map(.title) | .[]' "$1" 2>/dev/null || true; }
+          ANALYTICS='analytic|tracking|plausible|posthog|openpanel|web.?analytics|measure.*conversion'
+
+          a_titles=$(titles /tmp/assessment_A.json); b_titles=$(titles /tmp/assessment_B.json)
+          echo "::group::Arm A (real digest) issues_to_create"; echo "${a_titles:-<none>}"; echo "::endgroup::"
+          echo "::group::Arm B (empty digest) issues_to_create"; echo "${b_titles:-<none>}"; echo "::endgroup::"
+
+          a_hit=$(echo "$a_titles" | grep -ciE "$ANALYTICS" || true)
+          b_hit=$(echo "$b_titles" | grep -ciE "$ANALYTICS" || true)
+
+          echo "Arm A analytics proposals: $a_hit"
+          echo "Arm B analytics proposals: $b_hit"
+          echo "---"
+          if [ "$a_hit" -eq 0 ] && [ "$b_hit" -ge 1 ]; then
+            echo "VERDICT: PASS — digest suppresses the analytics proposal (A=0) that the empty arm makes (B=$b_hit). Mechanism bites."
+          elif [ "$a_hit" -ge 1 ]; then
+            echo "VERDICT: FAIL — analytics still proposed with the digest present (A=$a_hit). Grounding did not suppress."
+            exit 1
+          else
+            echo "VERDICT: INCONCLUSIVE — empty arm did not elicit analytics (B=0); control did not exercise the behavior. Re-run with a sharper snapshot."
+          fi

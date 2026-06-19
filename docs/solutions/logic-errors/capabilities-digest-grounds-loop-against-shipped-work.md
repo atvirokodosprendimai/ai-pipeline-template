@@ -79,9 +79,19 @@ digest works" from "the loop happened not to re-file"; the two-arm control can.
 
 ## Status
 
-- Collector, loop wiring, and system-prompt grounding: shipped (this change, U1-U3).
-- Control replay (R6) and disposition of the live #767 / #769: pending the change deploying
-  to the box and operator authorization to close the live issues. Recorded here when run.
+- Collector, loop wiring, and system-prompt grounding: shipped (PR #1849, `2aecc34` on main).
+  Takes effect on the next Observation Loop run — the loop is a GitHub Actions cron
+  (`observation-loop.yml`, `runs-on: ubuntu-latest`), not the Hetzner box; no deploy needed.
+- **Control replay, deterministic arm — PASS (2026-06-19).** `collect-capabilities.sh` run live
+  against `atvirokodosprendimai/wgmesh` (`--limit 200`) surfaced the OpenPanel capability with
+  rich body context: `OpenPanel analytics — track Polar CTA clicks (PR #762) — Adds the OpenPanel
+  tracker (self-hosted at counter.hackrsvalv.com) to the 4 landing pages...` (34 capability lines,
+  clean run). The grounding the LLM needs to make the #767 match is present and well-formed.
+- **Control replay, semantic arm — pending.** The two-arm LLM call (digest present → analytics not
+  proposed; digest empty → proposed) requires the loop model (`anthropic/claude-sonnet-4` via
+  OpenRouter, `OBSERVER_API_KEY`) and spends metered budget; run via a dispatch-only replay or
+  the next live tick observed against the control. Record the two arms here when run.
+- Disposition of the live #767 / #769: pending operator authorization (public seed repo).
 
 ## Residual risks
 
