@@ -1,0 +1,19 @@
+pipeline/pyproject.toml
+  s_ee5d170b65795e::t_fd9e1e3c30cdd2 12
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "df66c24bf15241cc5a6ba5b97125a5dc7512cccb",
+  "prompts": {},
+  "sessions": {
+    "s_ee5d170b65795e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "135e0f00-8a77-44af-ba87-de6eb16656bb",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
