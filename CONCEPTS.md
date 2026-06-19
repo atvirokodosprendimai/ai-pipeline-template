@@ -73,6 +73,11 @@ The agent role that reads an approved Spec and produces the Implementation. Curr
 ### Observer
 The model role that reads collected state during the Observation Loop and produces the Assessment.
 
+## Outbound
+
+### Social Drip
+The weekly cadence that auto-drafts one short social post for the product's public accounts and pings a human to review and publish — never posting unattended. Each run is one of two modes: a **ship-news** post highlighting a user-facing change that shipped, or, when nothing user-facing shipped, an **evergreen** post (a rotating educational/positioning angle) so the cadence never goes dark. Distinct from the daily release-notes digest, which is an internal email summary, not a public post.
+
 ## Principles and metrics
 
 ### Andon
