@@ -1,0 +1,19 @@
+docs/postmortems/2026-06-19-blogpost-ai-tried-to-paywall-its-own-open-source.md
+  s_2530e74cd22199::t_74ebfb03a9d0b1 1-62
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "48ac73c09b00a5cc93b2670fef02d4917a95860c",
+  "prompts": {},
+  "sessions": {
+    "s_2530e74cd22199": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "880cb85e-5a13-4d30-bcdf-520099c54268",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
