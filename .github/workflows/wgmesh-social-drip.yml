@@ -156,6 +156,8 @@ jobs:
           - Avoid angles listed in recent_angles when possible.
           - Keep the post technical, specific, and human. No hashtags. No markdown. No private/internal pipeline details.
           - Mention wgmesh by name and prefer a useful concrete claim over generic hype.
+          - HARD LIMIT: the post_body MUST be a COMPLETE, self-contained thought of AT MOST 270 characters INCLUDING the link. End with a finished sentence. Do NOT trail off, do NOT use an ellipsis ("..." or "…"), do NOT get cut mid-idea. If you can't fit the idea, say less — a shorter complete post beats a longer truncated one.
+          - ALWAYS end the post with the link: https://wgmesh.dev
           - Output JSON exactly matching: {{"ship_news":0|1,"post_body":"...","chosen_angle":"differentiator|how-it-works|use-case|tip|"}}
           """
 
@@ -191,14 +193,19 @@ jobs:
           import re
           import sys
 
-          def trim_post(text, limit=280):
+          def trim_post(text, limit=290):
+              # Backstop only — the prompt asks for a complete <=270 post. Never
+              # truncate mid-meaning or append an ellipsis; cut at the last full
+              # sentence within the limit, else at the last whole word.
               text = re.sub(r"\s+", " ", str(text or "")).strip()
               if len(text) <= limit:
                   return text
-              cut = text[: limit - 3].rstrip()
-              if " " in cut:
-                  cut = cut.rsplit(" ", 1)[0].rstrip()
-              return cut + "..."
+              window = text[:limit]
+              cut = max(window.rfind(". "), window.rfind("! "), window.rfind("? "))
+              if cut > 40:
+                  return window[: cut + 1].rstrip()
+              sp = window.rfind(" ")
+              return (window[:sp] if sp > 0 else window).rstrip()
 
           try:
               with open("/tmp/social_drip_llm_resp.json", encoding="utf-8") as fh:
