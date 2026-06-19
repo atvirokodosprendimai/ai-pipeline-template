@@ -23,7 +23,7 @@ jobs:
     env:
       TARGET_REPO: atvirokodosprendimai/wgmesh
       GH_TOKEN: ${{ secrets.PUSH_TOKEN }}
-      OBSERVER_API_KEY: ${{ secrets.OBSERVER_API_KEY }}
+      OBSERVER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
     steps:
       - uses: actions/checkout@v6
 
