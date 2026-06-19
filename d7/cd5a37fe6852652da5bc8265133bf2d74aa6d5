@@ -1,0 +1,21 @@
+pipeline/tests/test_setup_langfuse_evaluators.py
+  s_2530e74cd22199::t_62d892bcfb3feb 132-133
+  s_2530e74cd22199::t_4dec155db689ad 100-130
+  s_2530e74cd22199::t_8678e7d95aba28 16
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "d7cd5a37fe6852652da5bc8265133bf2d74aa6d5",
+  "prompts": {},
+  "sessions": {
+    "s_2530e74cd22199": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "880cb85e-5a13-4d30-bcdf-520099c54268",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
