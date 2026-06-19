@@ -1,0 +1,44 @@
+pipeline/wgmesh_pipeline/goose/runner.py
+  s_bc6a541c96bdd4::t_1b5d25b7cd795d 318-320
+  s_46dc94c5360748::t_60ccfe67840932 335-340,365-370,382-387,398-405,472-478,501,505-507
+pipeline/tests/test_langchain_agent_runner.py
+  s_46dc94c5360748::t_e1540c57acd90a 165
+pipeline/tests/test_goose_runner.py
+  s_46dc94c5360748::t_b34ae50acb6fd0 208,213-240
+  s_685e00ea088234::t_ed167883921061 24-36,188,247-391
+  s_685e00ea088234::t_d9a7ab5a119d45 8,241-246
+pipeline/wgmesh_pipeline/langchain_agent/runner.py
+  s_46dc94c5360748::t_810a05247414bd 78,86,101-102,126-130,143-147,294,299
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "2195781edbb567b231664659cc34999530187257",
+  "prompts": {},
+  "sessions": {
+    "s_46dc94c5360748": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ee077-5f0d-7120-b230-1e4a1abd4034",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    },
+    "s_685e00ea088234": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ee077-a6ba-78f0-ae82-240ca753f20f",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    },
+    "s_bc6a541c96bdd4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ad430f97-c1f6-4ded-a626-430f15f46308",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
