@@ -314,18 +314,22 @@ def verify() -> int:
         if isinstance(g, dict):
             print(f"  - {g.get('startTime')} name={g.get('name')} trace={g.get('traceId')}")
 
-    scores = _get_list(
-        "/api/public/scores?name=redo_of_shipped_capability&limit=50"
-    ) or _get_list(
-        "/api/public/v2/scores?name=redo_of_shipped_capability&limit=50"
+    # All recent scores, tallied by evaluator name — distinguishes "redo rule
+    # just hasn't seen a post-registration generation yet" (other evaluators ARE
+    # scoring → pipeline alive) from "no evaluator has ever scored" (score
+    # pipeline dead, independent of the redo addition).
+    all_scores = _get_list("/api/public/scores?limit=100") or _get_list(
+        "/api/public/v2/scores?limit=100"
     )
-    print(f"redo_of_shipped_capability scores: {len(scores)}")
-    for s in scores[:5]:
-        if isinstance(s, dict):
-            print(
-                f"  - {s.get('timestamp')} value={s.get('value')} "
-                f"obs={s.get('observationId')} comment={str(s.get('comment'))[:80]}"
-            )
+    by_name: dict[str, int] = {}
+    for s in all_scores:
+        if isinstance(s, dict) and s.get("name"):
+            by_name[str(s["name"])] = by_name.get(str(s["name"]), 0) + 1
+    our_names = {ev["name"] for ev in EVALUATORS}
+    redo_scores = by_name.get("redo_of_shipped_capability", 0)
+    other_eval_scores = sum(v for k, v in by_name.items() if k in our_names and k != "redo_of_shipped_capability")
+    print(f"recent scores by name (latest 100 sampled): {by_name or '{}'}")
+    print(f"redo_of_shipped_capability scores: {redo_scores}")
 
     print("---")
     if not gens:
@@ -335,19 +339,27 @@ def verify() -> int:
             "execution path). Instrument the box's LLM calls before this eval can fire."
         )
         return 1
-    if not scores:
+    if redo_scores > 0:
         print(
-            "VERIFY: box generations exist but ZERO redo scores. Evaluation rules score "
-            "NEW observations after registration only — either no box run since apply, or "
-            "the GENERATION filter does not match the box's observation type. Re-run verify "
-            "after the next box generation; if still zero, inspect the rule filter."
+            f"VERIFY: PASS — {redo_scores} redo_of_shipped_capability score(s) on real "
+            "generations. Evaluator is firing end-to-end."
+        )
+        return 0
+    if other_eval_scores > 0:
+        print(
+            f"VERIFY: WAIT — the score pipeline is ALIVE ({other_eval_scores} score(s) "
+            "from sibling evaluators), but no redo score yet. Langfuse rules score only "
+            "generations created AFTER the rule was registered; re-run verify after the "
+            "next box generation. If it stays zero while siblings keep scoring, the redo "
+            "rule's GENERATION filter is the suspect."
         )
         return 1
     print(
-        f"VERIFY: PASS — {len(scores)} redo_of_shipped_capability score(s) on real "
-        "generations. Evaluator is firing end-to-end."
+        "VERIFY: FAIL — box generations exist but NO evaluator (redo or sibling) has any "
+        "score. The eval-rule -> score path is not firing at all; fix that before trusting "
+        "any judge. Check the Langfuse default eval-model connection and rule enablement."
     )
-    return 0
+    return 1
 
 
 def _existing_names(path: str, key: str = "data") -> set[str]:
