@@ -209,7 +209,8 @@ def test_verify_pass_when_redo_scores_present(monkeypatch) -> None:
         "_request",
         _verify_request(
             gens=[{"startTime": "t", "name": "gate", "traceId": "x"}],
-            scores=[{"name": "redo_of_shipped_capability", "value": 1.0}],
+            # live Langfuse names scores after the rule, not the evaluator
+            scores=[{"name": "rule_redo_of_shipped_capability", "value": 1.0}],
         ),
     )
     assert mod.verify() == 0
@@ -238,7 +239,7 @@ def test_verify_waits_when_siblings_score_but_redo_absent(monkeypatch) -> None:
         "_request",
         _verify_request(
             gens=[{"startTime": "t", "name": "gate"}],
-            scores=[{"name": "growth_issue_quality", "value": 0.8}],
+            scores=[{"name": "rule_growth_issue_quality", "value": 0.8}],
         ),
     )
     # pipeline alive but redo not yet scored — non-zero, surfaces the WAIT state
