@@ -325,9 +325,17 @@ def verify() -> int:
     for s in all_scores:
         if isinstance(s, dict) and s.get("name"):
             by_name[str(s["name"])] = by_name.get(str(s["name"]), 0) + 1
+    # Live Langfuse names each score after its RULE (e.g. `rule_open_source_default`),
+    # not the evaluator — confirmed from the instance, contradicting older assumptions.
+    # Count both forms so the check is robust to either naming.
+    def _count(ev_name: str) -> int:
+        return by_name.get(ev_name, 0) + by_name.get(f"rule_{ev_name}", 0)
+
     our_names = {ev["name"] for ev in EVALUATORS}
-    redo_scores = by_name.get("redo_of_shipped_capability", 0)
-    other_eval_scores = sum(v for k, v in by_name.items() if k in our_names and k != "redo_of_shipped_capability")
+    redo_scores = _count("redo_of_shipped_capability")
+    other_eval_scores = sum(
+        _count(ev) for ev in our_names if ev != "redo_of_shipped_capability"
+    )
     print(f"recent scores by name (latest 100 sampled): {by_name or '{}'}")
     print(f"redo_of_shipped_capability scores: {redo_scores}")
 
