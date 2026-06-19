@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from wgmesh_pipeline.config import Config
-from wgmesh_pipeline.goose.runner import GooseRunner
+from wgmesh_pipeline.goose.runner import GooseRunner, _read_deliverable_safely
 from wgmesh_pipeline.goose.usage import UsageTotals
 
 
@@ -19,6 +19,19 @@ def cfg() -> Config:
 
 def completed(code: int = 0, stdout: str = "", stderr: str = "") -> subprocess.CompletedProcess[str]:
     return subprocess.CompletedProcess(args=["goose"], returncode=code, stdout=stdout, stderr=stderr)
+
+
+def write_usage(logs: Path, *, input_tokens: int = 12, output_tokens: int = 7, total_tokens: int = 19) -> None:
+    (logs / "llm_request.1.jsonl").write_text(
+        (
+            '{"usage":{'
+            f'"input_tokens":{input_tokens},'
+            f'"output_tokens":{output_tokens},'
+            f'"total_tokens":{total_tokens}'
+            "}}\n"
+        ),
+        encoding="utf-8",
+    )
 
 
 def test_mocked_goose_writes_spec_file_and_returns_ok(tmp_path) -> None:
@@ -172,10 +185,7 @@ def test_goose_runner_populates_usage_and_emits_generation(tmp_path, monkeypatch
     def run(command, **kwargs):
         output.parent.mkdir()
         output.write_text("content")
-        (logs / "llm_request.1.jsonl").write_text(
-            '{"usage":{"input_tokens":12,"output_tokens":7,"total_tokens":19}}\n',
-            encoding="utf-8",
-        )
+        write_usage(logs)
         return completed(stdout="wrote spec")
 
     result = GooseRunner(cfg(), runner=run).run_recipe(
@@ -195,8 +205,190 @@ def test_goose_runner_populates_usage_and_emits_generation(tmp_path, monkeypatch
             "stage": "spec",
             "model": cfg().goose_model,
             "usage": result.usage,
+            "output": "content",
         }
     ]
+
+
+def test_goose_runner_failure_emits_usage_without_output(tmp_path, monkeypatch) -> None:
+    logs = tmp_path / "goose-logs"
+    logs.mkdir()
+    emitted: list[dict[str, Any]] = []
+
+    monkeypatch.setattr("wgmesh_pipeline.goose.runner.default_logs_dir", lambda: logs)
+    monkeypatch.setattr(
+        "wgmesh_pipeline.goose.runner.tracing.emit_generation",
+        lambda **kwargs: emitted.append(kwargs),
+    )
+
+    def run(command, **kwargs):
+        (logs / "llm_request.1.jsonl").write_text(
+            '{"usage":{"input_tokens":5,"output_tokens":8,"total_tokens":13}}\n',
+            encoding="utf-8",
+        )
+        return completed(2, stdout="partial", stderr="bad recipe")
+
+    result = GooseRunner(cfg(), runner=run).run_recipe(
+        recipe="wgmesh-implementation.yaml",
+        workdir=tmp_path,
+        params={"spec_file": "spec.md"},
+        expected_output="diff.patch",
+        stage="implement",
+        session_id="issue-20",
+    )
+
+    assert result.ok is False
+    assert len(emitted) == 1
+    assert emitted[0]["session_id"] == "issue-20"
+    assert emitted[0]["stage"] == "implement"
+    assert emitted[0]["model"] == cfg().goose_model
+    assert emitted[0]["usage"] == result.usage
+    assert emitted[0].get("output") is None
+
+
+def test_goose_runner_success_emits_generation_once_with_deliverable_text(tmp_path, monkeypatch) -> None:
+    logs = tmp_path / "goose-logs"
+    logs.mkdir()
+    output = tmp_path / "specs/issue-21-spec.md"
+    deliverable = "## Deliverable\n\nConcrete stage text."
+    emitted: list[dict[str, Any]] = []
+
+    monkeypatch.setattr("wgmesh_pipeline.goose.runner.default_logs_dir", lambda: logs)
+    monkeypatch.setattr(
+        "wgmesh_pipeline.goose.runner.tracing.emit_generation",
+        lambda **kwargs: emitted.append(kwargs),
+    )
+
+    def run(command, **kwargs):
+        output.parent.mkdir()
+        output.write_text(deliverable, encoding="utf-8")
+        write_usage(logs)
+        return completed(stdout="wrote spec")
+
+    result = GooseRunner(cfg(), runner=run).run_recipe(
+        recipe="recipe.yaml",
+        workdir=tmp_path,
+        params={},
+        expected_output=output,
+        stage="spec",
+        session_id="issue-21",
+    )
+
+    assert result.ok is True
+    assert len(emitted) == 1
+    assert emitted[0]["usage"] == result.usage
+    assert emitted[0]["output"] == deliverable
+
+
+def test_goose_runner_nonzero_emits_usage_once_without_deliverable(tmp_path, monkeypatch) -> None:
+    logs = tmp_path / "goose-logs"
+    logs.mkdir()
+    emitted: list[dict[str, Any]] = []
+
+    monkeypatch.setattr("wgmesh_pipeline.goose.runner.default_logs_dir", lambda: logs)
+    monkeypatch.setattr(
+        "wgmesh_pipeline.goose.runner.tracing.emit_generation",
+        lambda **kwargs: emitted.append(kwargs),
+    )
+
+    def run(command, **kwargs):
+        write_usage(logs)
+        return completed(2, stdout="partial", stderr="bad recipe")
+
+    result = GooseRunner(cfg(), runner=run).run_recipe(
+        recipe="wgmesh-implementation.yaml",
+        workdir=tmp_path,
+        params={"spec_file": "spec.md"},
+        expected_output="diff.patch",
+        stage="implement",
+        session_id="issue-22",
+    )
+
+    assert result.ok is False
+    assert len(emitted) == 1
+    assert emitted[0]["usage"] == result.usage
+    assert emitted[0].get("output") is None
+
+
+def test_goose_runner_salvage_write_failure_emits_usage_once_without_deliverable(
+    tmp_path, monkeypatch
+) -> None:
+    logs = tmp_path / "goose-logs"
+    logs.mkdir()
+    blocked = tmp_path / "blocked"
+    blocked.write_text("not a directory", encoding="utf-8")
+    emitted: list[dict[str, Any]] = []
+
+    monkeypatch.setattr("wgmesh_pipeline.goose.runner.default_logs_dir", lambda: logs)
+    monkeypatch.setattr(
+        "wgmesh_pipeline.goose.runner.tracing.emit_generation",
+        lambda **kwargs: emitted.append(kwargs),
+    )
+
+    def run(command, **kwargs):
+        write_usage(logs)
+        return completed(0, stdout="# Spec\n\n" + ("body\n" * 80))
+
+    result = GooseRunner(cfg(), runner=run).run_recipe(
+        recipe="wgmesh-triage-spec.yaml",
+        workdir=tmp_path,
+        params={"spec_file": "blocked/out.md"},
+        expected_output="blocked/out.md",
+        stage="spec",
+        session_id="issue-23",
+    )
+
+    assert result.ok is False
+    assert "salvage write failed" in (result.error or "")
+    assert len(emitted) == 1
+    assert emitted[0]["usage"] == result.usage
+    assert emitted[0].get("output") is None
+
+
+def test_goose_runner_empty_output_guard_emits_usage_once_without_deliverable(
+    tmp_path, monkeypatch
+) -> None:
+    logs = tmp_path / "goose-logs"
+    logs.mkdir()
+    emitted: list[dict[str, Any]] = []
+
+    monkeypatch.setattr("wgmesh_pipeline.goose.runner.default_logs_dir", lambda: logs)
+    monkeypatch.setattr(
+        "wgmesh_pipeline.goose.runner.tracing.emit_generation",
+        lambda **kwargs: emitted.append(kwargs),
+    )
+
+    def run(command, **kwargs):
+        write_usage(logs)
+        return completed(0, stdout="done, no file written")
+
+    result = GooseRunner(cfg(), runner=run).run_recipe(
+        recipe="wgmesh-triage-spec.yaml",
+        workdir=tmp_path,
+        params={"spec_file": "specs/issue-24-spec.md"},
+        expected_output="specs/issue-24-spec.md",
+        stage="spec",
+        session_id="issue-24",
+    )
+
+    assert result.ok is False
+    assert "empty output guard" in (result.error or "")
+    assert len(emitted) == 1
+    assert emitted[0]["usage"] == result.usage
+    assert emitted[0].get("output") is None
+
+
+def test_read_deliverable_safely_reads_and_truncates(tmp_path) -> None:
+    output = tmp_path / "out.txt"
+    output.write_text("abcdef", encoding="utf-8")
+
+    assert _read_deliverable_safely(output, limit=4) == "abcd"
+
+
+def test_read_deliverable_safely_returns_none_on_oserror(tmp_path) -> None:
+    missing = tmp_path / "missing.txt"
+
+    assert _read_deliverable_safely(missing) is None
 
 
 def test_goose_runner_usage_collection_exception_does_not_break_run(tmp_path, monkeypatch) -> None:
