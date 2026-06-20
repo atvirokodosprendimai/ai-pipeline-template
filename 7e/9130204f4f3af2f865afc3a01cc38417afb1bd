@@ -1,0 +1,21 @@
+pipeline/wgmesh_pipeline/langchain_agent/replay.py
+  s_623d97065e20a1::t_b78d104ecfcf9a 66,75-76
+  s_623d97065e20a1::t_1a0e0f76dfe95c 170-171,179-182
+  s_623d97065e20a1::t_d7676e65d8a5de 118-139
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "7e9130204f4f3af2f865afc3a01cc38417afb1bd",
+  "prompts": {},
+  "sessions": {
+    "s_623d97065e20a1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4f69d3fc-bb89-4527-ac98-5195e026eaf9",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
