@@ -115,7 +115,7 @@ class Poller:
             self.scratch[issue.number] = dict(self.graph.spec(state))
             return self.store.transition(issue.number, "triaged", "specced")
 
-        if issue.stage in {"specced", "spec_ready", "implemented", "reviewed"} and self.config.mode == "shadow":
+        if issue.stage in {"specced", "spec_ready", "implemented", "reviewed", "awaiting_merge"} and self.config.mode == "shadow":
             return issue
 
         if issue.stage == "specced":
@@ -171,18 +171,56 @@ class Poller:
             # merge but before the transition would re-attempt the merge on
             # retry; merge_pr should tolerate an already-merged PR at the API
             # layer to make that fully idempotent.
+            # U4 judge-gated automerge: on a merge decision the side effect only
+            # ENABLES GitHub auto-merge; the box does not merge. The issue parks
+            # in awaiting_merge and is completed to terminal merged only once the
+            # PR has actually merged (the awaiting_merge handler below) — never
+            # here. This preserves the cardinal invariant: no merged state while
+            # the PR is still open.
             apply_gate_side_effects(result)
-            # Scratch + outcome AFTER side effects: the distinct-principal merge
-            # gate can
-            # flip the decision merge -> escalate at side-effect time (red CI,
-            # no distinct approval). Reading decision or scratch before the
-            # flip recorded a terminal 'merged' state inconsistent with the PR —
-            # the false-completion class this pipeline exists to prevent.
             self.scratch[issue.number] = dict(result)
-            outcome = "merged" if result["decision"] == "merge" else "escalated"
+            outcome = "awaiting_merge" if result["decision"] == "merge" else "escalated"
             advanced = self.store.transition(issue.number, "reviewed", outcome)
             score_run(result, outcome=outcome)
             return advanced
+
+        if issue.stage == "awaiting_merge":
+            # Terminal outcomes are scored HERE (not at reviewed->awaiting_merge,
+            # which only records the intermediate 'awaiting_merge' state): the
+            # auto_merged signal must reflect a REAL merge, never an enabled-but-
+            # pending one. Carry the original run's tags from scratch so the
+            # merged/escalated score keeps model/risk/escalation attribution.
+            score_state = {**self.scratch.get(issue.number, {}), "issue": issue}
+            impl_pr = issue.impl_pr
+            if impl_pr is None:
+                self.client.add_label(issue.number, "needs-human")
+                score_run(score_state, outcome="escalated")
+                return self.store.transition(issue.number, "awaiting_merge", "escalated")
+            pr = self.client.get_pr(int(impl_pr))
+            if bool(pr.get("merged") or pr.get("merged_at")):
+                # Real merge confirmed -> terminal. (The seed repo's
+                # impl-merged-close workflow closes the issue on the merge.)
+                score_run(score_state, outcome="merged")
+                return self.store.transition(issue.number, "awaiting_merge", "merged")
+            if str(pr.get("state") or "") == "closed":
+                # Closed without merging — judge/checks failed or a human closed it.
+                self.client.add_label(issue.number, "needs-human")
+                score_run(score_state, outcome="escalated")
+                return self.store.transition(issue.number, "awaiting_merge", "escalated")
+            # Still open: auto-merge fires when impl-judge + build + status pass.
+            # Refresh updated_at so other work is claimed fairly, then re-poll on
+            # a later tick. No transition — never record merged while the PR is
+            # open (no phantom completion).
+            self.store.upsert_issue(
+                issue.number,
+                issue.title,
+                classification=issue.classification,
+                stage="awaiting_merge",
+                status=issue.status,
+                spec_pr=issue.spec_pr,
+                impl_pr=issue.impl_pr,
+            )
+            return issue
 
         raise ValueError(f"stage is not actionable: {issue.stage}")
 

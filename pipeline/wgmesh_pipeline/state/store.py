@@ -15,13 +15,27 @@ ALLOWED_TRANSITIONS: dict[str, set[str]] = {
     "specced": {"spec_ready", "spec_opened", "escalated", "failed"},
     "spec_ready": {"implemented", "escalated", "failed"},
     "implemented": {"reviewed", "escalated", "failed"},
-    "reviewed": {"merged", "escalated", "failed"},
+    # U4 judge-gated automerge: the box enables auto-merge and PARKS the issue in
+    # awaiting_merge — it no longer jumps straight to merged (which would be a
+    # phantom completion if the forge's impl-judge later FAILs). Terminal merged
+    # is reached only from awaiting_merge, once the PR has actually merged.
+    "reviewed": {"awaiting_merge", "escalated", "failed"},
+    "awaiting_merge": {"merged", "escalated", "failed"},
     "spec_opened": {"spec_ready"},
     "merged": set(),
     "escalated": set(),
     "failed": set(),
 }
-ACTIONABLE_STAGES = ("queued", "triaged", "specced", "spec_ready", "implemented", "reviewed")
+# awaiting_merge is actionable so claim_next re-polls the PR until it merges/closes.
+ACTIONABLE_STAGES = (
+    "queued",
+    "triaged",
+    "specced",
+    "spec_ready",
+    "implemented",
+    "reviewed",
+    "awaiting_merge",
+)
 
 
 class TransitionError(ValueError):

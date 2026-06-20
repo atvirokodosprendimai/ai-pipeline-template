@@ -1,19 +1,17 @@
 """End-to-end live-path proof (mocked): the full loop owns through merge.
 
 Drives the poller through every stage in PIPELINE_MODE=live and asserts the
-terminal behaviour: a low-risk issue gets its impl PR created AND merged with a
-recorded 'merged' score; a high-risk issue escalates to needs-human with no
-merge and an 'escalated' score. No real network/goose/LangSmith.
+terminal behaviour: a low-risk issue gets its impl PR created, has auto-merge
+ENABLED (U4 — the box never self-merges), then completes to a recorded 'merged'
+score once the PR actually merges; a high-risk issue escalates to needs-human
+with no merge and an 'escalated' score. No real network/goose/LangSmith.
 """
 
 from __future__ import annotations
 
 import asyncio
 
-import pytest
-
 from wgmesh_pipeline.config import Config
-from wgmesh_pipeline.forge.box_ci import BoxCiResult
 from wgmesh_pipeline.github.client import GitHubClient
 from wgmesh_pipeline.poller import Poller
 from wgmesh_pipeline.scoring import init_scoring
@@ -38,17 +36,28 @@ class _Session:
 
     def request(self, method, url, **kwargs):
         self.calls.append({"method": method, "url": url, "kwargs": kwargs})
-        # create_pr returns a PR number; everything else returns ok
+        # create_pr returns a PR number (+ node_id for the auto-merge mutation)
         if url.endswith("/pulls"):
-            return _Response({"number": 4242})
-        # Distinct-principal merge-gate readiness reads (stub the HTTP
-        # boundary; the gate itself stays in the tested path):
-        if "/check-runs" in url:
-            return _Response({"check_runs": [{"status": "completed", "conclusion": "success"}]})
-        if method == "GET" and url.endswith("/reviews"):
-            return _Response([{"user": {"login": "reviewer-bot"}, "state": "APPROVED"}])
+            return _Response({"number": 4242, "node_id": "PR_4242"})
+        # U4: enable_auto_merge issues a GraphQL mutation — it succeeds.
+        if method == "POST" and url.endswith("/graphql"):
+            return _Response(
+                {"data": {"enablePullRequestAutoMerge": {"pullRequest": {}}}}
+            )
+        # get_pr: the PR carries node_id (for enabling auto-merge) and, once
+        # auto-merge has fired (impl-judge + build + status green), reports as
+        # merged so the awaiting_merge handler completes it to terminal.
         if method == "GET" and "/pulls/" in url:
-            return _Response({"number": 4242, "user": {"login": "author-bot"}, "head": {"sha": "abc"}})
+            return _Response(
+                {
+                    "number": 4242,
+                    "node_id": "PR_4242",
+                    "state": "closed",
+                    "merged": True,
+                    "user": {"login": "author-bot"},
+                    "head": {"sha": "abc"},
+                }
+            )
         return _Response({"ok": True})
 
 
@@ -101,9 +110,8 @@ class _Recorder:
 
 
 def _drive_to_terminal(p: Poller, issue_number: int, max_ticks: int = 12):
-    last = None
     for _ in range(max_ticks):
-        last = asyncio.run(p.tick())
+        asyncio.run(p.tick())
         rec = p.store.get_issue(issue_number)
         if rec.stage in {"merged", "escalated", "failed"}:
             return rec
@@ -114,15 +122,7 @@ def _live_poller(tmp_path, graph, session):
     cfg = Config(target_repo="atvirokodosprendimai/wgmesh", mode="live", max_files=3)
     store = StateStore(tmp_path / "state.db")
     client = _RecordingClient(cfg, session=session)
-    # Box CI (U9) green: these scenarios exercise the flow downstream of the
-    # box's own pre-merge CI; box_ci internals are covered in test_box_ci.py.
-    return Poller(
-        config=cfg,
-        store=store,
-        client=client,
-        graph=graph,
-        box_ci=lambda forge, pr: BoxCiResult(green=True, failures=()),
-    )
+    return Poller(config=cfg, store=store, client=client, graph=graph)
 
 
 def test_live_low_risk_issue_merges_and_scores(tmp_path) -> None:
@@ -135,9 +135,12 @@ def test_live_low_risk_issue_merges_and_scores(tmp_path) -> None:
     issue = _drive_to_terminal(p, 584)
 
     assert issue.stage == "merged"
-    # the real impl PR (4242) was merged, not 0
-    merges = [c for c in session.calls if c["url"].endswith("/4242/merge")]
-    assert len(merges) == 1
+    # U4: the box ENABLES auto-merge (GraphQL) and never calls the REST /merge
+    # endpoint itself; the forge merges the PR once the impl-judge check passes.
+    assert any(c["method"] == "POST" and c["url"].endswith("/graphql") for c in session.calls)
+    assert not any(c["url"].endswith("/4242/merge") for c in session.calls)
+    # The terminal merge is scored 'merged' (auto_merged=1) only on the REAL
+    # merge — not at the reviewed->awaiting_merge transition.
     assert rec.calls[-1]["outcome"] == "merged"
     assert rec.calls[-1]["scores"]["auto_merged"] == 1
     init_scoring(Config(target_repo="r", mode="live", max_files=3))  # reset module scorer
@@ -153,8 +156,9 @@ def test_live_high_risk_issue_escalates_no_merge(tmp_path) -> None:
     issue = _drive_to_terminal(p, 540)
 
     assert issue.stage == "escalated"
-    # no merge call for a high-risk diff
+    # no merge AND no auto-merge enable for a high-risk diff
     assert not any(c["url"].endswith("/merge") for c in session.calls)
+    assert not any(c["url"].endswith("/graphql") for c in session.calls)
     # needs-human label applied
     assert any(c["kwargs"].get("json") == {"labels": ["needs-human"]} for c in session.calls)
     assert rec.calls[-1]["outcome"] == "escalated"
@@ -164,25 +168,26 @@ def test_live_high_risk_issue_escalates_no_merge(tmp_path) -> None:
     init_scoring(Config(target_repo="r", mode="live", max_files=3))
 
 
-class _MergeFailSession(_Session):
+class _EnableFailSession(_Session):
     def request(self, method, url, **kwargs):
-        if url.endswith("/merge"):
+        if method == "POST" and url.endswith("/graphql"):
             self.calls.append({"method": method, "url": url, "kwargs": kwargs})
-            raise RuntimeError("502 from GitHub merge endpoint")
+            raise RuntimeError("502 from GitHub graphql endpoint")
         return super().request(method, url, **kwargs)
 
 
-def test_live_merge_failure_leaves_issue_retriable_not_phantom_merged(tmp_path) -> None:
-    # If the merge network call fails AFTER the gate decides merge, the issue
-    # must NOT be left terminal 'merged' with the PR unmerged. It stays at
-    # 'reviewed' (retriable), never silently dropped.
+def test_live_enable_automerge_failure_leaves_issue_retriable_not_phantom_merged(tmp_path) -> None:
+    # If enabling auto-merge fails AFTER the gate decides merge, the issue must
+    # NOT be left terminal 'merged' (nor parked in awaiting_merge) with nothing
+    # actually enabled. It stays at 'reviewed' (retriable), never silently dropped.
     init_scoring(Config(target_repo="r", mode="live", max_files=3))
-    session = _MergeFailSession()
+    session = _EnableFailSession()
     p = _live_poller(tmp_path, _LowRiskGraph(), session)
     p.store.upsert_issue(584, "Add Polar CTAs")
 
     issue = _drive_to_terminal(p, 584)
 
     assert issue.stage != "merged"  # no phantom merge
-    # the merge was attempted (and failed), issue is bumped/retriable, not terminal-merged
-    assert any(c["url"].endswith("/4242/merge") for c in session.calls)
+    assert issue.stage != "awaiting_merge"  # nothing was enabled to await
+    # the enable was attempted (and failed)
+    assert any(c["url"].endswith("/graphql") for c in session.calls)

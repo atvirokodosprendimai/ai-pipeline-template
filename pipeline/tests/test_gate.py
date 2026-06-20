@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import replace
-
 from wgmesh_pipeline.config import Config
 from wgmesh_pipeline.github.client import GitHubClient, GitHubIssue
 from wgmesh_pipeline.graph.build import CompiledGraph, build_graph
@@ -186,7 +184,11 @@ def test_implement_created_pr_number_is_merged_by_gate() -> None:
 
     assert implemented["impl_pr"] == 456
     assert result["decision"] == "merge"
-    assert client.session.calls[-1]["url"].endswith("/pulls/456/merge")
+    # U4: a merge decision ENABLES auto-merge (GraphQL) — the box never calls
+    # the REST /merge endpoint itself.
+    assert client.session.calls[-1]["method"] == "POST"
+    assert client.session.calls[-1]["url"].endswith("/graphql")
+    assert not any(c["url"].endswith("/pulls/456/merge") for c in client.session.calls)
 
 
 def test_review_failed_verification_escalates_at_gate(monkeypatch) -> None:
@@ -265,7 +267,9 @@ def test_live_review_uses_verification_result_and_gate_can_merge(
     assert reviewed["tests_passed"] is True
     assert reviewed["verification"]["tests_passed"] is True
     assert gated["decision"] == "merge"
-    assert client.session.calls[-1]["url"].endswith("/pulls/456/merge")
+    assert client.session.calls[-1]["method"] == "POST"
+    assert client.session.calls[-1]["url"].endswith("/graphql")
+    assert not any(c["url"].endswith("/pulls/456/merge") for c in client.session.calls)
 
 
 def test_non_live_review_keeps_tests_passed_fallback(monkeypatch) -> None:
@@ -538,7 +542,7 @@ def test_graph_full_fix_path_reaches_gate_with_diff_and_shadow_has_no_network_wr
         "create_pr",
         "remove_label",
         "add_label",
-        "merge_pr",
+        "enable_auto_merge",
     ]
 
 
@@ -551,20 +555,16 @@ class SessionForPr:
         self.calls.append({"method": method, "url": url, "kwargs": kwargs})
         if method == "POST" and url.endswith("/pulls"):
             return ResponseForPr(self.create_response)
-        # Distinct-principal merge-gate readiness reads (keep the gate in the
-        # tested path — stub the HTTP boundary, never the gate itself):
-        if "/check-runs" in url:
+        if method == "POST" and url.endswith("/graphql"):
+            # U4: the enable_auto_merge mutation succeeds.
             return ResponseForPr(
-                {"check_runs": [{"status": "completed", "conclusion": "success"}]}
-            )
-        if url.endswith("/reviews") and method == "GET":
-            return ResponseForPr(
-                [{"user": {"login": "reviewer-bot"}, "state": "APPROVED"}]
+                {"data": {"enablePullRequestAutoMerge": {"pullRequest": {}}}}
             )
         if method == "GET" and "/pulls/" in url:
             return ResponseForPr(
                 {
                     **self.create_response,
+                    "node_id": "PR_node_456",
                     "user": {"login": "author-bot"},
                     "head": {"sha": "abc"},
                 }
@@ -611,175 +611,3 @@ def _node(name: str, **updates):
 
     return run
 
-
-class SessionRedCi(SessionForPr):
-    def request(self, method: str, url: str, **kwargs):
-        if "/check-runs" in url:
-            self.calls.append({"method": method, "url": url, "kwargs": kwargs})
-            return ResponseForPr(
-                {"check_runs": [{"status": "completed", "conclusion": "failure"}]}
-            )
-        return super().request(method, url, **kwargs)
-
-
-def test_gate_escalates_instead_of_merging_when_ci_red() -> None:
-    """Merge decision + red CI at side-effect time -> needs-human label, no
-    merge call, decision flipped to escalate. The box never merges past a
-    red check run."""
-    client = GitHubClient(
-        cfg(mode="live"),
-        session=SessionRedCi({"number": 456}),
-        sanitiser=lambda text: True,
-    )
-
-    result = gate_node(
-        {
-            "issue": GitHubIssue(number=9, title="Fix relay", labels=(), state="open"),
-            "github": client,
-            "diff": "+docs\n",
-            "changed_files": ["docs/readme.md"],
-            "impl_pr": 456,
-            "tests_passed": True,
-            "sanitise_ok": True,
-            "review_findings": [],
-        },
-        max_files=3,
-    )
-
-    assert result["decision"] == "escalate"
-    assert any("ci not green" in r for r in result["risk_reasons"])
-    assert not any(c["url"].endswith("/pulls/456/merge") for c in client.session.calls)
-    assert any(c["url"].endswith("/issues/9/labels") for c in client.session.calls)
-
-
-class SessionNoApprovals(SessionForPr):
-    def request(self, method: str, url: str, **kwargs):
-        if method == "GET" and url.endswith("/reviews"):
-            self.calls.append({"method": method, "url": url, "kwargs": kwargs})
-            return ResponseForPr([])
-        return super().request(method, url, **kwargs)
-
-
-def test_gate_escalates_when_no_approval_and_no_reviewer_credential() -> None:
-    """Branch B of the merge gate: CI green, nobody approved, box has no
-    reviewer identity -> escalate, never merge."""
-    client = GitHubClient(
-        cfg(mode="live"),
-        session=SessionNoApprovals({"number": 456}),
-        sanitiser=lambda text: True,
-    )
-
-    result = gate_node(
-        {
-            "issue": GitHubIssue(number=9, title="Fix relay", labels=(), state="open"),
-            "github": client,
-            "diff": "+docs\n",
-            "changed_files": ["docs/readme.md"],
-            "impl_pr": 456,
-            "tests_passed": True,
-            "sanitise_ok": True,
-            "review_findings": [],
-        },
-        max_files=3,
-    )
-
-    assert result["decision"] == "escalate"
-    assert not any(c["url"].endswith("/pulls/456/merge") for c in client.session.calls)
-
-
-def test_gate_self_serves_reviewer_approval_then_merges() -> None:
-    """Reviewer credential present, no existing approval: the gate approves
-    as the reviewer identity (distinct Bearer token) and proceeds to merge."""
-    config = replace(cfg(mode="live"), reviewer_pat="reviewer-pat")
-    client = GitHubClient(
-        config, session=SessionNoApprovals({"number": 456}), sanitiser=lambda text: True
-    )
-
-    result = gate_node(
-        {
-            "issue": GitHubIssue(number=9, title="Fix relay", labels=(), state="open"),
-            "github": client,
-            "diff": "+docs\n",
-            "changed_files": ["docs/readme.md"],
-            "impl_pr": 456,
-            "tests_passed": True,
-            "sanitise_ok": True,
-            "review_findings": [],
-        },
-        max_files=3,
-    )
-
-    assert result["decision"] == "merge"
-    approve = next(
-        c
-        for c in client.session.calls
-        if c["method"] == "POST" and c["url"].endswith("/reviews")
-    )
-    assert approve["kwargs"]["headers"]["Authorization"] == "Bearer reviewer-pat"
-    assert any(c["url"].endswith("/pulls/456/merge") for c in client.session.calls)
-
-
-# ---- cutover U9: box-run CI feeds the gate for bot PRs; no Actions
-# check-run poll happens when a box CI verdict is in the state ----
-
-
-def _u9_state(client, *, box_ci):
-    return {
-        "issue": GitHubIssue(number=9, title="Fix relay", labels=(), state="open"),
-        "github": client,
-        "diff": "+docs\n",
-        "changed_files": ["docs/readme.md"],
-        "impl_pr": 456,
-        "tests_passed": True,
-        "sanitise_ok": True,
-        "review_findings": [],
-        "box_ci": box_ci,
-    }
-
-
-def test_gate_red_box_ci_blocks_merge_without_any_actions_run() -> None:
-    """U9 verification scenario: a failing test on a box PR blocks its merge
-    without any Actions run — the gate consumes the box verdict and never
-    touches the check-runs API."""
-    from wgmesh_pipeline.forge.box_ci import BoxCiResult
-
-    client = GitHubClient(
-        cfg(mode="live"),
-        session=SessionForPr({"number": 456}),
-        sanitiser=lambda text: True,
-    )
-    ci_calls: list[int] = []
-
-    def box_ci(forge, pr_number: int) -> BoxCiResult:
-        ci_calls.append(pr_number)
-        return BoxCiResult(green=False, failures=("box ci: go test failed",))
-
-    result = gate_node(_u9_state(client, box_ci=box_ci), max_files=3)
-
-    assert ci_calls == [456]
-    assert result["decision"] == "escalate"
-    assert any("go test failed" in r for r in result["risk_reasons"])
-    assert not any("/check-runs" in c["url"] for c in client.session.calls)
-    assert not any(c["url"].endswith("/pulls/456/merge") for c in client.session.calls)
-    assert any(c["url"].endswith("/issues/9/labels") for c in client.session.calls)
-
-
-def test_gate_green_box_ci_merges_without_actions_check_runs() -> None:
-    from wgmesh_pipeline.forge.box_ci import BoxCiResult
-
-    client = GitHubClient(
-        cfg(mode="live"),
-        session=SessionForPr({"number": 456}),
-        sanitiser=lambda text: True,
-    )
-
-    result = gate_node(
-        _u9_state(
-            client, box_ci=lambda forge, pr: BoxCiResult(green=True, failures=())
-        ),
-        max_files=3,
-    )
-
-    assert result["decision"] == "merge"
-    assert not any("/check-runs" in c["url"] for c in client.session.calls)
-    assert any(c["url"].endswith("/pulls/456/merge") for c in client.session.calls)

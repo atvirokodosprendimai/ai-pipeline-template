@@ -288,6 +288,65 @@ class GitHubClient:
             payload={"commit_title": commit_title} if commit_title else {},
         )
 
+    def enable_auto_merge(self, pr_number: int, *, merge_method: str = "SQUASH") -> Any:
+        """Enable GitHub auto-merge so the forge merges the PR when its required
+        checks (impl-judge + build + status) pass — the box stops self-merging
+        (U4 judge-gated automerge: the judge CI check is the gate, no approval).
+
+        Mode-gated like other writes: shadow -> dry-run record; spec-only ->
+        blocked. Idempotent: an 'already enabled' GraphQL state is tolerated so a
+        retry tick is safe. If GitHub reports the PR is already in 'clean status'
+        (all checks green, nothing to wait for), auto-merge can't be armed, so we
+        merge it directly instead.
+        """
+        self._sanitise_write("enable_auto_merge", {})
+        mode = self.config.mode
+        if mode == "shadow":
+            result = DryRunResult(
+                dry_run=True, operation="enable_auto_merge", payload={"pr": pr_number}
+            )
+            self.dry_run_records.append(result)
+            return result
+        if mode == "spec-only":
+            raise PermissionError(
+                "enable_auto_merge is not allowed when PIPELINE_MODE=spec-only"
+            )
+        pr = self.get_pr(pr_number)
+        node_id = pr.get("node_id")
+        if not node_id:
+            raise RuntimeError(f"enable_auto_merge: no node_id for PR #{pr_number}")
+        mutation = (
+            "mutation($id: ID!, $m: PullRequestMergeMethod!) {"
+            " enablePullRequestAutoMerge(input: {pullRequestId: $id, mergeMethod: $m})"
+            " { pullRequest { autoMergeRequest { enabledAt } } } }"
+        )
+        error_text = self._graphql(mutation, {"id": node_id, "m": merge_method})
+        if error_text and "clean status" in error_text.lower():
+            # Already mergeable, nothing pending to gate on -> merge now.
+            log.info(
+                "enable_auto_merge: PR #%s already clean — merging directly", pr_number
+            )
+            return self.merge_pr(pr_number)
+        return None
+
+    def _graphql(self, query: str, variables: dict[str, Any]) -> str | None:
+        """POST a GraphQL query through ``_request`` (shared auth/timeout/session
+        abstraction). Returns None on success, or the error message text when
+        GitHub reports a tolerable/benign state (the caller decides what to do) —
+        raises on a hard error. GraphQL returns HTTP 200 even on logical errors,
+        so the error surface is the response body, not the status code."""
+        body = self._request(
+            "POST", "/graphql", json={"query": query, "variables": variables}
+        )
+        errors = body.get("errors")
+        if not errors:
+            return None
+        text = "; ".join(str(error.get("message", error)) for error in errors)
+        if any(token in text.lower() for token in ("already", "clean status")):
+            log.info("graphql tolerated state: %s", text)
+            return text
+        raise RuntimeError(f"graphql error: {text}")
+
     def pr_checks_green(self, pr_number: int) -> bool:
         """All check runs on the PR head completed successfully. No checks at
         all counts as NOT green — fail closed."""
