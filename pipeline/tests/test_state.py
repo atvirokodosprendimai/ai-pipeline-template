@@ -82,6 +82,97 @@ def test_reset_queue_clears_issues_and_runs_idempotently(tmp_path) -> None:
     assert versions == ["0001", "0002"]
 
 
+def test_requeue_failed_all_preserves_linkage_and_clears_attempts(tmp_path) -> None:
+    db = store(tmp_path)
+    now = datetime(2026, 6, 20, 12, tzinfo=timezone.utc)
+    db.upsert_issue(
+        730,
+        "Growth issue",
+        classification="fn:gtm",
+        stage="spec_ready",
+        spec_pr=1730,
+        impl_pr=2730,
+    )
+    db.bump_attempt(730, "runner storm", max_attempts=1, now=now - timedelta(minutes=1))
+
+    result = db.requeue_failed(now=now)
+
+    issue = db.get_issue(730)
+    assert result == {"requeued": 1, "numbers": [730], "target_stage": "spec_ready"}
+    assert issue.stage == "spec_ready"
+    assert issue.attempts == 0
+    assert issue.last_error is None
+    assert issue.title == "Growth issue"
+    assert issue.spec_pr == 1730
+    assert issue.impl_pr == 2730
+    assert issue.updated_at == now
+
+
+def test_requeue_failed_numbers_filter_only_updates_subset(tmp_path) -> None:
+    db = store(tmp_path)
+    for number in (730, 731, 732):
+        db.upsert_issue(number, f"issue {number}", stage="queued")
+        db.bump_attempt(number, "failed", max_attempts=1)
+
+    result = db.requeue_failed([730, 732], target_stage="queued")
+
+    assert result == {"requeued": 2, "numbers": [730, 732], "target_stage": "queued"}
+    assert db.get_issue(730).stage == "queued"
+    assert db.get_issue(731).stage == "failed"
+    assert db.get_issue(732).stage == "queued"
+
+
+def test_requeue_failed_ignores_non_failed_issue_in_filter(tmp_path) -> None:
+    db = store(tmp_path)
+    db.upsert_issue(730, "failed", stage="queued")
+    db.bump_attempt(730, "failed", max_attempts=1)
+    db.upsert_issue(731, "still queued", stage="queued")
+
+    result = db.requeue_failed([730, 731])
+
+    assert result == {"requeued": 1, "numbers": [730], "target_stage": "spec_ready"}
+    assert db.get_issue(730).stage == "spec_ready"
+    assert db.get_issue(731).stage == "queued"
+
+
+def test_requeue_failed_rejects_non_actionable_target_without_writes(tmp_path) -> None:
+    db = store(tmp_path)
+    db.upsert_issue(730, "failed", stage="queued")
+    db.bump_attempt(730, "failed once", max_attempts=1)
+
+    with pytest.raises(ValueError, match="target_stage"):
+        db.requeue_failed(target_stage="failed")
+
+    issue = db.get_issue(730)
+    assert issue.stage == "failed"
+    assert issue.attempts == 1
+    assert issue.last_error == "failed once"
+
+
+def test_requeue_failed_no_failed_issues_returns_zero(tmp_path) -> None:
+    db = store(tmp_path)
+    db.upsert_issue(730, "queued", stage="queued")
+
+    result = db.requeue_failed()
+
+    assert result == {"requeued": 0, "numbers": [], "target_stage": "spec_ready"}
+    assert db.get_issue(730).stage == "queued"
+
+
+def test_requeue_failed_issue_is_claimable_immediately(tmp_path) -> None:
+    db = store(tmp_path)
+    now = datetime(2026, 6, 20, 12, tzinfo=timezone.utc)
+    db.upsert_issue(730, "claim me", stage="queued", updated_at=now - timedelta(minutes=5))
+    db.bump_attempt(730, "failed", max_attempts=1, now=now - timedelta(minutes=1))
+
+    db.requeue_failed([730], now=now)
+    claimed = db.claim_next(now=now)
+
+    assert claimed is not None
+    assert claimed.number == 730
+    assert claimed.stage == "spec_ready"
+
+
 def test_upsert_and_transition_persist(tmp_path) -> None:
     db = store(tmp_path)
     db.upsert_issue(1, "Fix relay")
