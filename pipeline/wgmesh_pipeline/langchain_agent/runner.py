@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import subprocess
 import time
 from pathlib import Path
 from typing import Any, Callable, Mapping
@@ -51,10 +52,16 @@ class LangchainAgentRunner:
             root = Path(workdir).resolve()
             output_path = resolve_workspace_path(root, expected_output)
             profile = self._resolve_profile(stage, tier)
+            is_implement_stage = stage == "implement"
             try:
-                rendered_prompt = prompts.render_recipe_prompt(
-                    recipe, params, workdir=root
-                )
+                if is_implement_stage:
+                    rendered_prompt = prompts.build_implement_prompt(
+                        params.get("spec_file")
+                    )
+                else:
+                    rendered_prompt = prompts.render_recipe_prompt(
+                        recipe, params, workdir=root
+                    )
             except prompts.PromptRenderError as exc:
                 return _result(
                     ok=False,
@@ -72,10 +79,10 @@ class LangchainAgentRunner:
 
             HumanMessage, SystemMessage, ToolMessage = _message_classes()
             messages: list[Any] = [
-                SystemMessage(content=_system_prompt()),
+                SystemMessage(content=_system_prompt(is_implement_stage)),
                 HumanMessage(content=rendered_prompt),
             ]
-            raw_log.append(f"system: {_system_prompt()}")
+            raw_log.append(f"system: {_system_prompt(is_implement_stage)}")
             raw_log.append(f"human: {rendered_prompt}")
 
             iterations = 0
@@ -106,6 +113,18 @@ class LangchainAgentRunner:
                 raw_log.append(f"assistant: {completion_text}")
 
                 tool_calls = list(getattr(ai_message, "tool_calls", None) or [])
+                # Agent-trace observability (non-goose executor build): the box
+                # journal was blind to what the ReAct agent actually does — this
+                # surfaces the per-iteration tool sequence so "no tree changes" /
+                # tiny-token runs are explainable (e.g. agent runs only run_bash,
+                # never read_file/edit_file → it skipped the implementation).
+                _LOGGER.info(
+                    "agent trace stage=%s iter=%d tools=%s text_len=%d",
+                    stage,
+                    iterations,
+                    [_tool_call_parts(call)[0] for call in tool_calls],
+                    len(completion_text or ""),
+                )
                 if not tool_calls:
                     break
 
@@ -125,7 +144,11 @@ class LangchainAgentRunner:
                             name=name,
                         )
                     )
-                if output_path.exists() and output_path.stat().st_size > 0:
+                if (
+                    not is_implement_stage
+                    and output_path.exists()
+                    and output_path.stat().st_size > 0
+                ):
                     _emit_usage(
                         session_id=session_id,
                         stage=stage,
@@ -167,6 +190,26 @@ class LangchainAgentRunner:
                 usage=usage,
                 output=completion_text,
             )
+            if is_implement_stage:
+                if _workspace_is_dirty(root):
+                    return _result(
+                        ok=True,
+                        output_path=output_path,
+                        started=started,
+                        raw_log=raw_log,
+                        error=None,
+                        profile=profile,
+                        usage=usage,
+                    )
+                return _result(
+                    ok=False,
+                    output_path=output_path,
+                    started=started,
+                    raw_log=raw_log,
+                    error="agent made no source changes",
+                    profile=profile,
+                    usage=usage,
+                )
             if output_path.exists():
                 return _result(
                     ok=True,
@@ -262,12 +305,32 @@ def _message_classes() -> tuple[type[Any], type[Any], type[Any]]:
     return HumanMessage, SystemMessage, ToolMessage
 
 
-def _system_prompt() -> str:
+def _system_prompt(is_implement_stage: bool = False) -> str:
+    if is_implement_stage:
+        return prompts.IMPLEMENT_SYSTEM_PROMPT
     return (
         "You are an autonomous coding agent. Use the provided workspace tools to "
         "inspect and modify files. Keep all work inside the workspace, and write "
         "the requested expected output before finishing."
     )
+
+
+def _workspace_is_dirty(workdir: str | Path) -> bool:
+    root = Path(workdir)
+    completed = subprocess.run(
+        ["git", "status", "--porcelain"],
+        cwd=root,
+        text=True,
+        errors="replace",
+        capture_output=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError(
+            "could not inspect workspace git status: "
+            f"{completed.stderr.strip() or completed.stdout.strip()}"
+        )
+    return bool(completed.stdout.strip())
 
 
 def _tool_call_parts(call: Any) -> tuple[str, dict[str, Any], str]:
