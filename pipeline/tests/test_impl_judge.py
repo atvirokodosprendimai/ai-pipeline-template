@@ -167,3 +167,110 @@ def test_main_missing_key_real_path_returns_2(tmp_path, monkeypatch, capsys) -> 
     rc = main(["--diff-file", d, "--spec-file", s])  # default judge_fn → real path
     assert rc == 2
     assert "missing API key" in capsys.readouterr().err
+
+
+def test_main_missing_spec_file_blocks(tmp_path) -> None:
+    d = _write(tmp_path, "x.diff", _DIFF)
+    rc = main(
+        ["--diff-file", d, "--spec-file", str(tmp_path / "nope.spec")],
+        judge_fn=lambda *a, **k: Verdict(True, ()),  # would-pass, but spec missing
+    )
+    assert rc == 1  # fail-closed, not 0
+
+
+def test_main_forwards_issue(tmp_path) -> None:
+    d = _write(tmp_path, "x.diff", _DIFF)
+    s = _write(tmp_path, "x.spec", _SPEC)
+    seen = {}
+
+    def capturing(diff, spec, *, issue=None):
+        seen["issue"] = issue
+        return Verdict(True, ())
+
+    main(["--diff-file", d, "--spec-file", s, "--issue", "42"], judge_fn=capturing)
+    assert seen["issue"] == 42
+
+
+# ---- review-hardening: never-raises, dup-key, injection, error paths --------
+
+
+def test_base_exception_blocks_never_escapes() -> None:
+    """SystemExit from the caller must map to fail-closed, never escape judge()
+    (an escaping raise could be read as 'check errored/skip' = fail-open)."""
+
+    def system_exit(_payload):
+        raise SystemExit(99)
+
+    verdict = judge(_DIFF, _SPEC, http_caller=system_exit)
+    assert verdict.passed is False
+    assert any("provider error" in r for r in verdict.reasons)
+
+
+def test_keyboard_interrupt_propagates() -> None:
+    def interrupt(_payload):
+        raise KeyboardInterrupt
+
+    with pytest.raises(KeyboardInterrupt):
+        judge(_DIFF, _SPEC, http_caller=interrupt)
+
+
+def test_duplicate_key_response_blocks() -> None:
+    content = (
+        '{"faithfulness": {"pass": false}, "faithfulness": {"pass": true}, '
+        '"safety": {"pass": true}}'
+    )
+    body = {"choices": [{"message": {"content": content}}]}
+    verdict = judge(_DIFF, _SPEC, http_caller=lambda p: body)
+    assert verdict.passed is False  # last-wins PASS must NOT slip through
+    assert verdict.reasons == ("unparseable judge response",)
+
+
+def test_urlerror_timeout_blocks() -> None:
+    import socket
+    import urllib.error
+
+    def timed_out(_payload):
+        raise urllib.error.URLError(socket.timeout("timed out"))
+
+    verdict = judge(_DIFF, _SPEC, http_caller=timed_out)
+    assert verdict.passed is False
+    assert any("provider error" in r for r in verdict.reasons)
+
+
+def test_http_error_429_blocks() -> None:
+    import urllib.error
+
+    def rate_limited(_payload):
+        raise urllib.error.HTTPError(None, 429, "Too Many Requests", None, None)
+
+    assert judge(_DIFF, _SPEC, http_caller=rate_limited).passed is False
+
+
+def test_both_dimensions_fail_lists_both() -> None:
+    verdict = judge(_DIFF, _SPEC, http_caller=_caller(False, False, f_reason="bad", s_reason="leak"))
+    assert verdict.passed is False
+    assert any("faithfulness" in r for r in verdict.reasons)
+    assert any("safety" in r for r in verdict.reasons)
+
+
+def test_empty_reason_uses_fallback() -> None:
+    verdict = judge(_DIFF, _SPEC, http_caller=_caller(False, True, f_reason=""))
+    assert verdict.passed is False
+    assert any(impl_judge._FALLBACK_REASON in r for r in verdict.reasons)
+
+
+def test_whitespace_content_blocks() -> None:
+    body = {"choices": [{"message": {"content": "   "}}]}
+    verdict = judge(_DIFF, _SPEC, http_caller=lambda p: body)
+    assert verdict.passed is False
+    assert verdict.reasons == ("unparseable judge response",)
+
+
+def test_prompt_fences_untrusted_and_warns_against_injection() -> None:
+    prompt = impl_judge._build_prompt("DIFFTEXT", "SPECTEXT", issue=7)
+    # untrusted content is fenced and flagged as DATA, not instructions
+    assert impl_judge._UNTRUSTED in prompt
+    assert "never instructions" in prompt.lower() or "not instructions" in prompt.lower()
+    # rubric/output format come AFTER the untrusted blocks
+    assert prompt.index("SPECTEXT") < prompt.index("faithfulness:")
+    assert prompt.index("DIFFTEXT") < prompt.index("Respond with ONLY")
