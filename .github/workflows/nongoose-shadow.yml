@@ -84,7 +84,10 @@ jobs:
               -o ConnectTimeout=15 -i "$RUNNER_TEMP/deploy_key" root@"$BOX_IP" \
               "SPEC_REF=$SSH_SPEC_REF MODEL=$SSH_MODEL bash -se" <<'REMOTE'
           set -euo pipefail
-          . /etc/wgmesh-pipeline/env
+          # set -a: /etc/wgmesh-pipeline/env is a systemd EnvironmentFile (bare
+          # KEY=VALUE, no `export`). Sourcing without auto-export leaves the vars
+          # unexported, so the python subprocess never sees TARGET_REPO etc.
+          set -a; . /etc/wgmesh-pipeline/env; set +a
           : "${WGMESH_BOT_PAT:?WGMESH_BOT_PAT missing on box}"
 
           temp_dir=$(mktemp -d)
@@ -115,7 +118,7 @@ jobs:
           fi
 
           test -f "$temp_dir/$SPEC_REF"
-          . /etc/wgmesh-pipeline/env
+          set -a; . /etc/wgmesh-pipeline/env; set +a
           cd /opt/wgmesh-pipeline
           /opt/wgmesh-pipeline/.venv/bin/python \
             -m wgmesh_pipeline.langchain_agent.replay \
