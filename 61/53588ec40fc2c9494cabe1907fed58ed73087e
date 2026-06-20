@@ -1,0 +1,44 @@
+pipeline/tests/test_langchain_agent_runner.py
+  s_690d6edc950df2::t_5ed98e749528ca 349-361
+  s_690d6edc950df2::t_b5c6eed77cd2f5 786
+  s_690d6edc950df2::t_060f495e7f5c1b 17,111-175,180-222
+  s_d422723728d1f4::t_16c2908ad6fb75 13
+  s_d422723728d1f4::t_f64e8375aeb476 248-266,278-290,294-295
+  s_d422723728d1f4::t_151ac1c5fa1550 176-179
+  s_690d6edc950df2::t_2f45d794a459e9 225-247
+  s_690d6edc950df2::t_d6e38db998b865 267-277,291-293
+  s_690d6edc950df2::t_f52d4907178f89 749-785,787-869
+pipeline/wgmesh_pipeline/langchain_agent/replay.py
+  s_d422723728d1f4::t_a18985fd9e35cd 32
+pipeline/wgmesh_pipeline/langchain_agent/runner.py
+  s_d422723728d1f4::t_42e2068cc2cb3c 25,181-193,323-325,328-334,337-352,359-382
+  s_690d6edc950df2::t_a802b30e262fd7 326-327,335-336,353-358,383-393
+  s_d422723728d1f4::t_4b4bd2c8e6d2c3 113,320-322
+  s_d422723728d1f4::t_3332a47a6202e6 105-108
+pipeline/tests/test_langchain_agent_replay.py
+  s_690d6edc950df2::t_9bb7d18e45f33f 4,224-259
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "6153588ec40fc2c9494cabe1907fed58ed73087e",
+  "prompts": {},
+  "sessions": {
+    "s_690d6edc950df2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ee639-06e6-7162-a156-6e8c29db1eef",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    },
+    "s_d422723728d1f4": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ee638-752a-77e2-8f19-ffe6cafe04f5",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
