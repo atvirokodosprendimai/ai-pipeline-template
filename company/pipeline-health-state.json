@@ -1,8 +1,8 @@
 {
-  "last_check": "2026-06-20T00:15:52Z",
+  "last_check": "2026-06-20T04:51:53Z",
   "check_interval_hours": 0.5,
-  "checks_run": 898,
-  "issues_healed_total": 35,
+  "checks_run": 899,
+  "issues_healed_total": 41,
   "consecutive_no_mutation_runs": 0,
   "retry_tracker": {
     "651": {
@@ -65,19 +65,49 @@
       "retries": 2,
       "last_retry": "2026-06-13T08:36:29Z",
       "action": "retrigger_goose"
+    },
+    "753": {
+      "retries": 1,
+      "last_retry": "2026-06-20T04:51:25Z",
+      "action": "retrigger_copilot"
+    },
+    "752": {
+      "retries": 1,
+      "last_retry": "2026-06-20T04:51:29Z",
+      "action": "retrigger_copilot"
+    },
+    "745": {
+      "retries": 1,
+      "last_retry": "2026-06-20T04:51:34Z",
+      "action": "retrigger_copilot"
+    },
+    "733": {
+      "retries": 1,
+      "last_retry": "2026-06-20T04:51:38Z",
+      "action": "retrigger_copilot"
+    },
+    "734": {
+      "retries": 1,
+      "last_retry": "2026-06-20T04:51:42Z",
+      "action": "retrigger_copilot"
+    },
+    "732": {
+      "retries": 1,
+      "last_retry": "2026-06-20T04:51:46Z",
+      "action": "retrigger_copilot"
     }
   },
   "funnel_signals": {
     "dogfood": true,
     "presence": true,
     "endpoint_details": "chimney:ok,cloudroof:ok,coroot:ok,tvcentras:ok",
-    "checked_at": "2026-06-20T00:15:51Z"
+    "checked_at": "2026-06-20T04:51:52Z"
   },
   "idle_signal": {
     "idle": false,
-    "open_prs": 23,
+    "open_prs": 16,
     "active_pipeline_issues": 13,
-    "checked_at": "2026-06-20T00:15:51Z",
+    "checked_at": "2026-06-20T04:51:52Z",
     "last_dispatch_at": "2026-06-16T08:26:33Z"
   },
   "last_run_summary": {
@@ -85,12 +115,12 @@
     "stale_copilot_found": 9,
     "stale_approved_found": 0,
     "needs_human_closed": 0,
-    "actions_taken": 0,
+    "actions_taken": 6,
     "errors": 0
   },
-  "last_mutation_asserted_at": "2026-06-20T00:15:52Z",
+  "last_mutation_asserted_at": "2026-06-20T04:51:53Z",
   "last_mutation_assertion": {
     "status": "passed",
-    "checked_at": "2026-06-20T00:15:52Z"
+    "checked_at": "2026-06-20T04:51:53Z"
   }
 }
