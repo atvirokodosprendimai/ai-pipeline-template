@@ -1,0 +1,30 @@
+pipeline/evals/impl_judge.py
+  s_623d97065e20a1::t_5f1be5f9e49d88 68-70,72-78,80-85,87-89,98-107
+  s_623d97065e20a1::t_fd5f1793ff549d 185-187
+  s_623d97065e20a1::t_adceef6d53d06c 39
+  s_623d97065e20a1::t_5f7019628de14d 110-113,115
+  s_623d97065e20a1::t_2c7292238e78d4 184
+  s_623d97065e20a1::t_ac59d5d2390b77 151
+  s_623d97065e20a1::t_6a3c966de08b15 194-196
+  s_623d97065e20a1::t_a69701bf482363 233
+  s_623d97065e20a1::t_114f0837645056 133
+  s_623d97065e20a1::t_7d18dee0474ffa 203,205
+pipeline/tests/test_impl_judge.py
+  s_623d97065e20a1::t_a93982f84082c3 170-276
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "de50036975d9a16d63d109cf456163d958ef62fc",
+  "prompts": {},
+  "sessions": {
+    "s_623d97065e20a1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4f69d3fc-bb89-4527-ac98-5195e026eaf9",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
