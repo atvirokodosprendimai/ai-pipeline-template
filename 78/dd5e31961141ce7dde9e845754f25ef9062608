@@ -1,0 +1,21 @@
+pipeline/tests/test_langchain_agent_runner.py
+  s_197902c5ff431d::t_d8306dcf428b74 11-15,32,39,65-135,181,242,276-277,309,311-502
+pipeline/wgmesh_pipeline/langchain_agent/runner.py
+  s_197902c5ff431d::t_a39b28678708e8 3,22-23,25,49,83,123,128-144,158,234-256
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "78dd5e31961141ce7dde9e845754f25ef9062608",
+  "prompts": {},
+  "sessions": {
+    "s_197902c5ff431d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ee3aa-ad22-7df2-8daf-d9ca2947278c",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
