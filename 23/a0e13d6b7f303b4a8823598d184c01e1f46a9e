@@ -1,0 +1,21 @@
+pipeline/evals/impl_judge.py
+  s_623d97065e20a1::t_c092a761386036 1-214
+pipeline/tests/test_impl_judge.py
+  s_623d97065e20a1::t_26f63244c0dd56 1-169
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "23a0e13d6b7f303b4a8823598d184c01e1f46a9e",
+  "prompts": {},
+  "sessions": {
+    "s_623d97065e20a1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4f69d3fc-bb89-4527-ac98-5195e026eaf9",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
