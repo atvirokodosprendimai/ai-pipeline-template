@@ -1,0 +1,22 @@
+docs/pulse-reports/2026-06-20_16-52.md
+  s_623d97065e20a1::t_431e9e77b32a66 1-42
+.github/workflows/provision-pipeline-box.yml
+  s_623d97065e20a1::t_6e5f8898b7217d 178-182
+  s_623d97065e20a1::t_b93b0f69e9fb85 210
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "d53d90f912ded3bda6fd4e9b93edfd3817939835",
+  "prompts": {},
+  "sessions": {
+    "s_623d97065e20a1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4f69d3fc-bb89-4527-ac98-5195e026eaf9",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
