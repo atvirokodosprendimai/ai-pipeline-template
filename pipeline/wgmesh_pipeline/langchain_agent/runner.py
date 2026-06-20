@@ -106,6 +106,18 @@ class LangchainAgentRunner:
                 raw_log.append(f"assistant: {completion_text}")
 
                 tool_calls = list(getattr(ai_message, "tool_calls", None) or [])
+                # Agent-trace observability (non-goose executor build): the box
+                # journal was blind to what the ReAct agent actually does — this
+                # surfaces the per-iteration tool sequence so "no tree changes" /
+                # tiny-token runs are explainable (e.g. agent runs only run_bash,
+                # never read_file/edit_file → it skipped the implementation).
+                _LOGGER.info(
+                    "agent trace stage=%s iter=%d tools=%s text_len=%d",
+                    stage,
+                    iterations,
+                    [_tool_call_parts(call)[0] for call in tool_calls],
+                    len(completion_text or ""),
+                )
                 if not tool_calls:
                     break
 
