@@ -1,0 +1,24 @@
+pipeline/tests/test_langchain_agent_replay.py
+  s_96fdbc1eca2621::t_7c74f1aedbf07c 1-83,90-122,124-222
+  s_96fdbc1eca2621::t_f771902639d7ed 84-89,123
+pipeline/wgmesh_pipeline/langchain_agent/replay.py
+  s_96fdbc1eca2621::t_5ee49888b0bcae 1-156
+.github/workflows/nongoose-shadow.yml
+  s_96fdbc1eca2621::t_7f584e243414d4 1-129
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "33fb6940c48937b6ebb275717b63415b80bc3eb0",
+  "prompts": {},
+  "sessions": {
+    "s_96fdbc1eca2621": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ee5c2-6312-7131-b86e-a3b87bf03923",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
