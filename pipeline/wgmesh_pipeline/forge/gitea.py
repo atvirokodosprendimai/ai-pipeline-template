@@ -20,8 +20,7 @@ in callers:
   (GitHub omits the key entirely), so PR filtering is on truthiness.
 
 Endpoints that are byte-identical on both hosts (``get_pr``, ``comment``,
-``create_pr``, ``update_pr_body``, ``approve_pr``, ``push_branch``) are
-inherited unchanged.
+``create_pr``, ``update_pr_body``, ``push_branch``) are inherited unchanged.
 """
 
 from __future__ import annotations
@@ -146,42 +145,6 @@ class GiteaForge(GitHubClient):
         return self._request(
             "GET", f"{self._repo_base}/pulls/{pr_number}.diff", raw_text=True
         )
-
-    def pr_checks_green(self, pr_number: int) -> bool:
-        """Combined commit status on the PR head is success. No statuses at
-        all counts as NOT green — fail closed, exactly like the GitHub
-        adapter's no-check-runs case."""
-        pr = self.get_pr(pr_number)
-        sha = (pr.get("head") or {}).get("sha")
-        if not sha:
-            return False
-        data = self._request("GET", f"{self._repo_base}/commits/{sha}/status")
-        statuses = (data or {}).get("statuses") or []
-        if not statuses:
-            return False
-        return (data or {}).get("state") == "success"
-
-    def list_pr_approvals(self, pr_number: int) -> list[str]:
-        """Logins whose LATEST review on the PR is an approval."""
-        reviews = self._request(
-            "GET",
-            f"{self._repo_base}/pulls/{pr_number}/reviews",
-            params={"limit": LABELS_PAGE_SIZE},
-        )
-        latest: dict[str, str] = {}
-        for review in reviews or []:
-            login = str(((review.get("user") or {}).get("login")) or "")
-            state = str(review.get("state") or "")
-            # Gitea spells rejection REQUEST_CHANGES (GitHub: CHANGES_REQUESTED);
-            # accept both so latest-wins works regardless of host spelling.
-            if login and state in {
-                "APPROVED",
-                "REQUEST_CHANGES",
-                "CHANGES_REQUESTED",
-                "DISMISSED",
-            }:
-                latest[login] = state
-        return [login for login, state in latest.items() if state == "APPROVED"]
 
     # ----------------------------------------------------------------- writes
 
@@ -338,29 +301,3 @@ class GiteaForge(GitHubClient):
         # Fail loudly: a silently-skipped label write is how lifecycle gates
         # rot (defensive-guard-must-announce lesson).
         raise RuntimeError(f"label not found on {self.config.target_repo}: {name!r}")
-
-    def approve_pr(self, pr_number: int) -> Any:
-        """Gitea's CreatePullReview expects event \"APPROVED\" (GitHub uses
-        \"APPROVE\"). Same reviewer-credential semantics as the base class."""
-        if not self.config.reviewer_pat:
-            raise RuntimeError(
-                "approve_pr requires WGMESH_REVIEWER_PAT (reviewer identity)"
-            )
-        if self.config.mode == "shadow":
-            result = DryRunResult(
-                dry_run=True,
-                operation="approve_pr",
-                payload={"pr": pr_number, "event": "APPROVED"},
-            )
-            self.dry_run_records.append(result)
-            return result
-        if self.config.mode == "spec-only":
-            raise PermissionError(
-                "approve_pr is not allowed when PIPELINE_MODE=spec-only"
-            )
-        return self._request(
-            "POST",
-            f"{self._repo_base}/pulls/{pr_number}/reviews",
-            json={"event": "APPROVED"},
-            headers={"Authorization": f"Bearer {self.config.reviewer_pat}"},
-        )

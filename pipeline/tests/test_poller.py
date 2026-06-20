@@ -5,7 +5,6 @@ import asyncio
 import pytest
 
 from wgmesh_pipeline.config import Config
-from wgmesh_pipeline.forge.box_ci import BoxCiResult
 from wgmesh_pipeline.github.client import GitHubClient
 from wgmesh_pipeline.graph.build import build_graph
 from wgmesh_pipeline.poller import Poller
@@ -366,9 +365,6 @@ def test_advance_one_stage_injects_goose_runner_and_repo_path(
     repo_path = tmp_path / "wgmesh"
     runner = object()
 
-    def box_ci(forge, pr):
-        return BoxCiResult(green=True, failures=())
-
     spec_only = Config(
         target_repo=cfg.target_repo, mode="spec-only", repo_path=str(repo_path)
     )
@@ -380,7 +376,6 @@ def test_advance_one_stage_injects_goose_runner_and_repo_path(
         client=EmptyClient(spec_only),
         graph=graph,
         goose_runner=runner,
-        box_ci=box_ci,
     )
 
     p._advance_one_stage(store.get_issue(17))
@@ -389,7 +384,6 @@ def test_advance_one_stage_injects_goose_runner_and_repo_path(
     assert graph.seen_state["goose_runner"] is runner
     assert graph.seen_state["repo_path"] == repo_path
     assert graph.seen_state["config"] is spec_only
-    assert graph.seen_state["box_ci"] is box_ci
 
 
 def test_specced_issue_opens_spec_pr_then_stops_in_spec_only(

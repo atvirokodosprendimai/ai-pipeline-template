@@ -20,25 +20,26 @@ Roll out in `shadow` first: every write becomes a `DryRunResult` while reads
 exercise the real Gitea API. Promote to `spec-only`, then `live`, exactly as
 on GitHub.
 
-## 2. Credentials: two forge accounts (author + reviewer)
+## 2. Credentials: one forge account (author bot)
 
-GitHub App tokens and `GITHUB_TOKEN` do **not** port. Replace them with two
-plain Gitea user accounts — the distinct-principal review gate requires two
-identities (self-approval is rejected on both hosts):
+GitHub App tokens and `GITHUB_TOKEN` do **not** port. Replace them with a
+single plain Gitea user account:
 
 1. **Author bot** (e.g. `wgmesh-bot`): API token with
    `write:repository,write:issue` → `WGMESH_BOT_PAT`. Used for all reads and
-   author-side writes (issues, labels, PRs, merges).
-2. **Reviewer** (e.g. `wgmesh-reviewer`): separate account, repo collaborator
-   with write permission, own API token → `WGMESH_REVIEWER_PAT`. Used only by
-   `approve_pr` (the adapter sends this token, never the author token —
-   asserted by the conformance suite).
+   author-side writes (issues, labels, PRs, enabling auto-merge).
+
+No second "reviewer" identity is needed. The box does **not** self-approve or
+self-merge — it enables forge auto-merge and the merge is gated by a required,
+fail-closed **impl-judge CI check** (a distinct model from the implementer)
+plus the required status checks. The sockpuppet-reviewer approach (a second PAT
+approving the bot's own PRs) was retired in favour of this judge-as-gate model.
 
 Token mint: Forgejo UI → Settings → Applications, or
 `forgejo admin user generate-access-token` (see
 `pipeline/tests/conformance/docker-compose.gitea.yml` for exact commands). Scope
-minimally; per the allowlist-not-denylist lesson, expose only these two
-tokens to the box process.
+minimally; per the allowlist-not-denylist lesson, expose only this token to the
+box process.
 
 ## 3. Git remote: ssh deploy key swap
 
@@ -96,9 +97,8 @@ explicit deferral in the forge-portable plan.)
 |---|---|
 | GitHub App tokens (`pupabobas`, `APP_ID`/`APP_PRIVATE_KEY`) | plain user API tokens (section 2) |
 | `GITHUB_TOKEN` per-workflow principal | Gitea Actions provides a same-named token for CI, but the box never uses it |
-| Copilot review gate | box reviewer identity: `can_review()` / `approve_pr()` with `WGMESH_REVIEWER_PAT`; CI + sanitise walls stay authoritative |
+| Copilot review gate | required fail-closed **impl-judge CI check** (distinct model) + required status checks; box enables auto-merge, never self-approves/merges |
 | Search API (`/search/issues`) | adapter lists closed pulls and applies the same exact-title resolution regex |
-| Check-runs API | commit-status API (`/commits/{sha}/status`); fail-closed semantics preserved (no statuses ≠ green) |
 | Label writes by name | adapter resolves name → numeric id internally; callers still use names |
 
 ## 7. End-to-end verification checklist (local Forgejo)
@@ -115,16 +115,13 @@ the live proof.
 3. **Issue → spec PR:** create an issue labeled `needs-triage`; run the box
    in `spec-only` with `FORGE_KIND=gitea` → spec branch pushed, spec PR
    opened, labels swapped (`needs-triage` → `copilot-triaging`).
-4. **Review:** with `WGMESH_REVIEWER_PAT` set, `can_review()` is true; box
-   approves the PR as the reviewer identity; `list_pr_approvals` shows the
-   reviewer login.
-5. **Checks gate:** with no CI configured, `pr_checks_green` is **False**
-   (fail-closed); after `.gitea/workflows/ci.yml` runs green on the PR head,
-   it flips True.
-6. **Merge:** in `live` mode the box squash-merges; issue's
-   `has_merged_resolution_pr` flips True for the exact spec/impl title and
-   stays False for loose mentions.
-7. Record date + Forgejo version of the last successful run below.
+4. **Merge gate:** in `live` mode, on a merge decision the box enables forge
+   auto-merge (it does not self-merge); the PR merges only once the required
+   impl-judge check and status checks pass. The issue parks in `awaiting_merge`
+   and completes to terminal `merged` only on the real merge. Once merged, the
+   issue's `has_merged_resolution_pr` flips True for the exact spec/impl title
+   and stays False for loose mentions.
+5. Record date + Forgejo version of the last successful run below.
 
 | Date | Forgejo | Result |
 |---|---|---|

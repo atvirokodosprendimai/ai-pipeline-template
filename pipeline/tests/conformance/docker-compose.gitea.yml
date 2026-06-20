@@ -26,14 +26,7 @@
 #          -H "Content-Type: application/json" \
 #          -d '{"name":"conformance","auto_init":true,"default_branch":"main"}'
 #
-#   4. (Optional, for approve_pr/distinct-principal tests) repeat steps 1-2
-#      for a second user `reviewer` and add it as a repo collaborator:
-#        curl -sf -X PUT \
-#          http://localhost:3000/api/v1/repos/conformance/conformance/collaborators/reviewer \
-#          -H "Authorization: token <TOKEN>" \
-#          -H "Content-Type: application/json" -d '{"permission":"write"}'
-#
-#   5. Run the live contract:
+#   4. Run the live contract:
 #        GITEA_LIVE=1 GITEA_TOKEN=<TOKEN> \
 #        GITEA_REPO=conformance/conformance \
 #        .venv/bin/python -m pytest tests/conformance/ -q
