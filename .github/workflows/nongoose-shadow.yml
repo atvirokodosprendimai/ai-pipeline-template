@@ -12,6 +12,9 @@ on:
       model:
         description: 'Implement model id'
         default: 'GLM-5.2'
+      iters:
+        description: 'Max agent iterations (LANGCHAIN_MAX_ITERATIONS)'
+        default: '40'
 
 permissions:
   contents: read
@@ -41,10 +44,15 @@ jobs:
           SERVER_NAME: ${{ github.event.inputs.server_name }}
           SPEC_REF: ${{ github.event.inputs.spec_ref }}
           MODEL: ${{ github.event.inputs.model }}
+          ITERS: ${{ github.event.inputs.iters }}
         run: |
           set -euo pipefail
           [[ "$SERVER_NAME" =~ ^[A-Za-z0-9._-]+$ ]] || {
             echo "invalid server_name" >&2
+            exit 1
+          }
+          [[ "$ITERS" =~ ^[0-9]+$ ]] || {
+            echo "invalid iters" >&2
             exit 1
           }
           [[ "$MODEL" =~ ^[A-Za-z0-9._-]+$ ]] || {
@@ -74,12 +82,14 @@ jobs:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           SPEC_REF: ${{ github.event.inputs.spec_ref }}
           MODEL: ${{ github.event.inputs.model }}
+          ITERS: ${{ github.event.inputs.iters }}
         run: |
           set -euo pipefail
           umask 077
           printf '%s\n' "$DEPLOY_SSH_KEY" > "$RUNNER_TEMP/deploy_key"
           SSH_SPEC_REF=$(printf '%q' "$SPEC_REF")
           SSH_MODEL=$(printf '%q' "$MODEL")
+          SSH_ITERS=$(printf '%q' "$ITERS")
           # ServerAlive*: the implement agent runs minutes with long silent gaps
           # (LLM calls, `go build`/`go test`). Without keepalive the SSH session
           # drops ("client_loop: send disconnect: Broken pipe") before the REPORT
@@ -88,7 +98,7 @@ jobs:
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               -o ConnectTimeout=15 -o ServerAliveInterval=30 -o ServerAliveCountMax=40 \
               -i "$RUNNER_TEMP/deploy_key" root@"$BOX_IP" \
-              "SPEC_REF=$SSH_SPEC_REF MODEL=$SSH_MODEL bash -se" <<'REMOTE'
+              "SPEC_REF=$SSH_SPEC_REF MODEL=$SSH_MODEL ITERS=$SSH_ITERS bash -se" <<'REMOTE'
           set -euo pipefail
           # set -a: /etc/wgmesh-pipeline/env is a systemd EnvironmentFile (bare
           # KEY=VALUE, no `export`). Sourcing without auto-export leaves the vars
@@ -125,6 +135,7 @@ jobs:
 
           test -f "$temp_dir/$SPEC_REF"
           set -a; . /etc/wgmesh-pipeline/env; set +a
+          export LANGCHAIN_MAX_ITERATIONS="$ITERS"
           cd /opt/wgmesh-pipeline
           PYTHONUNBUFFERED=1 /opt/wgmesh-pipeline/.venv/bin/python \
             -m wgmesh_pipeline.langchain_agent.replay \
