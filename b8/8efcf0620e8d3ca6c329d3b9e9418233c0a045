@@ -1,0 +1,19 @@
+docs/plans/2026-06-20-003-feat-surgical-requeue-failed-issues-plan.md
+  s_623d97065e20a1::t_8c4a420e351d0a 1-221
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "b88efcf0620e8d3ca6c329d3b9e9418233c0a045",
+  "prompts": {},
+  "sessions": {
+    "s_623d97065e20a1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4f69d3fc-bb89-4527-ac98-5195e026eaf9",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
