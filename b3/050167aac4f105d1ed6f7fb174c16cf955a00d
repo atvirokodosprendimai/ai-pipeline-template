@@ -1,0 +1,40 @@
+pipeline/wgmesh_pipeline/langchain_agent/prompts.py
+  s_c44771cd11323f::t_4d37f0c4c6541a 65,82,94-95
+  s_4a6a497c09fdf9::t_29d76e91b525a5 16-23,63-64,66,68-81,83-93,96-100
+  s_4a6a497c09fdf9::t_686bf79a78e543 67
+pipeline/wgmesh_pipeline/langchain_agent/runner.py
+  s_4a6a497c09fdf9::t_5680f10536fd1f 5,55,57-58,60-64,82,85,147-151,193,195-212,308-310,320-333
+  s_4a6a497c09fdf9::t_5b325258586dc2 59
+  s_c44771cd11323f::t_73c7607e4a182d 194,318-319
+pipeline/tests/test_langchain_agent_prompts.py
+  s_c44771cd11323f::t_0d3972e740ae47 9,50-67,69
+  s_4a6a497c09fdf9::t_49f5ce7965c502 68
+pipeline/tests/test_langchain_agent_runner.py
+  s_4a6a497c09fdf9::t_8fc79cf3f45cd5 3,216,267,315-316,384,704
+  s_c44771cd11323f::t_618e4f02e4209d 424-425,437,747-748
+  s_c44771cd11323f::t_93bf9966695d81 66-90,200,212-215,217-266,268-314,317-377
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "b3050167aac4f105d1ed6f7fb174c16cf955a00d",
+  "prompts": {},
+  "sessions": {
+    "s_4a6a497c09fdf9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ee5b3-ecef-77c0-a415-f59664bdabf7",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    },
+    "s_c44771cd11323f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ee5b3-709c-70c0-ba30-81786b6e7ef0",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
