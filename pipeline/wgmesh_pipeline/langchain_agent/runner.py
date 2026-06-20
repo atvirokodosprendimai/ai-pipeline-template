@@ -22,6 +22,7 @@ from wgmesh_pipeline.models import (
 ClientFactory = Callable[[ModelProfile, Config], Any]
 MAX_ITERATIONS = 40
 MAX_TOOL_OUTPUT_CHARS = 16_000
+MAX_CONTEXT_CHARS = 120_000
 WALL_CLOCK_LIMIT_SECONDS = 1800
 _LOGGER = logging.getLogger(__name__)
 
@@ -101,11 +102,15 @@ class LangchainAgentRunner:
                         output_path=output_path,
                         started=started,
                         raw_log=raw_log,
-                        error=f"langchain agent timed out after {WALL_CLOCK_LIMIT_SECONDS}s",
+                        error=(
+                            "langchain agent timed out after "
+                            f"{WALL_CLOCK_LIMIT_SECONDS}s"
+                        ),
                         profile=profile,
                         usage=usage,
                     )
                 iterations += 1
+                messages = _compact_messages(messages)
                 ai_message = llm.invoke(messages)
                 messages.append(ai_message)
                 usage = _add_usage(usage, getattr(ai_message, "usage_metadata", None))
@@ -173,6 +178,19 @@ class LangchainAgentRunner:
                     usage=usage,
                     output=completion_text,
                 )
+                if is_implement_stage and _workspace_is_dirty(root):
+                    return _result(
+                        ok=True,
+                        output_path=output_path,
+                        started=started,
+                        raw_log=raw_log,
+                        error=(
+                            "harvested at max iterations "
+                            f"({max_iterations}) — workspace had changes"
+                        ),
+                        profile=profile,
+                        usage=usage,
+                    )
                 return _result(
                     ok=False,
                     output_path=output_path,
@@ -297,6 +315,82 @@ def _bounded(text: str) -> str:
     dropped_chars = len(text) - MAX_TOOL_OUTPUT_CHARS
     marker = f"\n...[truncated {dropped_chars} chars]...\n"
     return f"{text[:head_chars]}{marker}{text[-tail_chars:]}"
+
+
+def _compact_messages(
+    messages: list[Any], max_chars: int = MAX_CONTEXT_CHARS
+) -> list[Any]:
+    """Drop oldest middle rounds when total content chars exceed max_chars.
+
+    Always keep messages[0] (SystemMessage) and messages[1] (initial HumanMessage).
+    Drop whole rounds: an AIMessage with tool_calls and its following
+    ToolMessage(s) form one round. Size is based on message content.
+    """
+    if len(messages) <= 2 or _messages_size(messages) <= max_chars:
+        return messages
+
+    prefix = messages[:2]
+    rounds = _message_rounds(messages[2:])
+    kept_rounds = list(rounds)
+    while len(kept_rounds) > 1 and (
+        _messages_size(prefix + _flatten_rounds(kept_rounds)) > max_chars
+    ):
+        kept_rounds.pop(0)
+    return prefix + _flatten_rounds(kept_rounds)
+
+
+def _messages_size(messages: list[Any]) -> int:
+    return sum(len(str(getattr(message, "content", ""))) for message in messages)
+
+
+def _message_rounds(messages: list[Any]) -> list[list[Any]]:
+    rounds: list[list[Any]] = []
+    index = 0
+    while index < len(messages):
+        message = messages[index]
+        round_messages = [message]
+        index += 1
+        tool_call_ids = _tool_call_ids(message)
+        if tool_call_ids:
+            while (
+                index < len(messages)
+                and _tool_message_call_id(messages[index]) in tool_call_ids
+            ):
+                round_messages.append(messages[index])
+                index += 1
+        rounds.append(round_messages)
+    return rounds
+
+
+def _flatten_rounds(rounds: list[list[Any]]) -> list[Any]:
+    return [message for round_messages in rounds for message in round_messages]
+
+
+def _tool_call_ids(message: Any) -> set[str]:
+    tool_calls = getattr(message, "tool_calls", None) or []
+    ids: set[str] = set()
+    for call in tool_calls:
+        if isinstance(call, dict):
+            raw_id = call.get("id") or call.get("tool_call_id")
+        else:
+            raw_id = getattr(call, "id", None) or getattr(call, "tool_call_id", None)
+        if raw_id is not None:
+            ids.add(str(raw_id))
+    return ids
+
+
+def _is_tool_message(message: Any) -> bool:
+    return (
+        hasattr(message, "tool_call_id")
+        or message.__class__.__name__ == "ToolMessage"
+    )
+
+
+def _tool_message_call_id(message: Any) -> str | None:
+    if not _is_tool_message(message):
+        return None
+    raw_id = getattr(message, "tool_call_id", None)
+    return str(raw_id) if raw_id is not None else None
 
 
 def _message_classes() -> tuple[type[Any], type[Any], type[Any]]:

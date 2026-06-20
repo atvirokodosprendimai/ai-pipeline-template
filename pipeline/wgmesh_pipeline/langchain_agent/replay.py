@@ -29,6 +29,7 @@ def main(
     config_loader: ConfigLoader = load_config,
     stdout: TextIO | None = None,
 ) -> int:
+    logging.basicConfig(level=logging.INFO, stream=sys.stdout, force=True)
     args = _parse_args(argv)
     out = stdout or sys.stdout
     workdir = Path(args.workdir).resolve()
