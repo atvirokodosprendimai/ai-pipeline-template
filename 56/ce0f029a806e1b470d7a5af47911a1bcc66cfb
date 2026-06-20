@@ -1,0 +1,69 @@
+pipeline/wgmesh_pipeline/state/store.py
+  s_623d97065e20a1::t_e9bc794840fd63 18-23,29-38
+pipeline/wgmesh_pipeline/poller.py
+  s_623d97065e20a1::t_27b939937c1e51 111
+  s_623d97065e20a1::t_9c560050fa95b9 167-172,175,180,187-189,191-195,197-200,202-216
+  s_dcf37fd19845c1::t_00dc4a583e3edf 181-186,190,196,201
+pipeline/tests/test_live_e2e.py
+  s_dcf37fd19845c1::t_30cc598f06b723 4-7,39,41-49,51-60,125,138-143,159,161,171,173,175,179-182,184,191-193
+  s_dcf37fd19845c1::t_a4124635cab551 114
+pipeline/wgmesh_pipeline/github/client.py
+  s_623d97065e20a1::t_3d3d434c3b288a 291-332,340-349
+  s_dcf37fd19845c1::t_46e47fb2f4c0ce 333-339
+pipeline/wgmesh_pipeline/graph/nodes/gate.py
+  s_623d97065e20a1::t_d829899aaac20f 105-114
+pipeline/tests/test_build_escalation.py
+  s_dcf37fd19845c1::t_207ded9c79ebc1 99,180,213
+pipeline/tests/test_gate.py
+  s_dcf37fd19845c1::t_47ed6426dd6223 187-191
+  s_dcf37fd19845c1::t_872fba41705978 270-272
+  s_623d97065e20a1::t_1be45edd7b2157 558-559,561,567
+  s_dcf37fd19845c1::t_f1e976aead15c6 545
+pipeline/tests/test_build_lg_parity.py
+  s_dcf37fd19845c1::t_9f889970b0747b 45-48
+  s_dcf37fd19845c1::t_4eca846da4e025 211,237
+pipeline/tests/test_poller.py
+  s_623d97065e20a1::t_df667541b73324 301-304,307,309-311,316-317,330-331
+  s_623d97065e20a1::t_2c7f492c961a24 477,480-496,501-502,515-572
+pipeline/wgmesh_pipeline/forge/gitea.py
+  s_dcf37fd19845c1::t_6233bc1bfae87f 23
+pipeline/tests/conformance/docker-compose.gitea.yml
+  s_dcf37fd19845c1::t_a4008b85125e44 29
+pipeline/tests/conformance/test_forge_conformance.py
+  s_dcf37fd19845c1::t_b3ae6e95acaceb 649
+.github/workflows/pii-policy-check.yml
+  s_dcf37fd19845c1::t_aa700d1f2613d5 40-45
+pipeline/docs/FORGE-SWAP.md
+  s_dcf37fd19845c1::t_c76bca7f54dca1 124
+  s_dcf37fd19845c1::t_4acdd13345df8d 100
+  s_dcf37fd19845c1::t_46d0279ad0fb61 118-123
+  s_dcf37fd19845c1::t_8fa7addcdd1e7a 23,25-26,30-36,41-42
+.github/workflows/pipeline-ci.yml
+  s_dcf37fd19845c1::t_bdce686802a820 22-26
+.github/workflows/sanitise-wall.yml
+  s_dcf37fd19845c1::t_6e62bf6b5cda62 12-15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "56ce0f029a806e1b470d7a5af47911a1bcc66cfb",
+  "prompts": {},
+  "sessions": {
+    "s_623d97065e20a1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4f69d3fc-bb89-4527-ac98-5195e026eaf9",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    },
+    "s_dcf37fd19845c1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "971c1898-bd61-4edf-8cb9-f382f0d73f00",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
