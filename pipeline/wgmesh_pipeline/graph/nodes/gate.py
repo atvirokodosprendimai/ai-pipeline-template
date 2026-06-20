@@ -3,8 +3,6 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from wgmesh_pipeline.forge.box_ci import BoxCiResult
-from wgmesh_pipeline.forge.merge_gate import ensure_mergeable
 from wgmesh_pipeline.graph.state import Decision, GraphState
 from wgmesh_pipeline.paywall import detect_component_paywall
 from wgmesh_pipeline.risk import classify_risk
@@ -104,40 +102,16 @@ def apply_gate_side_effects(state: GraphState) -> None:
         impl_pr = state.get("impl_pr")
         if impl_pr is None:
             raise RuntimeError("cannot merge implementation without impl_pr")
-        # Distinct-principal merge gate: CI green + approval by a non-author.
-        # Shadow mode skips the live readiness reads — the merge itself is
-        # only a dry-run record there.
-        if getattr(getattr(client, "config", None), "mode", None) != "shadow":
-            # Cutover U9: when a box-CI runner is wired, the box's own verdict
-            # IS the CI signal — the host's Actions check-runs are not polled.
-            box_ci = state.get("box_ci")
-            ci_verdict = None
-            if box_ci is not None:
-                try:
-                    ci_verdict = box_ci(client, int(impl_pr))
-                except Exception:
-                    # A crashing runner is a red verdict (fail closed), never
-                    # an exception that strands the issue mid-merge.
-                    log.exception("gate: box CI runner crashed for PR #%s", impl_pr)
-                    ci_verdict = BoxCiResult(
-                        green=False, failures=("box ci: runner crashed (see box logs)",)
-                    )
-            readiness = ensure_mergeable(client, int(impl_pr), ci_verdict=ci_verdict)
-            if not readiness.ready:
-                log.warning(
-                    "gate: PR #%s not mergeable (%s); escalating instead of merging",
-                    impl_pr,
-                    "; ".join(readiness.reasons),
-                )
-                state["decision"] = "escalate"
-                state["risk_reasons"] = list(state.get("risk_reasons", [])) + list(
-                    readiness.reasons
-                )
-                client.add_label(state["issue"].number, "needs-human")
-                return
-        client.merge_pr(
-            int(impl_pr), commit_title=f"Merge issue #{state['issue'].number}"
-        )
+        # Judge-gated automerge (U4): the box no longer self-merges (which
+        # required a non-author approval it can't supply — every impl PR
+        # escalated, layer 3 of the convergence stall). It enables GitHub
+        # auto-merge; the wgmesh protect-main ruleset gates the merge on the
+        # impl-judge fail-closed CI check (+ build + status), so the PR merges
+        # only when the judge passes — no approval, no reviewer PAT.
+        # enable_auto_merge is mode-gated (shadow -> dry-run; spec-only ->
+        # blocked). The poller parks the issue in awaiting_merge and completes it
+        # to merged only on the real merge — never here (no phantom completion).
+        client.enable_auto_merge(int(impl_pr))
     else:
         client.add_label(state["issue"].number, "needs-human")
 

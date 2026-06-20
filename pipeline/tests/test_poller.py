@@ -299,30 +299,23 @@ def test_success_tick_does_not_record_failure_score(tmp_path, cfg: Config) -> No
 def test_reviewed_issue_not_phantom_merged_when_side_effect_fails(
     tmp_path, cfg: Config
 ) -> None:
-    # Side effect (merge) runs BEFORE the terminal transition. A failed merge
-    # must NOT leave the issue terminal-'merged' with the PR unmerged — it stays
-    # at 'reviewed', retriable.
-    class FailingMergeClient(EmptyClient):
+    # U4: the merge-decision side effect is enable_auto_merge (NOT a self-merge).
+    # If it fails, the issue must NOT advance to awaiting_merge/merged — it stays
+    # at 'reviewed', retriable. No phantom completion.
+    class FailingEnableClient(EmptyClient):
         def __init__(self, config):
             super().__init__(config)
-            self.merged_prs: list[int] = []
+            self.enable_calls: list[int] = []
 
-        def merge_pr(self, pr_number: int, *, commit_title: str | None = None):
-            self.merged_prs.append(pr_number)
-            raise RuntimeError("merge side effect failed")
+        def enable_auto_merge(self, pr_number: int, *, merge_method: str = "SQUASH"):
+            self.enable_calls.append(pr_number)
+            raise RuntimeError("enable auto-merge side effect failed")
 
     live = Config(target_repo=cfg.target_repo, mode="live", max_files=cfg.max_files)
     store = StateStore(tmp_path / "state.db")
     store.upsert_issue(2, "Ready", stage="reviewed", impl_pr=321)
-    client = FailingMergeClient(live)
-    # Box CI (U9) green so the gate proceeds to the merge call under test.
-    p = Poller(
-        config=live,
-        store=store,
-        client=client,
-        graph=Graph(),
-        box_ci=lambda forge, pr: BoxCiResult(green=True, failures=()),
-    )
+    client = FailingEnableClient(live)
+    p = Poller(config=live, store=store, client=client, graph=Graph())
     p.scratch[2] = {
         "diff": "+docs\n",
         "changed_files": ["docs/readme.md"],
@@ -335,8 +328,8 @@ def test_reviewed_issue_not_phantom_merged_when_side_effect_fails(
     result = asyncio.run(p.tick())
 
     assert result is None
-    assert client.merged_prs == [321]
-    assert store.get_issue(2).stage != "merged"
+    assert client.enable_calls == [321]
+    assert store.get_issue(2).stage == "reviewed"  # not awaiting_merge, not merged
 
 
 def test_restart_mid_flight_resumes_persisted_stage_without_double_work(
@@ -487,47 +480,32 @@ def test_main_graph_shadow_fixture_halts_at_specced_without_writes(
     assert client.dry_run_records == []
 
 
-def test_reviewed_issue_records_escalated_when_gate_flips_decision(
+def test_reviewed_merge_enables_automerge_and_parks_awaiting_merge(
     tmp_path, cfg: Config
 ) -> None:
-    """P0 regression guard: the distinct-principal merge gate can flip the
-    decision merge -> escalate at side-effect time. The poller must record
-    the POST-side-effect outcome — recording the pre-flip decision stored a
-    terminal 'merged' with the PR unmerged (false completion)."""
+    """U4: on a merge decision the box ENABLES auto-merge (no self-merge) and
+    parks the issue in awaiting_merge — completion to merged happens only on the
+    real merge (the awaiting_merge handler), never here."""
 
-    class RoutedSession:
-        def __init__(self):
-            self.calls = []
+    class EnablingClient(EmptyClient):
+        def __init__(self, config):
+            super().__init__(config)
+            self.enabled: list[int] = []
+            self.merged_prs: list[int] = []
 
-        def request(self, method, url, **kwargs):
-            self.calls.append({"method": method, "url": url, "kwargs": kwargs})
-            if method == "GET" and url.endswith("/reviews"):
-                return Response([])
-            if method == "GET" and "/pulls/" in url:
-                return Response(
-                    {
-                        "number": 321,
-                        "user": {"login": "author-bot"},
-                        "head": {"sha": "abc"},
-                    }
-                )
-            return Response({"ok": True})
+        def enable_auto_merge(self, pr_number, *, merge_method="SQUASH"):
+            self.enabled.append(pr_number)
+            return None
+
+        def merge_pr(self, pr_number, *, commit_title=None):
+            self.merged_prs.append(pr_number)
+            return {"merged": True}
 
     live = Config(target_repo=cfg.target_repo, mode="live", max_files=cfg.max_files)
     store = StateStore(tmp_path / "state.db")
     store.upsert_issue(3, "Ready", stage="reviewed", impl_pr=321)
-    session = RoutedSession()
-    client = EmptyClient(live, session=session)
-    # Box CI (U9) red -> gate must refuse the merge and escalate.
-    p = Poller(
-        config=live,
-        store=store,
-        client=client,
-        graph=Graph(),
-        box_ci=lambda forge, pr: BoxCiResult(
-            green=False, failures=("box ci: go test failed",)
-        ),
-    )
+    client = EnablingClient(live)
+    p = Poller(config=live, store=store, client=client, graph=Graph())
     p.scratch[3] = {
         "diff": "+docs\n",
         "changed_files": ["docs/readme.md"],
@@ -540,5 +518,61 @@ def test_reviewed_issue_records_escalated_when_gate_flips_decision(
     result = asyncio.run(p.tick())
 
     assert result is not None
-    assert store.get_issue(3).stage == "escalated"
-    assert not any(c["url"].endswith("/321/merge") for c in session.calls)
+    assert store.get_issue(3).stage == "awaiting_merge"
+    assert client.enabled == [321]
+    assert client.merged_prs == []  # the box does NOT self-merge
+
+
+class _PrStateClient(EmptyClient):
+    """Fake client whose get_pr returns a fixed PR payload; records add_label."""
+
+    def __init__(self, config, pr_payload):
+        super().__init__(config)
+        self._pr = pr_payload
+        self.labels: list[tuple[int, str]] = []
+
+    def get_pr(self, number):
+        return self._pr
+
+    def add_label(self, number, label):
+        self.labels.append((number, label))
+        return None
+
+
+def test_awaiting_merge_completes_on_real_merge(tmp_path, cfg: Config) -> None:
+    live = Config(target_repo=cfg.target_repo, mode="live", max_files=cfg.max_files)
+    store = StateStore(tmp_path / "state.db")
+    store.upsert_issue(4, "Merging", stage="awaiting_merge", impl_pr=321)
+    client = _PrStateClient(live, {"number": 321, "state": "closed", "merged": True})
+    p = Poller(config=live, store=store, client=client, graph=Graph())
+
+    result = asyncio.run(p.tick())
+
+    assert result is not None
+    assert store.get_issue(4).stage == "merged"
+
+
+def test_awaiting_merge_escalates_on_closed_unmerged(tmp_path, cfg: Config) -> None:
+    live = Config(target_repo=cfg.target_repo, mode="live", max_files=cfg.max_files)
+    store = StateStore(tmp_path / "state.db")
+    store.upsert_issue(5, "Closed", stage="awaiting_merge", impl_pr=321)
+    client = _PrStateClient(live, {"number": 321, "state": "closed", "merged": False})
+    p = Poller(config=live, store=store, client=client, graph=Graph())
+
+    asyncio.run(p.tick())
+
+    assert store.get_issue(5).stage == "escalated"
+    assert (5, "needs-human") in client.labels
+
+
+def test_awaiting_merge_stays_while_pr_open(tmp_path, cfg: Config) -> None:
+    live = Config(target_repo=cfg.target_repo, mode="live", max_files=cfg.max_files)
+    store = StateStore(tmp_path / "state.db")
+    store.upsert_issue(6, "Open", stage="awaiting_merge", impl_pr=321)
+    client = _PrStateClient(live, {"number": 321, "state": "open", "merged": False})
+    p = Poller(config=live, store=store, client=client, graph=Graph())
+
+    asyncio.run(p.tick())
+
+    assert store.get_issue(6).stage == "awaiting_merge"  # no transition, no phantom
+    assert client.labels == []

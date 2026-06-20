@@ -96,7 +96,7 @@ def test_tier_zero_fails_tests_tier_one_passes_merges_once() -> None:
     assert result["decision"] == "merge"
     assert result["escalation_history"] == [0, 1]
     assert result["escalation_attempts"] == 1
-    assert [record.operation for record in client.dry_run_records] == ["merge_pr"]
+    assert [record.operation for record in client.dry_run_records] == ["enable_auto_merge"]
 
 
 def test_tier_zero_fails_ladder_length_one_does_not_retry() -> None:
@@ -177,7 +177,7 @@ def test_no_needs_human_label_on_intermediate_failing_pass() -> None:
 
     graph.invoke(_state(client))
 
-    assert [record.operation for record in client.dry_run_records] == ["merge_pr"]
+    assert [record.operation for record in client.dry_run_records] == ["enable_auto_merge"]
 
 
 def test_spec_only_mode_never_enters_escalation_loop() -> None:
@@ -210,4 +210,4 @@ def test_clean_tier_zero_build_merges_without_escalation() -> None:
     assert result["decision"] == "merge"
     assert result["escalation_history"] == [0]
     assert result["escalation_attempts"] == 0
-    assert [record.operation for record in client.dry_run_records] == ["merge_pr"]
+    assert [record.operation for record in client.dry_run_records] == ["enable_auto_merge"]

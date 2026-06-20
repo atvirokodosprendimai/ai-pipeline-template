@@ -42,6 +42,10 @@ class RecordingClient:
     def merge_pr(self, pr_number: int, *, commit_title: str) -> None:
         self.calls.append(("merge_pr", pr_number, commit_title))
 
+    def enable_auto_merge(self, pr_number: int, *, merge_method: str = "SQUASH") -> None:
+        # U4: a merge decision enables auto-merge; the box does not self-merge.
+        self.calls.append(("enable_auto_merge", pr_number))
+
 
 @dataclass(frozen=True)
 class Nodes:
@@ -204,7 +208,7 @@ def test_langgraph_parity_full_live_path_merges_after_gate_side_effects(
         monkeypatch,
         config=_cfg(),
         nodes=_nodes(review_results={0: {"tests_passed": True}}),
-        expected_calls=[("merge_pr", 123, "Merge issue #1")],
+        expected_calls=[("enable_auto_merge", 123)],
     )
 
     assert result["decision"] == "merge"
@@ -230,7 +234,7 @@ def test_langgraph_parity_retryable_failure_retries_next_tier_then_merges(
                 1: {"tests_passed": True},
             }
         ),
-        expected_calls=[("merge_pr", 123, "Merge issue #1")],
+        expected_calls=[("enable_auto_merge", 123)],
     )
 
     assert result["decision"] == "merge"
