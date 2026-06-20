@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from importlib import resources
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Sequence
 
 
 ALLOWED_TRANSITIONS: dict[str, set[str]] = {
@@ -319,6 +319,49 @@ class StateStore:
         self._conn.execute("DELETE FROM issues")
         self._conn.commit()
         return {"issues": issue_count, "runs": run_count}
+
+    def requeue_failed(
+        self,
+        numbers: Sequence[int] | None = None,
+        *,
+        target_stage: str = "spec_ready",
+        now: datetime | None = None,
+    ) -> dict[str, Any]:
+        """Move failed issues back to an actionable stage without wiping state."""
+        if target_stage not in ACTIONABLE_STAGES:
+            raise ValueError(f"target_stage must be actionable: {target_stage}")
+
+        params: list[Any] = []
+        where = "stage = 'failed'"
+        if numbers:
+            issue_numbers = [int(number) for number in numbers]
+            where += f" AND number IN ({','.join('?' for _ in issue_numbers)})"
+            params.extend(issue_numbers)
+
+        rows = self._conn.execute(
+            f"SELECT number FROM issues WHERE {where} ORDER BY number",
+            params,
+        ).fetchall()
+        affected_numbers = [int(row["number"]) for row in rows]
+        requeued = 0
+        if affected_numbers:
+            placeholders = ",".join("?" for _ in affected_numbers)
+            cursor = self._conn.execute(
+                f"""
+                UPDATE issues
+                   SET stage = ?, attempts = 0, last_error = NULL, updated_at = ?
+                 WHERE stage = 'failed'
+                   AND number IN ({placeholders})
+                """,
+                (target_stage, _iso(_dt(now)), *affected_numbers),
+            )
+            requeued = int(cursor.rowcount)
+        self._conn.commit()
+        return {
+            "requeued": requeued,
+            "numbers": affected_numbers,
+            "target_stage": target_stage,
+        }
 
     def bump_attempt(
         self,

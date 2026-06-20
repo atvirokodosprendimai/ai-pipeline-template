@@ -1,0 +1,92 @@
+name: Requeue Failed Issues
+
+# One-shot: SSH to the pipeline box and surgically move failed issues back to
+# an actionable stage, WITHOUT restarting the service or wiping durable state.
+
+on:
+  workflow_dispatch:
+    inputs:
+      server_name:
+        description: 'Hetzner server name'
+        default: 'wgmesh-pipeline'
+      issues:
+        description: 'optional comma-separated issue numbers (empty = all failed)'
+        default: ''
+      target_stage:
+        description: 'actionable target stage'
+        default: 'spec_ready'
+
+permissions:
+  contents: read
+
+jobs:
+  requeue:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate secrets
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+        run: |
+          set -euo pipefail
+          : "${DEPLOY_SSH_KEY:?DEPLOY_SSH_KEY secret missing}"
+          : "${HCLOUD_TOKEN:?HCLOUD_TOKEN secret missing (org)}"
+
+      - name: Install hcloud CLI
+        run: |
+          set -euo pipefail
+          curl -fsSL https://github.com/hetznercloud/cli/releases/latest/download/hcloud-linux-amd64.tar.gz \
+            | tar xz hcloud
+          sudo mv hcloud /usr/local/bin/
+
+      - name: Resolve box IP
+        env:
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+          SERVER_NAME: ${{ github.event.inputs.server_name }}
+        run: |
+          set -euo pipefail
+          IP=$(hcloud server ip "$SERVER_NAME")
+          echo "BOX_IP=$IP" >> "$GITHUB_ENV"
+
+      - name: Requeue failed issues (no restart)
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          ISSUES: ${{ github.event.inputs.issues }}
+          TARGET_STAGE: ${{ github.event.inputs.target_stage }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$ISSUES" =~ ^[0-9,]*$ ]]; then
+            echo "issues must be empty or a comma-separated list of numbers" >&2
+            exit 1
+          fi
+          if [[ ! "$TARGET_STAGE" =~ ^[a-z_]+$ ]]; then
+            echo "target_stage must contain only lowercase letters and underscores" >&2
+            exit 1
+          fi
+          umask 077
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$RUNNER_TEMP/deploy_key"
+          SSH_ISSUES=$(printf '%q' "$ISSUES")
+          SSH_TARGET_STAGE=$(printf '%q' "$TARGET_STAGE")
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              -o ConnectTimeout=15 -i "$RUNNER_TEMP/deploy_key" root@"$BOX_IP" \
+              "ISSUES=$SSH_ISSUES TARGET_STAGE=$SSH_TARGET_STAGE bash -se" <<'REMOTE'
+          set -euo pipefail
+          set -a
+          . /etc/wgmesh-pipeline/env
+          set +a
+          cd /opt/wgmesh-pipeline
+          cmd=(/opt/wgmesh-pipeline/.venv/bin/python -m wgmesh_pipeline.main --requeue-failed)
+          if [ -n "${ISSUES}" ]; then
+            cmd+=(--issues "$ISSUES")
+          fi
+          cmd+=(--target-stage "$TARGET_STAGE")
+          echo '===== requeue failed issues ====='
+          printf 'command:'
+          printf ' %q' "${cmd[@]}"
+          printf '\n'
+          "${cmd[@]}" 2>&1
+          REMOTE
+
+      - name: Cleanup
+        if: always()
+        run: rm -f "$RUNNER_TEMP/deploy_key"

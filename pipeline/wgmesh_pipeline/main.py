@@ -25,6 +25,38 @@ def _truthy(value: str | None) -> bool:
     return value is not None and value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _parse_issue_numbers(value: str) -> list[int]:
+    raw_value = value.strip()
+    if not raw_value:
+        return []
+    numbers: list[int] = []
+    for raw_number in raw_value.split(","):
+        item = raw_number.strip()
+        if not item or not item.isdigit():
+            raise argparse.ArgumentTypeError(
+                "--issues must be a comma-separated list of issue numbers"
+            )
+        numbers.append(int(item))
+    return numbers
+
+
+def requeue_failed_main(
+    *,
+    numbers: list[int] | None = None,
+    target_stage: str = "spec_ready",
+) -> None:
+    config = load_config()
+    store = open_state_store(config)
+    result = store.requeue_failed(numbers, target_stage=target_stage)
+    print(
+        "[pipeline] requeue_failed "
+        f"requeued={result['requeued']} "
+        f"target_stage={result['target_stage']} "
+        f"numbers={result['numbers']}",
+        file=sys.stderr,
+    )
+
+
 async def async_main(*, reset_queue: bool = False) -> None:
     logging.basicConfig(
         level=logging.INFO,
@@ -77,8 +109,30 @@ async def async_main(*, reset_queue: bool = False) -> None:
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--reset-queue", action="store_true", help="clear durable issue queue and run history before polling")
+    parser.add_argument(
+        "--reset-queue",
+        action="store_true",
+        help="clear durable issue queue and run history before polling",
+    )
+    parser.add_argument(
+        "--requeue-failed",
+        action="store_true",
+        help="move failed issues back to an actionable stage and exit",
+    )
+    parser.add_argument(
+        "--issues",
+        type=_parse_issue_numbers,
+        help="comma-separated issue numbers to requeue",
+    )
+    parser.add_argument(
+        "--target-stage",
+        default="spec_ready",
+        help="actionable stage to assign to requeued issues",
+    )
     args = parser.parse_args(argv)
+    if args.requeue_failed:
+        requeue_failed_main(numbers=args.issues, target_stage=args.target_stage)
+        return
     asyncio.run(async_main(reset_queue=args.reset_queue))
 
 
