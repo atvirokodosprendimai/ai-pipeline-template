@@ -8,7 +8,11 @@ import pytest
 
 from wgmesh_pipeline.config import Config, load_config
 from wgmesh_pipeline.goose.usage import UsageTotals
-from wgmesh_pipeline.langchain_agent.runner import LangchainAgentRunner
+from wgmesh_pipeline.langchain_agent.runner import (
+    MAX_TOOL_OUTPUT_CHARS,
+    LangchainAgentRunner,
+    _bounded,
+)
 from wgmesh_pipeline.models import ModelProfile
 
 pytestmark = pytest.mark.unit
@@ -25,12 +29,14 @@ class FakeClient:
     def __init__(self, messages: list[FakeAIMessage]):
         self._messages = messages
         self.bound_specs: list[object] | None = None
+        self.invocations: list[list[Any]] = []
 
     def bind_tools(self, specs):
         self.bound_specs = list(specs)
         return self
 
     def invoke(self, messages):
+        self.invocations.append(list(messages))
         if len(self._messages) == 1:
             return self._messages[0]
         return self._messages.pop(0)
@@ -54,6 +60,77 @@ def write_recipe(tmp_path: Path, body: str | None = None) -> Path:
         encoding="utf-8",
     )
     return recipe
+
+
+def test_bounded_under_budget_passthrough_and_pure() -> None:
+    text = "under budget"
+
+    assert _bounded(text) == text
+    assert _bounded(text) == _bounded(text)
+
+
+def test_bounded_over_budget_keeps_head_tail_and_marker() -> None:
+    text = "head" + ("x" * MAX_TOOL_OUTPUT_CHARS) + "tail"
+    bounded = _bounded(text)
+    dropped = len(text) - MAX_TOOL_OUTPUT_CHARS
+
+    assert len(bounded) <= MAX_TOOL_OUTPUT_CHARS + 64
+    assert bounded.startswith("head")
+    assert bounded.endswith("tail")
+    assert f"[truncated {dropped} chars]" in bounded
+
+
+def test_tool_output_is_bounded_but_raw_log_keeps_full_output(tmp_path) -> None:
+    recipe = write_recipe(tmp_path)
+    large_output = "head" + ("x" * MAX_TOOL_OUTPUT_CHARS) + "tail"
+    (tmp_path / "large.txt").write_text(large_output, encoding="utf-8")
+    fake_client: FakeClient | None = None
+
+    def client_factory(profile: ModelProfile, config: Config) -> FakeClient:
+        nonlocal fake_client
+        fake_client = FakeClient(
+            [
+                FakeAIMessage(
+                    content="reading",
+                    tool_calls=[
+                        {
+                            "name": "read_file",
+                            "args": {"path": "large.txt"},
+                            "id": "call-1",
+                        }
+                    ],
+                    usage_metadata={
+                        "input_tokens": 1,
+                        "output_tokens": 1,
+                        "total_tokens": 2,
+                    },
+                ),
+                FakeAIMessage(
+                    content="finished",
+                    tool_calls=[],
+                    usage_metadata={
+                        "input_tokens": 1,
+                        "output_tokens": 1,
+                        "total_tokens": 2,
+                    },
+                ),
+            ]
+        )
+        return fake_client
+
+    result = LangchainAgentRunner(cfg(), client_factory=client_factory).run_recipe(
+        recipe=recipe,
+        workdir=tmp_path,
+        params={"output_file": "out.txt"},
+        expected_output="out.txt",
+    )
+
+    assert result.ok is False
+    assert large_output in result.raw_log
+    assert fake_client is not None
+    tool_message = fake_client.invocations[1][-1]
+    assert tool_message.content == _bounded(large_output)
+    assert tool_message.content != large_output
 
 
 def test_happy_path_writes_expected_output_and_sums_usage(tmp_path) -> None:
@@ -101,7 +178,7 @@ def test_happy_path_writes_expected_output_and_sums_usage(tmp_path) -> None:
     assert result.output_path == tmp_path / "out.txt"
     assert (tmp_path / "out.txt").read_text(encoding="utf-8") == "done"
     assert result.usage == UsageTotals(
-        input_tokens=14, output_tokens=5, total_tokens=19, requests=2, skipped=0
+        input_tokens=10, output_tokens=3, total_tokens=13, requests=1, skipped=0
     )
     assert result.model_key == "default"
 
@@ -162,7 +239,7 @@ def test_emit_generation_called_with_stage_model_and_usage(
             "stage": "implement",
             "model": cfg().goose_model,
             "usage": result.usage,
-            "output": "finished",
+            "output": "writing",
         }
     ]
 
@@ -196,7 +273,8 @@ def test_missing_expected_output_returns_not_ok(tmp_path) -> None:
     assert "expected output was not written" in (result.error or "")
 
 
-def test_max_iterations_is_bounded(tmp_path) -> None:
+def test_max_iterations_default_is_40(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("LANGCHAIN_MAX_ITERATIONS", raising=False)
     recipe = write_recipe(tmp_path)
 
     def client_factory(profile: ModelProfile, config: Config) -> FakeClient:
@@ -228,9 +306,200 @@ def test_max_iterations_is_bounded(tmp_path) -> None:
     )
 
     assert result.ok is False
-    assert "max iterations" in (result.error or "")
+    assert "max iterations (40)" in (result.error or "")
     assert result.usage is not None
-    assert result.usage.requests == 25
+    assert result.usage.requests == 40
+
+
+def test_max_iterations_env_override_reports_actual_cap(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setenv("LANGCHAIN_MAX_ITERATIONS", "3")
+    recipe = write_recipe(tmp_path)
+
+    def client_factory(profile: ModelProfile, config: Config) -> FakeClient:
+        return FakeClient(
+            [
+                FakeAIMessage(
+                    content="again",
+                    tool_calls=[
+                        {
+                            "name": "write_file",
+                            "args": {"path": "scratch.txt", "content": "again"},
+                            "id": "call-loop",
+                        }
+                    ],
+                    usage_metadata={
+                        "input_tokens": 1,
+                        "output_tokens": 1,
+                        "total_tokens": 2,
+                    },
+                )
+            ]
+        )
+
+    result = LangchainAgentRunner(cfg(), client_factory=client_factory).run_recipe(
+        recipe=recipe,
+        workdir=tmp_path,
+        params={"output_file": "out.txt"},
+        expected_output="out.txt",
+    )
+
+    assert result.ok is False
+    assert "max iterations (3)" in (result.error or "")
+    assert result.usage is not None
+    assert result.usage.requests == 3
+
+
+def test_max_iterations_invalid_env_falls_back_to_default(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setenv("LANGCHAIN_MAX_ITERATIONS", "not-an-int")
+    recipe = write_recipe(tmp_path)
+
+    def client_factory(profile: ModelProfile, config: Config) -> FakeClient:
+        return FakeClient(
+            [
+                FakeAIMessage(
+                    content="again",
+                    tool_calls=[
+                        {
+                            "name": "write_file",
+                            "args": {"path": "scratch.txt", "content": "again"},
+                            "id": "call-loop",
+                        }
+                    ],
+                    usage_metadata={
+                        "input_tokens": 1,
+                        "output_tokens": 1,
+                        "total_tokens": 2,
+                    },
+                )
+            ]
+        )
+
+    result = LangchainAgentRunner(cfg(), client_factory=client_factory).run_recipe(
+        recipe=recipe,
+        workdir=tmp_path,
+        params={"output_file": "out.txt"},
+        expected_output="out.txt",
+    )
+
+    assert result.ok is False
+    assert "max iterations (40)" in (result.error or "")
+    assert result.usage is not None
+    assert result.usage.requests == 40
+
+
+def test_expected_output_written_mid_loop_returns_before_cap(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setenv("LANGCHAIN_MAX_ITERATIONS", "5")
+    recipe = write_recipe(tmp_path)
+    fake_client: FakeClient | None = None
+
+    def client_factory(profile: ModelProfile, config: Config) -> FakeClient:
+        nonlocal fake_client
+        fake_client = FakeClient(
+            [
+                FakeAIMessage(
+                    content="writing",
+                    tool_calls=[
+                        {
+                            "name": "write_file",
+                            "args": {"path": "out.txt", "content": "diff"},
+                            "id": "call-1",
+                        }
+                    ],
+                    usage_metadata={
+                        "input_tokens": 1,
+                        "output_tokens": 1,
+                        "total_tokens": 2,
+                    },
+                )
+            ]
+        )
+        return fake_client
+
+    result = LangchainAgentRunner(cfg(), client_factory=client_factory).run_recipe(
+        recipe=recipe,
+        workdir=tmp_path,
+        params={"output_file": "out.txt"},
+        expected_output="out.txt",
+    )
+
+    assert result.ok is True
+    assert fake_client is not None
+    assert len(fake_client.invocations) == 1
+    assert result.usage.requests == 1
+
+
+def test_empty_expected_output_does_not_return_early(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setenv("LANGCHAIN_MAX_ITERATIONS", "3")
+    recipe = write_recipe(tmp_path)
+
+    def client_factory(profile: ModelProfile, config: Config) -> FakeClient:
+        return FakeClient(
+            [
+                FakeAIMessage(
+                    content="writing placeholder",
+                    tool_calls=[
+                        {
+                            "name": "write_file",
+                            "args": {"path": "out.txt", "content": ""},
+                            "id": "call-1",
+                        }
+                    ],
+                    usage_metadata={
+                        "input_tokens": 1,
+                        "output_tokens": 1,
+                        "total_tokens": 2,
+                    },
+                )
+            ]
+        )
+
+    result = LangchainAgentRunner(cfg(), client_factory=client_factory).run_recipe(
+        recipe=recipe,
+        workdir=tmp_path,
+        params={"output_file": "out.txt"},
+        expected_output="out.txt",
+    )
+
+    assert result.ok is False
+    assert "max iterations (3)" in (result.error or "")
+    assert result.usage.requests == 3
+
+
+def test_model_stops_with_existing_output_still_succeeds(tmp_path) -> None:
+    recipe = write_recipe(tmp_path)
+    (tmp_path / "out.txt").write_text("done", encoding="utf-8")
+
+    def client_factory(profile: ModelProfile, config: Config) -> FakeClient:
+        return FakeClient(
+            [
+                FakeAIMessage(
+                    content="finished",
+                    tool_calls=[],
+                    usage_metadata={
+                        "input_tokens": 1,
+                        "output_tokens": 1,
+                        "total_tokens": 2,
+                    },
+                )
+            ]
+        )
+
+    result = LangchainAgentRunner(cfg(), client_factory=client_factory).run_recipe(
+        recipe=recipe,
+        workdir=tmp_path,
+        params={"output_file": "out.txt"},
+        expected_output="out.txt",
+    )
+
+    assert result.ok is True
 
 
 def test_model_routing_passes_resolved_profile_to_client_factory(

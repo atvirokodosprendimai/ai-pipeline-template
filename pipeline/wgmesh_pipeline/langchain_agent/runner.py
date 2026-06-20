@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import time
 from pathlib import Path
@@ -18,8 +19,10 @@ from wgmesh_pipeline.models import (
 )
 
 ClientFactory = Callable[[ModelProfile, Config], Any]
-MAX_ITERATIONS = 25
+MAX_ITERATIONS = 40
+MAX_TOOL_OUTPUT_CHARS = 16_000
 WALL_CLOCK_LIMIT_SECONDS = 1800
+_LOGGER = logging.getLogger(__name__)
 
 
 class LangchainAgentRunner:
@@ -43,6 +46,7 @@ class LangchainAgentRunner:
         usage = _empty_usage()
         profile: ModelProfile | None = None
         output_path: Path | None = None
+        max_iterations = _max_iterations()
         try:
             root = Path(workdir).resolve()
             output_path = resolve_workspace_path(root, expected_output)
@@ -76,7 +80,7 @@ class LangchainAgentRunner:
 
             iterations = 0
             completion_text: str | None = None
-            while iterations < MAX_ITERATIONS:
+            while iterations < max_iterations:
                 if time.monotonic() - started > WALL_CLOCK_LIMIT_SECONDS:
                     _emit_usage(
                         session_id=session_id,
@@ -116,10 +120,27 @@ class LangchainAgentRunner:
                     raw_log.append(f"tool {name}: {result}")
                     messages.append(
                         ToolMessage(
-                            content=str(result),
+                            content=_bounded(str(result)),
                             tool_call_id=call_id,
                             name=name,
                         )
+                    )
+                if output_path.exists() and output_path.stat().st_size > 0:
+                    _emit_usage(
+                        session_id=session_id,
+                        stage=stage,
+                        model=profile.model,
+                        usage=usage,
+                        output=completion_text,
+                    )
+                    return _result(
+                        ok=True,
+                        output_path=output_path,
+                        started=started,
+                        raw_log=raw_log,
+                        error=None,
+                        profile=profile,
+                        usage=usage,
                     )
             else:
                 _emit_usage(
@@ -134,7 +155,7 @@ class LangchainAgentRunner:
                     output_path=output_path,
                     started=started,
                     raw_log=raw_log,
-                    error=f"langchain agent reached max iterations ({MAX_ITERATIONS})",
+                    error=f"langchain agent reached max iterations ({max_iterations})",
                     profile=profile,
                     usage=usage,
                 )
@@ -208,6 +229,31 @@ def _credential_env(config: Config) -> Mapping[str, str]:
     if getattr(config, "zai_api_key", None):
         env.setdefault("ZAI_API_KEY", config.zai_api_key or "")
     return env
+
+
+def _max_iterations() -> int:
+    raw = os.environ.get("LANGCHAIN_MAX_ITERATIONS")
+    if raw is None:
+        return MAX_ITERATIONS
+    try:
+        return int(raw)
+    except ValueError:
+        _LOGGER.warning(
+            "invalid LANGCHAIN_MAX_ITERATIONS=%r; using default %s",
+            raw,
+            MAX_ITERATIONS,
+        )
+        return MAX_ITERATIONS
+
+
+def _bounded(text: str) -> str:
+    if len(text) <= MAX_TOOL_OUTPUT_CHARS:
+        return text
+    head_chars = MAX_TOOL_OUTPUT_CHARS // 2
+    tail_chars = MAX_TOOL_OUTPUT_CHARS - head_chars
+    dropped_chars = len(text) - MAX_TOOL_OUTPUT_CHARS
+    marker = f"\n...[truncated {dropped_chars} chars]...\n"
+    return f"{text[:head_chars]}{marker}{text[-tail_chars:]}"
 
 
 def _message_classes() -> tuple[type[Any], type[Any], type[Any]]:
