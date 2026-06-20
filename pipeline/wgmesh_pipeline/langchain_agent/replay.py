@@ -63,6 +63,7 @@ def main(
     )
     dirty = _workspace_is_dirty(workdir)
     diff = _bounded(_git_diff(workdir))
+    build_ok, build_tail = _go_build(workdir) if dirty else (None, "")
     _print_report(
         stdout=out,
         model=config.goose_model,
@@ -71,6 +72,8 @@ def main(
         dirty=dirty,
         diff=diff,
         usage=result.usage,
+        build_ok=build_ok,
+        build_tail=build_tail,
     )
     return 0 if result.ok and dirty else 1
 
@@ -112,6 +115,28 @@ def _workspace_is_dirty(workdir: Path) -> bool:
     return bool(completed.stdout.strip())
 
 
+def _go_build(workdir: Path) -> tuple[bool | None, str]:
+    """Run `go build ./...` in the workdir to verify the harvested diff compiles.
+    Returns (ok, stderr_tail); ok=None when go is unavailable (don't fail the
+    confidence check on a missing toolchain)."""
+    try:
+        completed = subprocess.run(
+            ["go", "build", "./..."],
+            cwd=workdir,
+            text=True,
+            errors="replace",
+            capture_output=True,
+            check=False,
+            timeout=600,
+        )
+    except FileNotFoundError:
+        return None, "go toolchain not found"
+    except subprocess.TimeoutExpired:
+        return False, "go build timed out"
+    tail = (completed.stderr or completed.stdout).strip()
+    return completed.returncode == 0, tail[-2000:]
+
+
 def _git_diff(workdir: Path) -> str:
     completed = subprocess.run(
         ["git", "diff", "--"],
@@ -142,6 +167,8 @@ def _print_report(
     dirty: bool,
     diff: str,
     usage: object,
+    build_ok: bool | None = None,
+    build_tail: str = "",
 ) -> None:
     print("REPORT", file=stdout)
     print(f"model: {model}", file=stdout)
@@ -149,6 +176,10 @@ def _print_report(
     print(f"error: {error}", file=stdout)
     print(f"git_dirty: {dirty}", file=stdout)
     print(f"usage: {usage}", file=stdout)
+    build_label = "skipped" if build_ok is None else ("pass" if build_ok else "FAIL")
+    print(f"go_build: {build_label}", file=stdout)
+    if build_ok is False and build_tail:
+        print(f"go_build_tail:\n{build_tail}", file=stdout)
     print("diff:", file=stdout)
     print(diff or "(empty)", file=stdout)
 
