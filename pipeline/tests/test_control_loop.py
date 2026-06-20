@@ -51,7 +51,6 @@ _WRITE_METHODS = frozenset(
         "update_pr_body",
         "merge_pr",
         "push_branch",
-        "approve_pr",
     }
 )
 

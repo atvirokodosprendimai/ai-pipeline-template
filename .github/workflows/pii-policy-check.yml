@@ -37,12 +37,12 @@ permissions:
 
 jobs:
   pii-policy-check:
-    # Cutover #1599 U9: bot PRs run this same path-scoped rule on the box
-    # (wgmesh_pipeline.forge.box_ci.pii_path_violations, per-commit over the
-    # PR range) as a merge-gate stage; retire this Actions run for that PR
-    # class. The guard never lapses for ANY class: ci.yml (U10) carries the
-    # absorbed pii-policy-check job on every PR — fork PRs, the highest
-    # PII-risk authors, stay on the Actions sandbox.
+    # Bot PRs (bot/* heads) skip this standalone Actions run — they are
+    # gated at merge by the required impl-judge check (fail-closed safety
+    # rubric) plus the required status checks. The guard never lapses for
+    # ANY class: ci.yml (U10) carries the absorbed pii-policy-check job on
+    # every PR — fork PRs, the highest PII-risk authors, stay on the
+    # Actions sandbox.
     if: github.event_name != 'pull_request' || !startsWith(github.event.pull_request.head.ref, 'bot/')
     runs-on: ubuntu-latest
     steps:

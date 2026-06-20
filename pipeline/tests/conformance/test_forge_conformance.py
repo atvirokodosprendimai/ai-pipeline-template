@@ -77,7 +77,6 @@ def make_client(
         target_repo="o/r",
         mode=mode,
         wgmesh_bot_pat="author-pat",
-        reviewer_pat="reviewer-pat",
     )
     session = RoutingSession(routes)
     cls = GitHubClient if kind == GITHUB else GiteaForge
@@ -406,127 +405,6 @@ def test_spec_only_label_gate_blocks_non_spec_allows_needs_human(kind: str) -> N
 
 
 # ---------------------------------------------------------------------------
-# approve_pr: distinct reviewer principal
-# ---------------------------------------------------------------------------
-
-
-@parametrize_adapters
-def test_approve_pr_uses_reviewer_credential_not_author_token(kind: str) -> None:
-    routes = [("POST", "/pulls/7/reviews", Response({"id": 1, "state": "APPROVED"}))]
-    client, session = make_client(kind, "live", routes)
-
-    client.approve_pr(7)
-
-    call = session.calls[0]
-    auth = call["kwargs"]["headers"]["Authorization"]
-    assert auth == "Bearer reviewer-pat"
-    assert auth != "Bearer author-pat"
-    # Host spelling divergence: GitHub's CreateReview event is "APPROVE",
-    # Gitea's CreatePullReview expects "APPROVED".
-    expected_event = "APPROVE" if kind == GITHUB else "APPROVED"
-    assert call["kwargs"]["json"] == {"event": expected_event}
-
-
-@parametrize_adapters
-def test_approve_pr_shadow_dry_runs(kind: str) -> None:
-    client, session = make_client(kind, "shadow", [])
-
-    result = client.approve_pr(7)
-
-    assert isinstance(result, DryRunResult)
-    assert result.operation == "approve_pr"
-    assert session.calls == []
-
-
-@parametrize_adapters
-def test_can_review_false_without_reviewer_credential(kind: str) -> None:
-    cfg = Config(target_repo="o/r", mode="shadow", wgmesh_bot_pat="author-pat")
-    cls = GitHubClient if kind == GITHUB else GiteaForge
-    client = cls(cfg, session=RoutingSession([]), sanitiser=lambda _t: True)
-
-    assert client.can_review() is False
-
-
-# ---------------------------------------------------------------------------
-# pr_checks_green: fail closed
-# ---------------------------------------------------------------------------
-
-
-def _checks_routes(
-    kind: str, checks_response: Response
-) -> list[tuple[str, str, Response]]:
-    pr_route = ("GET", "/pulls/7", Response({"head": {"sha": "abc123"}}))
-    if kind == GITHUB:
-        return [pr_route, ("GET", "/commits/abc123/check-runs", checks_response)]
-    return [pr_route, ("GET", "/commits/abc123/status", checks_response)]
-
-
-@parametrize_adapters
-def test_pr_checks_green_fail_closed_when_no_checks(kind: str) -> None:
-    empty = (
-        Response({"check_runs": []})
-        if kind == GITHUB
-        else Response({"state": "", "statuses": []})
-    )
-    client, _ = make_client(kind, "shadow", _checks_routes(kind, empty))
-
-    assert client.pr_checks_green(7) is False
-
-
-@parametrize_adapters
-def test_pr_checks_green_true_when_all_checks_succeed(kind: str) -> None:
-    green = (
-        Response({"check_runs": [{"status": "completed", "conclusion": "success"}]})
-        if kind == GITHUB
-        else Response({"state": "success", "statuses": [{"status": "success"}]})
-    )
-    client, _ = make_client(kind, "shadow", _checks_routes(kind, green))
-
-    assert client.pr_checks_green(7) is True
-
-
-@parametrize_adapters
-def test_pr_checks_green_false_while_pending(kind: str) -> None:
-    pending = (
-        Response({"check_runs": [{"status": "in_progress", "conclusion": None}]})
-        if kind == GITHUB
-        else Response({"state": "pending", "statuses": [{"status": "pending"}]})
-    )
-    client, _ = make_client(kind, "shadow", _checks_routes(kind, pending))
-
-    assert client.pr_checks_green(7) is False
-
-
-def test_gitea_checks_success_state_without_statuses_is_not_green() -> None:
-    """A combined state of success with ZERO statuses means nothing ran —
-    fail closed, mirroring the GitHub adapter's empty check-runs case."""
-    routes = _checks_routes(GITEA, Response({"state": "success", "statuses": []}))
-    client, _ = make_client(GITEA, "shadow", routes)
-
-    assert client.pr_checks_green(7) is False
-
-
-# ---------------------------------------------------------------------------
-# list_pr_approvals: latest review wins
-# ---------------------------------------------------------------------------
-
-
-@parametrize_adapters
-def test_list_pr_approvals_latest_review_wins(kind: str) -> None:
-    rejection = "CHANGES_REQUESTED" if kind == GITHUB else "REQUEST_CHANGES"
-    reviews = [
-        {"user": {"login": "rev-a"}, "state": "APPROVED"},
-        {"user": {"login": "rev-a"}, "state": rejection},
-        {"user": {"login": "rev-b"}, "state": "APPROVED"},
-    ]
-    client, _ = make_client(
-        kind, "shadow", [("GET", "/pulls/7/reviews", Response(reviews))]
-    )
-
-    assert client.list_pr_approvals(7) == ["rev-b"]
-
-
-# ---------------------------------------------------------------------------
 # U1: create_issue — sanitise-gated, shadow dry-run, spec-only refused,
 # live round-trip (Gitea label-id path), needs-human safety valve
 # ---------------------------------------------------------------------------
@@ -768,7 +646,7 @@ class TestGiteaLiveContract:
     """Same contract against a real Forgejo at http://localhost:3000.
 
     Env: GITEA_LIVE=1, GITEA_TOKEN (author token), GITEA_REPO=owner/repo
-    (default conformance/conformance), optional GITEA_REVIEWER_TOKEN.
+    (default conformance/conformance).
     Bootstrap steps are documented in docker-compose.gitea.yml.
     """
 
@@ -780,7 +658,6 @@ class TestGiteaLiveContract:
             target_repo=os.environ.get("GITEA_REPO", "conformance/conformance"),
             mode="live",
             wgmesh_bot_pat=os.environ["GITEA_TOKEN"],
-            reviewer_pat=os.environ.get("GITEA_REVIEWER_TOKEN"),
         )
         return GiteaForge(cfg, session=requests.Session(), sanitiser=lambda _t: True)
 
@@ -822,11 +699,3 @@ class TestGiteaLiveContract:
         self, client: GiteaForge
     ) -> None:
         assert client.find_open_pr_number(f"bot/spec-{uuid.uuid4().hex}") is None
-
-
-@parametrize_adapters
-def test_approve_pr_spec_only_refused(kind: str) -> None:
-    client, _session = make_client(kind, "spec-only", [])
-
-    with pytest.raises(PermissionError, match="approve_pr.*spec-only"):
-        client.approve_pr(7)
