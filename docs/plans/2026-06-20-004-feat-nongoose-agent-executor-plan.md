@@ -237,9 +237,11 @@ code actually changing.
 
 ## Resolved Decisions (operator, 2026-06-20)
 
-- **Agent model(s):** test **DeepSeek (metered, cheap)** and **MiniMax (flat-rate)** — move off
-  GLM-4.7 (it produced 844 tokens / no edits); skip frontier unless both fail. Route the implement
-  stage to these via the model-routing layer (`MODEL_REGISTRY`/`STAGE_ROUTING`).
+- **Agent model(s):** test **DeepSeek (metered, cheap)**, **MiniMax (flat-rate)**, and
+  **GLM-5.2 (flat-rate flagship)** — move off GLM-4.7 (it produced 844 tokens / no edits; 4.7 may
+  simply be too weak — 5.2 is the current flagship and flat-rate, so likely the best value if it
+  can drive the agent loop). Skip frontier (Anthropic/OpenAI) unless all three fail. Route the
+  implement stage per-model via the model-routing layer (`MODEL_REGISTRY`/`STAGE_ROUTING`).
 - **Run env for real experiments:** **box shadow run** — execute the agent executor on the box
   (has creds) against one issue WITHOUT flipping global `EXECUTOR`; goose stays live. No local key.
 
