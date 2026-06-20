@@ -1,0 +1,19 @@
+.github/workflows/set-box-env.yml
+  s_623d97065e20a1::t_cbe63e362dad25 84-90
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "952c30cf59338705ebe81e03254a086c9ff54070",
+  "prompts": {},
+  "sessions": {
+    "s_623d97065e20a1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4f69d3fc-bb89-4527-ac98-5195e026eaf9",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
