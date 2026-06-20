@@ -6,6 +6,7 @@ import pytest
 
 from wgmesh_pipeline.langchain_agent.prompts import (
     PromptRenderError,
+    build_implement_prompt,
     render_recipe_prompt,
 )
 
@@ -44,6 +45,28 @@ def test_implementation_recipe_renders_required_params() -> None:
     assert "diff.patch" in rendered
     assert "{{" not in rendered
     assert "}}" not in rendered
+
+
+def test_build_implement_prompt_contains_agent_native_editing_instructions() -> None:
+    rendered = build_implement_prompt("specs/issue-5-spec.md")
+
+    assert "specs/issue-5-spec.md" in rendered
+    assert "IMPLEMENT by EDITING FILES" in rendered
+    assert "edit_file" in rendered
+    assert "write_file" in rendered
+    assert "go build ./..." in rendered
+    assert "go test ./..." in rendered
+    assert "go vet ./..." in rendered
+    assert "diff_file" not in rendered
+    assert "git add" not in rendered
+    assert "git diff" not in rendered
+    assert "Run exactly" not in rendered
+
+
+@pytest.mark.parametrize("spec_file", ["", None])
+def test_build_implement_prompt_requires_spec_file(spec_file) -> None:
+    with pytest.raises(PromptRenderError, match="spec_file"):
+        build_implement_prompt(spec_file)
 
 
 def test_missing_required_param_names_missing_key(tmp_path: Path) -> None:

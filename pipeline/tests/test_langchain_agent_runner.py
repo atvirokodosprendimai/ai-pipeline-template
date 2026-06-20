@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -60,6 +61,31 @@ def write_recipe(tmp_path: Path, body: str | None = None) -> Path:
         encoding="utf-8",
     )
     return recipe
+
+
+def init_git_repo(tmp_path: Path) -> None:
+    subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "config", "user.email", "test@example.com"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Test User"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+    (tmp_path / "README.md").write_text("initial\n", encoding="utf-8")
+    (tmp_path / "spec.md").write_text("Implement the change.\n", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "commit", "-m", "initial"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
 
 
 def test_bounded_under_budget_passthrough_and_pure() -> None:
@@ -171,7 +197,7 @@ def test_happy_path_writes_expected_output_and_sums_usage(tmp_path) -> None:
         workdir=tmp_path,
         params={"output_file": "out.txt"},
         expected_output="out.txt",
-        stage="implement",
+        stage="spec",
     )
 
     assert result.ok is True
@@ -183,10 +209,179 @@ def test_happy_path_writes_expected_output_and_sums_usage(tmp_path) -> None:
     assert result.model_key == "default"
 
 
+def test_implement_stage_agent_edits_file_then_stops_returns_ok_for_dirty_workspace(
+    tmp_path,
+) -> None:
+    recipe = write_recipe(tmp_path)
+    init_git_repo(tmp_path)
+
+    def client_factory(profile: ModelProfile, config: Config) -> FakeClient:
+        return FakeClient(
+            [
+                FakeAIMessage(
+                    content="editing",
+                    tool_calls=[
+                        {
+                            "name": "write_file",
+                            "args": {"path": "implemented.txt", "content": "done\n"},
+                            "id": "call-1",
+                        }
+                    ],
+                    usage_metadata={
+                        "input_tokens": 10,
+                        "output_tokens": 3,
+                        "total_tokens": 13,
+                    },
+                ),
+                FakeAIMessage(
+                    content="finished",
+                    tool_calls=[],
+                    usage_metadata={
+                        "input_tokens": 4,
+                        "output_tokens": 2,
+                        "total_tokens": 6,
+                    },
+                ),
+            ]
+        )
+
+    result = LangchainAgentRunner(cfg(), client_factory=client_factory).run_recipe(
+        recipe=recipe,
+        workdir=tmp_path,
+        params={"spec_file": "spec.md"},
+        expected_output="diff.patch",
+        stage="implement",
+    )
+
+    assert result.ok is True
+    assert (tmp_path / "implemented.txt").read_text(encoding="utf-8") == "done\n"
+    assert result.usage == UsageTotals(
+        input_tokens=14, output_tokens=5, total_tokens=19, requests=2, skipped=0
+    )
+
+
+def test_implement_stage_agent_without_edits_returns_no_source_changes_error(
+    tmp_path,
+) -> None:
+    recipe = write_recipe(tmp_path)
+    init_git_repo(tmp_path)
+
+    def client_factory(profile: ModelProfile, config: Config) -> FakeClient:
+        return FakeClient(
+            [
+                FakeAIMessage(
+                    content="checking",
+                    tool_calls=[
+                        {
+                            "name": "run_bash",
+                            "args": {"command": "true"},
+                            "id": "call-1",
+                        }
+                    ],
+                    usage_metadata={
+                        "input_tokens": 1,
+                        "output_tokens": 1,
+                        "total_tokens": 2,
+                    },
+                ),
+                FakeAIMessage(
+                    content="finished",
+                    tool_calls=[],
+                    usage_metadata={
+                        "input_tokens": 1,
+                        "output_tokens": 1,
+                        "total_tokens": 2,
+                    },
+                ),
+            ]
+        )
+
+    result = LangchainAgentRunner(cfg(), client_factory=client_factory).run_recipe(
+        recipe=recipe,
+        workdir=tmp_path,
+        params={"spec_file": "spec.md"},
+        expected_output="diff.patch",
+        stage="implement",
+    )
+
+    assert result.ok is False
+    assert "no source changes" in (result.error or "")
+
+
+def test_implement_stage_ignores_stale_diff_file_when_workspace_is_clean(
+    tmp_path,
+) -> None:
+    recipe = write_recipe(tmp_path)
+    (tmp_path / "diff.patch").write_text("stale diff\n", encoding="utf-8")
+    init_git_repo(tmp_path)
+
+    def client_factory(profile: ModelProfile, config: Config) -> FakeClient:
+        return FakeClient(
+            [
+                FakeAIMessage(
+                    content="finished",
+                    tool_calls=[],
+                    usage_metadata={
+                        "input_tokens": 1,
+                        "output_tokens": 1,
+                        "total_tokens": 2,
+                    },
+                )
+            ]
+        )
+
+    result = LangchainAgentRunner(cfg(), client_factory=client_factory).run_recipe(
+        recipe=recipe,
+        workdir=tmp_path,
+        params={"spec_file": "spec.md"},
+        expected_output="diff.patch",
+        stage="implement",
+    )
+
+    assert result.ok is False
+    assert "no source changes" in (result.error or "")
+
+
+def test_non_implement_stage_still_completes_from_expected_output(tmp_path) -> None:
+    recipe = write_recipe(tmp_path)
+
+    def client_factory(profile: ModelProfile, config: Config) -> FakeClient:
+        return FakeClient(
+            [
+                FakeAIMessage(
+                    content="writing",
+                    tool_calls=[
+                        {
+                            "name": "write_file",
+                            "args": {"path": "out.txt", "content": "done"},
+                            "id": "call-1",
+                        }
+                    ],
+                    usage_metadata={
+                        "input_tokens": 1,
+                        "output_tokens": 1,
+                        "total_tokens": 2,
+                    },
+                )
+            ]
+        )
+
+    result = LangchainAgentRunner(cfg(), client_factory=client_factory).run_recipe(
+        recipe=recipe,
+        workdir=tmp_path,
+        params={"output_file": "out.txt"},
+        expected_output="out.txt",
+        stage="spec",
+    )
+
+    assert result.ok is True
+
+
 def test_emit_generation_called_with_stage_model_and_usage(
     tmp_path, monkeypatch
 ) -> None:
     recipe = write_recipe(tmp_path)
+    init_git_repo(tmp_path)
     emitted: list[dict[str, Any]] = []
     monkeypatch.setattr(
         "wgmesh_pipeline.langchain_agent.runner.tracing.emit_generation",
@@ -226,8 +421,8 @@ def test_emit_generation_called_with_stage_model_and_usage(
     result = LangchainAgentRunner(cfg(), client_factory=client_factory).run_recipe(
         recipe=recipe,
         workdir=tmp_path,
-        params={"output_file": "out.txt"},
-        expected_output="out.txt",
+        params={"spec_file": "spec.md"},
+        expected_output="diff.patch",
         stage="implement",
         session_id="issue-1",
     )
@@ -239,7 +434,7 @@ def test_emit_generation_called_with_stage_model_and_usage(
             "stage": "implement",
             "model": cfg().goose_model,
             "usage": result.usage,
-            "output": "writing",
+            "output": "finished",
         }
     ]
 
@@ -506,6 +701,7 @@ def test_model_routing_passes_resolved_profile_to_client_factory(
     tmp_path, monkeypatch
 ) -> None:
     recipe = write_recipe(tmp_path)
+    init_git_repo(tmp_path)
     monkeypatch.setenv("OPENROUTER_API_KEY", "or-key")
     config = load_config(
         {
@@ -548,8 +744,8 @@ def test_model_routing_passes_resolved_profile_to_client_factory(
     result = LangchainAgentRunner(config, client_factory=client_factory).run_recipe(
         recipe=recipe,
         workdir=tmp_path,
-        params={"output_file": "out.txt"},
-        expected_output="out.txt",
+        params={"spec_file": "spec.md"},
+        expected_output="diff.patch",
         stage="implement",
     )
 
