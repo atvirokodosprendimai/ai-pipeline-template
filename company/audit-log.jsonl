@@ -939,3 +939,4 @@
 {"timestamp":"2026-06-20T04:51:42Z","run_id":"27860692292","action":"retrigger_copilot","issue_number":734,"target_repo":"wgmesh","reason":"stale >48h at copilot-triaging","outcome":"success","retry_count":1}
 {"timestamp":"2026-06-20T04:51:46Z","run_id":"27860692292","action":"retrigger_copilot","issue_number":732,"target_repo":"wgmesh","reason":"stale >48h at copilot-triaging","outcome":"success","retry_count":1}
 {"timestamp":"2026-06-20T04:51:52Z","run_id":"27860692292","action":"check_funnel_signals","issue_number":null,"target_repo":"wgmesh","reason":"periodic signal check","outcome":"success","retry_count":null,"signals":{"dogfood":true,"presence":true}}
+{"timestamp":"2026-06-20T08:21:36Z","run_id":"27865475555","action":"check_funnel_signals","issue_number":null,"target_repo":"wgmesh","reason":"periodic signal check","outcome":"success","retry_count":null,"signals":{"dogfood":true,"presence":true}}
