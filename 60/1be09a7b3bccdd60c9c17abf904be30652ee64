@@ -1,0 +1,19 @@
+docs/plans/2026-06-20-004-feat-nongoose-agent-executor-plan.md
+  s_623d97065e20a1::t_2a22be616f9583 238-245,250
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "601be09a7b3bccdd60c9c17abf904be30652ee64",
+  "prompts": {},
+  "sessions": {
+    "s_623d97065e20a1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4f69d3fc-bb89-4527-ac98-5195e026eaf9",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
