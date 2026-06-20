@@ -1,0 +1,129 @@
+name: Nongoose Shadow
+
+on:
+  workflow_dispatch:
+    inputs:
+      server_name:
+        description: 'Hetzner server name'
+        default: 'wgmesh-pipeline'
+      spec_ref:
+        description: 'Spec path in the wgmesh repo, e.g. specs/issue-783-spec.md'
+        required: true
+      model:
+        description: 'Implement model id'
+        default: 'GLM-5.2'
+
+permissions:
+  contents: read
+
+jobs:
+  shadow:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate secrets
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+        run: |
+          set -euo pipefail
+          : "${DEPLOY_SSH_KEY:?DEPLOY_SSH_KEY secret missing}"
+          : "${HCLOUD_TOKEN:?HCLOUD_TOKEN secret missing (org)}"
+
+      - name: Install hcloud CLI
+        run: |
+          set -euo pipefail
+          curl -fsSL https://github.com/hetznercloud/cli/releases/latest/download/hcloud-linux-amd64.tar.gz \
+            | tar xz hcloud
+          sudo mv hcloud /usr/local/bin/
+
+      - name: Validate inputs
+        env:
+          SERVER_NAME: ${{ github.event.inputs.server_name }}
+          SPEC_REF: ${{ github.event.inputs.spec_ref }}
+          MODEL: ${{ github.event.inputs.model }}
+        run: |
+          set -euo pipefail
+          [[ "$SERVER_NAME" =~ ^[A-Za-z0-9._-]+$ ]] || {
+            echo "invalid server_name" >&2
+            exit 1
+          }
+          [[ "$MODEL" =~ ^[A-Za-z0-9._-]+$ ]] || {
+            echo "invalid model" >&2
+            exit 1
+          }
+          [[ "$SPEC_REF" =~ ^[A-Za-z0-9._/-]+$ ]] || {
+            echo "invalid spec_ref" >&2
+            exit 1
+          }
+          [[ "$SPEC_REF" != /* && "$SPEC_REF" != *..* ]] || {
+            echo "invalid spec_ref path" >&2
+            exit 1
+          }
+
+      - name: Resolve box IP
+        env:
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+          SERVER_NAME: ${{ github.event.inputs.server_name }}
+        run: |
+          set -euo pipefail
+          IP=$(hcloud server ip "$SERVER_NAME")
+          echo "BOX_IP=$IP" >> "$GITHUB_ENV"
+
+      - name: Run shadow replay on box
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SPEC_REF: ${{ github.event.inputs.spec_ref }}
+          MODEL: ${{ github.event.inputs.model }}
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$RUNNER_TEMP/deploy_key"
+          SSH_SPEC_REF=$(printf '%q' "$SPEC_REF")
+          SSH_MODEL=$(printf '%q' "$MODEL")
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              -o ConnectTimeout=15 -i "$RUNNER_TEMP/deploy_key" root@"$BOX_IP" \
+              "SPEC_REF=$SSH_SPEC_REF MODEL=$SSH_MODEL bash -se" <<'REMOTE'
+          set -euo pipefail
+          . /etc/wgmesh-pipeline/env
+          : "${WGMESH_BOT_PAT:?WGMESH_BOT_PAT missing on box}"
+
+          temp_dir=$(mktemp -d)
+          cleanup() {
+            rm -rf "$temp_dir"
+          }
+          trap cleanup EXIT
+
+          git clone --depth 1 \
+            "https://x-access-token:${WGMESH_BOT_PAT}@github.com/atvirokodosprendimai/wgmesh.git" \
+            "$temp_dir"
+
+          if [ ! -f "$temp_dir/$SPEC_REF" ]; then
+            git -C "$temp_dir" fetch --depth 1 origin \
+              '+refs/heads/*:refs/remotes/origin/*' || true
+            found_ref=$(
+              git -C "$temp_dir" for-each-ref --format='%(refname:short)' \
+                refs/remotes/origin | while read -r ref; do
+                if git -C "$temp_dir" cat-file -e "$ref:$SPEC_REF" 2>/dev/null; then
+                  printf '%s\n' "$ref"
+                  break
+                fi
+              done
+            )
+            if [ -n "$found_ref" ]; then
+              git -C "$temp_dir" checkout --detach "$found_ref"
+            fi
+          fi
+
+          test -f "$temp_dir/$SPEC_REF"
+          . /etc/wgmesh-pipeline/env
+          cd /opt/wgmesh-pipeline
+          /opt/wgmesh-pipeline/.venv/bin/python \
+            -m wgmesh_pipeline.langchain_agent.replay \
+            --spec "$temp_dir/$SPEC_REF" \
+            --workdir "$temp_dir" \
+            --model "$MODEL"
+          REMOTE
+
+      - name: Cleanup
+        if: always()
+        run: rm -f "$RUNNER_TEMP/deploy_key"
