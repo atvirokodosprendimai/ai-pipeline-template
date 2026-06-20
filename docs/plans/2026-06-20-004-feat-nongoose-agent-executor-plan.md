@@ -235,13 +235,19 @@ code actually changing.
 - **Dependency:** local real runs need `ZAI_API_KEY` (and possibly a stronger model's creds). If
   unavailable locally, U3/U5 real-validation happens in a box shadow run instead — note the gap.
 
+## Resolved Decisions (operator, 2026-06-20)
+
+- **Agent model(s):** test **DeepSeek (metered, cheap)** and **MiniMax (flat-rate)** — move off
+  GLM-4.7 (it produced 844 tokens / no edits); skip frontier unless both fail. Route the implement
+  stage to these via the model-routing layer (`MODEL_REGISTRY`/`STAGE_ROUTING`).
+- **Run env for real experiments:** **box shadow run** — execute the agent executor on the box
+  (has creds) against one issue WITHOUT flipping global `EXECUTOR`; goose stays live. No local key.
+
 ## Open Questions (resolve during implementation)
 
-- **Which model drives the agent?** Keep GLM-4.7, or route implement to a more capable coding model
-  (DeepSeek / frontier via OpenRouter, per the model-routing layer)? Decide empirically with the U2
-  harness — this likely matters more than the prompt.
 - **New recipe file vs inline prompt?** A `recipes/wgmesh-implementation-agent.md` keeps prompts
   editable without code changes; an inline template is simpler. Pick during U3.
+- **DeepSeek vs MiniMax** — decide from the shadow A/B (real edits + `go build` clean + cost).
 
 ## Verification (end-to-end)
 
