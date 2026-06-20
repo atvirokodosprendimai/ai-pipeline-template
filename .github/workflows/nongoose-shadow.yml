@@ -80,8 +80,14 @@ jobs:
           printf '%s\n' "$DEPLOY_SSH_KEY" > "$RUNNER_TEMP/deploy_key"
           SSH_SPEC_REF=$(printf '%q' "$SPEC_REF")
           SSH_MODEL=$(printf '%q' "$MODEL")
+          # ServerAlive*: the implement agent runs minutes with long silent gaps
+          # (LLM calls, `go build`/`go test`). Without keepalive the SSH session
+          # drops ("client_loop: send disconnect: Broken pipe") before the REPORT
+          # prints. 30s probes x40 ≈ 20min tolerance, matching the runner's
+          # WALL_CLOCK_LIMIT_SECONDS=1800.
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              -o ConnectTimeout=15 -i "$RUNNER_TEMP/deploy_key" root@"$BOX_IP" \
+              -o ConnectTimeout=15 -o ServerAliveInterval=30 -o ServerAliveCountMax=40 \
+              -i "$RUNNER_TEMP/deploy_key" root@"$BOX_IP" \
               "SPEC_REF=$SSH_SPEC_REF MODEL=$SSH_MODEL bash -se" <<'REMOTE'
           set -euo pipefail
           # set -a: /etc/wgmesh-pipeline/env is a systemd EnvironmentFile (bare
@@ -120,7 +126,7 @@ jobs:
           test -f "$temp_dir/$SPEC_REF"
           set -a; . /etc/wgmesh-pipeline/env; set +a
           cd /opt/wgmesh-pipeline
-          /opt/wgmesh-pipeline/.venv/bin/python \
+          PYTHONUNBUFFERED=1 /opt/wgmesh-pipeline/.venv/bin/python \
             -m wgmesh_pipeline.langchain_agent.replay \
             --spec "$temp_dir/$SPEC_REF" \
             --workdir "$temp_dir" \
