@@ -81,7 +81,11 @@ jobs:
             if ! printf '%s' "$key" | grep -Eq '^[A-Z_][A-Z0-9_]*$'; then
               echo "::error::illegal key (charset)"; exit 2
             fi
-            if ! printf '%s' "$val" | grep -Eq '^[A-Za-z0-9_./:-]+$'; then
+            # '*' (not '+'): an EMPTY value is allowed so a key can be CLEARED
+            # in place (e.g. MODEL_REGISTRY=/STAGE_ROUTING= → zero-config single
+            # default model) without a full server-recreating provision. Non-empty
+            # values still must be flag-charset (no JSON/secrets).
+            if ! printf '%s' "$val" | grep -Eq '^[A-Za-z0-9_./:-]*$'; then
               echo "::error::illegal value for ${key} (flags only — JSON/secret goes through provision)"; exit 2
             fi
             if grep -q "^${key}=" "$ENV_FILE"; then
