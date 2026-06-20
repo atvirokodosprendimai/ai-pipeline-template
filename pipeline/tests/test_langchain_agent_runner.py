@@ -10,9 +10,11 @@ import pytest
 from wgmesh_pipeline.config import Config, load_config
 from wgmesh_pipeline.goose.usage import UsageTotals
 from wgmesh_pipeline.langchain_agent.runner import (
+    MAX_CONTEXT_CHARS,
     MAX_TOOL_OUTPUT_CHARS,
     LangchainAgentRunner,
     _bounded,
+    _compact_messages,
 )
 from wgmesh_pipeline.models import ModelProfile
 
@@ -106,6 +108,191 @@ def test_bounded_over_budget_keeps_head_tail_and_marker() -> None:
     assert f"[truncated {dropped} chars]" in bounded
 
 
+def test_compact_messages_under_budget_returns_messages_unchanged() -> None:
+    from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+
+    messages = [
+        SystemMessage(content="system"),
+        HumanMessage(content="task"),
+        AIMessage(content="done", tool_calls=[]),
+    ]
+
+    assert _compact_messages(messages, 1_000) == messages
+
+
+def test_compact_messages_over_budget_preserves_prefix_and_pairs() -> None:
+    from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+    from langchain_core.messages import ToolMessage
+
+    messages = [
+        SystemMessage(content="system"),
+        HumanMessage(content="task"),
+        AIMessage(
+            content="old ai " + ("x" * 50),
+            tool_calls=[
+                {
+                    "name": "read_file",
+                    "args": {"path": "old.txt"},
+                    "id": "old-call",
+                }
+            ],
+        ),
+        ToolMessage(content="old tool " + ("x" * 50), tool_call_id="old-call"),
+        AIMessage(
+            content="middle ai " + ("x" * 50),
+            tool_calls=[
+                {
+                    "name": "read_file",
+                    "args": {"path": "middle.txt"},
+                    "id": "middle-call",
+                }
+            ],
+        ),
+        ToolMessage(
+            content="middle tool " + ("x" * 50), tool_call_id="middle-call"
+        ),
+        AIMessage(
+            content="last ai",
+            tool_calls=[
+                {
+                    "name": "read_file",
+                    "args": {"path": "last.txt"},
+                    "id": "last-call",
+                }
+            ],
+        ),
+        ToolMessage(content="last tool", tool_call_id="last-call"),
+    ]
+
+    compacted = _compact_messages(messages, 100)
+
+    assert compacted[0] == messages[0]
+    assert compacted[1] == messages[1]
+    assert messages[2] not in compacted
+    assert messages[3] not in compacted
+    assert messages[4] not in compacted
+    assert messages[5] not in compacted
+    assert messages[6:] == compacted[2:]
+    compacted_size = sum(
+        len(str(getattr(message, "content", ""))) for message in compacted
+    )
+    assert compacted_size <= 100
+    _assert_no_orphaned_tool_pairs(compacted)
+
+
+def test_compact_messages_preserves_pairing_integrity_across_rounds() -> None:
+    from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+    from langchain_core.messages import ToolMessage
+
+    messages = [
+        SystemMessage(content="system"),
+        HumanMessage(content="task"),
+        AIMessage(
+            content="old no tools " + ("x" * 40),
+            tool_calls=[],
+        ),
+        AIMessage(
+            content="middle tools " + ("x" * 40),
+            tool_calls=[
+                {"name": "read_file", "args": {"path": "a.txt"}, "id": "middle-a"},
+                {"name": "read_file", "args": {"path": "b.txt"}, "id": "middle-b"},
+            ],
+        ),
+        ToolMessage(content="middle result a " + ("x" * 40), tool_call_id="middle-a"),
+        ToolMessage(content="middle result b " + ("x" * 40), tool_call_id="middle-b"),
+        AIMessage(
+            content="last tools",
+            tool_calls=[
+                {"name": "read_file", "args": {"path": "c.txt"}, "id": "last-a"},
+                {"name": "read_file", "args": {"path": "d.txt"}, "id": "last-b"},
+            ],
+        ),
+        ToolMessage(content="last result a", tool_call_id="last-a"),
+        ToolMessage(content="last result b", tool_call_id="last-b"),
+    ]
+
+    compacted = _compact_messages(messages, 90)
+
+    assert compacted[:2] == messages[:2]
+    assert messages[2] not in compacted
+    assert messages[3] not in compacted
+    assert messages[4] not in compacted
+    assert messages[5] not in compacted
+    assert messages[6:] == compacted[2:]
+    _assert_no_orphaned_tool_pairs(compacted)
+
+
+def test_compact_messages_keeps_last_round_when_last_round_exceeds_budget() -> None:
+    from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+    from langchain_core.messages import ToolMessage
+
+    messages = [
+        SystemMessage(content="system"),
+        HumanMessage(content="task"),
+        AIMessage(content="old", tool_calls=[]),
+        AIMessage(
+            content="last ai " + ("x" * 80),
+            tool_calls=[
+                {"name": "read_file", "args": {"path": "last.txt"}, "id": "last"}
+            ],
+        ),
+        ToolMessage(content="last tool " + ("x" * 80), tool_call_id="last"),
+    ]
+
+    compacted = _compact_messages(messages, 40)
+
+    assert compacted == messages[:2] + messages[3:]
+    _assert_no_orphaned_tool_pairs(compacted)
+
+
+def test_agent_compacts_history_before_each_llm_invoke(tmp_path: Path) -> None:
+    recipe = write_recipe(tmp_path)
+    fake_client: FakeClient | None = None
+
+    def client_factory(profile: ModelProfile, config: Config) -> FakeClient:
+        nonlocal fake_client
+        fake_client = FakeClient(
+            [
+                FakeAIMessage(
+                    content="x" * (MAX_CONTEXT_CHARS + 1),
+                    tool_calls=[
+                        {
+                            "name": "run_bash",
+                            "args": {"command": "true"},
+                            "id": "call-1",
+                        }
+                    ],
+                    usage_metadata={},
+                ),
+                FakeAIMessage(
+                    content="small follow-up",
+                    tool_calls=[
+                        {
+                            "name": "run_bash",
+                            "args": {"command": "true"},
+                            "id": "call-2",
+                        }
+                    ],
+                    usage_metadata={},
+                ),
+                FakeAIMessage(content="finished", tool_calls=[], usage_metadata={}),
+            ]
+        )
+        return fake_client
+
+    LangchainAgentRunner(cfg(), client_factory=client_factory).run_recipe(
+        recipe=recipe,
+        workdir=tmp_path,
+        params={"output_file": "out.txt"},
+        expected_output="out.txt",
+    )
+
+    assert fake_client is not None
+    assert len(fake_client.invocations) == 3
+    assert len(fake_client.invocations[2]) == 4
+    assert fake_client.invocations[2][2].content == "small follow-up"
+
+
 def test_tool_output_is_bounded_but_raw_log_keeps_full_output(tmp_path) -> None:
     recipe = write_recipe(tmp_path)
     large_output = "head" + ("x" * MAX_TOOL_OUTPUT_CHARS) + "tail"
@@ -157,6 +344,19 @@ def test_tool_output_is_bounded_but_raw_log_keeps_full_output(tmp_path) -> None:
     tool_message = fake_client.invocations[1][-1]
     assert tool_message.content == _bounded(large_output)
     assert tool_message.content != large_output
+
+
+def _assert_no_orphaned_tool_pairs(messages: list[Any]) -> None:
+    ai_call_ids: set[str] = set()
+    tool_call_ids: set[str] = set()
+    for message in messages:
+        for tool_call in getattr(message, "tool_calls", None) or []:
+            ai_call_ids.add(str(tool_call["id"]))
+        tool_call_id = getattr(message, "tool_call_id", None)
+        if tool_call_id is not None:
+            tool_call_ids.add(str(tool_call_id))
+
+    assert ai_call_ids == tool_call_ids
 
 
 def test_happy_path_writes_expected_output_and_sums_usage(tmp_path) -> None:
@@ -544,6 +744,127 @@ def test_max_iterations_env_override_reports_actual_cap(
     assert "max iterations (3)" in (result.error or "")
     assert result.usage is not None
     assert result.usage.requests == 3
+
+
+def test_implement_stage_at_max_iterations_harvests_dirty_workspace(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setenv("LANGCHAIN_MAX_ITERATIONS", "3")
+    recipe = write_recipe(tmp_path)
+    init_git_repo(tmp_path)
+
+    def client_factory(profile: ModelProfile, config: Config) -> FakeClient:
+        return FakeClient(
+            [
+                FakeAIMessage(
+                    content="still working",
+                    tool_calls=[
+                        {
+                            "name": "write_file",
+                            "args": {"path": "README.md", "content": "changed\n"},
+                            "id": "call-loop",
+                        }
+                    ],
+                    usage_metadata={
+                        "input_tokens": 1,
+                        "output_tokens": 1,
+                        "total_tokens": 2,
+                    },
+                )
+            ]
+        )
+
+    result = LangchainAgentRunner(cfg(), client_factory=client_factory).run_recipe(
+        recipe=recipe,
+        workdir=tmp_path,
+        params={"spec_file": "spec.md"},
+        expected_output="diff.patch",
+        stage="implement",
+    )
+
+    assert result.ok is True
+    assert result.error == "harvested at max iterations (3) — workspace had changes"
+    assert result.usage.requests == 3
+
+
+def test_implement_stage_at_max_iterations_clean_workspace_still_fails(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setenv("LANGCHAIN_MAX_ITERATIONS", "3")
+    recipe = write_recipe(tmp_path)
+    init_git_repo(tmp_path)
+
+    def client_factory(profile: ModelProfile, config: Config) -> FakeClient:
+        return FakeClient(
+            [
+                FakeAIMessage(
+                    content="still checking",
+                    tool_calls=[
+                        {
+                            "name": "run_bash",
+                            "args": {"command": "true"},
+                            "id": "call-loop",
+                        }
+                    ],
+                    usage_metadata={
+                        "input_tokens": 1,
+                        "output_tokens": 1,
+                        "total_tokens": 2,
+                    },
+                )
+            ]
+        )
+
+    result = LangchainAgentRunner(cfg(), client_factory=client_factory).run_recipe(
+        recipe=recipe,
+        workdir=tmp_path,
+        params={"spec_file": "spec.md"},
+        expected_output="diff.patch",
+        stage="implement",
+    )
+
+    assert result.ok is False
+    assert result.error == "langchain agent reached max iterations (3)"
+    assert "harvested" not in (result.error or "")
+
+
+def test_non_implement_stage_at_max_iterations_still_fails(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setenv("LANGCHAIN_MAX_ITERATIONS", "3")
+    recipe = write_recipe(tmp_path)
+
+    def client_factory(profile: ModelProfile, config: Config) -> FakeClient:
+        return FakeClient(
+            [
+                FakeAIMessage(
+                    content="still working",
+                    tool_calls=[
+                        {
+                            "name": "run_bash",
+                            "args": {"command": "true"},
+                            "id": "call-loop",
+                        }
+                    ],
+                    usage_metadata={
+                        "input_tokens": 1,
+                        "output_tokens": 1,
+                        "total_tokens": 2,
+                    },
+                )
+            ]
+        )
+
+    result = LangchainAgentRunner(cfg(), client_factory=client_factory).run_recipe(
+        recipe=recipe,
+        workdir=tmp_path,
+        params={"output_file": "out.txt"},
+        expected_output="out.txt",
+        stage="spec",
+    )
+
+    assert result.ok is False
+    assert result.error == "langchain agent reached max iterations (3)"
 
 
 def test_max_iterations_invalid_env_falls_back_to_default(

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import logging
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -220,3 +221,39 @@ def test_replay_model_override_sets_goose_model_before_running(
     assert code == 0
     assert seen_models == ["X"]
     assert "model: X" in stdout.getvalue()
+
+
+def test_replay_configures_logging_to_stdout(monkeypatch, tmp_path: Path) -> None:
+    spec = init_git_repo(tmp_path)
+    calls: list[dict[str, Any]] = []
+
+    def fake_basic_config(**kwargs: Any) -> None:
+        calls.append(kwargs)
+
+    class FakeRunner:
+        def __init__(self, config: Config) -> None:
+            self.config = config
+
+        def run_recipe(self, **kwargs: Any) -> Any:
+            return type(
+                "Result",
+                (),
+                {
+                    "ok": False,
+                    "error": "agent made no source changes",
+                    "usage": object(),
+                },
+            )()
+
+    monkeypatch.setattr(logging, "basicConfig", fake_basic_config)
+
+    replay.main(
+        ["--spec", str(spec), "--workdir", str(tmp_path)],
+        runner_factory=FakeRunner,
+        config_loader=cfg,
+        stdout=io.StringIO(),
+    )
+
+    assert calls[0]["level"] == logging.INFO
+    assert calls[0]["stream"] is replay.sys.stdout
+    assert calls[0]["force"] is True
