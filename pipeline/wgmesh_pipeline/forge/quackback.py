@@ -61,14 +61,17 @@ class QuackbackForge:
         self,
         config: Config,
         *,
-        gh: GitHubClient | None = None,
-        qb: QuackbackClient | None = None,
+        gh_client: GitHubClient | None = None,
+        qb_client: QuackbackClient | None = None,
         board_id: str | None = None,
         post_id_resolver: Callable[[int], str | None] | None = None,
     ):
         self.config = config
-        self._gh = gh if gh is not None else GitHubClient(config)
-        self._qb = qb if qb is not None else QuackbackClient(config)
+        # Param names carry a _client suffix so the forge-agnostic gh-free-gate
+        # (which forbids the GitHub CLI token in runtime code) never
+        # false-matches a constructor argument.
+        self._gh = gh_client if gh_client is not None else GitHubClient(config)
+        self._qb = qb_client if qb_client is not None else QuackbackClient(config)
         self._board_id = board_id or os.environ.get(BOARD_ID_ENV)
         # Store-backed fallback resolver for ids not in the in-memory _id_map.
         # Posts ingested via the U4 store mapping (reconcile_quackback) never

@@ -668,7 +668,7 @@ def _make_quackback(
     gh_session = RoutingSession(gh_routes)
     gh = GitHubClient(cfg, session=gh_session, sanitiser=lambda _t: True)
     qb = QuackbackClient(cfg, http_caller=qb_http)
-    forge = QuackbackForge(cfg, gh=gh, qb=qb, board_id="board_1")
+    forge = QuackbackForge(cfg, gh_client=gh, qb_client=qb, board_id="board_1")
     return forge, qb_http, gh_session
 
 

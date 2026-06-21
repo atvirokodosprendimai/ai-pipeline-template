@@ -139,7 +139,7 @@ def _forge(
 ) -> tuple[QuackbackForge, FakeGH, FakeQB]:
     gh = gh or FakeGH()
     qb = qb or FakeQB()
-    forge = QuackbackForge(_cfg(), gh=gh, qb=qb, board_id="board_1")
+    forge = QuackbackForge(_cfg(), gh_client=gh, qb_client=qb, board_id="board_1")
     return forge, gh, qb
 
 
@@ -436,7 +436,7 @@ def test_bind_resolver_resolves_store_mapped_post() -> None:
     # A post ingested via the store mapping never populated _id_map; the
     # bound resolver lets set_status/get_issue/comment reach it (U6).
     qb = StatusQB()
-    forge = QuackbackForge(_cfg(), gh=FakeGH(), qb=qb, board_id="board_1")
+    forge = QuackbackForge(_cfg(), gh_client=FakeGH(), qb_client=qb, board_id="board_1")
     forge.bind_resolver(lambda number: "post_store" if number == 7 else None)
 
     forge.set_status(7, "Building")
@@ -447,7 +447,7 @@ def test_bind_resolver_resolves_store_mapped_post() -> None:
 
 def test_get_decision_status_maps_status_id_to_name() -> None:
     qb = StatusQB(status_id="status_afb")
-    forge = QuackbackForge(_cfg(), gh=FakeGH(), qb=qb, board_id="board_1")
+    forge = QuackbackForge(_cfg(), gh_client=FakeGH(), qb_client=qb, board_id="board_1")
     forge.bind_resolver(lambda number: "post_store")
 
     assert forge.get_decision_status(3) == "Accepted for Build"
@@ -461,7 +461,7 @@ def test_get_decision_status_none_when_unresolvable() -> None:
 
 def test_get_decision_status_none_for_unknown_status_id() -> None:
     qb = StatusQB(status_id="status_gone")  # not in list_statuses
-    forge = QuackbackForge(_cfg(), gh=FakeGH(), qb=qb, board_id="board_1")
+    forge = QuackbackForge(_cfg(), gh_client=FakeGH(), qb_client=qb, board_id="board_1")
     forge.bind_resolver(lambda number: "post_store")
 
     assert forge.get_decision_status(3) is None
