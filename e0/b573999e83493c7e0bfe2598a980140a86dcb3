@@ -1,0 +1,43 @@
+pipeline/wgmesh_pipeline/graph/state.py
+  s_49b81b2f491ac5::t_a8279d09d89cc6 29-30
+pipeline/wgmesh_pipeline/poller.py
+  s_49b81b2f491ac5::t_a5fb7ce4a7b774 187-192
+  s_49b81b2f491ac5::t_2b174084cb5bdd 14
+pipeline/wgmesh_pipeline/forge/protocol.py
+  s_49b81b2f491ac5::t_9eb38387af52ee 79-88
+pipeline/tests/test_guards_node.py
+  s_49b81b2f491ac5::t_d5a503f1a3d989 1-43,45-50,64-136
+  s_49b81b2f491ac5::t_03666fba587a2f 44,51-63
+pipeline/wgmesh_pipeline/config.py
+  s_49b81b2f491ac5::t_ead6d33f168154 66-70
+pipeline/wgmesh_pipeline/github/client.py
+  s_49b81b2f491ac5::t_d2eeb96ac3a8df 322-351
+pipeline/wgmesh_pipeline/forge/quackback.py
+  s_49b81b2f491ac5::t_508ad0bcdcfd78 257-275
+pipeline/tests/test_gate.py
+  s_49b81b2f491ac5::t_adc4ba86b81e08 45-91
+pipeline/tests/test_create_commit_status.py
+  s_49b81b2f491ac5::t_3a497474f678d1 1-84
+pipeline/wgmesh_pipeline/graph/nodes/guards.py
+  s_49b81b2f491ac5::t_e30ae1b3c6c905 1-31,49-159
+  s_49b81b2f491ac5::t_45cc4f05ad85e0 32-48
+pipeline/wgmesh_pipeline/graph/nodes/gate.py
+  s_49b81b2f491ac5::t_b1614892c09a5e 92-97
+  s_49b81b2f491ac5::t_b4972b4d963797 30-31,39-42
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "e0b573999e83493c7e0bfe2598a980140a86dcb3",
+  "prompts": {},
+  "sessions": {
+    "s_49b81b2f491ac5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "719e3d43-993d-4485-926d-940cb03d3bdc",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
