@@ -39,9 +39,9 @@ CD does, on merge, like for any developer. `build-pipeline-image.yml` (push) +
 Strangler throughout — disable an Actions workflow only after its box equivalent
 bakes. Each step maps to a #1599 phase.
 
-1. **CI invariant + Phase-D reversal** — *done in this change*: ci.yml is the CI; external-pr-ci + box ci/guards removed.
-2. **Make ci.yml the required gate** (follow-up, governance) — point the `protect-main` ruleset's required status checks at ci.yml's job names (`pipeline-tests`, `sanitise-wall`, `pii-policy-check`); then disable the legacy standalone `pipeline-ci` / `sanitise-wall` / `pii-policy-check` workflows. Drain CONFLICTING bot PRs first.
-3. **Seed repo CI** — give `wgmesh` its own `ci.yml` (go build/test + leak guards + `impl-judge` **as a CI job**, not a box gate) for all authors; secretless fork lane.
+1. **CI invariant + Phase-D reversal** — *done* (#1948): ci.yml is the CI; external-pr-ci + box ci/guards removed.
+2. **Make ci.yml the required gate** — *meta done*: `protect-main` (13925617) now requires `pipeline-tests` / `sanitise-wall` / `pii-policy-check` (ci.yml jobs); the standalone `pipeline-ci` / `sanitise-wall` / `pii-policy-check` workflows are disabled. Reusable: `scripts/ruleset/apply-required-checks.sh`. **wgmesh deferred** — its `protect-main` (12831947) already requires `impl-judge` / `status-check` / `build-and-push`; **add** `build-test` to that set (don't replace), and only after conflict-heal drains its CONFLICTING bot PRs (#755, #744 at time of writing).
+3. **Seed repo CI** — *done* (`wgmesh#798`): `ci.yml` runs go build/test/vet for all authors, secretless. `impl-judge` stays its own secret-bearing, same-repo-gated workflow (folding it into the secretless lane would expose its LLM-judge key to forks). wgmesh has no `docs/outreach`/`docs/customers`, so the meta path-scoped PII guard is N/A there; impl-judge's safety axis covers PII/secret on bot PRs.
 4. **Loop → box** (#1599 Phase B): goal-sprint, observation, supervisor, strategy, conflict-heal, heartbeat-automerge, requeue, nongoose-shadow.
 5. **Monitoring → box** (#1599 Phase C): health, error-rate, diagnose, checkout-monitor, langfuse ×3, mentisdb, control-replay.
 6. **Provisioning → box/off-box** (#1599 Phase E): provision box/langfuse/quackback, set-box-env, terraform.
