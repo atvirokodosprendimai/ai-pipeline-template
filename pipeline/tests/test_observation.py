@@ -176,16 +176,81 @@ def test_duplicate_create_is_skipped():
     assert plan.skips[0].message == "Skipping duplicate: Update burn rate alerts thresholds"
 
 
-def test_create_with_both_labels_routes_to_fn_dev_only():
-    # An LLM that hedges fn:dev + needs-human must NOT strand implementable work
-    # in the human queue: fn:dev wins so it flows to the build pipeline.
+def test_product_hedge_routes_to_fn_dev_only():
+    # On the PRODUCT surface, code is the norm: an LLM hedging fn:dev + needs-human
+    # must NOT strand implementable work in the human queue — fn:dev wins and it
+    # flows to the build pipeline in the wgmesh repo.
     plan = plan_actions(
         {"issues_to_create": [
-            {"title": "DevOps VPN SEO landing page", "body": "b",
-             "labels": ["fn:dev", "needs-human"]}]},
+            {"title": "Harden mesh discovery retry", "body": "b",
+             "labels": ["surface:product", "fn:dev", "needs-human"]}]},
         INPUTS)
     assert len(plan.actions) == 1
-    assert plan.actions[0].labels == ("fn:dev",)
+    assert "fn:dev" in plan.actions[0].labels
+    assert "needs-human" not in plan.actions[0].labels
+    assert plan.actions[0].repo == "atvirokodosprendimai/wgmesh"
+
+
+def test_service_human_gated_stays_needs_human():
+    # INVERSION of the product rule: a service GTM item that needs a human
+    # (capital/pricing/outreach) must STAY needs-human — fn:dev must NOT win, even
+    # when the LLM hedges both — and it targets the cloudroof-eu repo.
+    plan = plan_actions(
+        {"issues_to_create": [
+            {"title": "Outreach to 50 DevOps communities", "body": "b",
+             "labels": ["surface:service", "fn:dev", "needs-human"]}]},
+        INPUTS)
+    assert len(plan.actions) == 1
+    assert "needs-human" in plan.actions[0].labels
+    assert "fn:dev" not in plan.actions[0].labels
+    assert plan.actions[0].repo == "atvirokodosprendimai/cloudroof-eu"
+
+
+def test_service_code_routes_to_cloudroof_fn_dev():
+    plan = plan_actions(
+        {"issues_to_create": [
+            {"title": "cloudroof.eu pricing page", "body": "b",
+             "labels": ["surface:service", "fn:dev"]}]},
+        INPUTS)
+    assert len(plan.actions) == 1
+    assert plan.actions[0].labels == ("surface:service", "fn:dev")
+    assert plan.actions[0].repo == "atvirokodosprendimai/cloudroof-eu"
+
+
+def test_product_code_routes_to_wgmesh():
+    plan = plan_actions(
+        {"issues_to_create": [
+            {"title": "Add LAN-only mesh mode", "body": "b",
+             "labels": ["surface:product", "fn:dev"]}]},
+        INPUTS)
+    assert plan.actions[0].repo == "atvirokodosprendimai/wgmesh"
+
+
+def test_missing_surface_with_fn_dev_fails_safe_to_needs_human():
+    # No surface label + fn:dev must NOT be mis-filed as product code — it is
+    # forced into the human queue (and logged), defaulting to the wgmesh repo.
+    plan = plan_actions(
+        {"issues_to_create": [
+            {"title": "Some untagged conversion task", "body": "b",
+             "labels": ["fn:dev"]}]},
+        INPUTS)
+    assert len(plan.actions) == 1
+    assert "needs-human" in plan.actions[0].labels
+    assert "fn:dev" not in plan.actions[0].labels
+    assert plan.actions[0].repo == "atvirokodosprendimai/wgmesh"
+
+
+def test_distinct_cloudroof_issue_not_suppressed_by_wgmesh_dup():
+    # Per-repo dedup: a title that would dup against the wgmesh board must still
+    # be created when it routes to cloudroof-eu — the corpora are per-repo.
+    inputs = ObservationInputs(open_issue_titles=("Add mesh telemetry endpoint",))
+    plan = plan_actions(
+        {"issues_to_create": [
+            {"title": "Add mesh telemetry endpoint", "body": "b",
+             "labels": ["surface:service", "fn:dev"]}]},
+        inputs)
+    assert len(plan.actions) == 1  # not suppressed — different repo corpus
+    assert plan.actions[0].repo == "atvirokodosprendimai/cloudroof-eu"
 
 
 def test_create_with_needs_human_only_is_unchanged():

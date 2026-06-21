@@ -38,14 +38,24 @@ TODO(protocol gaps) — not ported in this unit (stay caller-side):
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
 
+logger = logging.getLogger(__name__)
+
 ORG = "atvirokodosprendimai"
-TARGET_REPO = f"{ORG}/wgmesh"
+TARGET_REPO = f"{ORG}/wgmesh"  # product surface (AGPL mesh software)
+CLOUDROOF_REPO = f"{ORG}/cloudroof-eu"  # service surface (managed hosting GTM)
 NEEDS_HUMAN_LABEL = "needs-human"
 FN_DEV_LABEL = "fn:dev"  # pipeline-implementable lane (triage->spec->implement)
+# Surface axis (product vs service) — orthogonal to the lane axis. A generated
+# item carries exactly one surface label; routing picks the repo by surface and
+# the lane by surface+kind. See docs/brainstorms/2026-06-21-product-service-split-requirements.md.
+SURFACE_PRODUCT_LABEL = "surface:product"
+SURFACE_SERVICE_LABEL = "surface:service"
+SURFACE_REPO = {"product": TARGET_REPO, "service": CLOUDROOF_REPO}
 CLOSE_REASON_NOT_PLANNED = "not planned"
 MAX_KEYWORDS = 5
 DUPLICATE_MIN_HITS = 2
@@ -190,29 +200,73 @@ def build_open_board(
     return "\n".join(lines) + "\n"
 
 
-def _route_one_lane(labels: tuple[str, ...]) -> tuple[str, ...]:
-    """A proposed create routes to exactly ONE lane. ``fn:dev`` (the pipeline
-    implements it) wins over ``needs-human``, which would gate the issue OUT of
-    the autonomous build lane — so an LLM hedging BOTH labels does not strand
-    implementable work in the human queue."""
-    if FN_DEV_LABEL in labels and NEEDS_HUMAN_LABEL in labels:
-        return tuple(label for label in labels if label != NEEDS_HUMAN_LABEL)
-    return labels
+def _resolve_surface(labels: tuple[str, ...]) -> str | None:
+    """Read the surface label. ``service`` is checked first so a hedged item
+    carrying both surface labels is treated as service (the more gated surface)."""
+    if SURFACE_SERVICE_LABEL in labels:
+        return "service"
+    if SURFACE_PRODUCT_LABEL in labels:
+        return "product"
+    return None
 
 
-def _vet_create(item: Mapping[str, Any], corpus: list[str], *, kind: str,
+def _route_lane_and_repo(labels: tuple[str, ...]) -> tuple[tuple[str, ...], str]:
+    """Surface-aware routing → ``(routed_labels, repo)``.
+
+    - **service**: repo is ``cloudroof-eu``. A human-gated item (``needs-human``:
+      capital, pricing, cold outreach) MUST stay in the human queue — ``fn:dev``
+      must NOT win here (the inversion of the product rule). Service *code* keeps
+      ``fn:dev`` and flows to the build pipeline.
+    - **product**: repo is ``wgmesh``. Code is the norm, so a hedged
+      ``fn:dev`` + ``needs-human`` resolves to ``fn:dev`` (the historical rule).
+    - **missing surface**: FAIL SAFE — never mis-file as product code. An item
+      tagged ``fn:dev`` with no surface is forced to ``needs-human`` (and logged)
+      so a forgotten surface label can't silently push GTM into the code lane.
+      Repo defaults to ``wgmesh`` (where humans already watch the queue)."""
+    surface = _resolve_surface(labels)
+
+    if surface == "service":
+        repo = SURFACE_REPO["service"]
+        if NEEDS_HUMAN_LABEL in labels:
+            return tuple(l for l in labels if l != FN_DEV_LABEL), repo
+        return labels, repo
+
+    if surface == "product":
+        repo = SURFACE_REPO["product"]
+        if FN_DEV_LABEL in labels and NEEDS_HUMAN_LABEL in labels:
+            return tuple(l for l in labels if l != NEEDS_HUMAN_LABEL), repo
+        return labels, repo
+
+    # Missing/ambiguous surface — fail safe to the human lane.
+    repo = TARGET_REPO
+    if FN_DEV_LABEL in labels:
+        logger.warning(
+            "create without a surface label routed fail-safe to needs-human "
+            "(labels=%s)", labels)
+        routed = tuple(l for l in labels if l != FN_DEV_LABEL)
+        if NEEDS_HUMAN_LABEL not in routed:
+            routed = routed + (NEEDS_HUMAN_LABEL,)
+        return routed, repo
+    return labels, repo
+
+
+def _vet_create(item: Mapping[str, Any], corpus_by_repo: dict[str, list[str]], *, kind: str,
                 title: str, body: str, labels: tuple[str, ...],
                 skip_message: str) -> tuple[ObservationAction | None, ObservationSkip | None]:
-    """Shared dedup gate for both create steps. On create the title joins the
-    corpus so later items in the SAME run dedup against it (workflow appends
-    to /tmp/open_issues.txt)."""
+    """Shared dedup gate for both create steps. Surface routing resolves the
+    target repo first, then dedup runs against THAT repo's corpus only — a
+    wgmesh duplicate must not suppress a distinct cloudroof issue. On create the
+    title joins the repo's corpus so later same-repo items in the SAME run dedup
+    against it (workflow appends to /tmp/open_issues.txt)."""
+    routed_labels, repo = _route_lane_and_repo(labels)
+    corpus = corpus_by_repo.setdefault(repo, [])
     dedup_text = str(item.get("request") or item.get("title") or "")
     if is_duplicate(dedup_text, corpus):
         return None, ObservationSkip(action=kind, code="duplicate",
                                      message=skip_message, title=title)
     corpus.append(title)
     return ObservationAction(
-        kind=kind, title=title, body=body, labels=_route_one_lane(labels)
+        kind=kind, repo=repo, title=title, body=body, labels=routed_labels
     ), None
 
 
@@ -265,7 +319,10 @@ def plan_actions(assessment: Mapping[str, Any], inputs: ObservationInputs) -> Ob
     """
     actions: list[ObservationAction] = []
     skips: list[ObservationSkip] = []
-    corpus = build_dedup_corpus(inputs)
+    # Per-repo dedup corpora. The wgmesh (product) corpus seeds from the gathered
+    # board titles; other surfaces (e.g. cloudroof-eu) start empty until the
+    # caller gathers their titles, so cross-surface titles never cross-suppress.
+    corpus_by_repo: dict[str, list[str]] = {TARGET_REPO: build_dedup_corpus(inputs)}
 
     for item in assessment.get("issues_to_create") or []:
         title = str(item.get("title") or "")
@@ -273,7 +330,7 @@ def plan_actions(assessment: Mapping[str, Any], inputs: ObservationInputs) -> Ob
             raise ValueError(f"issues_to_create entry without a title: {item!r}")
         raw_labels = item.get("labels") or []
         action, skip = _vet_create(
-            item, corpus, kind="create_issue", title=title,
+            item, corpus_by_repo, kind="create_issue", title=title,
             body=str(item.get("body") or ""),
             labels=tuple(str(l) for l in raw_labels),
             skip_message=f"Skipping duplicate: {title}")
@@ -297,7 +354,7 @@ def plan_actions(assessment: Mapping[str, Any], inputs: ObservationInputs) -> Ob
         body = (f"**Urgency**: {req.get('urgency') or 'unspecified'}\n\n"
                 f"**Reason**: {req.get('reason') or 'unspecified'}\n\n_Created by observation loop._")
         action, skip = _vet_create(
-            req, corpus, kind="create_needs_human", title=full_title, body=body,
+            req, corpus_by_repo, kind="create_needs_human", title=full_title, body=body,
             labels=(NEEDS_HUMAN_LABEL,),
             skip_message=f"Skipping duplicate needs-human: {request}")
         if action:

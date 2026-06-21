@@ -22,10 +22,19 @@
 # for the incident.
 
 pulse_product_name: ai-pipeline-template
-# pulse_seed_product_repo identifies where actual product convergence
-# is measured. NOT used by the upstream ce-product-pulse skill yet,
-# but consumed by the corrected pulse generation in this repo.
+# pulse_seed_product_repo identifies where actual PRODUCT convergence
+# is measured (the wgmesh AGPL mesh software). NOT used by the upstream
+# ce-product-pulse skill yet, but consumed by the corrected pulse
+# generation in this repo and by goal-sprint surface routing.
 pulse_seed_product_repo: atvirokodosprendimai/wgmesh
+# pulse_service_repo identifies the SERVICE / monetization surface
+# (cloudroof managed hosting GTM). Product-vs-service split, 2026-06-21
+# (see docs/plans/2026-06-21-003-feat-product-service-split-plan.md):
+# the pulse attributes product traction (wgmesh: stars/releases/convergence)
+# and service revenue (cloudroof: subscribers/trials) on SEPARATE lines so the
+# "seed products 0" attribution ambiguity is resolved. goal-sprint routes
+# surface:service bets here; surface:product bets to pulse_seed_product_repo.
+pulse_service_repo: atvirokodosprendimai/cloudroof-eu
 pulse_primary_event: product_pr_merged
 pulse_value_event: autonomous_impl_merge_clean
 pulse_completion_events: paid_customer_added
