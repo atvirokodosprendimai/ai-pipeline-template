@@ -1,0 +1,127 @@
+name: External PR CI
+
+# The ONE Actions CI workflow that survives the #1599 box cutover.
+#
+# After the cutover the box CIs bot-authored PRs. Untrusted external/fork PRs
+# must be CI'd with ZERO box/secret access — GitHub's Actions sandbox is the
+# only safe place (R6, R10). This workflow folds the fork-side coverage of
+# pipeline-ci / sanitise-wall / pii-policy-check into one author-scoped file
+# and runs the sanitise + PII leak guards from the SAME shared scripts the
+# box's bot-side CI uses, so the two paths cannot drift ("no window without a
+# leak guard").
+#
+# HARDENING (U10 checklist):
+#   - `pull_request` ONLY, never `pull_request_target` (the latter exposes
+#     base-repo secrets to fork-supplied code — a secret-exfiltration vector).
+#   - `permissions: contents: read` — least privilege.
+#   - No `secrets.*` references anywhere. Fork code has no secret to reach.
+#   - Author/event filter scopes the jobs to external / non-bot PRs (bot PRs
+#     are CI'd on the box; this avoids double-gating).
+#
+# NOT in this workflow (owned by cutover Phase D): disabling the three
+# standalone workflows, and making this a required check on main.
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  # pytest — gated to PRs touching pipeline/** (KTD5). The gate is at the JOB
+  # level (a git-diff guard), NOT a top-level `on.paths:` filter: a top-level
+  # filter would skip the WHOLE workflow on a docs-only PR and drop the
+  # sanitise + PII leak guards, which must always run.
+  pytest:
+    # External / non-bot PRs only. Bot PRs (bot/* heads) are CI'd on the box;
+    # fork-origin PRs are non-bot and therefore in scope here.
+    if: ${{ !startsWith(github.event.pull_request.head.ref, 'bot/') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Detect pipeline/** changes
+        id: filter
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --quiet origin "$BASE_SHA" 2>/dev/null || true
+          if git diff --name-only "$BASE_SHA" "$HEAD_SHA" | grep -qE '^pipeline/'; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No pipeline/** changes — pytest skipped."
+          fi
+
+      - name: Set up Python
+        if: steps.filter.outputs.changed == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install pipeline package
+        if: steps.filter.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          pip install -e pipeline/
+
+      - name: Run tests (from repo root — dataset paths are repo-root-relative)
+        if: steps.filter.outputs.changed == 'true'
+        env:
+          # github.token is the auto-provisioned Actions token, NOT a repo
+          # secret. On a fork `pull_request` it is read-only and cannot reach
+          # repo secrets, so it preserves the secretless guarantee.
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python -m pytest pipeline/tests/ -q
+
+      - name: Run gate eval check
+        if: steps.filter.outputs.changed == 'true'
+        env:
+          PYTHONPATH: pipeline
+        run: |
+          set -euo pipefail
+          python -m evals.run_evals --check
+
+  # Sanitise leak guard — shared script, always runs (forks are the highest
+  # LLM-emit-risk authors).
+  sanitise:
+    if: ${{ !startsWith(github.event.pull_request.head.ref, 'bot/') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Check LLM emit sanitise gate
+        shell: bash
+        run: bash scripts/lint/check-llm-emit-sanitise.sh
+
+  # PII leak guard — shared script, always runs (forks are the highest-PII-risk
+  # authors). Same implementation pii-policy-check.yml calls (parity proof).
+  pii-policy:
+    if: ${{ !startsWith(github.event.pull_request.head.ref, 'bot/') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          # Explicit head SHA (not the synthetic merge ref) so the per-commit
+          # range walk matches what the user actually pushed.
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Scan policy-restricted paths across ALL commits in PR range
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: bash scripts/lint/check-pii-policy.sh
