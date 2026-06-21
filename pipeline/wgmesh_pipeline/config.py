@@ -63,11 +63,6 @@ def _read_box_config(path: Path = BOX_CONFIG_PATH) -> dict[str, str]:
 
 VALID_MODES = frozenset({"shadow", "spec-only", "live"})
 VALID_DB_MODES = frozenset({"local", "turso"})
-# The single required CI status context the protect-main ruleset gates on
-# (#1599 Phase D). Posted by the box for bot PRs and by external-pr-ci.yml for
-# external PRs — one name, two producers, so neither PR class orphans. A shared
-# constant keeps the posted name and the ruleset-required name from drifting.
-CI_GUARDS_CONTEXT = "ci/guards"
 DEFAULT_ANTHROPIC_HOST = "https://api.z.ai/api/anthropic"
 DEFAULT_TARGET_REPO = "atvirokodosprendimai/wgmesh"
 DEFAULT_POLL_INTERVAL_SECONDS = 300

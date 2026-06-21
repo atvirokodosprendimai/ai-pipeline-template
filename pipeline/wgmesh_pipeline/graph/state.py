@@ -26,8 +26,6 @@ class GraphState(TypedDict, total=False):
     review_findings: list[dict[str, Any]]
     tests_passed: bool
     sanitise_ok: bool
-    pii_ok: bool
-    emit_sanitise_ok: bool
     decision: Decision
     escalation_tier: int
     escalation_attempts: int

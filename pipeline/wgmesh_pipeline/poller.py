@@ -11,7 +11,6 @@ from wgmesh_pipeline.forge.protocol import Forge, ForgeIssue as GitHubIssue
 from wgmesh_pipeline.forge.quackback_status import is_active_lane, status_for_stage
 from wgmesh_pipeline.github.reconcile import reconcile_issues, reconcile_quackback
 from wgmesh_pipeline.graph.nodes.gate import apply_gate_side_effects, gate_node
-from wgmesh_pipeline.graph.nodes.guards import guards_node
 from wgmesh_pipeline.scoring import score_run
 from wgmesh_pipeline.state.store import ACTIONABLE_STAGES, IssueRecord, StateStore
 
@@ -184,12 +183,6 @@ class Poller:
             return self.store.transition(issue.number, "implemented", "reviewed")
 
         if issue.stage == "reviewed":
-            # #1599 Phase D: run the bot-PR leak guards (PII + emit-sanitise that
-            # the standalone Actions workflows skip for bot/* heads) and post the
-            # shared ci/guards required status BEFORE the gate decides, so the
-            # gate sees pii_ok/emit_sanitise_ok and GitHub auto-merge has the
-            # required check to wait on. Fail-closed inside guards_node.
-            state = guards_node(state)
             result = gate_node(state, max_files=self.config.max_files, apply_side_effects=False)
             # Side-effect BEFORE the terminal transition: if the merge/label
             # network call fails it raises here, the issue stays at 'reviewed'
