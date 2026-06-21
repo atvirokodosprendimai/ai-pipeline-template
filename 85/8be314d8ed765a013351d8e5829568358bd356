@@ -1,0 +1,22 @@
+pipeline/wgmesh_pipeline/config.py
+  s_b4742632db40e7::t_93111aa5252c00 103-104
+  s_b4742632db40e7::t_b6b7f67134279a 179-186,213,215-216
+pipeline/tests/test_config.py
+  s_b4742632db40e7::t_bad9e392541dc5 348-390
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "858be314d8ed765a013351d8e5829568358bd356",
+  "prompts": {},
+  "sessions": {
+    "s_b4742632db40e7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "07854d0f-63e4-4ebb-a0a3-b0b542d82519",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
