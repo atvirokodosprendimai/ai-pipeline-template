@@ -21,6 +21,17 @@ BOX_SETTABLE_STATUSES: frozenset[str] = frozenset(
 # status are the box's work queue.
 ACCEPTED_FOR_BUILD = "Accepted for Build"
 
+# The lane the box owns end-to-end: a post that has been accepted and is being
+# driven to ship moves through these statuses (the accept marker + the three
+# box-settable milestones). A post in this lane is the box's to mirror; a post
+# that has LEFT it — Cancelled / Rejected / Needs Refinement / Open for Vote —
+# is a human terminal/return decision the box must not overwrite (U12 drift
+# guard). Distinct from BOX_SETTABLE_STATUSES: the box does not *set* "Accepted
+# for Build", but a post sitting there is still in-lane.
+ACTIVE_BOX_LANE_STATUSES: frozenset[str] = frozenset(
+    {"Accepted for Build", "Building", "Ready for Review", "Shipped"}
+)
+
 # KTD4 milestone map: the box's internal execution stage (state/store.py
 # ALLOWED_TRANSITIONS) → the Quackback status it mirrors the post to. Only stages
 # *past* ``queued`` flip the post (first real claim → Building); the review
@@ -44,6 +55,16 @@ STAGE_TO_STATUS: dict[str, str] = {
 
 def is_box_settable(status: str) -> bool:
     return status in BOX_SETTABLE_STATUSES
+
+
+def is_active_lane(status: str | None) -> bool:
+    """True iff ``status`` is a status in the box's active lane (U12 drift guard).
+
+    A ``None`` status (unresolvable post / read failure) is treated as NOT in the
+    lane by this predicate alone — callers decide whether an unresolvable read is
+    fatal; a *clear* out-of-lane decision (Cancelled / Needs Refinement /
+    Rejected) is what aborts work."""
+    return status is not None and status in ACTIVE_BOX_LANE_STATUSES
 
 
 def status_for_stage(stage: str) -> str | None:

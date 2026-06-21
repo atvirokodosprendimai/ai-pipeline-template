@@ -33,7 +33,7 @@ import logging
 import os
 import re
 from itertools import count
-from typing import Any
+from typing import Any, Callable
 
 from wgmesh_pipeline.config import Config
 from wgmesh_pipeline.forge.protocol import ForgeIssue
@@ -64,11 +64,17 @@ class QuackbackForge:
         gh: GitHubClient | None = None,
         qb: QuackbackClient | None = None,
         board_id: str | None = None,
+        post_id_resolver: Callable[[int], str | None] | None = None,
     ):
         self.config = config
         self._gh = gh if gh is not None else GitHubClient(config)
         self._qb = qb if qb is not None else QuackbackClient(config)
         self._board_id = board_id or os.environ.get(BOARD_ID_ENV)
+        # Store-backed fallback resolver for ids not in the in-memory _id_map.
+        # Posts ingested via the U4 store mapping (reconcile_quackback) never
+        # touched _id_map, so set_status/comment/get_issue would KeyError on them
+        # without this fallback (U6). Bound lazily via bind_resolver too.
+        self._post_id_resolver = post_id_resolver
         # int↔string id seam (KTD6). Monotonic ints handed to int-keyed callers.
         self._id_map: dict[int, str] = {}
         self._id_counter = count(1)
@@ -122,11 +128,30 @@ class QuackbackForge:
         return post
 
     def get_issue(self, number: int) -> ForgeIssue | None:
-        post_id = self._id_map.get(number)
+        post_id = self._lookup_post_id(number)
         if post_id is None:
             return None
         post = self._qb.get_post(post_id)
         return _post_to_issue(number, post)
+
+    def get_decision_status(self, number: int) -> str | None:
+        """The human-readable decision status of the post mapped to ``number``.
+
+        Resolves the post id via the same in-memory→store fallback as the write
+        path, fetches the post, and maps its ``statusId`` to a status NAME via
+        the cached ``/statuses`` lookup. Returns the name (e.g. "Accepted for
+        Build", "Cancelled") or ``None`` when the post id, the post, or the
+        status mapping is unresolvable. Reads — never writes — so it carries no
+        allowlist guard; the U12 drift guard in the poller decides what an
+        out-of-lane (or unresolvable) read means."""
+        post_id = self._lookup_post_id(number)
+        if post_id is None:
+            return None
+        post = self._qb.get_post(post_id)
+        status_id = post.get("statusId")
+        if status_id in (None, ""):
+            return None
+        return self._status_name_for(str(status_id))
 
     def list_needs_triage(self) -> list[ForgeIssue]:
         """HOST SEAM: GitHub needs-triage labels have no Quackback analogue —
@@ -249,11 +274,55 @@ class QuackbackForge:
 
     # --------------------------------------------------------------- plumbing
 
-    def _require_post_id(self, number: int) -> str:
+    def bind_resolver(self, resolver: Callable[[int], str | None]) -> None:
+        """Bind the store-backed post-id resolver after construction (U6).
+
+        The poller wires ``store.quackback_post_id_for`` here so the write/read
+        path resolves ids for posts ingested via the store mapping (which never
+        populated the in-memory ``_id_map``)."""
+        self._post_id_resolver = resolver
+
+    def post_url(self, number: int) -> str | None:
+        """The Quackback post URL for ``number`` (``<QUACKBACK_URL>/posts/<id>``),
+        or ``None`` when the post id or base URL is unresolvable (R4)."""
+        post_id = self._lookup_post_id(number)
+        base = getattr(self.config, "quackback_url", None)
+        if post_id is None or not base:
+            return None
+        return f"{str(base).rstrip('/')}/posts/{post_id}"
+
+    def _lookup_post_id(self, number: int) -> str | None:
+        """Resolve a post id: in-memory ``_id_map`` first, then the store-backed
+        resolver (if bound), else ``None``."""
         post_id = self._id_map.get(number)
+        if post_id is not None:
+            return post_id
+        if self._post_id_resolver is not None:
+            return self._post_id_resolver(number)
+        return None
+
+    def _require_post_id(self, number: int) -> str:
+        post_id = self._lookup_post_id(number)
         if post_id is None:
             raise KeyError(f"no Quackback post mapped to int handle {number}")
         return post_id
+
+    def _status_name_for(self, status_id: str) -> str | None:
+        """Reverse of ``_status_id_for``: a statusId → its status NAME, or None.
+
+        Caches the same name→id map as ``_status_id_for`` and inverts it; an
+        unknown id (status removed/renamed) yields ``None`` rather than raising —
+        a mirror-time read must not crash the tick loop."""
+        if not self._status_id_cache:
+            for status in self._qb.list_statuses():
+                name = status.get("name")
+                sid = status.get("id")
+                if name and sid is not None:
+                    self._status_id_cache[str(name)] = str(sid)
+        for name, sid in self._status_id_cache.items():
+            if sid == status_id:
+                return name
+        return None
 
     def _number_for(self, post_id: str) -> int:
         for number, mapped in self._id_map.items():

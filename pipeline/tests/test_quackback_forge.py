@@ -409,3 +409,71 @@ def test_executor_create_issue_routes_to_quackback_build_suggestion() -> None:
     assert post["id"] == "post_new"
     assert any(c[0] == "create_post" for c in qb.calls)
     assert gh.calls == []
+
+
+# ----------------------------------------------- U6: resolver + decision read
+
+
+class StatusQB(FakeQB):
+    """FakeQB whose get_post carries a statusId so get_decision_status resolves."""
+
+    def __init__(self, *, status_id: str = "status_bld") -> None:
+        super().__init__()
+        self._post_status_id = status_id
+
+    def get_post(self, post_id: str) -> dict[str, Any]:
+        self.calls.append(("get_post", (post_id,)))
+        return {
+            "id": post_id,
+            "title": "T",
+            "tags": [],
+            "deletedAt": None,
+            "statusId": self._post_status_id,
+        }
+
+
+def test_bind_resolver_resolves_store_mapped_post() -> None:
+    # A post ingested via the store mapping never populated _id_map; the
+    # bound resolver lets set_status/get_issue/comment reach it (U6).
+    qb = StatusQB()
+    forge = QuackbackForge(_cfg(), gh=FakeGH(), qb=qb, board_id="board_1")
+    forge.bind_resolver(lambda number: "post_store" if number == 7 else None)
+
+    forge.set_status(7, "Building")
+
+    patch = next(c for c in qb.calls if c[0] == "set_post_status")
+    assert patch[1] == ("post_store", "status_bld")
+
+
+def test_get_decision_status_maps_status_id_to_name() -> None:
+    qb = StatusQB(status_id="status_afb")
+    forge = QuackbackForge(_cfg(), gh=FakeGH(), qb=qb, board_id="board_1")
+    forge.bind_resolver(lambda number: "post_store")
+
+    assert forge.get_decision_status(3) == "Accepted for Build"
+
+
+def test_get_decision_status_none_when_unresolvable() -> None:
+    forge, _, _ = _forge()
+    # No mapping, no resolver -> None (not a KeyError).
+    assert forge.get_decision_status(404) is None
+
+
+def test_get_decision_status_none_for_unknown_status_id() -> None:
+    qb = StatusQB(status_id="status_gone")  # not in list_statuses
+    forge = QuackbackForge(_cfg(), gh=FakeGH(), qb=qb, board_id="board_1")
+    forge.bind_resolver(lambda number: "post_store")
+
+    assert forge.get_decision_status(3) is None
+
+
+def test_post_url_uses_quackback_base_and_post_id() -> None:
+    forge, _, _ = _forge()
+    forge.create_issue(title="t", body="b")  # registers post_new at number 1
+
+    assert forge.post_url(1) == "https://qb.example.com/posts/post_new"
+
+
+def test_post_url_none_when_unresolvable() -> None:
+    forge, _, _ = _forge()
+    assert forge.post_url(999) is None
