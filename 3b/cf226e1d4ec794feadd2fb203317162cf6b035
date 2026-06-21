@@ -1,0 +1,29 @@
+docs/plans/2026-06-21-004-feat-external-pr-ci-plan.md
+  s_c6cc841b64a6e3::t_08acb8cc7f7160 1-146
+.github/workflows/external-pr-ci.yml
+  s_49b81b2f491ac5::t_04ee91c0706a89 1-127
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "3bcf226e1d4ec794feadd2fb203317162cf6b035",
+  "prompts": {},
+  "sessions": {
+    "s_49b81b2f491ac5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "719e3d43-993d-4485-926d-940cb03d3bdc",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    },
+    "s_c6cc841b64a6e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6b261b64-6782-40d0-8026-e63a89ec9f94",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
