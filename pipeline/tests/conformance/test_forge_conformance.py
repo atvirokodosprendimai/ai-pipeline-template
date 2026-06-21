@@ -679,11 +679,20 @@ def test_quackback_issue_method_hits_qb_caller() -> None:
 
     forge, qb_http, gh_session = _make_quackback(
         qb_routes=[
+            # U5: create_issue reads the board (dedup) and tags (resolution)
+            # before the single POST that creates the tagged Build Suggestion.
+            ("GET", "/api/v1/posts", HttpResponse(200, _json.dumps({"data": []}))),
+            ("GET", "/api/v1/tags", HttpResponse(200, _json.dumps({"data": []}))),
+            (
+                "POST",
+                "/api/v1/tags",
+                HttpResponse(201, _json.dumps({"data": {"id": "t"}})),
+            ),
             (
                 "POST",
                 "/api/v1/posts",
                 HttpResponse(201, _json.dumps({"data": {"id": "post_1"}})),
-            )
+            ),
         ],
         gh_routes=[],
     )
@@ -691,8 +700,13 @@ def test_quackback_issue_method_hits_qb_caller() -> None:
     post = forge.create_issue(title="t", body="b")
 
     assert post["id"] == "post_1"
-    # Issue method hit the Quackback caller, never the GitHub session.
-    assert [c["method"] for c in qb_http.calls] == ["POST"]
+    # Issue method hit the Quackback caller only — every request landed on the
+    # Quackback HTTP layer, and the GitHub session was never touched.
+    assert {c["method"] for c in qb_http.calls} <= {"GET", "POST"}
+    assert any(
+        c["method"] == "POST" and c["url"].endswith("/api/v1/posts")
+        for c in qb_http.calls
+    )
     assert gh_session.calls == []
 
 
@@ -717,11 +731,18 @@ def test_quackback_set_status_accepted_for_build_raises_locally() -> None:
 
     forge, qb_http, gh_session = _make_quackback(
         qb_routes=[
+            ("GET", "/api/v1/posts", HttpResponse(200, _json.dumps({"data": []}))),
+            ("GET", "/api/v1/tags", HttpResponse(200, _json.dumps({"data": []}))),
+            (
+                "POST",
+                "/api/v1/tags",
+                HttpResponse(201, _json.dumps({"data": {"id": "t"}})),
+            ),
             (
                 "POST",
                 "/api/v1/posts",
                 HttpResponse(201, _json.dumps({"data": {"id": "post_1"}})),
-            )
+            ),
         ],
         gh_routes=[],
     )

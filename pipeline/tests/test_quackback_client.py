@@ -216,3 +216,66 @@ def test_delete_post_tolerates_204_empty_body() -> None:
     client.delete_post("post_x")
 
     assert http.calls[0]["method"] == "DELETE"
+
+
+# --------------------------------------------------------------- tags (U5)
+
+
+def test_create_post_includes_tag_ids_when_present() -> None:
+    body = json.dumps({"data": {"id": "post_abc"}})
+    client, http = _client([("POST", "/posts", HttpResponse(201, body))])
+
+    client.create_post("board_1", "t", "c", tag_ids=["tag_a", "tag_b"])
+
+    assert http.calls[0]["body"]["tagIds"] == ["tag_a", "tag_b"]
+
+
+def test_create_post_omits_tag_ids_when_empty() -> None:
+    body = json.dumps({"data": {"id": "post_abc"}})
+    client, http = _client([("POST", "/posts", HttpResponse(201, body))])
+
+    client.create_post("board_1", "t", "c")
+    client.create_post("board_1", "t", "c", tag_ids=[])
+
+    assert "tagIds" not in http.calls[0]["body"]
+    assert "tagIds" not in http.calls[1]["body"]
+
+
+def test_list_tags_returns_data_array() -> None:
+    body = json.dumps(
+        {"data": [{"id": "tag_1", "name": "build-candidate", "color": "#fff"}]}
+    )
+    client, _ = _client([("GET", "/tags", HttpResponse(200, body))])
+
+    tags = client.list_tags()
+
+    assert tags[0]["name"] == "build-candidate"
+    assert tags[0]["id"] == "tag_1"
+
+
+def test_list_tags_malformed_data_raises() -> None:
+    client, _ = _client(
+        [("GET", "/tags", HttpResponse(200, json.dumps({"data": "nope"})))]
+    )
+
+    with pytest.raises(QuackbackError, match="missing 'data' array"):
+        client.list_tags()
+
+
+def test_create_tag_posts_name_and_returns_tag_object() -> None:
+    body = json.dumps({"data": {"id": "tag_new", "name": "growth", "color": "#abc"}})
+    client, http = _client([("POST", "/tags", HttpResponse(201, body))])
+
+    tag = client.create_tag("growth")
+
+    assert tag["id"] == "tag_new"
+    assert http.calls[0]["method"] == "POST"
+    assert http.calls[0]["body"] == {"name": "growth"}
+
+
+def test_create_tag_malformed_payload_raises() -> None:
+    # 201 but no 'data' object — must not be trusted on status alone.
+    client, _ = _client([("POST", "/tags", HttpResponse(201, json.dumps({"ok": 1})))])
+
+    with pytest.raises(QuackbackError, match="missing 'data' object"):
+        client.create_tag("growth")

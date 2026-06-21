@@ -22,12 +22,36 @@ class FakeQB:
 
     def __init__(self) -> None:
         self.calls: list[tuple[str, tuple[Any, ...]]] = []
+        # name → existing tag id; the two Build-Suggestion tags pre-exist.
+        self._tags: dict[str, str] = {
+            "agent-suggestion": "tag_sugg",
+            "build-candidate": "tag_cand",
+        }
+        # Board posts returned by an unfiltered list_posts (cross-status dedup).
+        self.board_posts: list[dict[str, Any]] = []
 
     def create_post(
-        self, board_id: str, title: str, content: str, status_id: str | None = None
+        self,
+        board_id: str,
+        title: str,
+        content: str,
+        status_id: str | None = None,
+        tag_ids: list[str] | None = None,
     ) -> dict[str, Any]:
-        self.calls.append(("create_post", (board_id, title, content, status_id)))
+        self.calls.append(
+            ("create_post", (board_id, title, content, status_id, tag_ids))
+        )
         return {"id": "post_new", "title": title}
+
+    def list_tags(self) -> list[dict[str, Any]]:
+        self.calls.append(("list_tags", ()))
+        return [{"id": tid, "name": name} for name, tid in self._tags.items()]
+
+    def create_tag(self, name: str) -> dict[str, Any]:
+        self.calls.append(("create_tag", (name,)))
+        tid = f"tag_{name.replace('-', '_')}"
+        self._tags[name] = tid
+        return {"id": tid, "name": name}
 
     def get_post(self, post_id: str) -> dict[str, Any]:
         self.calls.append(("get_post", (post_id,)))
@@ -43,7 +67,10 @@ class FakeQB:
 
     def list_posts(self, status_slug=None, cursor=None, limit=None) -> dict[str, Any]:
         self.calls.append(("list_posts", (status_slug, cursor, limit)))
-        return {"data": [], "meta": {}}
+        # An unfiltered list (no slug) returns the whole board for dedup; a
+        # slug-filtered list keeps its existing empty-by-default behaviour.
+        data = self.board_posts if status_slug is None else []
+        return {"data": list(data), "meta": {}}
 
     def list_statuses(self) -> list[dict[str, Any]]:
         self.calls.append(("list_statuses", ()))
@@ -133,8 +160,12 @@ def test_issue_method_routes_to_qb() -> None:
     post = forge.create_issue(title="t", body="b", labels=())
 
     assert post["id"] == "post_new"
-    assert [c[0] for c in qb.calls] == ["create_post"]
-    # create_post is the ONLY backend write — nothing reached _gh.
+    # U5: create_issue reads the board (dedup) and tags (resolution) then writes
+    # exactly one post — create_post is the ONLY backend WRITE on _qb, and
+    # nothing reached _gh (no PR/code-backend call for an issue method).
+    ops = [c[0] for c in qb.calls]
+    assert ops.count("create_post") == 1
+    assert "comment" not in ops
     assert gh.calls == []
 
 
@@ -277,3 +308,104 @@ def test_list_open_issues_filters_to_accepted_for_build() -> None:
     assert list_call[1][0] == "accepted-for-build"
     assert len(issues) == 1
     assert issues[0].title == "A"
+
+
+# ----------------------------------------------------- U5: build-suggestion tags
+
+
+def test_create_issue_tags_post_with_build_suggestion_and_label_tags() -> None:
+    forge, gh, qb = _forge()
+
+    forge.create_issue(title="Add SSO login", body="b", labels=("growth",))
+
+    create = next(c for c in qb.calls if c[0] == "create_post")
+    # (board_id, title, content, status_id, tag_ids)
+    board_id, title, _content, status_id, tag_ids = create[1]
+    assert board_id == "board_1"
+    assert title == "Add SSO login"
+    # Default status: no statusId — the board's default ("Open for Vote").
+    assert status_id is None
+    # The two pre-existing Build-Suggestion tags plus the growth label tag.
+    assert set(tag_ids) == {"tag_sugg", "tag_cand", "tag_growth"}
+
+
+def test_create_issue_resolves_missing_tag_by_creating_it_once() -> None:
+    forge, _, qb = _forge()
+
+    # "growth" does not pre-exist → must be created exactly once.
+    forge.create_issue(title="t1", body="b", labels=("growth",))
+    forge.create_issue(title="t2 distinct", body="b", labels=("growth",))
+
+    creations = [c for c in qb.calls if c[0] == "create_tag" and c[1] == ("growth",)]
+    assert len(creations) == 1
+    # The created id is reused on the second post.
+    second = [c for c in qb.calls if c[0] == "create_post"][1]
+    assert "tag_growth" in second[1][4]
+
+
+# ----------------------------------------------------- U5: cross-status dedup
+
+
+def test_create_issue_dedups_against_existing_board_post() -> None:
+    qb = FakeQB()
+    # A near-duplicate already on the board (any status).
+    qb.board_posts = [{"id": "post_old", "title": "Add  SSO   Login!"}]
+    forge, gh, qb = _forge(qb=qb)
+
+    result = forge.create_issue(title="add sso login", body="more detail")
+
+    # Commented on the existing post; NO new post created.
+    assert ("comment", ("post_old", "more detail")) in qb.calls
+    assert all(c[0] != "create_post" for c in qb.calls)
+    # Returns the existing post.
+    assert result["id"] == "post_old"
+
+
+def test_create_issue_creates_post_when_no_duplicate() -> None:
+    qb = FakeQB()
+    qb.board_posts = [{"id": "post_old", "title": "Totally unrelated feature"}]
+    forge, _, qb = _forge(qb=qb)
+
+    forge.create_issue(title="Add SSO login", body="b")
+
+    assert any(c[0] == "create_post" for c in qb.calls)
+    assert all(c[0] != "comment" for c in qb.calls)
+
+
+def test_dedup_sanitise_wall_runs_before_any_post() -> None:
+    from wgmesh_pipeline.github.client import SanitiseError
+
+    gh = FakeGH(sanitiser=lambda text: "SECRET" not in text)
+    qb = FakeQB()
+    forge, gh, qb = _forge(gh=gh, qb=qb)
+
+    with pytest.raises(SanitiseError):
+        forge.create_issue(title="t", body="leaking SECRET token")
+
+    # Sanitise blocks before list/create/comment touch the board.
+    assert qb.calls == []
+
+
+# ----------------------------------------------------- U5: executor angle
+
+
+def test_executor_create_issue_routes_to_quackback_build_suggestion() -> None:
+    from dataclasses import dataclass
+
+    from wgmesh_pipeline.control_loop.executor import _h_create_issue
+
+    @dataclass
+    class _Action:
+        title: str
+        body: str
+        labels: tuple[str, ...]
+
+    forge, gh, qb = _forge()
+    action = _Action(title="Add SSO login", body="b", labels=("growth",))
+
+    post = _h_create_issue(forge, action)
+
+    # The executor handler produced a Quackback Build Suggestion, not a GH call.
+    assert post["id"] == "post_new"
+    assert any(c[0] == "create_post" for c in qb.calls)
+    assert gh.calls == []

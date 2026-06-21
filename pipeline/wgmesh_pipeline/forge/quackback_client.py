@@ -112,6 +112,7 @@ class QuackbackClient:
         title: str,
         content: str,
         status_id: str | None = None,
+        tag_ids: list[str] | None = None,
     ) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "boardId": board_id,
@@ -120,6 +121,10 @@ class QuackbackClient:
         }
         if status_id is not None:
             payload["statusId"] = status_id
+        # ``tagIds`` (not ``tags``) is the only attach mechanism honoured on
+        # create; omit it entirely when empty so the payload stays minimal.
+        if tag_ids:
+            payload["tagIds"] = list(tag_ids)
         body = self._call("POST", "/posts", payload=payload)
         return self._post_from(body)
 
@@ -183,6 +188,19 @@ class QuackbackClient:
         if not isinstance(data, list):
             raise QuackbackError("Quackback /statuses response missing 'data' array")
         return data
+
+    # ------------------------------------------------------------------- tags
+
+    def list_tags(self) -> list[dict[str, Any]]:
+        body = self._call("GET", "/tags")
+        data = body.get("data")
+        if not isinstance(data, list):
+            raise QuackbackError("Quackback /tags response missing 'data' array")
+        return data
+
+    def create_tag(self, name: str) -> dict[str, Any]:
+        body = self._call("POST", "/tags", payload={"name": name})
+        return self._post_from(body)
 
     # --------------------------------------------------------------- plumbing
 

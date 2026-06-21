@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from itertools import count
 from typing import Any
 
@@ -73,22 +74,46 @@ class QuackbackForge:
         self._id_counter = count(1)
         # name→statusId cache (statuses are board-stable).
         self._status_id_cache: dict[str, str] = {}
+        # name→tagId cache (tags are board-stable; resolved create-if-missing).
+        self._tag_id_cache: dict[str, str] = {}
 
     # ------------------------------------------------------- post → _qb (issues)
 
     def create_issue(
         self, *, title: str, body: str, labels: tuple[str, ...] = ()
     ) -> Any:
-        """Create a Build Suggestion post on the board. The sanitise wall runs on
-        the title+body before the post is created, mirroring the Gitea adapter's
-        gate on the name-bearing payload."""
+        """Emit an Observation-Loop Build Suggestion on the board (U5).
+
+        Order is load-bearing:
+
+          1. **sanitise wall** on the name-bearing payload FIRST — a leaking
+             title/body must be blocked before any board read or write,
+             mirroring the Gitea adapter's gate (KTD10);
+          2. **cross-status dedup** — list every board post (no status filter)
+             and, on a normalized-title match, comment the new body on the
+             existing post and return it (no new post);
+          3. otherwise resolve the Build-Suggestion + label tag ids and create
+             a tagged post at the board default status (Open for Vote).
+        """
         if not self._board_id:
             raise RuntimeError(
                 f"QuackbackForge.create_issue requires a board id (set {BOARD_ID_ENV})"
             )
-        # Reuse the GitHubClient sanitise wall (public-repo safety, KTD10).
+        # 1. Reuse the GitHubClient sanitise wall (public-repo safety, KTD10).
         self._gh._sanitise_write("create_issue", {"title": title, "body": body})
-        post = self._qb.create_post(self._board_id, title, body)
+
+        # 2. Cross-status dedup against existing board posts.
+        existing = self._find_duplicate_post(title)
+        if existing is not None:
+            existing_id = str(existing.get("id") or "")
+            if existing_id:
+                self._qb.comment(existing_id, body)
+                self._number_for(existing_id)
+                return existing
+
+        # 3. Resolve tags and create the tagged Build Suggestion.
+        tag_ids = self._resolve_tag_ids(BUILD_SUGGESTION_TAGS + tuple(labels))
+        post = self._qb.create_post(self._board_id, title, body, tag_ids=tag_ids)
         post_id = str(post.get("id") or "")
         if not post_id:
             raise RuntimeError("Quackback create_post returned a post without an id")
@@ -238,6 +263,62 @@ class QuackbackForge:
         self._id_map[number] = post_id
         return number
 
+    # Bound on how many board posts the dedup read pages through, so a large
+    # board cannot make every Build Suggestion an unbounded scan.
+    _DEDUP_MAX_POSTS = 500
+
+    def _find_duplicate_post(self, title: str) -> dict[str, Any] | None:
+        """Return an existing board post whose title matches ``title`` after
+        normalization (case/space/punctuation-insensitive), else None.
+
+        Lists posts with NO status filter so a duplicate is caught regardless of
+        where it already sits in the funnel (the cross-status guarantee). Paged
+        up to ``_DEDUP_MAX_POSTS`` via the cursor; an API error propagates
+        (fail-closed) rather than silently skipping dedup."""
+        target = _normalize_title(title)
+        if not target:
+            return None
+        seen = 0
+        cursor: str | None = None
+        while seen < self._DEDUP_MAX_POSTS:
+            page = self._qb.list_posts(cursor=cursor, limit=100)
+            posts = page.get("data", [])
+            for post in posts:
+                seen += 1
+                if _normalize_title(str(post.get("title", ""))) == target:
+                    return post
+            pagination = (page.get("meta") or {}).get("pagination") or {}
+            cursor = pagination.get("cursor")
+            if not pagination.get("hasMore") or not cursor or not posts:
+                break
+        return None
+
+    def _resolve_tag_ids(self, names: tuple[str, ...]) -> list[str]:
+        """Map tag names → ids, creating any that don't yet exist.
+
+        The board tag list is fetched once and cached; a name absent from the
+        cache is created (``create_tag``) and its id reused thereafter."""
+        if not self._tag_id_cache:
+            for tag in self._qb.list_tags():
+                name = tag.get("name")
+                tag_id = tag.get("id")
+                if name and tag_id is not None:
+                    self._tag_id_cache[str(name)] = str(tag_id)
+        ids: list[str] = []
+        for name in names:
+            tag_id = self._tag_id_cache.get(name)
+            if tag_id is None:
+                created = self._qb.create_tag(name)
+                tag_id = str(created.get("id") or "")
+                if not tag_id:
+                    raise RuntimeError(
+                        f"Quackback create_tag returned no id for tag {name!r}"
+                    )
+                self._tag_id_cache[name] = tag_id
+            if tag_id not in ids:
+                ids.append(tag_id)
+        return ids
+
     def _slug_for(self, status_name: str) -> str:
         for status in self._qb.list_statuses():
             if status.get("name") == status_name:
@@ -259,6 +340,15 @@ class QuackbackForge:
         if resolved is None:
             raise RuntimeError(f"Quackback status not found: {status_name!r}")
         return resolved
+
+
+def _normalize_title(title: str) -> str:
+    """Lowercase, collapse all non-alphanumeric runs to single spaces, strip.
+
+    Deliberately simple normalized-equality (not fuzzy overlap): a title is a
+    duplicate only when it reduces to the same alphanumeric token sequence —
+    case, spacing, and punctuation are ignored, nothing more clever."""
+    return re.sub(r"[^a-z0-9]+", " ", title.lower()).strip()
 
 
 def _post_to_issue(number: int, post: dict[str, Any]) -> ForgeIssue:
