@@ -140,6 +140,17 @@ class QuackbackForge:
             issues.append(_post_to_issue(number, post))
         return issues
 
+    def list_accepted_posts(self) -> list[dict[str, Any]]:
+        """Raw ``Accepted for Build`` post dicts for the U4 ingest (KTD3).
+
+        ``reconcile_quackback`` needs ``id`` + ``updatedAt`` (the accept marker),
+        which the host-neutral ``ForgeIssue`` does not carry — so this returns the
+        unmapped post dicts rather than ``ForgeIssue``. Fail-closed: an API error
+        propagates, never an empty-looks-healthy list (KTD5)."""
+        slug = self._slug_for(ACCEPTED_FOR_BUILD)
+        page = self._qb.list_posts(status_slug=slug)
+        return list(page.get("data", []))
+
     def comment(self, issue_number: int, body: str) -> Any:
         post_id = self._require_post_id(issue_number)
         return self._qb.comment(post_id, body)

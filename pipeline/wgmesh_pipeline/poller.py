@@ -8,7 +8,7 @@ from pathlib import Path
 
 from wgmesh_pipeline.config import Config
 from wgmesh_pipeline.forge.protocol import Forge, ForgeIssue as GitHubIssue
-from wgmesh_pipeline.github.reconcile import reconcile_issues
+from wgmesh_pipeline.github.reconcile import reconcile_issues, reconcile_quackback
 from wgmesh_pipeline.graph.nodes.gate import apply_gate_side_effects, gate_node
 from wgmesh_pipeline.scoring import score_run
 from wgmesh_pipeline.state.store import ACTIONABLE_STAGES, IssueRecord, StateStore
@@ -38,7 +38,12 @@ class Poller:
 
     async def tick(self) -> IssueRecord | None:
         try:
-            result = reconcile_issues(self.client, self.store, resolution_lookup=self.resolution_lookup)
+            if getattr(self.config, "forge_kind", "github") == "quackback":
+                # Quackback posts have no GitHub-label semantics — the dedicated
+                # ingest upserts only 'Accepted for Build' posts at queued (KTD3).
+                result = reconcile_quackback(self.client, self.store)
+            else:
+                result = reconcile_issues(self.client, self.store, resolution_lookup=self.resolution_lookup)
             claim_stages = ACTIONABLE_STAGES
             if self.config.mode != "spec-only":
                 claim_stages = ACTIONABLE_STAGES + ("spec_opened",)
