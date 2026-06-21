@@ -127,18 +127,30 @@ prior `*_LIVE` flags). The pipeline reads `QUACKBACK_URL` / `QUACKBACK_TOKEN`; s
 
 ## 2. API facts the adapter depends on
 
-Base: `<BASE_URL>/api/v1`, `Authorization: Bearer qb_…`.
+Base: `<BASE_URL>/api/v1`, `Authorization: Bearer qb_…`. **All rows below VERIFIED against
+the live instance `http://89.167.62.47:3000` on 2026-06-21** (status codes observed inline).
 
-| Need | Fact | Source / status |
+| Need | Fact | Status |
 |---|---|---|
-| Create Build Suggestion | `POST /api/v1/posts` | CONFIRMED |
-| Read one post (drift re-read, confirm) | `GET /api/v1/posts/{postId}` | CONFIRMED |
-| List accepted posts (ingest) | `GET /api/v1/posts?status=accepted_for_build&sort=newest&cursor=&limit=` | CONFIRMED; cursor pagination, `limit` max 100 |
-| Set status (Building/Ready/Shipped) | `PATCH /api/v1/posts/{postId}` | **VERIFY** full schema against instance — REST path is in the API index; MCP `triage_post` is the documented equivalent |
-| Comment | REST `POST /api/v1/posts/{postId}/comments` | **VERIFY** — MCP `comment_on_post` confirmed; REST schema not in fetched docs |
-| Post id | string TypeID `post_01h…` — **not numeric** | CONFIRMED → U4 maintains `quackback_post_id`↔int map (KTD6/OQ3 fallback) |
-| Idempotency / concurrency | only `updatedAt` (ISO 8601); **no** `status_version`/revision | CONFIRMED → KTD6 accept-transition timestamp fallback (OQ2 resolved) |
+| Create Build Suggestion | `POST /api/v1/posts` `{boardId, title, content, statusId?}` → **201** | VERIFIED |
+| Read one post (drift re-read, confirm) | `GET /api/v1/posts/{postId}` → **200** | VERIFIED |
+| List accepted posts (ingest) | `GET /api/v1/posts?status=accepted_for_build&cursor=&limit=` → **200** | VERIFIED — filter is by status **SLUG** |
+| **Filter gotcha** | `?status=<slug>` filters; **`?statusId=<id>` is IGNORED** (returns all) | VERIFIED — ingest MUST use the slug param |
+| Set status (Building/Ready/Shipped) | `PATCH /api/v1/posts/{postId}` `{"statusId":"<status TypeID>"}` → **200** | VERIFIED — body takes the status **id**, not slug; box maps slug→id via `GET /statuses` |
+| Comment | `POST /api/v1/posts/{postId}/comments` `{"content":"…"}` → **201** | VERIFIED |
+| Delete (probe cleanup) | `DELETE /api/v1/posts/{postId}` → **204** | VERIFIED |
+| Post id | string TypeID `post_01h…` — **not numeric** | VERIFIED → U4 maintains `quackback_post_id`↔int map (KTD6/OQ3) |
+| Idempotency / concurrency | post payload has **no** `version`/`revision`/`statusVersion`; only `createdAt`/`updatedAt` | VERIFIED → KTD6 accept-transition `updatedAt` marker (OQ2 resolved) |
+| `decided_by` (KTD10, PII-safe) | use `ownerPrincipalId` (opaque) — payload also exposes `authorEmail`/`authorName`; **never persist those** | VERIFIED |
+| Status object | `{id (status_…), name, slug, color, category(active\|complete\|closed), position, showOnRoadmap, isDefault}` | VERIFIED |
 | Post metadata | no custom-fields API | CONFIRMED → encode via tags + body |
+
+**Live instance state (2026-06-21):** workspace `wgmesh`; board **Build Suggestions**
+`board_01kvm80e4df69b5wf8t1v6x6xh` (slug `build-suggestions`); the 8 decision statuses
+created (slugs `open_for_vote`/`needs_refinement`/`accepted_for_build`/`building`/
+`ready_for_review`/`rejected`/`cancelled`/`shipped`); bot key `autobox` minted;
+`QUACKBACK_URL`/`QUACKBACK_TOKEN` set as repo secrets. (6 default statuses + 3 default
+boards from onboarding also present — harmless; the box targets `build-suggestions`.)
 
 Webhooks (deferred unit, when a public receiver exists): HMAC-SHA256 over
 `{timestamp}.{body}`, header **`X-Quackback-Signature`** (NOT `-256` as the plan guessed),
@@ -164,10 +176,11 @@ GitHub backlog was drained at cutover, reseed it. No code revert required.
 
 ---
 
-## 5. Open / VERIFY before depending units are proven
+## 5. VERIFY items — RESOLVED 2026-06-21 (probed against the live instance)
 
-- **VERIFY** `PATCH /api/v1/posts/{postId}` status-set request/response schema (U2/U3/U6).
-- **VERIFY** REST comment endpoint shape (U2/U5) — else route comments via MCP later.
-- **VERIFY** Postgres base version in `docker/postgres/Dockerfile` before pinning upgrades.
-- Probe a live post payload to confirm the `updatedAt` field name used for the
-  accept-transition idempotency marker (U2).
+- ✅ `PATCH /api/v1/posts/{postId}` `{"statusId":"<id>"}` → 200 (set-status; body takes id).
+- ✅ `POST /api/v1/posts/{postId}/comments` `{"content":"…"}` → 201.
+- ✅ Idempotency marker = `updatedAt` (no version/revision field on the post payload).
+- ✅ Ingest filter = `?status=<slug>` (the `?statusId=` param is ignored — see §2).
+- Still open: Postgres base version in `docker/postgres/Dockerfile` before pinning upgrades
+  (not blocking — the stack runs on the built image).
