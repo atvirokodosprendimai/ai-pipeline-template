@@ -345,3 +345,46 @@ def test_committed_box_config_is_valid_and_allowlisted() -> None:
     for k in cfg:
         if k.endswith("_SECONDS") or k == "MAX_FILES":
             assert int(cfg[k]) > 0
+
+
+# --- Quackback config tests ---
+
+_MINIMAL_ENV = {
+    "TARGET_REPO": "atvirokodosprendimai/wgmesh",
+    "DATABASE_MODE": "local",
+}
+
+
+def test_quackback_forge_with_creds_loads_successfully() -> None:
+    cfg = load_config(
+        {
+            **_MINIMAL_ENV,
+            "FORGE_KIND": "quackback",
+            "QUACKBACK_URL": "https://quackback.example.com",
+            "QUACKBACK_TOKEN": "secret-token",
+        }
+    )
+    assert cfg.quackback_url == "https://quackback.example.com"
+    assert cfg.quackback_token == "secret-token"
+
+
+def test_quackback_forge_missing_token_raises_value_error() -> None:
+    with pytest.raises(ValueError, match="QUACKBACK"):
+        load_config(
+            {
+                **_MINIMAL_ENV,
+                "FORGE_KIND": "quackback",
+                "QUACKBACK_URL": "https://quackback.example.com",
+                # QUACKBACK_TOKEN intentionally absent
+            }
+        )
+
+
+def test_github_forge_without_quackback_vars_is_fine() -> None:
+    cfg = load_config(
+        {
+            **_MINIMAL_ENV,
+            # FORGE_KIND defaults to github; no Quackback vars set
+        }
+    )
+    assert cfg.quackback_url is None

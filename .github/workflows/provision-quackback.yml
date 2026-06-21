@@ -1,0 +1,172 @@
+name: Provision Quackback
+
+# Self-hosted Quackback (AGPL feedback/decision board) on a Hetzner box via the
+# project's docker-compose.prod.yml (app + postgres[pg_cron] + dragonfly[redis] +
+# minio). Mirrors provision-langfuse.yml: a one-shot dispatch that creates the VM,
+# installs Docker via cloud-init, then deploys the stack OVER SSH with infra
+# secrets generated ON the box (never via cloud-init user-data, which lands in
+# Hetzner metadata/logs).
+#
+# Unlike Langfuse, Quackback has NO headless init env (no LANGFUSE_INIT_*
+# equivalent): after this run the stack is up and reachable, but the admin
+# account, the decision statuses, and the bot API key are created by hand in the
+# UI (see the Report step). The box's compose BUILDS postgres from a Dockerfile
+# in the repo, so the full repo (pinned to a release tag) is cloned on the box,
+# not just the compose file.
+#
+# Required secret: HCLOUD_TOKEN (org — Hetzner project to bill/host).
+# Optional: SSH_PUBKEY (operator key added alongside the ephemeral CI key).
+# Open the UI at http://<ip>:3000 and complete the setup wizard.
+
+on:
+  workflow_dispatch:
+    inputs:
+      server_name:
+        default: 'quackback'
+      server_type:
+        # postgres + dragonfly + minio + app — no clickhouse, so lighter than
+        # langfuse; cpx22 is enough. Bump to cpx32 if the box thrashes.
+        default: 'cpx22'
+      location:
+        default: 'hel1'
+
+permissions:
+  contents: read
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    env:
+      NAME: ${{ github.event.inputs.server_name }}
+    steps:
+      - name: Validate secrets
+        run: |
+          set -euo pipefail
+          : "${HCLOUD_TOKEN:?}"
+        env:
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+
+      - name: Install hcloud CLI
+        run: |
+          set -euo pipefail
+          curl -fsSL https://github.com/hetznercloud/cli/releases/latest/download/hcloud-linux-amd64.tar.gz | tar xz hcloud
+          sudo mv hcloud /usr/local/bin/
+
+      - name: Ephemeral SSH key
+        run: ssh-keygen -t ed25519 -N '' -f "$RUNNER_TEMP/k" -C "qb-${{ github.run_id }}"
+
+      - name: Create server
+        env:
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+          SSH_PUBKEY: ${{ secrets.SSH_PUBKEY }}
+        run: |
+          set -euo pipefail
+          KEYNAME="qb-${{ github.run_id }}"
+          hcloud ssh-key create --name "$KEYNAME" --public-key-from-file "$RUNNER_TEMP/k.pub"
+          SSHKEYS="$KEYNAME"
+          if [ -n "${SSH_PUBKEY:-}" ]; then
+            printf '%s\n' "$SSH_PUBKEY" > "$RUNNER_TEMP/op.pub"
+            hcloud ssh-key describe op-persistent >/dev/null 2>&1 || \
+              hcloud ssh-key create --name op-persistent --public-key-from-file "$RUNNER_TEMP/op.pub"
+            SSHKEYS="$KEYNAME,op-persistent"
+          fi
+          cat > "$RUNNER_TEMP/ci.yml" <<'CLOUD'
+          #cloud-config
+          package_update: true
+          runcmd:
+            - curl -fsSL https://get.docker.com | sh
+            - command -v git || (apt-get update && apt-get install -y git)
+            - install -d -m 700 /opt/quackback
+            - touch /opt/quackback/.ci-done
+          CLOUD
+          hcloud server describe "$NAME" >/dev/null 2>&1 && hcloud server delete "$NAME" || true
+          hcloud server create --name "$NAME" --type "${{ github.event.inputs.server_type }}" \
+            --image ubuntu-24.04 --location "${{ github.event.inputs.location }}" \
+            --ssh-key "$SSHKEYS" --user-data-from-file "$RUNNER_TEMP/ci.yml"
+          echo "BOX_IP=$(hcloud server ip "$NAME")" >> "$GITHUB_ENV"
+          echo "KEYNAME=$KEYNAME" >> "$GITHUB_ENV"
+
+      - name: Wait for Docker
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 40); do
+            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i "$RUNNER_TEMP/k" root@"$BOX_IP" \
+                 'cloud-init status --wait >/dev/null 2>&1; command -v docker && command -v git && test -f /opt/quackback/.ci-done'; then
+              echo ok; exit 0
+            fi
+            sleep 15
+          done
+          echo "::error::docker not ready"; exit 1
+
+      - name: Deploy Quackback stack
+        run: |
+          set -euo pipefail
+          # Clone the repo pinned to a RELEASE TAG (postgres builds from a
+          # Dockerfile in the tree, so the whole repo is needed; main can change
+          # service shape between provisions with zero signal). Generate infra
+          # secrets ONCE on the box — keep an existing .env so SECRET_KEY /
+          # POSTGRES_PASSWORD stay stable across redeploys.
+          ssh -o StrictHostKeyChecking=no -i "$RUNNER_TEMP/k" root@"$BOX_IP" bash -s -- "$BOX_IP" <<'REMOTE'
+          set -euo pipefail
+          IP="$1"
+          QB_TAG="v0.12.4"
+          cd /opt/quackback
+          if [ ! -d src ]; then
+            git clone --branch "$QB_TAG" --depth 1 https://github.com/QuackbackIO/quackback.git src
+          fi
+          cd src
+          if [ ! -f .env ]; then
+            # Docker reads .env literally: no quotes, no inline comments on values.
+            # NOTE: QUACKBACK_TAG is the ghcr IMAGE tag (no leading 'v'). If
+            # ghcr.io/quackbackio/quackback:0.12.4 does not exist, adjust this.
+            cat > .env <<EOF
+          BASE_URL=http://$IP:3000
+          SECRET_KEY=$(openssl rand -base64 32)
+          QUACKBACK_TAG=0.12.4
+          APP_PORT=3000
+          POSTGRES_USER=quackback
+          POSTGRES_PASSWORD=$(openssl rand -base64 24)
+          POSTGRES_DB=quackback
+          MINIO_ROOT_USER=quackback
+          MINIO_ROOT_PASSWORD=$(openssl rand -base64 24)
+          S3_BUCKET=quackback
+          S3_REGION=us-east-1
+          EMAIL_SMTP_HOST=
+          EMAIL_SMTP_PORT=587
+          EMAIL_SMTP_USER=
+          EMAIL_SMTP_PASS=
+          EMAIL_FROM=Quackback <noreply@localhost>
+          EOF
+            chmod 600 .env
+          fi
+          docker compose -f docker-compose.prod.yml --env-file .env up -d
+          REMOTE
+
+      - name: Wait for Quackback web
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 40); do
+            if curl -fsS -o /dev/null "http://$BOX_IP:3000/api/health"; then echo "quackback up"; exit 0; fi
+            sleep 15
+          done
+          echo "::warning::health endpoint not green yet — stack may still be migrating"
+          ssh -o StrictHostKeyChecking=no -i "$RUNNER_TEMP/k" root@"$BOX_IP" \
+            'cd /opt/quackback/src && docker compose -f docker-compose.prod.yml ps' || true
+
+      - name: Cleanup ephemeral key
+        if: always()
+        env:
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+        run: hcloud ssh-key delete "${KEYNAME:-qb-${{ github.run_id }}}" || true
+
+      - name: Report
+        run: |
+          echo "Quackback at http://$BOX_IP:3000"
+          echo "Quackback has no headless init — finish setup by hand:"
+          echo "  1. Open http://$BOX_IP:3000 and complete the setup wizard (admin account + first board)."
+          echo "  2. Create the 8 decision statuses (Admin UI or POST /api/v1/statuses):"
+          echo "     Open for Vote, Needs Refinement, Accepted for Build, Building, Ready for Review (active);"
+          echo "     Rejected, Cancelled (closed); Shipped (complete). See docs/runbooks/quackback-cutover.md."
+          echo "  3. Mint a named API key: Admin -> Settings -> Developers (shown once; format qb_)."
+          echo "  4. Set repo secrets: QUACKBACK_URL=http://$BOX_IP:3000 and QUACKBACK_TOKEN=<qb_ key>,"
+          echo "     then propagate to the box env via set-box-env."

@@ -100,6 +100,8 @@ class Config:
     goose_model: str = DEFAULT_GOOSE_MODEL
     forge_kind: str = "github"
     gitea_url: str | None = None
+    quackback_url: str | None = None
+    quackback_token: str | None = None
     database_mode: str = "local"
     database_path: str = "pipeline/state.db"
     turso_url: str | None = None
@@ -174,6 +176,14 @@ def load_config(env: Mapping[str, str] | None = None) -> Config:
     if db_mode == "turso" and not turso_url:
         raise ValueError("DATABASE_MODE=turso requires TURSO_DATABASE_URL")
 
+    forge_kind = _get_nonempty(source, "FORGE_KIND") or "github"
+    quackback_url = _get_nonempty(source, "QUACKBACK_URL")
+    quackback_token = _get_nonempty(source, "QUACKBACK_TOKEN")
+    if forge_kind == "quackback" and not (quackback_url and quackback_token):
+        raise ValueError(
+            "forge_kind=quackback requires QUACKBACK_URL and QUACKBACK_TOKEN"
+        )
+
     control_loop_mode = (
         _get_nonempty(source, "CONTROL_LOOP_MODE") or DEFAULT_CONTROL_LOOP_MODE
     ).lower()
@@ -200,8 +210,10 @@ def load_config(env: Mapping[str, str] | None = None) -> Config:
         zai_api_key=_get_nonempty(source, "ZAI_API_KEY"),
         anthropic_host=anthropic_host,
         langsmith_api_key=_get_nonempty(source, "LANGSMITH_API_KEY"),
-        forge_kind=_get_nonempty(source, "FORGE_KIND") or "github",
+        forge_kind=forge_kind,
         gitea_url=_get_nonempty(source, "GITEA_URL"),
+        quackback_url=quackback_url,
+        quackback_token=quackback_token,
         poll_interval_seconds=_get_int(
             source, "POLL_INTERVAL_SECONDS", DEFAULT_POLL_INTERVAL_SECONDS
         ),
