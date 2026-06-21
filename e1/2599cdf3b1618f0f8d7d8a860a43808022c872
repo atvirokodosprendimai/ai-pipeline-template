@@ -1,0 +1,22 @@
+.github/workflows/deploy-pipeline-box.yml
+  s_a97c740b38fba0::t_c89ec282039642 59
+  s_a97c740b38fba0::t_7bf4d06e9d642b 65
+  s_a97c740b38fba0::t_b311b514903925 74
+  s_a97c740b38fba0::t_687375e61deb6d 109
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "e12599cdf3b1618f0f8d7d8a860a43808022c872",
+  "prompts": {},
+  "sessions": {
+    "s_a97c740b38fba0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f43da7d4-7733-4182-bcea-c529610e4013",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
