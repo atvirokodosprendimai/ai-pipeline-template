@@ -1,0 +1,20 @@
+.compound-engineering/config.local.yaml
+  s_49b81b2f491ac5::t_10afd9e6bae94a 66-72
+  s_49b81b2f491ac5::t_16e3fc1b261074 92-104
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "3aaacfe5931000e2d8ec0bef0e364db37c625934",
+  "prompts": {},
+  "sessions": {
+    "s_49b81b2f491ac5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "719e3d43-993d-4485-926d-940cb03d3bdc",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
