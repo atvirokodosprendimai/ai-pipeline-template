@@ -20,6 +20,15 @@ ESCALATE_COOLDOWN_HOURS = 24
 # stale sweeps'. The retry cap is shared (MAX_RETRIES_BEFORE_ESCALATE).
 CONFLICT_ESCALATE_COOLDOWN_HOURS = 72
 HEAL_KIND_CONFLICT_REBASE = "conflict_rebase"
+# Check-rearm: a MERGEABLE bot PR whose required judge check never ran (it
+# predates the lane, so no pull_request event ever fired it) is permanently
+# pending, never red. We re-arm it (enable auto-merge + push an empty commit to
+# fire the judge). After a re-arm we wait one cron cycle before re-checking, so
+# a single tick can't thrash a branch while the judge runs. The retry cap is
+# shared (MAX_RETRIES_BEFORE_ESCALATE); the escalate cooldown reuses the
+# conflict value (a PR that can't be armed in 2 tries needs a human).
+HEAL_KIND_CHECK_REARM = "check_rearm"
+REARM_RECHECK_COOLDOWN_HOURS = 6
 IDLE_DISPATCH_COOLDOWN_SECONDS = 6 * 60 * 60
 CHECK_INTERVAL_HOURS = 0.5
 ACTIVE_PIPELINE_LABELS = (
@@ -111,6 +120,18 @@ class ConflictHealPlan:
     / ``escalate`` actions plus the retry tracker the executor persists. The
     planner does NOT increment a rebase attempt — the executor reports the
     outcome and the *next* cycle's tracker reflects it (R5)."""
+
+    actions: tuple[HealAction, ...] = ()
+    tracker: dict[str, Any] = field(default_factory=dict)
+    dry_run: bool = False
+
+
+@dataclass(frozen=True)
+class CheckRearmPlan:
+    """Result of the pure check-rearm planner: the planned ``check_rearm`` /
+    ``escalate`` actions plus the retry tracker the executor persists. Like the
+    conflict planner, it does NOT record the re-arm attempt — the executor
+    reports the outcome and the next cycle's tracker reflects it."""
 
     actions: tuple[HealAction, ...] = ()
     tracker: dict[str, Any] = field(default_factory=dict)
