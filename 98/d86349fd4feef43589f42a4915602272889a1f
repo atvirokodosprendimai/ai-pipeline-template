@@ -1,0 +1,39 @@
+pipeline/wgmesh_pipeline/selfheal/conflict.py
+  s_34934da2b7af0e::t_b8ab1f13d15ad1 1-97
+docs/plans/2026-06-21-002-feat-conflict-heal-plan.md
+  s_ddae7d7e56c5bd::t_1f7081c19ebf38 1-384
+pipeline/wgmesh_pipeline/selfheal/__init__.py
+  s_34934da2b7af0e::t_c31d8557f5125b 74,76,80-81,86,95
+  s_34934da2b7af0e::t_b5c35edc0bb0bd 33,39,41,45,51
+pipeline/tests/test_conflict_heal.py
+  s_34934da2b7af0e::t_4b8608df69ee51 1-129
+pipeline/wgmesh_pipeline/selfheal/retry_policy.py
+  s_34934da2b7af0e::t_29faf83660cf61 1-56
+pipeline/wgmesh_pipeline/selfheal/models.py
+  s_34934da2b7af0e::t_4de1ec05bb499a 108-119
+  s_34934da2b7af0e::t_1cc092cfe5ee47 18-22
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "98d86349fd4feef43589f42a4915602272889a1f",
+  "prompts": {},
+  "sessions": {
+    "s_34934da2b7af0e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6394dab5-5498-4ad5-a9f9-5eddc755745d",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    },
+    "s_ddae7d7e56c5bd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "39386ee2-23f7-44e7-932b-be4ea5a7a0b7",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
