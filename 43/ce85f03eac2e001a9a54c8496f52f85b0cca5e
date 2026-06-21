@@ -1,0 +1,20 @@
+scripts/ruleset/apply-protect-main-required-checks.sh
+  s_49b81b2f491ac5::t_1bf8bc6162cf56 68-72,77-100
+  s_49b81b2f491ac5::t_fc08a94cf22b92 2,4-11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "43ce85f03eac2e001a9a54c8496f52f85b0cca5e",
+  "prompts": {},
+  "sessions": {
+    "s_49b81b2f491ac5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "719e3d43-993d-4485-926d-940cb03d3bdc",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
