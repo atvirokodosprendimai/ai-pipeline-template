@@ -52,6 +52,17 @@ def spec_node(state: GraphState) -> GraphState:
             issue.number, result.error, recipe_path, repo_path, len(raw), head, tail,
         )
         raise RuntimeError(result.error or "goose spec failed")
+    # Content gate: result.ok only proves the spec file exists and is non-empty.
+    # On #783, goose dumped a 3672-line session transcript whose final write-tool
+    # call was truncated ("-32602: Could not parse tool arguments") — a malformed
+    # "spec" that passed result.ok, advanced to implement, and produced off-spec
+    # code the judge then rejected. Reject a transcript/truncated spec here so it
+    # fails like any other spec failure (retry/escalate) instead of poisoning the
+    # downstream impl.
+    reason = _spec_malformed_reason(_read_full(result.output_path))
+    if reason:
+        log.error("malformed spec for #%s: %s", issue.number, reason)
+        raise RuntimeError(f"malformed spec: {reason}")
     next_state["spec_path"] = str(result.output_path)
     if result.model_key is not None:
         next_state["spec_model_key"] = result.model_key
@@ -64,6 +75,42 @@ def spec_node(state: GraphState) -> GraphState:
 
 
 _SPEC_EXCERPT_LIMIT = 6000
+# Capacious enough to scan a bloated transcript head+tail without reading an
+# unbounded file; the discriminating markers appear at the start (goose banner)
+# and end (truncated-write error) of a transcript-spec.
+_SPEC_SCAN_LIMIT = 500_000
+
+# Markers that appear in a goose session TRANSCRIPT or a truncated write-tool
+# call, and never in a clean authored spec (verified: #783 has all of these,
+# clean spec #779 has none). Their presence means the spec write failed and the
+# file captured the raw session instead of a structured spec.
+_MALFORMED_MARKERS = (
+    "goose is ready",
+    "● new session ·",
+    "Could not parse tool arguments",
+    "the response may have been truncated",
+    "-32602",
+)
+
+
+def _spec_malformed_reason(content: str) -> str | None:
+    """Return a reason string if the spec content is a goose transcript or a
+    truncated write rather than a clean spec, else None."""
+    for marker in _MALFORMED_MARKERS:
+        if marker in content:
+            return (
+                f"spec file contains goose-transcript/error marker {marker!r} — "
+                "the spec write likely truncated, leaving a raw session instead "
+                "of a structured spec"
+            )
+    return None
+
+
+def _read_full(path) -> str:
+    try:
+        return Path(path).read_text(encoding="utf-8", errors="replace")[:_SPEC_SCAN_LIMIT]
+    except Exception:
+        return ""
 
 
 def _read_excerpt(path) -> str:
