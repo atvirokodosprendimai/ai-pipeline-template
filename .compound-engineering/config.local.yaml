@@ -63,8 +63,13 @@ pulse_lookback_default: 24h
 #                           action. The unprocessed-defect count at 48h granularity —
 #                           tighter than pr_dwell_violations (7d, PRs only) and also
 #                           covers issues. Target 0.
-pulse_metric_sources: paid_customers=chimney-html,autonomous_ship_rate=seed-repo-pr-data,lead_time_hours=seed-repo-pr-data,spec_coverage=seed-repo-pr-data,self_heal_rate=company/pipeline-health-state.json,active_stuck_issues=seed-repo-issues,cycle_time_to_revenue=polar,supervisor_rank_state=company/supervisor-rank-state.json,pr_processing_rate=meta-repo-pr-data,pr_dwell_violations=meta-repo-pr-data,aged_open_items=both-repos-issues-and-prs
-pulse_pending_metrics: cycle_time_to_revenue,spec_coverage
+#   mixpost_daily_posts  = Mixpost API (self-hosted) — count of PUBLISHED posts
+#                          in the window bucketed by calendar day. The cadence
+#                          KPI (below) asserts every day has >=1.
+pulse_metric_sources: paid_customers=chimney-html,autonomous_ship_rate=seed-repo-pr-data,lead_time_hours=seed-repo-pr-data,spec_coverage=seed-repo-pr-data,self_heal_rate=company/pipeline-health-state.json,active_stuck_issues=seed-repo-issues,cycle_time_to_revenue=polar,supervisor_rank_state=company/supervisor-rank-state.json,pr_processing_rate=meta-repo-pr-data,pr_dwell_violations=meta-repo-pr-data,aged_open_items=both-repos-issues-and-prs,mixpost_daily_posts=mixpost
+# mixpost_daily_posts is PENDING until the Mixpost instance URL + API token
+# (secret MIXPOST_TOKEN) are wired; rendered as `no data` until then.
+pulse_pending_metrics: cycle_time_to_revenue,spec_coverage,mixpost_daily_posts
 # --- PR-processing KPI (added 2026-06-05) ---
 # Intent: open PRs must be ACTED ON per the goal, never bulk-closed to clear backlog.
 # Every disposition needs a goal-aligned reason. Dwelling = defect, not idle.
@@ -83,6 +88,19 @@ pulse_open_age_kpi: enabled
 pulse_open_age_sla_hours: 48
 pulse_open_age_target: 0
 pulse_open_age_scope: meta-repo,seed-repo
+
+# --- Social posting cadence KPI (added 2026-06-21) ---
+# The social poster (Mixpost) must publish AT LEAST ONE post per day. A window
+# is clean only when every calendar day in it has >=1 published post; any
+# zero-post day is a tracked breach — silent outreach is a defect, not idle.
+# SCOPE = service (cloudroof/wgmesh GTM cadence, per the product-vs-service
+# split). Source = Mixpost API (self-hosted): list published posts in the
+# window, bucket by day, assert each day >= pulse_mixpost_min_posts_per_day.
+# PENDING: needs the Mixpost instance base URL + an API token (secret
+# MIXPOST_TOKEN) wired before it can measure; rendered `no data` until then.
+pulse_mixpost_kpi: enabled
+pulse_mixpost_min_posts_per_day: 1
+pulse_mixpost_scope: service
 
 # --- Action-success KPI (added 2026-06-06) ---
 # Andon/jidoka: EVERY autonomous action the pipeline attempts must succeed.
