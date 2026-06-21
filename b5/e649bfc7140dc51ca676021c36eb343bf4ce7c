@@ -1,0 +1,29 @@
+pipeline/tests/test_github_client.py
+  s_34934da2b7af0e::t_1a8f0444be5fd0 440-458
+pipeline/tests/test_forge_protocol.py
+  s_34934da2b7af0e::t_222395b2e177c5 29-39
+pipeline/wgmesh_pipeline/forge/quackback.py
+  s_34934da2b7af0e::t_5a625d243c71cd 232-234
+pipeline/wgmesh_pipeline/forge/protocol.py
+  s_34934da2b7af0e::t_c18017ac15e374 39-40
+pipeline/wgmesh_pipeline/github/client.py
+  s_34934da2b7af0e::t_7ec332b4021e11 126-136
+pipeline/wgmesh_pipeline/forge/gitea.py
+  s_34934da2b7af0e::t_8f65ce43bf739c 149-159
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "b5e649bfc7140dc51ca676021c36eb343bf4ce7c",
+  "prompts": {},
+  "sessions": {
+    "s_34934da2b7af0e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6394dab5-5498-4ad5-a9f9-5eddc755745d",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
