@@ -1,0 +1,37 @@
+company/system-prompt.md
+  s_c6cc841b64a6e3::t_78538b3c2ff1b9 17
+STRATEGY.md
+  s_c6cc841b64a6e3::t_7310788d795b0e 24-25
+docs/brainstorms/2026-06-21-product-service-split-requirements.md
+  s_c6cc841b64a6e3::t_656f28ce4a8396 1-82
+CONCEPTS.md
+  s_c6cc841b64a6e3::t_a7e9d0be972858 56-59
+pipeline/wgmesh_pipeline/observation_gather.py
+  s_c6cc841b64a6e3::t_084d46c3f59ef0 289-302
+pipeline/tests/test_observation.py
+  s_c6cc841b64a6e3::t_2a5426337d7e65 179-182,185-186,189-253
+docs/plans/2026-06-21-003-feat-product-service-split-plan.md
+  s_c6cc841b64a6e3::t_bb7b93be2ed82e 1-224
+pipeline/wgmesh_pipeline/observation.py
+  s_c6cc841b64a6e3::t_6d09ed861aa782 357
+  s_c6cc841b64a6e3::t_adf2b700a77c61 203-250
+  s_c6cc841b64a6e3::t_f39fef62bfda4c 322-325,333
+  s_c6cc841b64a6e3::t_27a52c43d1182b 41,46-47,49-50,53-58
+  s_c6cc841b64a6e3::t_0e2f47f396ed63 253,256-262,269
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "88c60f48fef1e50133004dd433bce1722424d6bd",
+  "prompts": {},
+  "sessions": {
+    "s_c6cc841b64a6e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6b261b64-6782-40d0-8026-e63a89ec9f94",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
