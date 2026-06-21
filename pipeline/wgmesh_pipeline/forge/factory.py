@@ -22,4 +22,10 @@ def make_forge(config: Any) -> Forge:
         from wgmesh_pipeline.forge.gitea import GiteaForge
 
         return GiteaForge(config)
-    raise ValueError(f"unknown forge_kind: {kind!r} (expected 'github' or 'gitea')")
+    if kind == "quackback":
+        from wgmesh_pipeline.forge.quackback import QuackbackForge
+
+        return QuackbackForge(config)
+    raise ValueError(
+        f"unknown forge_kind: {kind!r} (expected 'github', 'gitea', or 'quackback')"
+    )

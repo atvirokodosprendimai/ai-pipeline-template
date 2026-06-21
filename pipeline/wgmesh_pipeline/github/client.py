@@ -198,6 +198,26 @@ class GitHubClient:
             payload={"body": body},
         )
 
+    def set_status(self, number: int, status: str) -> Any:
+        """HOST SEAM: decision-status is a Quackback concept. GitHub Issues have
+        no equivalent free-form status the box drives, so this no-ops-and-warns
+        (records a marker, never an HTTP write) — keeping GitHub/Gitea adapters
+        structurally conformant with the Forge protocol's ``set_status`` without
+        introducing a GitHub label-status convention the box doesn't use."""
+        log.warning(
+            "set_status(%r, %r) unsupported on GitHub-shaped host — no-op "
+            "(host seam; decision status is a Quackback-only concept)",
+            number,
+            status,
+        )
+        result = DryRunResult(
+            dry_run=True,
+            operation="set_status",
+            payload={"unsupported_host": "github", "number": number, "status": status},
+        )
+        self.dry_run_records.append(result)
+        return result
+
     def create_issue(
         self, *, title: str, body: str, labels: tuple[str, ...] = ()
     ) -> Any:
