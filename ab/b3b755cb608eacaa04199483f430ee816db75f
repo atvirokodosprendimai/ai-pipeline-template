@@ -1,0 +1,21 @@
+.github/workflows/auto-deploy-on-merge.yml
+  s_ddae7d7e56c5bd::t_d84208e2918277 1-22
+.github/workflows/deploy-pipeline-box.yml
+  s_ddae7d7e56c5bd::t_2980fc72cf8787 9,13-23,59,65,109
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "abb3b755cb608eacaa04199483f430ee816db75f",
+  "prompts": {},
+  "sessions": {
+    "s_ddae7d7e56c5bd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "39386ee2-23f7-44e7-932b-be4ea5a7a0b7",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
