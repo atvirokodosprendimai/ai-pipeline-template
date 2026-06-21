@@ -23,8 +23,7 @@ Process:
    - acceptance_criteria: testable list.
    - build_sequence: ordered implementation steps.
    - class: exactly "needs-human" only for things that cannot be contracted via the internet (physical presence, wet signatures, irreversible decisions with no undo path), or exactly "automatable" for everything else, including GTM/outreach/CTA/sales/account-setup that can be contracted via the internet and should be automated or posted as a RAH bounty instead of marked needs-human.
-   - surface: exactly "product" for work on the wgmesh AGPL mesh software itself (daemon, CLI, discovery, protocol), or exactly "service" for cloudroof managed-service go-to-market (landing/pricing pages, signup, onboarding, trials, outreach, content, analytics, referral). The bet is routed to a DIFFERENT repo by surface — product to the wgmesh repo, service to the cloudroof-eu repo — so this must be accurate. Almost all customer-acquisition bets are "service".
-   - labels: optional downstream routing labels; only labels that already exist in the seed repo are applied. Always include the matching surface label ("surface:product" or "surface:service").
+   - labels: optional downstream routing labels; only labels that already exist in the seed repo are applied.
 
 Emit strict JSON inside one triple-backtick json fence. Do not include prose before or after the fence.
 
@@ -47,7 +46,6 @@ The JSON must have exactly this shape:
     "acceptance_criteria": ["str"],
     "build_sequence": ["str"],
     "class": "automatable",
-    "surface": "service",
     "labels": ["str"]
   },
   "fingerprint": "<stable slug of top.title>"
@@ -58,6 +56,5 @@ Additional constraints:
 - The ideas array must contain exactly 5 items.
 - The fingerprint must be a stable lowercase slug of top.title, using hyphens.
 - The top.class value must be either "automatable" or "needs-human".
-- The top.surface value must be either "product" or "service", and top.labels must include the matching "surface:product" or "surface:service" label.
 - Contractable human work such as outreach, sales, and sign-ups is "automatable", not "needs-human".
 - Avoid repeating the prior fingerprint unless it is still clearly the best non-duplicate move.

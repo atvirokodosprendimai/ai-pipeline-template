@@ -54,36 +54,26 @@ jobs:
           echo "::add-mask::$token"
           echo "GH_TOKEN=$token" >> "$GITHUB_ENV"
 
-      - name: Read seed repositories
+      - name: Read seed repository
         run: |
-          read_key() {
-            python3 - "$1" <<'PY'
-          import sys
+          seed_repo=$(python3 - <<'PY'
           from pathlib import Path
-          key = sys.argv[1] + ":"
           path = Path(".compound-engineering/config.local.yaml")
           value = ""
           if path.exists():
               for line in path.read_text().splitlines():
                   stripped = line.strip()
-                  if stripped.startswith(key):
+                  if stripped.startswith("pulse_seed_product_repo:"):
                       value = stripped.split(":", 1)[1].strip().strip('"').strip("'")
           print(value)
           PY
-          }
-          product_repo="$(read_key pulse_seed_product_repo)"
-          service_repo="$(read_key pulse_service_repo)"
-          if [ -z "$product_repo" ]; then
+          )
+          if [ -z "$seed_repo" ]; then
             echo "::error::pulse_seed_product_repo missing from .compound-engineering/config.local.yaml"
             exit 1
           fi
-          # PRODUCT_REPO / SERVICE_REPO drive surface routing (resolved after the
-          # LLM picks a surface). SEED_REPO defaults to product and is overridden
-          # for service bets by the surface-resolution step below.
-          echo "PRODUCT_REPO=$product_repo" >> "$GITHUB_ENV"
-          echo "SERVICE_REPO=$service_repo" >> "$GITHUB_ENV"
-          echo "SEED_REPO=$product_repo" >> "$GITHUB_ENV"
-          echo "Product repo: $product_repo ; service repo: ${service_repo:-<unset>}"
+          echo "SEED_REPO=$seed_repo" >> "$GITHUB_ENV"
+          echo "Using seed repo: $seed_repo"
 
       - name: Build goal sprint context
         run: scripts/goal-sprint/build-context.sh
@@ -169,24 +159,6 @@ jobs:
           if ! printf '%s' "$goal_sprint_content" | bash company/scripts/sanitise.sh > /dev/null; then
             echo "::error::sanitise.sh rejected /tmp/goal_sprint.json"
             exit 1
-          fi
-
-      - name: Resolve surface repo
-        run: |
-          # Route the weekly bet by its surface: surface:service bets go to the
-          # cloudroof-eu service repo, everything else stays on the wgmesh product
-          # repo. fingerprint.sh + emit.sh read SEED_REPO unchanged, so surface
-          # routing is fully resolved here. Missing/unknown surface, or an unset
-          # SERVICE_REPO, fails safe to the product repo (never mis-files GTM as a
-          # product issue the wrong way — the worst case is product, where humans
-          # already watch the board).
-          surface="$(jq -r '.top.surface // "product"' /tmp/goal_sprint.json)"
-          if [ "$surface" = "service" ] && [ -n "${SERVICE_REPO:-}" ]; then
-            echo "SEED_REPO=$SERVICE_REPO" >> "$GITHUB_ENV"
-            echo "Surface=service -> routing to $SERVICE_REPO"
-          else
-            echo "SEED_REPO=$PRODUCT_REPO" >> "$GITHUB_ENV"
-            echo "Surface=$surface -> routing to $PRODUCT_REPO"
           fi
 
       - name: Fingerprint goal sprint
