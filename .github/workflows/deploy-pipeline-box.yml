@@ -6,9 +6,21 @@ on:
       server_name:
         description: 'Hetzner server name'
         default: 'wgmesh-pipeline'
+        type: string
       sha:
         description: 'Image tag to deploy'
         default: 'latest'
+        type: string
+  workflow_call:
+    inputs:
+      server_name:
+        description: 'Hetzner server name'
+        default: 'wgmesh-pipeline'
+        type: string
+      sha:
+        description: 'Image tag to deploy'
+        default: 'latest'
+        type: string
 
 permissions:
   contents: read
@@ -44,13 +56,13 @@ jobs:
           HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
         run: |
           set -euo pipefail
-          IP=$(hcloud server ip "${{ github.event.inputs.server_name }}")
+          IP=$(hcloud server ip "${{ inputs.server_name }}")
           echo "BOX_IP=$IP" >> "$GITHUB_ENV"
 
       - name: Deploy image
         env:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-          SHA: ${{ github.event.inputs.sha }}
+          SHA: ${{ inputs.sha }}
         run: |
           set -euo pipefail
           umask 077
@@ -94,4 +106,4 @@ jobs:
           REMOTE
 
       - name: Report
-        run: echo "Box $BOX_IP deployed image tag '${{ github.event.inputs.sha }}'."
+        run: echo "Box $BOX_IP deployed image tag '${{ inputs.sha }}'."

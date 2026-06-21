@@ -1,0 +1,22 @@
+name: Auto Deploy on Merge
+
+on:
+  workflow_run:
+    workflows: ["Build Pipeline Image"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-pipeline-box
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' }}
+    uses: ./.github/workflows/deploy-pipeline-box.yml
+    with:
+      sha: ${{ github.event.workflow_run.head_sha }}
+      server_name: wgmesh-pipeline
+    secrets: inherit
