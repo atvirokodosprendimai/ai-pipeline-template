@@ -1,0 +1,44 @@
+pipeline/tests/test_quackback_forge.py
+  s_b4742632db40e7::t_b348da5c6a5170 412-479
+pipeline/wgmesh_pipeline/poller.py
+  s_b4742632db40e7::t_1cd044cd805c7d 237-238,240-247
+  s_b4742632db40e7::t_1983e5166bdd15 234-236
+  s_b4742632db40e7::t_ced9990f61b377 163-168
+  s_b4742632db40e7::t_0702ec40df7b3c 11
+  s_b4742632db40e7::t_9858c6302e8390 31-40
+  s_b4742632db40e7::t_5eb8bbde109387 121-128
+  s_b4742632db40e7::t_5282be4f8fd813 207-215
+  s_b4742632db40e7::t_25aded65aaaeb2 271-343
+pipeline/wgmesh_pipeline/forge/quackback_status.py
+  s_b4742632db40e7::t_d11f45541669d4 60-69
+  s_b4742632db40e7::t_b6fe53f6c2bf95 24-34
+pipeline/tests/test_quackback_lifecycle.py
+  s_b4742632db40e7::t_b917113ca26223 140-142
+  s_b4742632db40e7::t_8ac66312f950ee 53-57
+  s_b4742632db40e7::t_7c2e3f83b179e6 91-96
+  s_b4742632db40e7::t_4d3b5be008d086 1-52,58-90,97-139,143-184
+pipeline/wgmesh_pipeline/forge/quackback.py
+  s_b4742632db40e7::t_695e25bd9c7612 36
+  s_b4742632db40e7::t_8ad57c293b2f02 67,73-77
+  s_b4742632db40e7::t_5e2aad4fa7ad78 131,137-154
+  s_b4742632db40e7::t_4ca9048e0a6366 277-296,298-305,310-325
+pipeline/tests/test_quackback_drift.py
+  s_b4742632db40e7::t_01df705e6cdde6 1-61,66-255
+  s_b4742632db40e7::t_67a26df0735bca 62-65
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "66512ff180446de8eacb1d87df58600cf983f55a",
+  "prompts": {},
+  "sessions": {
+    "s_b4742632db40e7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "07854d0f-63e4-4ebb-a0a3-b0b542d82519",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
