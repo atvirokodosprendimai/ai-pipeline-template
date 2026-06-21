@@ -67,10 +67,9 @@ pulse_lookback_default: 24h
 #                          count posts bucketed by calendar day. Source already wired in
 #                          .github/workflows/wgmesh-social-drip.yml (secrets MIXPOST_API_TOKEN
 #                          + MIXPOST_WORKSPACE, var MIXPOST_BASE default
-#                          https://mixpost.infrawei.com/mixpost). NOTE the drip currently
-#                          creates DRAFTS ("schedule": false), so count PUBLISHED posts
-#                          (published_at in day) for true outbound cadence — a drip that
-#                          only drafts and never publishes is itself the breach the KPI surfaces.
+#                          https://mixpost.infrawei.com/mixpost). Counts ALL posts created
+#                          per day (pulse_mixpost_count: all) — drafts included — so a
+#                          zero-post day means the drip produced nothing that day.
 pulse_metric_sources: paid_customers=chimney-html,autonomous_ship_rate=seed-repo-pr-data,lead_time_hours=seed-repo-pr-data,spec_coverage=seed-repo-pr-data,self_heal_rate=company/pipeline-health-state.json,active_stuck_issues=seed-repo-issues,cycle_time_to_revenue=polar,supervisor_rank_state=company/supervisor-rank-state.json,pr_processing_rate=meta-repo-pr-data,pr_dwell_violations=meta-repo-pr-data,aged_open_items=both-repos-issues-and-prs,mixpost_daily_posts=mixpost
 pulse_pending_metrics: cycle_time_to_revenue,spec_coverage
 # --- PR-processing KPI (added 2026-06-05) ---
@@ -101,14 +100,14 @@ pulse_open_age_scope: meta-repo,seed-repo
 # .github/workflows/wgmesh-social-drip.yml: GET
 # ${MIXPOST_BASE}/api/${MIXPOST_WORKSPACE}/posts (Bearer MIXPOST_API_TOKEN),
 # bucket by day, assert each day >= pulse_mixpost_min_posts_per_day.
-# DEFINITIONAL FORK to confirm: the drip creates DRAFTS ("schedule": false), so
-# count PUBLISHED posts (real outbound) rather than drafts — a drip that drafts
-# but never publishes is the exact silent-outreach defect this KPI exists to
-# catch.
+# COUNT basis = ALL posts created that day (drafts included). Measures that the
+# drip RAN and produced a post each day, not that anything was published. The
+# drip creates drafts ("schedule": false), so `all` credits each drafted post;
+# a zero-post day means the drip itself didn't run / produced nothing.
 pulse_mixpost_kpi: enabled
 pulse_mixpost_min_posts_per_day: 1
 pulse_mixpost_scope: service
-pulse_mixpost_count: published   # published | scheduled | all
+pulse_mixpost_count: all   # all | scheduled | published
 
 # --- Action-success KPI (added 2026-06-06) ---
 # Andon/jidoka: EVERY autonomous action the pipeline attempts must succeed.
