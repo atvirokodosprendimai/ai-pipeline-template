@@ -1,0 +1,21 @@
+scripts/ruleset/apply-required-checks.sh
+  s_49b81b2f491ac5::t_0516b9aca8c36e 1-73
+docs/actions-cicd-only-end-state.md
+  s_49b81b2f491ac5::t_567c91282b1cb2 42-44
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "a23aa19a5aec802780182f6070f52d7867e37fb3",
+  "prompts": {},
+  "sessions": {
+    "s_49b81b2f491ac5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "719e3d43-993d-4485-926d-940cb03d3bdc",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
