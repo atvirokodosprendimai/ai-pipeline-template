@@ -1,0 +1,29 @@
+pipeline/tests/test_conflict_heal_run.py
+  s_34934da2b7af0e::t_eed72ab3876500 1-157
+company/conflict-heal-state-seed.json
+  s_34934da2b7af0e::t_58a3b159042f32 1-3
+company/scripts/conflict-heal/run.py
+  s_34934da2b7af0e::t_956ab7ebdfc2eb 1-74,76-175,180-220
+  s_34934da2b7af0e::t_f3c83fbec63d29 176-179
+  s_34934da2b7af0e::t_31c196aa5132f0 75
+.github/workflows/conflict-heal.yml
+  s_34934da2b7af0e::t_499d76519e7b82 1-133
+company/conflict-heal-state-meta.json
+  s_34934da2b7af0e::t_58a3b159042f32 1-3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "7cd612cbd1025f79ca2aca3dad95ecafe7b02344",
+  "prompts": {},
+  "sessions": {
+    "s_34934da2b7af0e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6394dab5-5498-4ad5-a9f9-5eddc755745d",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
