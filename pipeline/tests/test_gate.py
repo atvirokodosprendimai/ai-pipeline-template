@@ -42,53 +42,6 @@ def test_gate_tests_failed_only_low_risk_is_retryable() -> None:
     assert decision.retryable is True
 
 
-def test_gate_pii_failure_escalates_and_is_not_retryable() -> None:
-    # #1599 Phase D: a PII guard failure is a leak guard, not a flaky test —
-    # escalate to a human, never auto-retry.
-    decision = decide_gate(
-        changed_files=["docs/readme.md"],
-        diff="+docs\n",
-        max_files=3,
-        tests_passed=True,
-        sanitise_ok=True,
-        review_findings=[],
-        pii_ok=False,
-    )
-
-    assert decision.decision == "escalate"
-    assert "PII check failed" in decision.reasons
-    assert decision.retryable is False
-
-
-def test_gate_emit_sanitise_failure_escalates() -> None:
-    decision = decide_gate(
-        changed_files=["docs/readme.md"],
-        diff="+docs\n",
-        max_files=3,
-        tests_passed=True,
-        sanitise_ok=True,
-        review_findings=[],
-        emit_sanitise_ok=False,
-    )
-
-    assert decision.decision == "escalate"
-    assert "emit-sanitise failed" in decision.reasons
-    assert decision.retryable is False
-
-
-def test_gate_pii_emit_default_true_preserves_backward_compat() -> None:
-    decision = decide_gate(
-        changed_files=["docs/readme.md"],
-        diff="+docs\n",
-        max_files=3,
-        tests_passed=True,
-        sanitise_ok=True,
-        review_findings=[],
-    )
-
-    assert decision.decision == "merge"
-
-
 def test_gate_blocking_review_finding_only_low_risk_is_retryable() -> None:
     decision = decide_gate(
         changed_files=["docs/readme.md"],

@@ -319,36 +319,6 @@ class GitHubClient:
             payload={"commit_title": commit_title} if commit_title else {},
         )
 
-    def create_commit_status(
-        self,
-        sha: str,
-        *,
-        context: str,
-        state: str,
-        description: str = "",
-        target_url: str | None = None,
-    ) -> Any:
-        """Post a commit status (``POST /repos/{owner}/{repo}/statuses/{sha}``)
-        so GitHub branch protection can require it (#1599 Phase D ``ci/guards``).
-
-        ``state`` is one of ``success`` / ``failure`` / ``pending`` / ``error``.
-        Mode-gated via ``_write`` like other writes (shadow -> dry-run record;
-        spec-only -> PermissionError, which the guards node tolerates). The
-        ``description`` must carry NO PII/secret value — it is posted to a public
-        status surface; keep it to a static guard summary.
-        """
-        payload: dict[str, Any] = {"state": state, "context": context}
-        if description:
-            payload["description"] = description[:140]
-        if target_url:
-            payload["target_url"] = target_url
-        return self._write(
-            "create_commit_status",
-            "POST",
-            f"/repos/{self.config.owner}/{self.config.repo}/statuses/{sha}",
-            payload=payload,
-        )
-
     def enable_auto_merge(self, pr_number: int, *, merge_method: str = "SQUASH") -> Any:
         """Enable GitHub auto-merge so the forge merges the PR when its required
         checks (impl-judge + build + status) pass — the box stops self-merging
