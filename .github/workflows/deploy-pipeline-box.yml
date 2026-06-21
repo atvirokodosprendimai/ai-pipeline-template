@@ -74,6 +74,16 @@ jobs:
               "SHA=$SSH_SHA IMAGE=$SSH_IMAGE bash -lse" <<'REMOTE'
           set -euo pipefail
 
+          # docker lives outside the minimal non-interactive SSH PATH on this box
+          # (login shell alone didn't surface it). Augment with the common install
+          # dirs; if still missing, print where it actually is for a precise fix.
+          export PATH="/usr/local/sbin:/usr/local/bin:/snap/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
+          if ! command -v docker >/dev/null 2>&1; then
+            echo "::error::docker not on PATH after augment. PATH=$PATH"
+            ls -la /usr/local/bin/docker /usr/bin/docker /snap/bin/docker /opt/bin/docker 2>&1 || true
+            exit 1
+          fi
+
           docker pull "${IMAGE}:${SHA}"
 
           # First containerized deploy has no prior SHA — empty means "no
