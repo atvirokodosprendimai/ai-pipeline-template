@@ -1,29 +1,32 @@
 name: Auto Deploy on Merge
 
-# Restores the merge≠deploy KTLO fix (originally #1928, backed out in the
-# Actions-retirement churn): on a green "Build Pipeline Image" for main, deploy
-# that exact image to the box. CD-on-merge stays in Actions per the
-# Actions=CI/CD-only direction (CD is the explicitly-kept piece). Box-CODE merges
-# (graph nodes, observation routing) only take effect once the image is deployed;
-# without this, every such merge silently needs a manual Deploy Pipeline Box.
+# Closes the merge≠deploy lag for box CODE. The box runs the pipeline from a
+# git checkout under systemd (NOT a container — it has no docker), so the deploy
+# is a git-reset, not a docker pull. On a push to main that touches pipeline code,
+# git-reset the box to origin/main and restart. CD-on-merge stays in Actions per
+# the Actions=CI/CD-only direction.
+#
+# (The earlier #1928 chain pointed at the docker Deploy Pipeline Box; that path
+# can't run on this box — docker is absent — so this targets Update Pipeline Box,
+# the git-checkout deploy that actually works.)
 
 on:
-  workflow_run:
-    workflows: ["Build Pipeline Image"]
-    types: [completed]
+  push:
+    branches: [main]
+    paths:
+      - 'pipeline/**'
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: deploy-pipeline-box
+  group: update-pipeline-box
   cancel-in-progress: true
 
 jobs:
   deploy:
-    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' }}
-    uses: ./.github/workflows/deploy-pipeline-box.yml
+    uses: ./.github/workflows/update-pipeline-box.yml
     with:
-      sha: ${{ github.event.workflow_run.head_sha }}
       server_name: wgmesh-pipeline
     secrets: inherit

@@ -56,13 +56,13 @@ jobs:
           HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
         run: |
           set -euo pipefail
-          IP=$(hcloud server ip "${{ inputs.server_name }}")
+          IP=$(hcloud server ip "${{ github.event.inputs.server_name }}")
           echo "BOX_IP=$IP" >> "$GITHUB_ENV"
 
       - name: Deploy image
         env:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-          SHA: ${{ inputs.sha }}
+          SHA: ${{ github.event.inputs.sha }}
         run: |
           set -euo pipefail
           umask 077
@@ -71,18 +71,8 @@ jobs:
           SSH_IMAGE=$(printf '%q' "$IMAGE")
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               -o ConnectTimeout=15 -i "$RUNNER_TEMP/deploy_key" root@"$BOX_IP" \
-              "SHA=$SSH_SHA IMAGE=$SSH_IMAGE bash -lse" <<'REMOTE'
+              "SHA=$SSH_SHA IMAGE=$SSH_IMAGE bash -se" <<'REMOTE'
           set -euo pipefail
-
-          # docker lives outside the minimal non-interactive SSH PATH on this box
-          # (login shell alone didn't surface it). Augment with the common install
-          # dirs; if still missing, print where it actually is for a precise fix.
-          export PATH="/usr/local/sbin:/usr/local/bin:/snap/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
-          if ! command -v docker >/dev/null 2>&1; then
-            echo "::error::docker not on PATH after augment. PATH=$PATH"
-            ls -la /usr/local/bin/docker /usr/bin/docker /snap/bin/docker /opt/bin/docker 2>&1 || true
-            exit 1
-          fi
 
           docker pull "${IMAGE}:${SHA}"
 
@@ -116,4 +106,4 @@ jobs:
           REMOTE
 
       - name: Report
-        run: echo "Box $BOX_IP deployed image tag '${{ inputs.sha }}'."
+        run: echo "Box $BOX_IP deployed image tag '${{ github.event.inputs.sha }}'."

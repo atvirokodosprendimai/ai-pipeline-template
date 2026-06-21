@@ -16,6 +16,13 @@ on:
       server_name:
         description: 'Hetzner server name'
         default: 'wgmesh-pipeline'
+  # Reusable so Auto Deploy on Merge can git-reset the box to a green main.
+  workflow_call:
+    inputs:
+      server_name:
+        description: 'Hetzner server name'
+        default: 'wgmesh-pipeline'
+        type: string
 
 permissions:
   contents: read
@@ -45,7 +52,7 @@ jobs:
           HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
         run: |
           set -euo pipefail
-          IP=$(hcloud server ip "${{ github.event.inputs.server_name }}")
+          IP=$(hcloud server ip "${{ inputs.server_name }}")
           echo "BOX_IP=$IP" >> "$GITHUB_ENV"
 
       - name: Update + restart
