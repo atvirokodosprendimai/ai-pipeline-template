@@ -1,0 +1,24 @@
+pipeline/tests/test_impl_judge.py
+  s_a97c740b38fba0::t_76cfb544a585ef 119-158,161-174
+  s_a97c740b38fba0::t_8b674f042053c0 159-160
+pipeline/evals/impl_judge.py
+  s_a97c740b38fba0::t_d0546528119470 28
+  s_a97c740b38fba0::t_d6074840c3ba45 38-45
+  s_a97c740b38fba0::t_39afe8838644be 67-87,89-103,106-124
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "8b0f222a821b87f9bded0a80752fd8d39314b9b5",
+  "prompts": {},
+  "sessions": {
+    "s_a97c740b38fba0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f43da7d4-7733-4182-bcea-c529610e4013",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
