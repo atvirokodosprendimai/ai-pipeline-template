@@ -1,0 +1,19 @@
+docs/runbooks/quackback-cutover.md
+  s_b4742632db40e7::t_10bab84100c006 1-173
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "1f7ed5f30fa61a6d11a2aabf7f27d9a7a1e9fb25",
+  "prompts": {},
+  "sessions": {
+    "s_b4742632db40e7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "07854d0f-63e4-4ebb-a0a3-b0b542d82519",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
