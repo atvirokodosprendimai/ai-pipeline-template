@@ -30,20 +30,25 @@ surface (do NOT extend the protocol in this unit):
   - HTTP probe of health endpoints — presence signal (boundary I/O).
 """
 
+from wgmesh_pipeline.selfheal.conflict import plan_conflict_heal
 from wgmesh_pipeline.selfheal.models import (
     ACTIVE_PIPELINE_LABELS,
     CHECK_INTERVAL_HOURS,
     CIRCUIT_MAX_CREATES,
     CIRCUIT_MAX_ERRORS,
+    CONFLICT_ESCALATE_COOLDOWN_HOURS,
     ESCALATE_COOLDOWN_HOURS,
+    HEAL_KIND_CONFLICT_REBASE,
     IDLE_DISPATCH_COOLDOWN_SECONDS,
     MAX_RETRIES_BEFORE_ESCALATE,
     SUPERVISOR_DEAD_TITLE,
+    ConflictHealPlan,
     HealAction,
     SelfHealInputs,
     SelfHealRun,
     SweepOutcome,
 )
+from wgmesh_pipeline.selfheal.retry_policy import Decision, apply_retry_gate
 from wgmesh_pipeline.selfheal.runner import needs_human_from_forge, run_self_heal
 from wgmesh_pipeline.selfheal.signals import (
     assert_state_mutation,
@@ -66,14 +71,19 @@ __all__ = [
     "CHECK_INTERVAL_HOURS",
     "CIRCUIT_MAX_CREATES",
     "CIRCUIT_MAX_ERRORS",
+    "CONFLICT_ESCALATE_COOLDOWN_HOURS",
     "ESCALATE_COOLDOWN_HOURS",
+    "HEAL_KIND_CONFLICT_REBASE",
     "IDLE_DISPATCH_COOLDOWN_SECONDS",
     "MAX_RETRIES_BEFORE_ESCALATE",
     "SUPERVISOR_DEAD_TITLE",
+    "ConflictHealPlan",
+    "Decision",
     "HealAction",
     "SelfHealInputs",
     "SelfHealRun",
     "SweepOutcome",
+    "apply_retry_gate",
     "assert_state_mutation",
     "build_state",
     "check_funnel_signals",
@@ -82,6 +92,7 @@ __all__ = [
     "circuit_breaker_tripped",
     "decide_idle_dispatch",
     "needs_human_from_forge",
+    "plan_conflict_heal",
     "run_self_heal",
     "sweep_needs_human",
     "sweep_stale_approved",

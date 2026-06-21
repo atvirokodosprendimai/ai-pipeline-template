@@ -123,6 +123,17 @@ class GitHubClient:
             "GET", f"/repos/{self.config.owner}/{self.config.repo}/pulls/{number}"
         )
 
+    def get_pr_mergeable(self, number: int) -> str | None:
+        """Tri-state mergeability for conflict-heal: ``"CONFLICTING"`` /
+        ``"MERGEABLE"`` / ``None``. GitHub's REST ``mergeable`` is ``null``
+        until the server finishes computing it after a push — return ``None``
+        so the caller skips this cycle and recomputes next run (never infer
+        not-conflicting from null)."""
+        mergeable = self.get_pr(number).get("mergeable")
+        if mergeable is None:
+            return None
+        return "CONFLICTING" if mergeable is False else "MERGEABLE"
+
     def find_open_pr_number(self, head_branch: str) -> int | None:
         """Open PR number for a head branch, or None. Used to make spec PR
         creation idempotent: a retry after a partial run hits create_pr 422

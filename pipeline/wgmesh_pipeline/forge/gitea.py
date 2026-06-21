@@ -146,6 +146,17 @@ class GiteaForge(GitHubClient):
             "GET", f"{self._repo_base}/pulls/{pr_number}.diff", raw_text=True
         )
 
+    def get_pr_mergeable(self, number: int) -> str | None:
+        """Tri-state mergeability (``"CONFLICTING"`` / ``"MERGEABLE"`` /
+        ``None``). Gitea returns a ``mergeable`` boolean on the pull; a missing
+        value maps to ``None`` (not yet computed), matching the GitHub adapter's
+        skip-this-cycle contract."""
+        pull = self._request("GET", f"{self._repo_base}/pulls/{number}")
+        mergeable = (pull or {}).get("mergeable")
+        if mergeable is None:
+            return None
+        return "CONFLICTING" if mergeable is False else "MERGEABLE"
+
     # ----------------------------------------------------------------- writes
 
     def add_label(self, issue_number: int, label: str, *, spec_pr: bool = False) -> Any:
