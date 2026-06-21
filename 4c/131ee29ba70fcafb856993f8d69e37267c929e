@@ -1,0 +1,26 @@
+.github/workflows/goal-sprint.yml
+  s_c6cc841b64a6e3::t_590bf8a977dd76 174-191
+  s_c6cc841b64a6e3::t_58009d819ea537 57,59-61,63,69,73-76,80-86
+company/goal-sprint-system-prompt.md
+  s_c6cc841b64a6e3::t_17481b00045da0 50
+  s_c6cc841b64a6e3::t_833c79dc21e640 26-27
+  s_c6cc841b64a6e3::t_5dc9211ed531de 61
+.compound-engineering/config.local.yaml
+  s_c6cc841b64a6e3::t_5180b3caaa492b 25-28,30-37
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "4c131ee29ba70fcafb856993f8d69e37267c929e",
+  "prompts": {},
+  "sessions": {
+    "s_c6cc841b64a6e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6b261b64-6782-40d0-8026-e63a89ec9f94",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
