@@ -1,0 +1,133 @@
+name: Conflict Heal
+
+# Autonomous rebase of CONFLICTING bot PRs across both repos (meta + seed).
+# A bot PR goes CONFLICTING when main moves under it; such a PR fires no
+# pull_request workflows, so the judge never runs and it dead-ends. This rebases
+# it onto main (--force-with-lease, bot-branches only), re-arming the merge lane;
+# a genuinely unresolvable conflict escalates to a human after two attempts.
+#
+# Cron offset to 01/07/13/19 so it never overlaps pr-disposition's 0 */6.
+
+on:
+  schedule:
+    - cron: '0 1,7,13,19 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Print intended rebases/escalations without mutating GitHub or state.
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+env:
+  HAS_APP_CREDS: ${{ vars.APP_ID != '' && secrets.APP_PRIVATE_KEY != '' }}
+
+jobs:
+  heal:
+    name: Conflict-heal ${{ matrix.repo_label }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repo_label: meta
+            target_repo: atvirokodosprendimai/ai-pipeline-template
+          - repo_label: seed
+            target_repo: atvirokodosprendimai/wgmesh
+    concurrency:
+      group: conflict-heal-${{ matrix.repo_label }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pipeline package
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e pipeline/
+
+      # One token scoped to BOTH repos (same org): the target-repo gh/rebase
+      # ops AND the meta state-commit both authenticate with it (KTD-7).
+      - name: Generate GitHub App token
+        id: app-token
+        if: env.HAS_APP_CREDS == 'true'
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: |
+            ai-pipeline-template
+            wgmesh
+
+      - name: Select GitHub token
+        run: |
+          token="${{ steps.app-token.outputs.token }}"
+          if [ -z "$token" ]; then
+            token="${{ secrets.PUSH_TOKEN }}"
+          fi
+          if [ -z "$token" ]; then
+            token="${{ secrets.GITHUB_TOKEN }}"
+          fi
+          if [ -z "$token" ]; then
+            echo "::error::No GitHub App token, PUSH_TOKEN, or GITHUB_TOKEN available"
+            exit 1
+          fi
+          echo "::add-mask::$token"
+          echo "GH_TOKEN=$token" >> "$GITHUB_ENV"
+
+      - name: Run conflict-heal
+        env:
+          TARGET_REPO: ${{ matrix.target_repo }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+          CONFLICT_HEAL_STATE: company/conflict-heal-state-${{ matrix.repo_label }}.json
+        run: |
+          set -euo pipefail
+          args=()
+          if [ "$DRY_RUN" = "true" ]; then
+            args+=(--dry-run)
+          fi
+          python company/scripts/conflict-heal/run.py "${args[@]}"
+
+      - name: Commit state
+        if: ${{ (github.event.inputs.dry_run || 'false') != 'true' }}
+        env:
+          STATE_FILE: company/conflict-heal-state-${{ matrix.repo_label }}.json
+        run: |
+          set -euo pipefail
+
+          state_content="$(cat "$STATE_FILE")"
+          if ! printf '%s' "$state_content" | bash company/scripts/sanitise.sh > /dev/null; then
+            echo "::error::sanitise.sh rejected $STATE_FILE"
+            exit 1
+          fi
+
+          git config user.name "pupabobas[bot]"
+          git config user.email "pupabobas[bot]@users.noreply.github.com"
+          git add "$STATE_FILE"
+          git diff --cached --quiet && echo "No state changes to commit" && exit 0
+
+          today=$(date -u '+%Y-%m-%d')
+          branch="conflict-heal/${{ matrix.repo_label }}-${today}-${GITHUB_RUN_ID}"
+          git checkout -b "$branch" origin/main
+          git add "$STATE_FILE"
+          git commit -m "chore(conflict-heal): update ${{ matrix.repo_label }} state $today"
+          git push -u origin "$branch"
+
+          pr_url=$(gh pr create \
+            --repo "${{ github.repository }}" \
+            --title "chore(conflict-heal): update ${{ matrix.repo_label }} state $today" \
+            --body "Automated conflict-heal retry-tracker update." \
+            --base main \
+            --head "$branch")
+          echo "Opened state PR: $pr_url"
