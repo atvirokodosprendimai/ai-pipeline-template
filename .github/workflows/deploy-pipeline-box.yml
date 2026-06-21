@@ -9,6 +9,18 @@ on:
       sha:
         description: 'Image tag to deploy'
         default: 'latest'
+  # Reusable so Auto Deploy on Merge can deploy the just-built image on a green
+  # main build (restores the #1928 merge→deploy chain).
+  workflow_call:
+    inputs:
+      server_name:
+        description: 'Hetzner server name'
+        default: 'wgmesh-pipeline'
+        type: string
+      sha:
+        description: 'Image tag to deploy'
+        default: 'latest'
+        type: string
 
 permissions:
   contents: read
