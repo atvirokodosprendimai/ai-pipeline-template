@@ -116,6 +116,62 @@ def test_oversized_diff_truncated_before_caller() -> None:
     assert big not in sent  # full untruncated diff never sent
 
 
+def _file_section(name: str, body_lines: int) -> str:
+    lines = "\n".join(f"+line {i} of {name}" for i in range(body_lines))
+    return f"diff --git a/{name} b/{name}\n--- a/{name}\n+++ b/{name}\n{lines}\n"
+
+
+def test_realistic_diff_under_raised_cap_is_not_truncated() -> None:
+    # The #793 bug: a faithful ~30KB multi-file impl was cut at 16K, dropping the
+    # implementing file (pkg/referral/code.go). With the cap sized to the model
+    # context, a normal impl passes through whole and every file survives.
+    diff = (
+        _file_section("main.go", 40)
+        + _file_section("pkg/referral/code.go", 400)   # the core implementation
+        + _file_section("pkg/referral/store.go", 300)
+        + _file_section("pkg/referral/tier.go", 200)
+    )
+    assert 16_000 < len(diff) < impl_judge.MAX_DIFF_CHARS  # over the OLD cap, under the new
+    out = impl_judge._truncate(diff)
+    assert out == diff                                   # verbatim — nothing dropped
+    assert "pkg/referral/code.go" in out                # implementing file survives
+
+
+def test_oversized_diff_truncates_at_file_boundaries_not_midhunk() -> None:
+    # Three whole file sections, each well-formed; force truncation with a small
+    # explicit limit. A kept file must be WHOLE; a dropped file must be ABSENT —
+    # never sliced mid-hunk (which corrupts the diff and makes the judge
+    # confabulate).
+    s1 = _file_section("a.go", 50)
+    s2 = _file_section("b.go", 50)
+    s3 = _file_section("c.go", 50)
+    diff = s1 + s2 + s3
+    limit = len(s1) + len(s2) + 5  # room for ~2 sections, not the 3rd
+    out = impl_judge._truncate(diff, limit=limit)
+
+    assert s1 in out and s2 in out          # kept files are intact
+    assert "diff --git a/c.go" not in out   # dropped file fully absent, not partial
+    assert "PARTIAL diff" in out            # model is told the diff is incomplete
+    assert "[truncated" in out
+    # No mid-line corruption: every non-marker line in the output is a real input line.
+    input_lines = set(diff.splitlines())
+    for line in out.splitlines():
+        if not line or "truncated" in line or "PARTIAL diff" in line:
+            continue  # skip the marker's own lines (incl. its boundary blank)
+        assert line in input_lines
+
+
+def test_single_oversized_file_cut_at_line_boundary() -> None:
+    # A lone file larger than the limit can't be kept whole — cut at a LINE
+    # boundary (never mid-line) and flag it partial.
+    big = _file_section("huge.go", 5000)
+    out = impl_judge._truncate(big, limit=2000)
+    assert "[truncated" in out
+    body = out.split("...[truncated", 1)[0]
+    # The kept portion ends on a complete line (no dangling partial line).
+    assert body.endswith("\n") or body.splitlines()[-1] in set(big.splitlines())
+
+
 def test_purity_same_inputs_same_verdict() -> None:
     caller = _caller(False, True, f_reason="x")
     assert judge(_DIFF, _SPEC, http_caller=caller) == judge(_DIFF, _SPEC, http_caller=caller)
