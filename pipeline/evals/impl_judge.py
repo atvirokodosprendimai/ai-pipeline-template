@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import urllib.request
 from dataclasses import dataclass, field
@@ -34,7 +35,14 @@ HttpCaller = Callable[[Mapping[str, Any]], Mapping[str, Any]]
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 JUDGE_MODEL = "deepseek/deepseek-chat"
-MAX_DIFF_CHARS = 16_000
+# Sized to the judge model's context, NOT a tiny cap. The old 16K cut a normal
+# 30KB multi-file impl mid-hunk, dropping the implementing file — the judge then
+# could not see the code, failed a faithful PR, and confabulated unrelated-change
+# reasons (false-negative merge block). deepseek-chat carries ~64K tokens; 200K
+# chars (~50K tokens) leaves ample room for spec + rubric while letting any
+# realistic impl diff through whole. Truncation (below) only engages for
+# genuinely huge diffs, and then only at file boundaries.
+MAX_DIFF_CHARS = 200_000
 _KEY_ENVS = ("OPENROUTER_API_KEY", "DEEPSEEK_API_KEY")
 _FALLBACK_REASON = "failed"
 
@@ -56,13 +64,64 @@ class Verdict:
     reasons: tuple[str, ...] = field(default_factory=tuple)
 
 
+_PARTIAL_MARKER = (
+    "\n...[truncated {files} more file(s) / {chars} chars — PARTIAL diff, "
+    "the judge could not see the full change]...\n"
+)
+
+
+def _split_diff_sections(text: str) -> list[str]:
+    """Split a unified diff into per-file sections, each starting at a
+    ``diff --git`` header (the boundary is preserved). Any preamble before the
+    first header is its own leading section. No header at all → one section."""
+    starts = [m.start() for m in re.finditer(r"(?m)^diff --git ", text)]
+    if not starts:
+        return [text]
+    sections: list[str] = []
+    if starts[0] > 0:
+        sections.append(text[: starts[0]])
+    for begin, end in zip(starts, starts[1:] + [len(text)]):
+        sections.append(text[begin:end])
+    return sections
+
+
 def _truncate(text: str, limit: int = MAX_DIFF_CHARS) -> str:
+    """Bound the diff to ``limit`` chars WITHOUT corrupting it mid-hunk.
+
+    A merge gate must never silently grade a fragment. The previous head+tail
+    char cut dropped whole implementing files and sliced others mid-line,
+    yielding an invalid diff the model "failed" while confabulating reasons. So:
+
+    - under the limit (the common case once the limit is sized to the model
+      context): return verbatim;
+    - over the limit: keep WHOLE ``diff --git`` file sections from the top until
+      the next would overflow, then append an explicit PARTIAL-diff marker naming
+      how many files/chars were dropped, so the model knows the diff is
+      incomplete instead of treating the fragment as the whole change;
+    - a single file section larger than the limit is cut at a LINE boundary
+      (never mid-line) with the same marker.
+    """
     if len(text) <= limit:
         return text
-    dropped = len(text) - limit
-    head = limit // 2
-    tail = limit - head
-    return f"{text[:head]}\n...[truncated {dropped} chars]...\n{text[-tail:]}"
+
+    sections = _split_diff_sections(text)
+    if len(sections) > 1:
+        kept: list[str] = []
+        used = 0
+        for i, section in enumerate(sections):
+            if kept and used + len(section) > limit:
+                dropped_chars = sum(len(s) for s in sections[i:])
+                kept.append(_PARTIAL_MARKER.format(files=len(sections) - i, chars=dropped_chars))
+                return "".join(kept)
+            kept.append(section)
+            used += len(section)
+        return "".join(kept)
+
+    # Single oversized section (or no file headers): cut at a line boundary.
+    head = text[:limit].rsplit("\n", 1)[0]
+    if not head:  # no newline within the limit — fall back to a hard char cut
+        head = text[:limit]
+    return head + _PARTIAL_MARKER.format(files=0, chars=len(text) - len(head))
 
 
 _UNTRUSTED = "UNTRUSTED_CONTENT_8f3a1c"  # fence boundary the model is told never appears in real content
