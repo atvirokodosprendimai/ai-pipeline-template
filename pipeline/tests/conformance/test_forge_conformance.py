@@ -629,6 +629,135 @@ def test_dispatch_workflow_gitea_is_host_seam_noop() -> None:
 
 
 # ---------------------------------------------------------------------------
+# QUACKBACK: composition adapter — issue methods → _qb (fake http_caller),
+# PR methods → _gh (RoutingSession). Asserts the backend split and the
+# client-side decision-status allowlist (KTD9). The GitHub/Gitea parametrized
+# contract above is untouched — Quackback is a distinct two-transport object.
+# ---------------------------------------------------------------------------
+
+
+class _QBHttp:
+    """Fake Quackback http_caller (transport-level): records and replies."""
+
+    def __init__(self, routes: list[tuple[str, str, Any]]):
+        self.routes = list(routes)
+        self.calls: list[dict[str, Any]] = []
+
+    def __call__(self, method: str, url: str, headers: Any, body: bytes | None) -> Any:
+        self.calls.append({"method": method, "url": url, "body": body})
+        for route_method, fragment, response in self.routes:
+            if route_method == method and fragment in url:
+                return response
+        raise AssertionError(f"unexpected qb request: {method} {url}")
+
+
+def _make_quackback(
+    qb_routes: list[tuple[str, str, Any]], gh_routes: list[tuple[str, str, Response]]
+) -> tuple[Any, "_QBHttp", RoutingSession]:
+    from wgmesh_pipeline.forge.quackback import QuackbackForge
+    from wgmesh_pipeline.forge.quackback_client import QuackbackClient
+
+    cfg = Config(
+        target_repo="o/r",
+        mode="live",
+        wgmesh_bot_pat="author-pat",
+        quackback_url="https://qb.example.com",
+        quackback_token="qb_token",
+    )
+    qb_http = _QBHttp(qb_routes)
+    gh_session = RoutingSession(gh_routes)
+    gh = GitHubClient(cfg, session=gh_session, sanitiser=lambda _t: True)
+    qb = QuackbackClient(cfg, http_caller=qb_http)
+    forge = QuackbackForge(cfg, gh_client=gh, qb_client=qb, board_id="board_1")
+    return forge, qb_http, gh_session
+
+
+def test_quackback_issue_method_hits_qb_caller() -> None:
+    from wgmesh_pipeline.forge.quackback_client import HttpResponse
+
+    import json as _json
+
+    forge, qb_http, gh_session = _make_quackback(
+        qb_routes=[
+            # U5: create_issue reads the board (dedup) and tags (resolution)
+            # before the single POST that creates the tagged Build Suggestion.
+            ("GET", "/api/v1/posts", HttpResponse(200, _json.dumps({"data": []}))),
+            ("GET", "/api/v1/tags", HttpResponse(200, _json.dumps({"data": []}))),
+            (
+                "POST",
+                "/api/v1/tags",
+                HttpResponse(201, _json.dumps({"data": {"id": "t"}})),
+            ),
+            (
+                "POST",
+                "/api/v1/posts",
+                HttpResponse(201, _json.dumps({"data": {"id": "post_1"}})),
+            ),
+        ],
+        gh_routes=[],
+    )
+
+    post = forge.create_issue(title="t", body="b")
+
+    assert post["id"] == "post_1"
+    # Issue method hit the Quackback caller only — every request landed on the
+    # Quackback HTTP layer, and the GitHub session was never touched.
+    assert {c["method"] for c in qb_http.calls} <= {"GET", "POST"}
+    assert any(
+        c["method"] == "POST" and c["url"].endswith("/api/v1/posts")
+        for c in qb_http.calls
+    )
+    assert gh_session.calls == []
+
+
+def test_quackback_pr_method_hits_gh_session() -> None:
+    forge, qb_http, gh_session = _make_quackback(
+        qb_routes=[],
+        gh_routes=[("POST", "/repos/o/r/pulls", Response({"number": 99}))],
+    )
+
+    result = forge.create_pr(title="t", head="bot/impl-1", base="main", body="b")
+
+    assert result["number"] == 99
+    # PR method routed to the GitHub session, never the Quackback caller.
+    assert [c["method"] for c in gh_session.calls] == ["POST"]
+    assert qb_http.calls == []
+
+
+def test_quackback_set_status_accepted_for_build_raises_locally() -> None:
+    from wgmesh_pipeline.forge.quackback_client import HttpResponse
+
+    import json as _json
+
+    forge, qb_http, gh_session = _make_quackback(
+        qb_routes=[
+            ("GET", "/api/v1/posts", HttpResponse(200, _json.dumps({"data": []}))),
+            ("GET", "/api/v1/tags", HttpResponse(200, _json.dumps({"data": []}))),
+            (
+                "POST",
+                "/api/v1/tags",
+                HttpResponse(201, _json.dumps({"data": {"id": "t"}})),
+            ),
+            (
+                "POST",
+                "/api/v1/posts",
+                HttpResponse(201, _json.dumps({"data": {"id": "post_1"}})),
+            ),
+        ],
+        gh_routes=[],
+    )
+    forge.create_issue(title="t", body="b")
+    before = len(qb_http.calls)
+
+    with pytest.raises(PermissionError, match="Accepted for Build"):
+        forge.set_status(1, "Accepted for Build")
+
+    # The forbidden decision status is blocked locally — no extra HTTP write.
+    assert len(qb_http.calls) == before
+    assert gh_session.calls == []
+
+
+# ---------------------------------------------------------------------------
 # opt-in live Forgejo contract (docker-compose.gitea.yml)
 # ---------------------------------------------------------------------------
 

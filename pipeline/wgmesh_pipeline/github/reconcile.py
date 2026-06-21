@@ -164,6 +164,38 @@ def reconcile_issues(
     )
 
 
+def reconcile_quackback(client: object, store: StateStore) -> ReconcileResult:
+    """Quackback ingest (KTD3) — NO GitHub-label semantics.
+
+    Upserts only ``Accepted for Build`` posts into the store at ``queued``, keyed
+    on a store-backed ``(quackback_post_id, accept_marker)`` mapping. Idempotent
+    and safe to retry every tick:
+
+      - a transient API error propagates (fail-closed, KTD5) and the next tick
+        re-ingests cleanly;
+      - a partial page never double-ingests, because the mapping is keyed on
+        ``(post_id, marker)`` — an already-seen marker is a no-op.
+
+    ``accept_marker`` is the accepted post's ``updatedAt`` (KTD6/OQ2: no
+    status_version field exists, so the accept-transition timestamp IS the
+    marker; a re-accept advances it and re-queues the same number). Only the
+    post TITLE is carried into the store (KTD10) — never the full body.
+    """
+    seen = queued = 0
+    for post in client.list_accepted_posts():
+        post_id = str(post.get("id") or "")
+        if not post_id:
+            continue
+        marker = post.get("updatedAt")
+        title = str(post.get("title", ""))
+        number, fresh = store.map_quackback_post(post_id, marker)
+        seen += 1
+        if fresh:
+            store.upsert_issue(number, title, stage="queued", status="open")
+            queued += 1
+    return ReconcileResult(seen=seen, queued=queued, escalated=0, merged=0)
+
+
 def _current_stage(store: StateStore, number: int) -> str | None:
     try:
         return store.get_issue(number).stage

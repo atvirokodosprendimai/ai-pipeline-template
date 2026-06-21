@@ -452,6 +452,54 @@ class StateStore:
         self._conn.commit()
         return True
 
+    # --- Quackback post-id <-> int mapping (KTD6/OQ3) -------------------------
+
+    def map_quackback_post(
+        self, post_id: str, accept_marker: str | None
+    ) -> tuple[int, bool]:
+        """Upsert the store-backed post-id -> int mapping; return (number, fresh).
+
+        Idempotency keys on ``(quackback_post_id, accept_marker)``:
+
+          - unknown ``post_id``        -> INSERT (autoincrement number), fresh=True;
+          - known, SAME marker         -> (existing_number, False) — already ingested;
+          - known, DIFFERENT marker    -> UPDATE marker, (existing_number, True) —
+            a re-accept after cancel is a new run, re-queued on the same number.
+
+        ``fresh`` is the caller's signal to (re-)queue the issue. The autoincrement
+        ``number`` is the stable int handed to int-keyed callers."""
+        row = self._conn.execute(
+            "SELECT number, accept_marker FROM quackback_posts "
+            "WHERE quackback_post_id = ?",
+            (post_id,),
+        ).fetchone()
+        if row is None:
+            cursor = self._conn.execute(
+                "INSERT INTO quackback_posts(quackback_post_id, accept_marker, updated_at) "
+                "VALUES (?, ?, ?)",
+                (post_id, accept_marker, _iso(_now())),
+            )
+            self._conn.commit()
+            return int(cursor.lastrowid), True
+        number = int(row["number"])
+        if row["accept_marker"] == accept_marker:
+            return number, False
+        self._conn.execute(
+            "UPDATE quackback_posts SET accept_marker = ?, updated_at = ? "
+            "WHERE number = ?",
+            (accept_marker, _iso(_now()), number),
+        )
+        self._conn.commit()
+        return number, True
+
+    def quackback_post_id_for(self, number: int) -> str | None:
+        """Reverse lookup: the Quackback post id mapped to ``number``, or None."""
+        row = self._conn.execute(
+            "SELECT quackback_post_id FROM quackback_posts WHERE number = ?",
+            (number,),
+        ).fetchone()
+        return None if row is None else str(row["quackback_post_id"])
+
 
 class _MappingCursor:
     """Wraps a libsql cursor so fetchone/fetchall return name-accessible dict
