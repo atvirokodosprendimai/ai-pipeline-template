@@ -109,7 +109,11 @@ jobs:
           ssh -o StrictHostKeyChecking=no -i "$RUNNER_TEMP/k" root@"$BOX_IP" bash -s -- "$BOX_IP" <<'REMOTE'
           set -euo pipefail
           IP="$1"
-          QB_TAG="v0.12.4"
+          # Git tag for the repo (postgres builds from its Dockerfile) AND the
+          # published ghcr image tag must agree. The ghcr image lags the git
+          # tags — it tops out at 0.12.0 (git has v0.12.4 with no matching
+          # image), so both are pinned to 0.12.0.
+          QB_TAG="v0.12.0"
           cd /opt/quackback
           if [ ! -d src ]; then
             git clone --branch "$QB_TAG" --depth 1 https://github.com/QuackbackIO/quackback.git src
@@ -117,12 +121,12 @@ jobs:
           cd src
           if [ ! -f .env ]; then
             # Docker reads .env literally: no quotes, no inline comments on values.
-            # NOTE: QUACKBACK_TAG is the ghcr IMAGE tag (no leading 'v'). If
-            # ghcr.io/quackbackio/quackback:0.12.4 does not exist, adjust this.
+            # QUACKBACK_TAG is the ghcr IMAGE tag (no leading 'v'); kept in sync
+            # with QB_TAG above (image lags git — 0.12.0 is the latest published).
             cat > .env <<EOF
           BASE_URL=http://$IP:3000
           SECRET_KEY=$(openssl rand -base64 32)
-          QUACKBACK_TAG=0.12.4
+          QUACKBACK_TAG=0.12.0
           APP_PORT=3000
           POSTGRES_USER=quackback
           POSTGRES_PASSWORD=$(openssl rand -base64 24)
