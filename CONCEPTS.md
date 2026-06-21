@@ -53,6 +53,10 @@ The safety mechanism that stops Self-Healing from cascading within a single run 
 The handoff of a work item to a human when automated recovery is exhausted or a safety limit trips, marked by a dedicated needs-human state. An escalated item can be auto-closed later if resolution signals appear.
 *Avoid:* needs-human (that is the label; Escalation is the act).
 
+### Surface
+Which funnel owns a work item: **product** (the wgmesh AGPL mesh software, filed in `wgmesh`) or **service** (the cloudroof managed-hosting go-to-market, filed in `cloudroof-eu`). Carried by a `surface:product` / `surface:service` label and orthogonal to the work item's pipeline stage. Routing picks the repo by Surface and the lane by Surface plus kind: product and service *code* flow to the build lane; service go-to-market needing capital, pricing, or human outreach stays in the human queue. wgmesh measures product traction; cloudroof measures service revenue.
+*Avoid:* seed repo (a single Surface is not the whole seed).
+
 ### Funnel stage
 The company's overall maturity position along a fixed ladder — Foundation, Dogfood, Presence, Reachable, Pipeline, Revenue — inferred each run to decide where leverage is highest. Distinct from a work item's pipeline stage: the Funnel stage describes the whole company, a pipeline stage describes one Issue.
 

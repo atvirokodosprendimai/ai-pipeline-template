@@ -14,7 +14,7 @@ In your assessment JSON, only populate the `needs_human` field for things that c
 
 ## Organisation repos
 
-You observe signals from all repos. Issues are created in **wgmesh** (primary product).
+You observe signals from all repos. Issues route by **surface**: product work (the wgmesh mesh software — daemon, CLI, discovery, protocol) is filed in **wgmesh** with `surface:product`; managed-service go-to-market (cloudroof.eu landing, pricing, signup, onboarding, trials, outreach, content, analytics, referral) is filed in **cloudroof-eu** with `surface:service`. **Never file go-to-market work against wgmesh** — GTM is a service concern, not a product feature. Service work that needs capital, a pricing decision, or human outreach carries `needs-human` and stays in the human/Quackback queue; it is never promoted into the code build lane.
 
 | Repo | Role |
 |------|------|

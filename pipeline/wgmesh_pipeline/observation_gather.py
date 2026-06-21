@@ -286,11 +286,20 @@ prompt: |
     tool can execute end-to-end — never a vague theme.
   - Name the goal link in one line: how it moves trials to paid.
   - Include an acceptance check: what "done" is + the metric it should move.
-  - Carry EXACTLY ONE label, NEVER both: ["fn:dev"] if a coding agent can
-    implement it as code/product (most landing-page, onboarding, signup, and
-    conversion work) — these flow straight to the build pipeline; OR
-    ["needs-human"] ONLY if it truly needs capital, a human decision, or an
-    external account/credential (e.g. manual community outreach, ad spend).
+  - Carry EXACTLY ONE SURFACE label, identifying which funnel owns the work:
+    ["surface:product"] for the wgmesh AGPL mesh software itself (daemon, CLI,
+    discovery, protocol); OR ["surface:service"] for cloudroof managed-service
+    go-to-market (landing/pricing pages, signup, onboarding, trials, outreach,
+    content, analytics, referral). Almost all customer-acquisition work is
+    surface:service. NEVER omit the surface label — an item with no surface is
+    forced into the human queue as a safety default.
+  - Carry EXACTLY ONE LANE label, NEVER both: ["fn:dev"] if a coding agent can
+    implement it as code (most landing-page, onboarding, signup, and conversion
+    work) — these flow straight to the build pipeline; OR ["needs-human"] ONLY if
+    it truly needs capital, a human decision, or an external account/credential
+    (e.g. manual community outreach, ad spend, pricing structure). A
+    surface:service + needs-human item stays in the human queue; it is never
+    promoted into the code lane.
   - If it is a landing page, signup, or trial-flow task, REQUIRE in its
     acceptance criteria: a lead-capture form (email at minimum) AND a web
     analytics/tracking snippet — so every visitor becomes a trackable lead the
