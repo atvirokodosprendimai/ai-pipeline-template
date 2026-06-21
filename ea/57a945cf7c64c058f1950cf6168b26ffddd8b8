@@ -1,0 +1,42 @@
+pipeline/tests/conformance/test_forge_conformance.py
+  s_b4742632db40e7::t_c3e4b5c727855e 631-645,647-657,659-680,688-718,726-738
+  s_b4742632db40e7::t_02653d765d657f 658
+  s_b4742632db40e7::t_44eb032ce49ea2 646,681-687,719-725
+pipeline/tests/test_quackback_client.py
+  s_b4742632db40e7::t_44eb032ce49ea2 50-52,105-107,148-151,172-174,199-205
+  s_b4742632db40e7::t_ea77422c7c8ab3 1-49,53-104,108-147,152-171,175-198,206-218
+pipeline/wgmesh_pipeline/forge/quackback_client.py
+  s_b4742632db40e7::t_4fa4947f2bc0b7 1-234,236
+  s_b4742632db40e7::t_44eb032ce49ea2 235
+pipeline/tests/test_quackback_forge.py
+  s_b4742632db40e7::t_44eb032ce49ea2 51-55,57-61,110-112,219-222,265-268
+  s_b4742632db40e7::t_5c8bad1bc3ce3b 1-50,56,62-109,113-218,223-264,269-279
+pipeline/wgmesh_pipeline/forge/protocol.py
+  s_b4742632db40e7::t_4a1296bd59e889 55-56
+pipeline/wgmesh_pipeline/github/client.py
+  s_b4742632db40e7::t_23f3a205e3948e 201-220
+pipeline/wgmesh_pipeline/forge/factory.py
+  s_b4742632db40e7::t_af966b75d96db7 25-31
+pipeline/wgmesh_pipeline/forge/quackback_status.py
+  s_b4742632db40e7::t_56a408e8f73b22 1-26
+pipeline/wgmesh_pipeline/forge/quackback.py
+  s_b4742632db40e7::t_26f99454278cf9 106-124
+  s_b4742632db40e7::t_162d127f51cb78 1-105,125-192,196-255,257-262
+  s_b4742632db40e7::t_44eb032ce49ea2 193-195,256
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "ea57a945cf7c64c058f1950cf6168b26ffddd8b8",
+  "prompts": {},
+  "sessions": {
+    "s_b4742632db40e7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "07854d0f-63e4-4ebb-a0a3-b0b542d82519",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
