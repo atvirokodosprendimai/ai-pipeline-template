@@ -1,0 +1,21 @@
+.github/workflows/cloudroof-social-drip.yml
+  s_c6cc841b64a6e3::t_18157897564d04 1-517
+docs/quackback-decision-streams.md
+  s_c6cc841b64a6e3::t_e0ba0bddc57a4c 1-61
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "5aee65dd51f0fe63c5561e6b26a973cdf29159e3",
+  "prompts": {},
+  "sessions": {
+    "s_c6cc841b64a6e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6b261b64-6782-40d0-8026-e63a89ec9f94",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
