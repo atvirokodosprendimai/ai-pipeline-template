@@ -38,16 +38,20 @@ from wgmesh_pipeline.selfheal.models import (
     CIRCUIT_MAX_ERRORS,
     CONFLICT_ESCALATE_COOLDOWN_HOURS,
     ESCALATE_COOLDOWN_HOURS,
+    HEAL_KIND_CHECK_REARM,
     HEAL_KIND_CONFLICT_REBASE,
     IDLE_DISPATCH_COOLDOWN_SECONDS,
     MAX_RETRIES_BEFORE_ESCALATE,
+    REARM_RECHECK_COOLDOWN_HOURS,
     SUPERVISOR_DEAD_TITLE,
+    CheckRearmPlan,
     ConflictHealPlan,
     HealAction,
     SelfHealInputs,
     SelfHealRun,
     SweepOutcome,
 )
+from wgmesh_pipeline.selfheal.rearm import plan_check_rearm
 from wgmesh_pipeline.selfheal.retry_policy import Decision, apply_retry_gate
 from wgmesh_pipeline.selfheal.runner import needs_human_from_forge, run_self_heal
 from wgmesh_pipeline.selfheal.signals import (
@@ -73,10 +77,13 @@ __all__ = [
     "CIRCUIT_MAX_ERRORS",
     "CONFLICT_ESCALATE_COOLDOWN_HOURS",
     "ESCALATE_COOLDOWN_HOURS",
+    "HEAL_KIND_CHECK_REARM",
     "HEAL_KIND_CONFLICT_REBASE",
     "IDLE_DISPATCH_COOLDOWN_SECONDS",
     "MAX_RETRIES_BEFORE_ESCALATE",
+    "REARM_RECHECK_COOLDOWN_HOURS",
     "SUPERVISOR_DEAD_TITLE",
+    "CheckRearmPlan",
     "ConflictHealPlan",
     "Decision",
     "HealAction",
@@ -92,6 +99,7 @@ __all__ = [
     "circuit_breaker_tripped",
     "decide_idle_dispatch",
     "needs_human_from_forge",
+    "plan_check_rearm",
     "plan_conflict_heal",
     "run_self_heal",
     "sweep_needs_human",
