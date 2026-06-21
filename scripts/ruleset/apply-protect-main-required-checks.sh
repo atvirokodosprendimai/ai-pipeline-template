@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
-# #1599 Phase D — swap the protect-main ruleset's required status checks:
+# #1599 Phase D — set the protect-main ruleset's required status checks:
 # ADD `ci/guards` (the single shared CI gate, posted by the box for bot PRs and
-# by external-pr-ci.yml for external PRs) and REMOVE the three standalone
-# workflow contexts (pipeline-ci / sanitise-wall / pii-policy-check) once the
-# box + external producers are proven green.
+# by external-pr-ci.yml for external PRs) and drop the three standalone workflow
+# contexts (pipeline-ci / sanitise-wall / pii-policy-check) once the box +
+# external producers are proven green.
+#
+# CREATE-IF-ABSENT: the live ruleset today carries NO required_status_checks
+# rule at all (only pull_request + required_linear_history), so the script
+# APPENDS the rule when missing rather than no-opping. The "drop the three"
+# clause is a no-op when they were never required (the current state).
 #
 # SAFETY:
 #   * Dry-run by DEFAULT — prints the current and proposed required-check sets
@@ -60,21 +65,39 @@ fi
 echo "Drain gate: no open CONFLICTING bot PRs."
 echo
 
-# New ruleset with the required_status_checks list swapped (every other rule,
-# parameter, condition, and bypass actor preserved verbatim).
+# New ruleset with the required_status_checks list swapped. CREATE-IF-ABSENT:
+# the live protect-main ruleset may carry NO required_status_checks rule at all
+# (today it has only pull_request + required_linear_history), so when the rule
+# is missing we APPEND it rather than no-op. Every other rule, parameter,
+# condition, and bypass actor is preserved verbatim.
 new_ruleset="$(
   printf '%s' "$ruleset_json" | jq \
     --arg add "$CI_GUARDS_CONTEXT" \
     --argjson remove "$REMOVE_JSON" '
-    .rules |= map(
-      if .type=="required_status_checks" then
-        .parameters.required_status_checks =
-          ( ( [.parameters.required_status_checks[]
-               | select(.context as $c | ($remove | index($c)) | not)]
-              + [{context:$add, integration_id:null}] )
-            | unique_by(.context) )
-      else . end
-    )
+    # Existing required-check contexts (empty if the rule is absent), minus the
+    # retired three, plus ci/guards, deduped.
+    ( [ .rules[]?
+        | select(.type=="required_status_checks")
+        | .parameters.required_status_checks[]?.context ] ) as $cur
+    | ( ( [ $cur[] | select(. as $c | ($remove | index($c)) | not) ] + [$add] )
+        | unique ) as $names
+    | ( $names | map({context: .}) ) as $checks
+    | if ([ .rules[] | select(.type=="required_status_checks") ] | length) > 0
+      then
+        .rules |= map(
+          if .type=="required_status_checks"
+          then .parameters.required_status_checks = $checks
+          else . end
+        )
+      else
+        .rules += [{
+          type: "required_status_checks",
+          parameters: {
+            strict_required_status_checks_policy: false,
+            required_status_checks: $checks
+          }
+        }]
+      end
   '
 )"
 
