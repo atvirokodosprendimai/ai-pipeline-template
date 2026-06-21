@@ -10,6 +10,7 @@ from wgmesh_pipeline.graph.nodes.implement import implement_node
 from wgmesh_pipeline.graph.nodes.review import review_node
 from wgmesh_pipeline.graph.nodes.spec import spec_node
 from wgmesh_pipeline.graph.nodes.spec_pr import spec_pr_node
+from wgmesh_pipeline.graph.nodes.surface_gate import run_surface_gate, surface_gate_blocks
 from wgmesh_pipeline.graph.nodes.triage import triage_node
 from wgmesh_pipeline.graph.state import GraphState
 from wgmesh_pipeline.models import ladder_length_for
@@ -29,6 +30,18 @@ class CompiledGraph:
     def invoke(self, state: GraphState) -> GraphState:
         current = self.triage(state)
         if current.get("classification") in {"wont-do", "needs-info"}:
+            current = dict(current)
+            current["decision"] = "escalate"
+            if current.get("github") is not None:
+                current["github"].add_label(current["issue"].number, "needs-human")
+            current.setdefault("visited", []).append("escalate")
+            return current
+
+        # Surface gate (R2): a service or unclassified issue never reaches spec in
+        # the wgmesh pipeline. Mirrors the wont-do/needs-info escape above —
+        # park via needs-human (+ the persisted surface label) instead of building.
+        current = run_surface_gate(current)
+        if surface_gate_blocks(current):
             current = dict(current)
             current["decision"] = "escalate"
             if current.get("github") is not None:

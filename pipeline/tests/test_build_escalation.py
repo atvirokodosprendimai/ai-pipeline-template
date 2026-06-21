@@ -78,7 +78,7 @@ def _review_by_tier(results: dict[int, dict]):
 
 def _state(client: GitHubClient | None = None):
     return {
-        "issue": GitHubIssue(number=1, title="Fix docs", labels=("needs-triage",), state="open"),
+        "issue": GitHubIssue(number=1, title="Fix docs", labels=("needs-triage", "surface:product"), state="open"),
         "github": client,
     }
 
@@ -193,7 +193,7 @@ def test_spec_only_mode_never_enters_escalation_loop() -> None:
     result = graph.invoke(_state(GitHubClient(config)))
 
     assert calls == []
-    assert result["visited"] == ["triage", "spec", "spec_pr"]
+    assert result["visited"] == ["triage", "surface_gate", "spec", "spec_pr"]
     assert "escalation_history" not in result
 
 
