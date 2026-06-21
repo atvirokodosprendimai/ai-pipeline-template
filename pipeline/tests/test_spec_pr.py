@@ -48,7 +48,7 @@ def cfg() -> Config:
 
 
 def issue() -> GitHubIssue:
-    return GitHubIssue(number=17, title="Fix mesh discovery", labels=("needs-triage",), state="open")
+    return GitHubIssue(number=17, title="Fix mesh discovery", labels=("needs-triage", "surface:product"), state="open")
 
 
 def test_spec_pr_node_creates_exact_spec_title_and_swaps_labels(tmp_path: Path, cfg: Config) -> None:
@@ -307,7 +307,7 @@ def test_spec_pr_idempotent_reuses_existing_pr_on_422(tmp_path: Path) -> None:
 
     client = Reraiser(cfg)
     state = {
-        "issue": GitHubIssue(number=652, title="Fix CI", labels=(), state="open"),
+        "issue": GitHubIssue(number=652, title="Fix CI", labels=("surface:product",), state="open"),
         "github": client,
         "repo_path": str(tmp_path),
         "spec_path": "specs/issue-652-spec.md",

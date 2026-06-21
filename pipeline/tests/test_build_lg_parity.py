@@ -118,7 +118,7 @@ def _state(client: RecordingClient) -> GraphState:
         "issue": GitHubIssue(
             number=1,
             title="Fix docs",
-            labels=("needs-triage",),
+            labels=("needs-triage", "surface:product"),
             state="open",
         ),
         "github": client,
@@ -196,7 +196,7 @@ def test_langgraph_parity_spec_only_stops_after_spec_pr(monkeypatch) -> None:
         expected_calls=[],
     )
 
-    assert result["visited"] == ["triage", "spec", "spec_pr"]
+    assert result["visited"] == ["triage", "surface_gate", "spec", "spec_pr"]
     assert "decision" not in result
     assert "escalation_history" not in result
 
@@ -214,6 +214,7 @@ def test_langgraph_parity_full_live_path_merges_after_gate_side_effects(
     assert result["decision"] == "merge"
     assert result["visited"] == [
         "triage",
+        "surface_gate",
         "spec",
         "spec_pr",
         "implement",
@@ -307,3 +308,62 @@ def test_build_graph_langgraph_flag_dispatches_and_exposes_poller_nodes() -> Non
     assert graph.config is config
     for name in ("triage", "spec", "spec_pr", "implement", "review", "gate"):
         assert hasattr(graph, name)
+
+
+# ---- U3: surface gate parity (service/unknown blocked before spec, both impls) ----
+
+def _state_with_labels(client: RecordingClient, labels: tuple[str, ...]) -> GraphState:
+    return {
+        "issue": GitHubIssue(number=1, title="Add widget", labels=labels, state="open"),
+        "github": client,
+    }
+
+
+def _run_both(monkeypatch, *, labels: tuple[str, ...]) -> tuple[GraphState, GraphState, list, list]:
+    nodes = _nodes(classification="fix")
+    monkeypatch.setattr(build_lg, "triage_node", nodes.triage)
+    monkeypatch.setattr(build_lg, "spec_node", nodes.spec)
+    monkeypatch.setattr(build_lg, "spec_pr_node", nodes.spec_pr)
+    monkeypatch.setattr(build_lg, "implement_node", nodes.implement)
+    monkeypatch.setattr(build_lg, "review_node", nodes.review)
+    cfg = _cfg()
+    lc, gc = RecordingClient(cfg), RecordingClient(cfg)
+    legacy = CompiledGraph(
+        config=cfg, triage=nodes.triage, spec=nodes.spec, spec_pr=nodes.spec_pr,
+        implement=nodes.implement, review=nodes.review, gate=gate_node,
+    )
+    langgraph = build_lg.build_state_graph(cfg)
+    lr = legacy.invoke(_state_with_labels(lc, labels))
+    gr = langgraph.invoke(_state_with_labels(gc, labels))
+    return lr, gr, lc.calls, gc.calls
+
+
+def test_surface_gate_service_issue_blocked_before_spec_both_impls(monkeypatch) -> None:
+    lr, gr, lc, gc = _run_both(monkeypatch, labels=("fn:dev", "surface:service"))
+    for r in (lr, gr):
+        assert r["surface_verdict"] == "block_service"
+        assert "spec" not in r["visited"]          # never reached the builder
+        assert r["visited"] == ["triage", "surface_gate", "escalate"]
+        assert r["decision"] == "escalate"
+    # parked via needs-human → surface:service + needs-human = gtm-decision stream
+    assert ("add_label", 1, "needs-human") in lc and ("add_label", 1, "needs-human") in gc
+    assert lc == gc  # parity
+
+
+def test_surface_gate_unknown_issue_blocked_no_surface_label_both_impls(monkeypatch) -> None:
+    # No surface label, no classifier wired → unknown → block, needs-human, NO surface
+    # label applied (contract fail-safe → product-decision).
+    lr, gr, lc, gc = _run_both(monkeypatch, labels=("fn:dev",))
+    for r in (lr, gr):
+        assert r["surface_verdict"] == "block_unknown"
+        assert "spec" not in r["visited"]
+    assert ("add_label", 1, "needs-human") in lc
+    assert ("add_label", 1, "surface:service") not in lc  # no surface forced
+    assert lc == gc
+
+
+def test_surface_gate_product_issue_builds_both_impls(monkeypatch) -> None:
+    lr, gr, lc, gc = _run_both(monkeypatch, labels=("fn:dev", "surface:product"))
+    for r in (lr, gr):
+        assert r["surface_verdict"] == "build"
+        assert "spec" in r["visited"]              # reached the builder

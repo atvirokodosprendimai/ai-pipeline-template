@@ -11,6 +11,7 @@ from wgmesh_pipeline.graph.nodes.implement import implement_node
 from wgmesh_pipeline.graph.nodes.review import review_node
 from wgmesh_pipeline.graph.nodes.spec import spec_node
 from wgmesh_pipeline.graph.nodes.spec_pr import spec_pr_node
+from wgmesh_pipeline.graph.nodes.surface_gate import run_surface_gate
 from wgmesh_pipeline.graph.nodes.triage import triage_node
 from wgmesh_pipeline.graph.state import GraphState
 from wgmesh_pipeline.models import ladder_length_for
@@ -126,7 +127,12 @@ class StateGraphWrapper:
     def route_after_triage(self, state: GraphState) -> str:
         if state.get("classification") in {"wont-do", "needs-info"}:
             return "escalate"
-        return "spec"
+        return "surface_gate"
+
+    def route_after_surface_gate(self, state: GraphState) -> str:
+        # A non-build verdict parks the issue (escalate adds needs-human); only a
+        # product issue reaches spec. Parity with the legacy CompiledGraph.invoke.
+        return "spec" if state.get("surface_verdict") == "build" else "escalate"
 
     def route_after_spec_pr(self, state: GraphState) -> str:
         if self.config.mode == "spec-only":
@@ -190,6 +196,7 @@ def build_state_graph(config: Config) -> StateGraphWrapper:
     graph = StateGraph(GraphState)
     graph.add_node("triage", triage_node)
     graph.add_node("escalate", wrapper.escalate)
+    graph.add_node("surface_gate", run_surface_gate)
     graph.add_node("spec", spec_node)
     graph.add_node("spec_pr", spec_pr_node)
     graph.add_node("ladder_prep", wrapper.ladder_prep)
@@ -203,6 +210,11 @@ def build_state_graph(config: Config) -> StateGraphWrapper:
     graph.add_conditional_edges(
         "triage",
         wrapper.route_after_triage,
+        {"escalate": "escalate", "surface_gate": "surface_gate"},
+    )
+    graph.add_conditional_edges(
+        "surface_gate",
+        wrapper.route_after_surface_gate,
         {"escalate": "escalate", "spec": "spec"},
     )
     graph.add_edge("escalate", END)

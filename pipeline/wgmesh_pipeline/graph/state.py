@@ -36,3 +36,10 @@ class GraphState(TypedDict, total=False):
     goose_runner: Any
     impl_pr: int
     config: Config
+    # Surface gate (keeps service/unclassified issues out of the wgmesh builder).
+    # Declared so the langgraph StateGraph propagates them between nodes — an
+    # undeclared channel is silently dropped, which would make route_after_surface_gate
+    # see no verdict and escalate every issue.
+    surface: str
+    surface_verdict: str
+    surface_classifier: Any

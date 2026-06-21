@@ -123,7 +123,7 @@ def test_implement_derives_changed_files_from_existing_diff_for_gate() -> None:
     result = implement_node(
         {
             "issue": GitHubIssue(
-                number=7, title="Fix keys", labels=("needs-triage",), state="open"
+                number=7, title="Fix keys", labels=("needs-triage", "surface:product"), state="open"
             ),
             "diff": """diff --git a/internal/crypto/key.go b/internal/crypto/key.go
 --- a/internal/crypto/key.go
@@ -155,7 +155,7 @@ def test_implement_created_pr_number_is_merged_by_gate() -> None:
     implemented = implement_node(
         {
             "issue": GitHubIssue(
-                number=9, title="Fix relay", labels=("needs-triage",), state="open"
+                number=9, title="Fix relay", labels=("needs-triage", "surface:product"), state="open"
             ),
             "github": client,
             "diff": """diff --git a/docs/readme.md b/docs/readme.md
@@ -169,7 +169,7 @@ def test_implement_created_pr_number_is_merged_by_gate() -> None:
     result = gate_node(
         {
             "issue": GitHubIssue(
-                number=9, title="Fix relay", labels=("needs-triage",), state="open"
+                number=9, title="Fix relay", labels=("needs-triage", "surface:product"), state="open"
             ),
             "github": client,
             "diff": implemented["diff"],
@@ -199,7 +199,7 @@ def test_review_failed_verification_escalates_at_gate(monkeypatch) -> None:
     reviewed = review_node(
         {
             "issue": GitHubIssue(
-                number=8, title="Fix docs", labels=("needs-triage",), state="open"
+                number=8, title="Fix docs", labels=("needs-triage", "surface:product"), state="open"
             ),
             "diff": "+docs\n",
             "changed_files": ["docs/readme.md"],
@@ -250,7 +250,7 @@ def test_live_review_uses_verification_result_and_gate_can_merge(
     reviewed = review_node(
         {
             "issue": GitHubIssue(
-                number=11, title="Fix docs", labels=("needs-triage",), state="open"
+                number=11, title="Fix docs", labels=("needs-triage", "surface:product"), state="open"
             ),
             "github": client,
             "goose_runner": object(),
@@ -280,7 +280,7 @@ def test_non_live_review_keeps_tests_passed_fallback(monkeypatch) -> None:
     reviewed = review_node(
         {
             "issue": GitHubIssue(
-                number=12, title="Fix docs", labels=("needs-triage",), state="open"
+                number=12, title="Fix docs", labels=("needs-triage", "surface:product"), state="open"
             ),
             "goose_runner": object(),
             "diff": "+docs\n",
@@ -346,7 +346,7 @@ def test_gate_node_blocks_component_paywall_and_labels_needs_human() -> None:
     result = gate_node(
         {
             "issue": GitHubIssue(
-                number=766, title="Add trial expiry", labels=(), state="open"
+                number=766, title="Add trial expiry", labels=("surface:product",), state="open"
             ),
             "github": client,
             "diff": """diff --git a/internal/trial/api.go b/internal/trial/api.go
@@ -378,7 +378,7 @@ def test_gate_node_clean_managed_layer_change_does_not_add_paywall_reason() -> N
     result = gate_node(
         {
             "issue": GitHubIssue(
-                number=767, title="Add billing docs", labels=(), state="open"
+                number=767, title="Add billing docs", labels=("surface:product",), state="open"
             ),
             "diff": """diff --git a/docs/cloudroof-signup.md b/docs/cloudroof-signup.md
 --- a/docs/cloudroof-signup.md
@@ -408,7 +408,7 @@ def test_gate_node_paywall_detection_exception_fails_closed(monkeypatch) -> None
     )
     result = gate_node(
         {
-            "issue": GitHubIssue(number=768, title="Fix docs", labels=(), state="open"),
+            "issue": GitHubIssue(number=768, title="Fix docs", labels=("surface:product",), state="open"),
             "diff": "+docs\n",
             "changed_files": ["docs/readme.md"],
             "tests_passed": True,
@@ -452,7 +452,7 @@ def test_component_paywall_does_not_retry_model_ladder() -> None:
     result = graph.invoke(
         {
             "issue": GitHubIssue(
-                number=766, title="Add trial expiry", labels=(), state="open"
+                number=766, title="Add trial expiry", labels=("surface:product",), state="open"
             ),
             "github": client,
         }
@@ -468,7 +468,7 @@ def test_gate_node_surfaces_retryable_in_state() -> None:
     result = gate_node(
         {
             "issue": GitHubIssue(
-                number=10, title="Fix docs", labels=("needs-triage",), state="open"
+                number=10, title="Fix docs", labels=("needs-triage", "surface:product"), state="open"
             ),
             "diff": "+docs\n",
             "changed_files": ["docs/readme.md"],
@@ -493,7 +493,7 @@ def test_graph_wont_do_routes_to_escalate_and_skips_spec_implement() -> None:
             "issue": GitHubIssue(
                 number=5,
                 title="wont fix old path",
-                labels=("needs-triage",),
+                labels=("needs-triage", "surface:product"),
                 state="open",
             ),
             "github": client,
@@ -517,7 +517,7 @@ def test_graph_full_fix_path_reaches_gate_with_diff_and_shadow_has_no_network_wr
     result = graph.invoke(
         {
             "issue": GitHubIssue(
-                number=6, title="Fix docs", labels=("needs-triage",), state="open"
+                number=6, title="Fix docs", labels=("needs-triage", "surface:product"), state="open"
             ),
             "github": client,
             "diff": "+docs only\n",
@@ -529,6 +529,7 @@ def test_graph_full_fix_path_reaches_gate_with_diff_and_shadow_has_no_network_wr
 
     assert result["visited"] == [
         "triage",
+        "surface_gate",
         "spec",
         "spec_pr",
         "implement",
