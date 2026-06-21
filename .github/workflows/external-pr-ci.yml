@@ -18,8 +18,16 @@ name: External PR CI
 #   - Author/event filter scopes the jobs to external / non-bot PRs (bot PRs
 #     are CI'd on the box; this avoids double-gating).
 #
-# NOT in this workflow (owned by cutover Phase D): disabling the three
-# standalone workflows, and making this a required check on main.
+# Phase D: this workflow now emits the shared `ci/guards` required-check name
+# (the `ci-guards` aggregation job below) for the EXTERNAL path. The box posts
+# a commit status of the same name for bot PRs — one required context, two
+# producers, so neither PR class orphans. The aggregation is a JOB (its own
+# pass/fail is the check-run) rather than a `gh api` commit-status POST, because
+# a fork `pull_request` GITHUB_TOKEN is forced read-only and cannot write a
+# status — keeping the secretless guarantee intact.
+#
+# NOT in this workflow (owned by cutover Phase D): the protect-main ruleset swap
+# to require `ci/guards`, and disabling the three standalone workflows.
 
 on:
   pull_request:
@@ -125,3 +133,31 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: bash scripts/lint/check-pii-policy.sh
+
+  # Aggregate the three guard jobs into the single `ci/guards` required check
+  # (#1599 Phase D, KTD1). This job's own conclusion IS the check-run — no
+  # `gh api` status POST, so it needs no `statuses: write` and works under the
+  # read-only fork token. On bot PRs the `if` is false → the job is skipped →
+  # the `ci/guards` check-run reports skipped (= success for branch protection),
+  # while the box posts the real `ci/guards` commit status that actually gates
+  # the bot PR. So the required context exists for every PR class.
+  ci-guards:
+    name: ci/guards
+    if: ${{ always() && !startsWith(github.event.pull_request.head.ref, 'bot/') }}
+    needs: [pytest, sanitise, pii-policy]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Aggregate guard results
+        run: |
+          set -euo pipefail
+          echo "pytest=${{ needs.pytest.result }} sanitise=${{ needs.sanitise.result }} pii=${{ needs.pii-policy.result }}"
+          for result in \
+            "${{ needs.pytest.result }}" \
+            "${{ needs.sanitise.result }}" \
+            "${{ needs.pii-policy.result }}"; do
+            case "$result" in
+              success|skipped) ;;
+              *) echo "::error::a guard job concluded '$result' — ci/guards fails"; exit 1 ;;
+            esac
+          done
+          echo "external-pr guards green"
