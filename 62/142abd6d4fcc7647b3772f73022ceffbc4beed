@@ -1,0 +1,19 @@
+docs/plans/2026-06-21-005-refactor-1599-phase-d-bot-ci-plan.md
+  s_49b81b2f491ac5::t_a44b7f826965cf 1-199
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "62142abd6d4fcc7647b3772f73022ceffbc4beed",
+  "prompts": {},
+  "sessions": {
+    "s_49b81b2f491ac5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "719e3d43-993d-4485-926d-940cb03d3bdc",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
