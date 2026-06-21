@@ -1,0 +1,48 @@
+pipeline/tests/test_spec_pr.py
+  s_a97c740b38fba0::t_a538c2315baff6 51,310
+docs/brainstorms/2026-06-21-cloudroof-issue-routing-gate-requirements.md
+  s_a97c740b38fba0::t_50a985ada6424e 1-69
+docs/plans/2026-06-21-008-feat-surface-gate-builder-entry-plan.md
+  s_a97c740b38fba0::t_b26de0f40a7ec8 1-165
+pipeline/wgmesh_pipeline/graph/build.py
+  s_a97c740b38fba0::t_9cde0d66f824bc 40-51
+  s_a97c740b38fba0::t_2405b46c395259 13
+pipeline/tests/test_surface_gate.py
+  s_a97c740b38fba0::t_e804a72ead533e 1-154
+pipeline/tests/test_gate.py
+  s_a97c740b38fba0::t_a538c2315baff6 126,158,172,202,253,283,349,381,411,455,471,496,520
+  s_a97c740b38fba0::t_6e6fb117226daa 532
+pipeline/tests/test_build_escalation.py
+  s_a97c740b38fba0::t_6e6fb117226daa 196
+  s_a97c740b38fba0::t_a538c2315baff6 81
+pipeline/wgmesh_pipeline/graph/nodes/surface_gate.py
+  s_a97c740b38fba0::t_9c618e8102bfbc 1-27,29-123
+  s_a97c740b38fba0::t_ce38b0aecfa19a 28
+pipeline/wgmesh_pipeline/graph/state.py
+  s_a97c740b38fba0::t_3a5531c1b5103f 39-45
+pipeline/wgmesh_pipeline/graph/build_lg.py
+  s_a97c740b38fba0::t_6a8f5169aaed44 199
+  s_a97c740b38fba0::t_d1f29fc2c8e7a0 213-217
+  s_a97c740b38fba0::t_1d006906e20579 130-135
+  s_a97c740b38fba0::t_c46dd674219599 14
+pipeline/tests/test_build_lg_parity.py
+  s_a97c740b38fba0::t_a538c2315baff6 121
+  s_a97c740b38fba0::t_6e6fb117226daa 199,217
+  s_a97c740b38fba0::t_fd0d011b9dcc97 311-369
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "b8c08b31dd8922fda06d6b2b2bef9794e9eb1737",
+  "prompts": {},
+  "sessions": {
+    "s_a97c740b38fba0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f43da7d4-7733-4182-bcea-c529610e4013",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
