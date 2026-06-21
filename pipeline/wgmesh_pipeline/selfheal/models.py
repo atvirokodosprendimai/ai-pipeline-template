@@ -15,6 +15,11 @@ MAX_RETRIES_BEFORE_ESCALATE = 2
 CIRCUIT_MAX_CREATES = 10
 CIRCUIT_MAX_ERRORS = 5
 ESCALATE_COOLDOWN_HOURS = 24
+# Conflict-heal: a genuinely unresolvable rebase rests longer before re-trying
+# (it almost always needs a human), so its escalate cooldown is wider than the
+# stale sweeps'. The retry cap is shared (MAX_RETRIES_BEFORE_ESCALATE).
+CONFLICT_ESCALATE_COOLDOWN_HOURS = 72
+HEAL_KIND_CONFLICT_REBASE = "conflict_rebase"
 IDLE_DISPATCH_COOLDOWN_SECONDS = 6 * 60 * 60
 CHECK_INTERVAL_HOURS = 0.5
 ACTIVE_PIPELINE_LABELS = (
@@ -98,6 +103,18 @@ class SelfHealRun:
     audit: tuple[dict[str, Any], ...]
     circuit_breaker_tripped: bool
     mutation_asserted: bool
+
+
+@dataclass(frozen=True)
+class ConflictHealPlan:
+    """Result of the pure conflict-heal planner: the planned ``conflict_rebase``
+    / ``escalate`` actions plus the retry tracker the executor persists. The
+    planner does NOT increment a rebase attempt — the executor reports the
+    outcome and the *next* cycle's tracker reflects it (R5)."""
+
+    actions: tuple[HealAction, ...] = ()
+    tracker: dict[str, Any] = field(default_factory=dict)
+    dry_run: bool = False
 
 
 def parse_iso(value: str) -> datetime:
