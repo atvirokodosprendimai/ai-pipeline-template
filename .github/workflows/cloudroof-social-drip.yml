@@ -1,0 +1,517 @@
+name: cloudroof social drip
+
+# Service-surface (cloudroof) sibling of wgmesh-social-drip.yml. Same rail:
+# draft a single curated post -> Mixpost DRAFT -> sanitise -> Unsend review
+# ping -> human one-click publish. NO unattended auto-publish (CONSTITUTION +
+# the 2026-06-19 social-drip decision). Source is the cloudroof-eu SERVICE repo,
+# voice is @cloudroof, link is cloudroof.eu.
+#
+# Account safety: the cloudroof draft targets ONLY the account ids in
+# MIXPOST_CLOUDROOF_ACCOUNTS (a repo var). If that var is unset, the Mixpost
+# draft is SKIPPED — cloudroof content must never post to the shared @wgmesh
+# account — but the review-ping email still goes out with the proposed post, so
+# the pipeline produces the artifact and the operator decides. Set the var once
+# the @cloudroof account exists (deferred Q1 in the split plan).
+
+on:
+  schedule:
+    - cron: "0 15 * * 2"  # Tue 15:00 UTC — offset from wgmesh drip (Thu)
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "true = assemble + log, do NOT draft/send/update state"
+        type: boolean
+        default: false
+      since_hours:
+        description: "Look back window (hours)"
+        default: "168"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  social-drip:
+    runs-on: ubuntu-latest
+    env:
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      UNSEND_API_KEY: ${{ secrets.UNSEND_API_KEY }}
+      UNSEND_URL: ${{ vars.UNSEND_URL || 'https://unsend.admin.lt' }}
+      RELEASE_NOTES_FROM: ${{ secrets.RELEASE_NOTES_FROM }}
+      RELEASE_NOTES_TO: ${{ secrets.RELEASE_NOTES_TO }}
+      MIXPOST_API_TOKEN: ${{ secrets.MIXPOST_API_TOKEN }}
+      MIXPOST_WORKSPACE: ${{ secrets.MIXPOST_WORKSPACE }}
+      MIXPOST_BASE: ${{ vars.MIXPOST_BASE || 'https://mixpost.infrawei.com/mixpost' }}
+      MIXPOST_CLOUDROOF_ACCOUNTS: ${{ vars.MIXPOST_CLOUDROOF_ACCOUNTS }}
+      CLOUDROOF_REPO: ${{ vars.CLOUDROOF_REPO || 'atvirokodosprendimai/cloudroof-eu' }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+      SINCE_HOURS: ${{ github.event.inputs.since_hours || '168' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Collect merged PRs
+        run: |
+          set -uo pipefail
+          since_iso=$(date -u -d "${SINCE_HOURS} hours ago" '+%Y-%m-%dT%H:%M:%SZ')
+          echo "SINCE_ISO=${since_iso}" >> "$GITHUB_ENV"
+          echo "Collecting merged PRs for ${CLOUDROOF_REPO} since ${since_iso}"
+
+          if ! gh pr list -R "$CLOUDROOF_REPO" --state merged \
+            --search "merged:>=${since_iso}" \
+            --json number,title,url,labels,body > /tmp/cloudroof_prs.json; then
+            echo "::warning::failed to collect merged PRs from ${CLOUDROOF_REPO}; continuing with empty PR list"
+            echo "[]" > /tmp/cloudroof_prs.json
+          fi
+
+          python3 - <<'PY' > /tmp/filtered_prs.json
+          import json
+          import re
+
+          title_re = re.compile(r"(heal:|chore:|supervisor|bot-pr|pipeline-health|\[bot\])", re.I)
+          internal_labels = {"chore", "internal", "bot", "automated"}
+
+          try:
+              with open("/tmp/cloudroof_prs.json", encoding="utf-8") as fh:
+                  prs = json.load(fh)
+          except Exception:
+              prs = []
+
+          filtered = []
+          for pr in prs:
+              title = pr.get("title") or ""
+              labels = {
+                  (label.get("name") if isinstance(label, dict) else str(label)).lower()
+                  for label in pr.get("labels", [])
+              }
+              if title_re.search(title):
+                  continue
+              if labels & internal_labels:
+                  continue
+              filtered.append({
+                  "number": pr.get("number"),
+                  "title": title,
+                  "url": pr.get("url"),
+                  "labels": sorted(labels),
+                  "body": pr.get("body") or "",
+              })
+
+          print(json.dumps(filtered, ensure_ascii=False, indent=2))
+          PY
+
+          count=$(python3 - <<'PY'
+          import json
+          with open("/tmp/filtered_prs.json", encoding="utf-8") as fh:
+              print(len(json.load(fh)))
+          PY
+          )
+          echo "Filtered candidate PRs: ${count}"
+          {
+            echo "FILTERED_PRS<<EOF"
+            cat /tmp/filtered_prs.json
+            echo "EOF"
+          } >> "$GITHUB_ENV"
+
+      - name: LLM classify + generate post
+        run: |
+          set -uo pipefail
+          if [ -z "${OPENROUTER_API_KEY:-}" ]; then
+            echo "::warning::OPENROUTER_API_KEY unset; skipping social drip generation"
+            echo "SKIP_REMAINDER=true" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          if [ -s company/cloudroof-social-drip-state.json ]; then
+            cp company/cloudroof-social-drip-state.json /tmp/social-drip-state.json
+          else
+            printf '{"recent_angles":[],"last_run":null}\n' > /tmp/social-drip-state.json
+          fi
+          head -n 80 STRATEGY.md > /tmp/strategy_head.txt 2>/dev/null || true
+
+          python3 - <<'PY'
+          import json
+
+          with open("/tmp/filtered_prs.json", encoding="utf-8") as fh:
+              prs = json.load(fh)
+          with open("/tmp/social-drip-state.json", encoding="utf-8") as fh:
+              state = json.load(fh)
+          try:
+              with open("/tmp/strategy_head.txt", encoding="utf-8") as fh:
+                  strategy = fh.read()
+          except FileNotFoundError:
+              strategy = ""
+
+          prompt = f"""Write one concise social post for @cloudroof — the managed hosting service for wgmesh (cloudroof.eu): managed ingress, hosted mesh nodes, support, SLA. The product is the AGPL wgmesh software; cloudroof is the paid service that runs it for you.
+
+          Candidate merged PRs from the last window (cloudroof service repo):
+          {json.dumps(prs, ensure_ascii=False)}
+
+          Current rotation state:
+          {json.dumps(state, ensure_ascii=False)}
+
+          Product/service strategy context:
+          {strategy}
+
+          Instructions:
+          - If candidate PRs exist, classify whether there is meaningful customer-facing service news: SHIP_NEWS=1 or SHIP_NEWS=0.
+          - If SHIP_NEWS=1, write one highlight post about the single most customer-relevant service change.
+          - If SHIP_NEWS=0, pick an unused evergreen angle from exactly: differentiator, how-it-works, use-case, tip.
+          - Avoid angles listed in recent_angles when possible.
+          - Keep it technical, specific, and human. No hashtags. No markdown. No private/internal pipeline details. Never imply the wgmesh software is paywalled — only the managed service is paid.
+          - Prefer a concrete service benefit (no-ops ingress, hosted relays, uptime) over generic hype.
+          - HARD LIMIT: post_body MUST be a COMPLETE, self-contained thought of AT MOST 270 characters INCLUDING the link. End with a finished sentence. No ellipsis, no trailing off. If it won't fit, say less.
+          - ALWAYS end the post with the link: https://cloudroof.eu
+          - Output JSON exactly matching: {{"ship_news":0|1,"post_body":"...","chosen_angle":"differentiator|how-it-works|use-case|tip|"}}
+          """
+
+          payload = {
+              "model": "z-ai/glm-5.2",
+              "response_format": {"type": "json_object"},
+              "messages": [
+                  {
+                      "role": "system",
+                      "content": "You are a concise technical social media writer. Output ONLY valid JSON.",
+                  },
+                  {"role": "user", "content": prompt},
+              ],
+          }
+          with open("/tmp/social_drip_llm_req.json", "w", encoding="utf-8") as fh:
+              json.dump(payload, fh, ensure_ascii=False)
+          PY
+
+          http=$(curl -sS -m 180 -w '%{http_code}' -o /tmp/social_drip_llm_resp.json \
+            -X POST "https://openrouter.ai/api/v1/chat/completions" \
+            -H "Authorization: Bearer ${OPENROUTER_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -d @/tmp/social_drip_llm_req.json) || http="000"
+
+          if [ "$http" != "200" ]; then
+            echo "::warning::OpenRouter social drip generation failed (HTTP ${http}); skipping remainder"
+            echo "SKIP_REMAINDER=true" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          if ! python3 - <<'PY' > /tmp/social_drip_env
+          import json
+          import re
+          import sys
+
+          def trim_post(text, limit=290):
+              text = re.sub(r"\s+", " ", str(text or "")).strip()
+              if len(text) <= limit:
+                  return text
+              window = text[:limit]
+              cut = max(window.rfind(". "), window.rfind("! "), window.rfind("? "))
+              if cut > 40:
+                  return window[: cut + 1].rstrip()
+              sp = window.rfind(" ")
+              return (window[:sp] if sp > 0 else window).rstrip()
+
+          try:
+              with open("/tmp/social_drip_llm_resp.json", encoding="utf-8") as fh:
+                  response = json.load(fh)
+              raw = response["choices"][0]["message"]["content"]
+              data = json.loads(raw)
+          except Exception as exc:
+              print(f"parse_error={exc}", file=sys.stderr)
+              sys.exit(1)
+
+          ship_news = 1 if str(data.get("ship_news")) in {"1", "true", "True"} else 0
+          post_body = trim_post(data.get("post_body", ""))
+          chosen_angle = str(data.get("chosen_angle") or "").strip()
+          if ship_news == 1:
+              chosen_angle = ""
+          allowed = {"", "differentiator", "how-it-works", "use-case", "tip"}
+          if chosen_angle not in allowed:
+              chosen_angle = ""
+
+          print(f"SHIP_NEWS={ship_news}")
+          print(f"CHOSEN_ANGLE={chosen_angle}")
+          print("POST_BODY<<EOF")
+          print(post_body)
+          print("EOF")
+          PY
+          then
+            echo "::warning::OpenRouter response was not valid strict JSON; skipping remainder"
+            echo "SKIP_REMAINDER=true" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          cat /tmp/social_drip_env >> "$GITHUB_ENV"
+          chars=$(python3 - <<'PY'
+          import os
+          post = os.environ.get("POST_BODY", "")
+          if not post:
+              try:
+                  with open("/tmp/social_drip_env", encoding="utf-8") as fh:
+                      lines = fh.read().splitlines()
+                  capture = False
+                  parts = []
+                  for line in lines:
+                      if line == "POST_BODY<<EOF":
+                          capture = True
+                          continue
+                      if capture and line == "EOF":
+                          break
+                      if capture:
+                          parts.append(line)
+                  post = "\n".join(parts)
+              except FileNotFoundError:
+                  post = ""
+          print(len(post))
+          PY
+          )
+          echo "Generated post (${chars} chars)"
+
+      - name: Sanitise gate
+        run: |
+          set -uo pipefail
+          if [ "${SKIP_REMAINDER:-false}" = "true" ]; then
+            echo "Skipping sanitise gate because generation was skipped"
+            exit 0
+          fi
+          if [ -z "${POST_BODY:-}" ]; then
+            echo "::error::POST_BODY empty; refusing to continue"
+            exit 1
+          fi
+          if ! printf '%s\n' "$POST_BODY" | bash company/scripts/sanitise.sh > /tmp/social_post_sanitised.txt; then
+            echo "::error::sanitise.sh rejected generated post"
+            exit 1
+          fi
+
+      - name: DRY_RUN output
+        run: |
+          set -uo pipefail
+          if [ "${DRY_RUN}" != "true" ]; then
+            exit 0
+          fi
+          mode="Ship News"
+          if [ "${SHIP_NEWS:-0}" = "0" ]; then
+            mode="Evergreen ${CHOSEN_ANGLE:-unselected}"
+          fi
+          echo "Classification: ${mode}"
+          echo "Post body:"
+          printf '%s\n' "${POST_BODY:-}"
+          echo "Would create cloudroof Mixpost draft (skipped in dry run)"
+          exit 0
+
+      - name: Resolve Mixpost accounts
+        run: |
+          set -uo pipefail
+          if [ "${DRY_RUN}" = "true" ] || [ "${SKIP_REMAINDER:-false}" = "true" ]; then
+            exit 0
+          fi
+          if [ -z "${MIXPOST_API_TOKEN:-}" ] || [ -z "${MIXPOST_WORKSPACE:-}" ]; then
+            echo "::warning::MIXPOST_API_TOKEN or MIXPOST_WORKSPACE unset; skipping Mixpost draft"
+            echo "SKIP_MIXPOST=true" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          # SAFETY: cloudroof content posts ONLY to its configured account ids.
+          # Without MIXPOST_CLOUDROOF_ACCOUNTS we skip the draft rather than fall
+          # back to the shared @wgmesh account. The review-ping email still fires.
+          if [ -z "${MIXPOST_CLOUDROOF_ACCOUNTS:-}" ]; then
+            echo "::warning::MIXPOST_CLOUDROOF_ACCOUNTS unset; skipping Mixpost draft (won't post to shared accounts). Review ping still sent."
+            echo "SKIP_MIXPOST=true" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          account_ids=$(python3 - <<'PY'
+          import json, os
+          raw = os.environ.get("MIXPOST_CLOUDROOF_ACCOUNTS", "")
+          ids = []
+          for part in raw.split(","):
+              part = part.strip()
+              if not part:
+                  continue
+              ids.append(int(part) if part.isdigit() else part)
+          print(json.dumps(ids))
+          PY
+          )
+          if [ "$account_ids" = "[]" ]; then
+            echo "::warning::No cloudroof Mixpost accounts resolved; skipping Mixpost draft"
+            echo "SKIP_MIXPOST=true" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          echo "ACCOUNT_IDS=${account_ids}" >> "$GITHUB_ENV"
+          echo "Resolved cloudroof Mixpost accounts"
+
+      - name: Create Mixpost draft
+        run: |
+          set -uo pipefail
+          if [ "${DRY_RUN}" = "true" ] || [ "${SKIP_MIXPOST:-false}" = "true" ]; then
+            exit 0
+          fi
+          if [ "${SKIP_REMAINDER:-false}" = "true" ]; then
+            exit 0
+          fi
+
+          python3 - <<'PY'
+          import json
+          import os
+
+          account_ids = json.loads(os.environ.get("ACCOUNT_IDS", "[]"))
+          payload = {
+              "schedule": False,
+              "accounts": account_ids,
+              "versions": [
+                  {
+                      "account_id": 0,
+                      "is_original": True,
+                      "content": [{"body": os.environ.get("POST_BODY", ""), "media": []}],
+                      "options": {"mastodon": {"sensitive": False}},
+                  }
+              ],
+          }
+          with open("/tmp/mixpost_post_payload.json", "w", encoding="utf-8") as fh:
+              json.dump(payload, fh, ensure_ascii=False)
+          PY
+
+          posts_url="${MIXPOST_BASE%/}/api/${MIXPOST_WORKSPACE}/posts"
+          http=$(curl -sS -m 30 -w '%{http_code}' -o /tmp/mixpost_post_response.json \
+            -X POST "$posts_url" \
+            -H "Authorization: Bearer ${MIXPOST_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            -H "User-Agent: Mozilla/5.0" \
+            -d @/tmp/mixpost_post_payload.json) || http="000"
+
+          echo "Mixpost draft HTTP ${http}"
+          echo "MIXPOST_STATUS=${http}" >> "$GITHUB_ENV"
+          case "$http" in
+            200|201|202) echo "MIXPOST_CREATED=true" >> "$GITHUB_ENV" ;;
+            *)
+              echo "::error::Mixpost draft creation failed (HTTP ${http})"
+              echo "MIXPOST_CREATED=false" >> "$GITHUB_ENV"
+              ;;
+          esac
+
+      - name: Send review-ping email
+        run: |
+          set -uo pipefail
+          if [ "${DRY_RUN}" = "true" ]; then
+            exit 0
+          fi
+          if [ "${SKIP_REMAINDER:-false}" = "true" ]; then
+            exit 0
+          fi
+          if [ -z "${UNSEND_API_KEY:-}" ] || [ -z "${RELEASE_NOTES_FROM:-}" ] || [ -z "${RELEASE_NOTES_TO:-}" ]; then
+            echo "::warning::email secrets unset (UNSEND_API_KEY / RELEASE_NOTES_FROM / RELEASE_NOTES_TO); skipping review ping"
+            exit 0
+          fi
+
+          python3 - <<'PY'
+          import json
+          import os
+
+          post = os.environ.get("POST_BODY", "")
+          chars = len(post)
+          mode = "Ship News" if os.environ.get("SHIP_NEWS", "0") == "1" else f"Evergreen + {os.environ.get('CHOSEN_ANGLE', 'unselected') or 'unselected'}"
+          mixpost_base = os.environ.get("MIXPOST_BASE", "")
+          status = os.environ.get("MIXPOST_STATUS", "not attempted")
+          skipped = os.environ.get("SKIP_MIXPOST", "false") == "true"
+          draft_line = (
+              "Mixpost draft: SKIPPED (no cloudroof account configured — set MIXPOST_CLOUDROOF_ACCOUNTS)"
+              if skipped else f"Mixpost draft HTTP status: {status}"
+          )
+          text = (
+              "A cloudroof social drip draft is ready for review.\n\n"
+              f"Mode: {mode}\n"
+              f"Character count: {chars}\n"
+              f"{draft_line}\n"
+              f"Mixpost: {mixpost_base}\n\n"
+              f"{post}\n"
+          )
+          payload = {
+              "from": os.environ.get("RELEASE_NOTES_FROM", ""),
+              "to": [item.strip() for item in os.environ.get("RELEASE_NOTES_TO", "").split(",") if item.strip()],
+              "subject": "cloudroof social drip draft ready",
+              "text": text,
+          }
+          with open("/tmp/unsend_social_payload.json", "w", encoding="utf-8") as fh:
+              json.dump(payload, fh, ensure_ascii=False)
+          PY
+
+          http=$(curl -sS -m 30 -w '%{http_code}' -o /tmp/unsend_social_response.json \
+            -X POST "${UNSEND_URL%/}/api/v1/emails" \
+            -H "Authorization: Bearer ${UNSEND_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -H "User-Agent: Mozilla/5.0" \
+            -d @/tmp/unsend_social_payload.json) || http="000"
+
+          case "$http" in
+            200|201|202) echo "Review ping sent" ;;
+            *) echo "::warning::review ping email failed (HTTP ${http})" ;;
+          esac
+
+      - name: Update state + commit via PR
+        run: |
+          set -uo pipefail
+          if [ "${DRY_RUN}" = "true" ] || [ "${SKIP_REMAINDER:-false}" = "true" ] \
+             || [ "${SHIP_NEWS:-0}" = "1" ] || [ -z "${CHOSEN_ANGLE:-}" ]; then
+            echo "No evergreen angle to persist; skipping state commit."
+            exit 0
+          fi
+
+          python3 - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timezone
+
+          path = "company/cloudroof-social-drip-state.json"
+          try:
+              with open(path, encoding="utf-8") as fh:
+                  state = json.load(fh)
+          except Exception:
+              state = {"recent_angles": [], "last_run": None}
+
+          recent = state.get("recent_angles")
+          if not isinstance(recent, list):
+              recent = []
+          ship_news = os.environ.get("SHIP_NEWS", "0") == "1"
+          chosen_angle = os.environ.get("CHOSEN_ANGLE", "").strip()
+          if not ship_news and chosen_angle:
+              recent.append(chosen_angle)
+              recent = recent[-4:]
+          state["recent_angles"] = recent
+          state["last_run"] = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+          with open(path, "w", encoding="utf-8") as fh:
+              json.dump(state, fh, ensure_ascii=False, indent=2)
+              fh.write("\n")
+          PY
+
+          if ! cat company/cloudroof-social-drip-state.json | bash company/scripts/sanitise.sh > /dev/null; then
+            echo "::error::sanitise.sh rejected company/cloudroof-social-drip-state.json"
+            exit 1
+          fi
+
+          git config user.name "pupabobas[bot]"
+          git config user.email "pupabobas[bot]@users.noreply.github.com"
+          git add company/cloudroof-social-drip-state.json
+          if git diff --cached --quiet; then
+            echo "No social drip state changes to commit"
+            exit 0
+          fi
+
+          timestamp=$(date -u '+%Y%m%d%H%M%S')
+          today=$(date -u '+%Y-%m-%d')
+          branch="cloudroof-social-drip-state/${timestamp}"
+          if ! git checkout -b "$branch" origin/main; then
+            echo "::warning::could not create state branch; skipping state PR"
+            exit 0
+          fi
+          git commit -m "chore(cloudroof-social-drip): update state ${today}"
+          if ! git push -u origin "$branch"; then
+            echo "::warning::could not push social drip state branch"
+            exit 0
+          fi
+          if ! gh pr create \
+            --title "chore(cloudroof-social-drip): update state ${today}" \
+            --body "Automated cloudroof social drip state update." \
+            --base main \
+            --head "$branch" \
+            --label chore; then
+            echo "::warning::could not open social drip state PR"
+            exit 0
+          fi
