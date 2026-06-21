@@ -1,21 +1,23 @@
 # Assessment: 2026-06-21
 
-**Stage**: Reachable | **Run**: 281
+**Stage**: Reachable | **Run**: 282
 
-Stage 3, day 95. wgmesh v0.2.1 remains functional (21 stars) with healthy pipeline (15 fn:dev issues, 24 PRs). Billing works - 5 active subscribers with recent paid orders - but Polar.sh product attribution misconfigured for 95+ days. Pipeline moderately active, applying Commercial Idle Policy to prioritize customer acquisition.
+Stage 3, day 95. wgmesh remains fully functional (v0.2.1, 21 stars) with healthy infrastructure and 24 open PRs progressing. Critical blocker unchanged: zero subscribers to cloudroof seed products after 95+ days of functional billing integration. Revenue exists but from unrelated org products, not cloudroof tiers. Pipeline is essentially idle with commercial work already in progress.
 
 ## Blockers
-- Polar.sh billing configuration issue - seed products show 0 subscribers while org-level shows 5 active subscribers and paid orders, preventing proper revenue attribution for Stage 4 advancement
+- Zero subscribers to cloudroof seed products despite functional billing integration for 95+ days
+- Revenue attribution unclear - all payments from product 8e8e1c33 while cloudroof products have 0 subscribers
 
 ## Top Actions
-- **fn:gtm**: Create comprehensive internal wgmesh usage case study with specific metrics (uptime, peer count, data transferred, problems solved) as social proof for cloudroof.eu landing page (zero)
-- **fn:billing**: Fix Polar.sh product configuration to correctly attribute cloudroof.eu orders to seed product bucket instead of all-org bucket (zero)
-- **fn:dev**: Build interactive wgmesh quickstart page with copy-paste 3-command mesh setup and live terminal UI (zero)
+- **fn:dev**: Build 30-day wgmesh pilot evaluation framework for network administrators (zero)
+- **fn:dev**: Analyze zero subscriber problem for cloudroof tier products vs paying product 8e8e1c33 (zero)
+- **fn:dev**: Create cloudroof vs Tailscale comparison page for high-intent evaluator traffic (zero)
 
 ## Contributions
-- **Marty**: Recent git commits maintaining wgmesh codebase stability
-- **pupabobas[bot]**: 85 bot commits in past 7 days driving pipeline automation and CI/CD operations
-- **paying-customers**: 5 active subscribers with recent paid orders proving product-market validation
+- **Marty**: Recent git commits maintaining wgmesh codebase
+- **pupabobas[bot]**: 86 bot commits in past 7 days driving CI/CD pipeline operations
+- **github-community**: Project reached 21 stars and 2 forks showing sustained organic interest
+- **polar-customers**: 5 active subscribers with consistent payment history, though not attributed to seed products
 
 ## Needs Human
-- [blocking] Fix Polar.sh organization configuration to correctly attribute cloudroof.eu product orders to seed_product_bucket - 5 active subscribers and recent paid orders exist but are being attributed to all_org_bucket instead
+- [soon] Clarify Polar.sh organization structure - which product IDs should be attributed to wgmesh/cloudroof vs other business activities
