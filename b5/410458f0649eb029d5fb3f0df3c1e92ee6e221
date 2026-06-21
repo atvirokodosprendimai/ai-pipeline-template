@@ -1,0 +1,23 @@
+.github/workflows/pii-policy-check.yml
+  s_49b81b2f491ac5::t_2da912c990bce6 63-67
+scripts/lint/check-pii-policy.sh
+  s_49b81b2f491ac5::t_d119969259b937 1-169
+scripts/lint/test-check-pii-policy.sh
+  s_49b81b2f491ac5::t_7070b303ed5e5e 1-177
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "b5410458f0649eb029d5fb3f0df3c1e92ee6e221",
+  "prompts": {},
+  "sessions": {
+    "s_49b81b2f491ac5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "719e3d43-993d-4485-926d-940cb03d3bdc",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
