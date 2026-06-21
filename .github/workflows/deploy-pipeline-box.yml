@@ -56,13 +56,13 @@ jobs:
           HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
         run: |
           set -euo pipefail
-          IP=$(hcloud server ip "${{ github.event.inputs.server_name }}")
+          IP=$(hcloud server ip "${{ inputs.server_name }}")
           echo "BOX_IP=$IP" >> "$GITHUB_ENV"
 
       - name: Deploy image
         env:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-          SHA: ${{ github.event.inputs.sha }}
+          SHA: ${{ inputs.sha }}
         run: |
           set -euo pipefail
           umask 077
@@ -71,7 +71,7 @@ jobs:
           SSH_IMAGE=$(printf '%q' "$IMAGE")
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               -o ConnectTimeout=15 -i "$RUNNER_TEMP/deploy_key" root@"$BOX_IP" \
-              "SHA=$SSH_SHA IMAGE=$SSH_IMAGE bash -se" <<'REMOTE'
+              "SHA=$SSH_SHA IMAGE=$SSH_IMAGE bash -lse" <<'REMOTE'
           set -euo pipefail
 
           docker pull "${IMAGE}:${SHA}"
@@ -106,4 +106,4 @@ jobs:
           REMOTE
 
       - name: Report
-        run: echo "Box $BOX_IP deployed image tag '${{ github.event.inputs.sha }}'."
+        run: echo "Box $BOX_IP deployed image tag '${{ inputs.sha }}'."
