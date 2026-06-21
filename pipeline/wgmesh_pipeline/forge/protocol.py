@@ -76,6 +76,16 @@ class Forge(Protocol):
 
     def merge_pr(self, pr_number: int, *, commit_title: str | None = None) -> Any: ...
 
+    def create_commit_status(
+        self,
+        sha: str,
+        *,
+        context: str,
+        state: str,
+        description: str = "",
+        target_url: str | None = None,
+    ) -> Any: ...
+
     def push_branch(
         self, clone_path: str, branch: str, *, spec_pr: bool = False
     ) -> Any: ...

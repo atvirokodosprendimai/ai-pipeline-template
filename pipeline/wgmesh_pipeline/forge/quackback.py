@@ -254,6 +254,25 @@ class QuackbackForge:
     def merge_pr(self, pr_number: int, *, commit_title: str | None = None) -> Any:
         return self._gh.merge_pr(pr_number, commit_title=commit_title)
 
+    def create_commit_status(
+        self,
+        sha: str,
+        *,
+        context: str,
+        state: str,
+        description: str = "",
+        target_url: str | None = None,
+    ) -> Any:
+        # CI status is a GitHub commit concern → _gh (the code backend), not the
+        # decision board.
+        return self._gh.create_commit_status(
+            sha,
+            context=context,
+            state=state,
+            description=description,
+            target_url=target_url,
+        )
+
     def enable_auto_merge(self, pr_number: int, *, merge_method: str = "SQUASH") -> Any:
         return self._gh.enable_auto_merge(pr_number, merge_method=merge_method)
 

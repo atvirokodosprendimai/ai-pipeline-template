@@ -27,6 +27,8 @@ def decide_gate(
     sanitise_ok: bool,
     review_findings: list[dict],
     paywall_ok: bool = True,
+    pii_ok: bool = True,
+    emit_sanitise_ok: bool = True,
 ) -> GateDecision:
     risk = classify_risk(changed_files, diff, max_files=max_files)
     reasons = list(risk.reasons)
@@ -34,6 +36,10 @@ def decide_gate(
         reasons.append("tests failed")
     if not sanitise_ok:
         reasons.append("sanitise failed")
+    if not pii_ok:
+        reasons.append("PII check failed")
+    if not emit_sanitise_ok:
+        reasons.append("emit-sanitise failed")
     if not paywall_ok:
         reasons.append("component paywall")
     if any(finding.get("blocking", False) for finding in review_findings):
@@ -83,6 +89,12 @@ def gate_node(
         sanitise_ok=bool(next_state.get("sanitise_ok", False)),
         paywall_ok=paywall_ok,
         review_findings=list(next_state.get("review_findings", [])),
+        # The guards node (#1599 Phase D) is the always-on producer of these on
+        # the live reviewed path and sets explicit booleans (False on any guard
+        # failure). Default True covers shadow/synthetic paths where guards did
+        # not run, so it never blocks them spuriously.
+        pii_ok=bool(next_state.get("pii_ok", True)),
+        emit_sanitise_ok=bool(next_state.get("emit_sanitise_ok", True)),
     )
     next_state["decision"] = decision.decision
     next_state["risk_tier"] = decision.risk_tier
