@@ -1,0 +1,21 @@
+company/goal-sprint-system-prompt.md
+  s_c6cc841b64a6e3::t_9e7326fd4cb20c 26
+.github/workflows/goal-sprint.yml
+  s_c6cc841b64a6e3::t_9e7326fd4cb20c 57,59,66,70-71,75-76
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "567136affe2fc43c65856f3f10e31f47f7e2a3c2",
+  "prompts": {},
+  "sessions": {
+    "s_c6cc841b64a6e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6b261b64-6782-40d0-8026-e63a89ec9f94",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
