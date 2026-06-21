@@ -437,3 +437,22 @@ def test_list_needs_triage_filters_out_pull_requests(cfg: Config) -> None:
     issues = GitHubClient(cfg, session=session).list_needs_triage()
 
     assert [i.number for i in issues] == [10, 11]
+
+
+def test_get_pr_mergeable_conflicting(cfg: Config) -> None:
+    session = Session(Response({"mergeable": False, "mergeable_state": "dirty"}))
+
+    assert GitHubClient(cfg, session=session).get_pr_mergeable(744) == "CONFLICTING"
+
+
+def test_get_pr_mergeable_clean(cfg: Config) -> None:
+    session = Session(Response({"mergeable": True, "mergeable_state": "clean"}))
+
+    assert GitHubClient(cfg, session=session).get_pr_mergeable(7) == "MERGEABLE"
+
+
+def test_get_pr_mergeable_null_not_yet_computed(cfg: Config) -> None:
+    # GitHub returns mergeable: null until it finishes computing after a push.
+    session = Session(Response({"mergeable": None, "mergeable_state": "unknown"}))
+
+    assert GitHubClient(cfg, session=session).get_pr_mergeable(7) is None

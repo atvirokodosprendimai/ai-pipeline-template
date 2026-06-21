@@ -229,6 +229,9 @@ class QuackbackForge:
     def get_pr(self, number: int) -> dict[str, Any]:
         return self._gh.get_pr(number)
 
+    def get_pr_mergeable(self, number: int) -> str | None:
+        return self._gh.get_pr_mergeable(number)
+
     def find_open_pr_number(self, head_branch: str) -> int | None:
         return self._gh.find_open_pr_number(head_branch)
 

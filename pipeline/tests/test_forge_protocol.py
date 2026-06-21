@@ -26,3 +26,14 @@ def test_github_issue_is_the_forge_issue() -> None:
     """GitHubIssue stays importable as a backwards-compatible alias so the
     host-neutral dataclass has one definition."""
     assert GitHubIssue is ForgeIssue
+
+
+def test_forge_protocol_declares_get_pr_mergeable() -> None:
+    """Conflict-heal reads mergeability through the protocol, not raw dicts."""
+    assert hasattr(Forge, "get_pr_mergeable")
+
+
+def test_gitea_forge_satisfies_get_pr_mergeable() -> None:
+    from wgmesh_pipeline.forge.gitea import GiteaForge
+
+    assert hasattr(GiteaForge, "get_pr_mergeable")
