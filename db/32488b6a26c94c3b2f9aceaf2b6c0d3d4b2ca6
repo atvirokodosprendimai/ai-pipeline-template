@@ -1,0 +1,20 @@
+.github/workflows/external-pr-ci.yml
+  s_49b81b2f491ac5::t_f465e163d2e818 21-30
+  s_49b81b2f491ac5::t_cb3293ff9e1664 136-163
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "db32488b6a26c94c3b2f9aceaf2b6c0d3d4b2ca6",
+  "prompts": {},
+  "sessions": {
+    "s_49b81b2f491ac5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "719e3d43-993d-4485-926d-940cb03d3bdc",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
