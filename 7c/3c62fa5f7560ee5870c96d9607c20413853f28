@@ -1,0 +1,44 @@
+company/scripts/check-rearm/rearm.sh
+  s_a97c740b38fba0::t_a29bb3b537390f 1-65
+company/check-rearm-state-meta.json
+  s_a97c740b38fba0::t_2a4b9bea178eb6 1-3
+pipeline/tests/test_rearm.py
+  s_a97c740b38fba0::t_c83de643e43c73 1-102
+docs/plans/2026-06-21-007-feat-rearm-stuck-bot-pr-merge-lane-plan.md
+  s_a97c740b38fba0::t_2c150477c03219 1-312
+company/scripts/check-rearm/test-rearm.sh
+  s_a97c740b38fba0::t_57f5ea0505c8da 1-104
+company/check-rearm-state-seed.json
+  s_a97c740b38fba0::t_661d6cfe59627b 1-3
+.github/workflows/conflict-heal.yml
+  s_a97c740b38fba0::t_e2b8cc937dc371 3-15
+company/scripts/check-rearm/run.py
+  s_a97c740b38fba0::t_4c585d984bc892 1-287
+pipeline/tests/test_check_rearm_run.py
+  s_a97c740b38fba0::t_170b6a5a28dd1a 1-203
+pipeline/wgmesh_pipeline/selfheal/rearm.py
+  s_a97c740b38fba0::t_0835f5c3357903 1-117
+pipeline/wgmesh_pipeline/selfheal/__init__.py
+  s_a97c740b38fba0::t_65c87aa1b81961 41,45,47,54
+  s_a97c740b38fba0::t_8e167331bab11c 80,84,86
+  s_a97c740b38fba0::t_bf306e607c1363 102
+pipeline/wgmesh_pipeline/selfheal/models.py
+  s_a97c740b38fba0::t_2fbeec504a476e 23-31
+  s_a97c740b38fba0::t_1b1488a34bc7fe 129-140
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "7c3c62fa5f7560ee5870c96d9607c20413853f28",
+  "prompts": {},
+  "sessions": {
+    "s_a97c740b38fba0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f43da7d4-7733-4182-bcea-c529610e4013",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
