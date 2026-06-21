@@ -1,0 +1,30 @@
+pipeline/wgmesh_pipeline/forge/quackback.py
+  s_b4742632db40e7::t_8cd4cdc09f77d4 143-153
+pipeline/wgmesh_pipeline/poller.py
+  s_b4742632db40e7::t_977fff729a49bc 11
+  s_b4742632db40e7::t_9c6b57ac02c4f5 41-46
+pipeline/wgmesh_pipeline/state/store.py
+  s_b4742632db40e7::t_47e67cf4b94f00 455-502
+pipeline/wgmesh_pipeline/state/migrations/0003_quackback_id_map.sql
+  s_b4742632db40e7::t_c9ac4912e1335a 1-15
+pipeline/wgmesh_pipeline/github/reconcile.py
+  s_b4742632db40e7::t_5948b577d5975e 167-198
+pipeline/tests/test_quackback_discovery.py
+  s_b4742632db40e7::t_8951d14e953b02 1-306
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "641dc6ceefa03244ac161cb6dce357f3e380d390",
+  "prompts": {},
+  "sessions": {
+    "s_b4742632db40e7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "07854d0f-63e4-4ebb-a0a3-b0b542d82519",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
