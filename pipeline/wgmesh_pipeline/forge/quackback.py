@@ -178,6 +178,14 @@ class QuackbackForge:
         page = self._qb.list_posts(status_slug=NEEDS_REFINEMENT_SLUG)
         return list(page.get("data", []))
 
+    def list_post_comments(self, post_id: str) -> list[dict[str, Any]]:
+        """The discussion thread for a decision post (raw, post-id keyed)."""
+        return self._qb.list_comments(post_id)
+
+    def post_vote_count(self, post_id: str) -> int:
+        """The decision post's approve-vote count (the threshold gate input)."""
+        return self._qb.get_vote_count(post_id)
+
     def post_proposal_comment(self, post_id: str, body: str) -> Any:
         """Post a proposal (or a revision) as a comment on the discussion post —
         sanitise-walled (KTD10). A comment is the only verified write to an
