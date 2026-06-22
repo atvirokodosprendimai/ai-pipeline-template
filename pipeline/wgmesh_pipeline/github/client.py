@@ -156,7 +156,7 @@ class GitHubClient:
         """True iff any check on the PR's head commit concluded FAILURE — the
         stale-base-heal 'broken' signal. Covers both the Checks API
         (Actions, e.g. build-test) and legacy commit statuses, matching the
-        ``gh ... statusCheckRollup`` the Actions executor used."""
+        ``statusCheckRollup`` the retired Actions executor read via its CLI."""
         head_sha = (self.get_pr(number).get("head") or {}).get("sha")
         if not head_sha:
             return False
