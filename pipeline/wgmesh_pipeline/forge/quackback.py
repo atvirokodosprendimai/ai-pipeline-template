@@ -43,7 +43,7 @@ from wgmesh_pipeline.forge.quackback_status import (
     BOX_SETTABLE_STATUSES,
     is_box_settable,
 )
-from wgmesh_pipeline.github.client import GitHubClient
+from wgmesh_pipeline.github.client import DryRunResult, GitHubClient
 
 log = logging.getLogger("wgmesh_pipeline.forge.quackback")
 
@@ -72,7 +72,14 @@ class QuackbackForge:
         # false-matches a constructor argument.
         self._gh = gh_client if gh_client is not None else GitHubClient(config)
         self._qb = qb_client if qb_client is not None else QuackbackClient(config)
-        self._board_id = board_id or os.environ.get(BOARD_ID_ENV)
+        # Prefer the explicit arg, then Config (promoted in the cutover U2), then
+        # the env var (back-compat). load_config fail-closes when forge_kind is
+        # quackback and the board id is unset, so this is non-None in production.
+        self._board_id = (
+            board_id
+            or getattr(config, "quackback_board_id", None)
+            or os.environ.get(BOARD_ID_ENV)
+        )
         # Store-backed fallback resolver for ids not in the in-memory _id_map.
         # Posts ingested via the U4 store mapping (reconcile_quackback) never
         # touched _id_map, so set_status/comment/get_issue would KeyError on them
@@ -266,7 +273,27 @@ class QuackbackForge:
         return self._gh.close_pr(number, comment)
 
     def dispatch_workflow(self, workflow: str, inputs: dict[str, Any]) -> Any:
-        return self._gh.dispatch_workflow(workflow, inputs)
+        """HOST SEAM (cutover U1): under the Quackback decision layer the box's
+        own ``_cycle_observation`` is the sole Build-Suggestion creator, so
+        firing the GitHub Actions ``observation-loop`` (whose creation steps are
+        muted post-cutover) would be a no-op at best and a double-create race at
+        worst. Mirror the Gitea seam: no-op-and-warn, return a ``DryRunResult``
+        marker (no HTTP, never touches ``_gh``) so an idle signal can't re-arm a
+        creation-disabled workflow."""
+        log.warning(
+            "dispatch_workflow(%r) skipped under forge_kind=quackback — the box "
+            "observation loop is the successor creator (cutover U1 host seam)",
+            workflow,
+        )
+        return DryRunResult(
+            dry_run=True,
+            operation="dispatch_workflow",
+            payload={
+                "unsupported_host": "quackback",
+                "workflow": workflow,
+                "inputs": dict(inputs),
+            },
+        )
 
     # Labels are a GitHub PR concern here → _gh (the conformance split routes
     # them to the code backend, not the decision board).

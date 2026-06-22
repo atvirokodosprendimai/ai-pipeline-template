@@ -477,3 +477,26 @@ def test_post_url_uses_quackback_base_and_post_id() -> None:
 def test_post_url_none_when_unresolvable() -> None:
     forge, _, _ = _forge()
     assert forge.post_url(999) is None
+
+
+# ------------------------------------------------- U1: dispatch host seam
+
+
+def test_dispatch_workflow_is_box_native_host_seam_noop() -> None:
+    # Cutover U1: under forge_kind=quackback the box observation loop is the
+    # sole creator, so dispatch_workflow must NOT fire the (creation-muted)
+    # Actions observation-loop. It no-ops-and-warns like the Gitea seam:
+    # returns a DryRunResult marker and never touches the _gh PR backend.
+    from wgmesh_pipeline.github.client import DryRunResult
+
+    forge, gh, qb = _forge()
+
+    result = forge.dispatch_workflow("observation-loop.yml", {"signal": "idle"})
+
+    assert isinstance(result, DryRunResult)
+    assert result.operation == "dispatch_workflow"
+    assert result.payload["unsupported_host"] == "quackback"
+    assert result.payload["inputs"] == {"signal": "idle"}
+    # No GitHub dispatch attempted (FakeGH has no dispatch_workflow at all).
+    assert gh.calls == []
+    assert qb.calls == []

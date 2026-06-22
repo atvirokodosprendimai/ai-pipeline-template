@@ -694,7 +694,16 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.PUSH_TOKEN }}
           TARGET_REPO: atvirokodosprendimai/wgmesh
+          FORGE_KIND: ${{ vars.FORGE_KIND }}
         run: |
+          # Cutover U1 host seam: once forge_kind=quackback the box's own
+          # observation loop is the sole Build-Suggestion creator. Mute this
+          # Actions creator so the two paths never double-create. Reversible:
+          # clear/flip the FORGE_KIND repo variable back to github to re-enable.
+          if [ "$FORGE_KIND" = "quackback" ]; then
+            echo "FORGE_KIND=quackback — creation owned by the box; skipping gh issue create"
+            exit 0
+          fi
           # Fetch open AND recently closed issue titles for dedup.
           # Checking only open issues misses features that were already implemented
           # and closed — causing the LLM to re-create them as greenfield tasks.
@@ -778,7 +787,14 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.PUSH_TOKEN }}
           TARGET_REPO: atvirokodosprendimai/wgmesh
+          FORGE_KIND: ${{ vars.FORGE_KIND }}
         run: |
+          # Cutover U1 host seam (see "Create issues from assessment"): the box
+          # owns creation under quackback. Mute this needs-human creator too.
+          if [ "$FORGE_KIND" = "quackback" ]; then
+            echo "FORGE_KIND=quackback — creation owned by the box; skipping needs-human gh issue create"
+            exit 0
+          fi
           # Reuse open issues list (or fetch if not available)
           if [ ! -f /tmp/open_issues.txt ]; then
             gh issue list --repo "$TARGET_REPO" --state open --limit 100 --json title --jq '.[].title' > /tmp/open_issues.txt 2>/dev/null || touch /tmp/open_issues.txt
