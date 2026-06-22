@@ -21,6 +21,7 @@ def test_spec_recipe_renders_required_params() -> None:
         {
             "issue_number": "42",
             "issue_title": "Test title",
+            "issue_brief_file": "",  # the PM brief path (empty = title-only), #1978
             "spec_file": "spec.md",
         },
     )
