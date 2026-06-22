@@ -1,0 +1,20 @@
+.github/workflows/requeue-failed-issues.yml
+  s_b74ea68e6c35f5::t_6b71205345b727 95
+  s_b74ea68e6c35f5::t_1608b75bf8e41d 75-79,82
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "13a8986fa4e70dc50691b61f35596267c30f2ede",
+  "prompts": {},
+  "sessions": {
+    "s_b74ea68e6c35f5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "401a8475-8ec4-479f-9685-70462be2819a",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
