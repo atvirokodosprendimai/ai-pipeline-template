@@ -57,6 +57,22 @@ def requeue_failed_main(
     )
 
 
+def reset_queue_main() -> None:
+    """One-shot: clear the durable issue queue + run history and EXIT — never
+    starts the poller (unlike ``--reset-queue``, which resets then runs forever).
+    Used to drain orphaned store rows after a forge cutover without spawning a
+    second poller alongside the systemd service. Migrations + the Quackback
+    post-id map survive (``reset_queue`` deletes only ``issues``/``runs``)."""
+    config = load_config()
+    store = open_state_store(config)
+    cleared = store.reset_queue()
+    print(
+        f"[pipeline] reset_queue_and_exit cleared "
+        f"issues={cleared['issues']} runs={cleared['runs']}",
+        file=sys.stderr,
+    )
+
+
 async def async_main(*, reset_queue: bool = False) -> None:
     logging.basicConfig(
         level=logging.INFO,
@@ -120,6 +136,11 @@ def main(argv: list[str] | None = None) -> None:
         help="move failed issues back to an actionable stage and exit",
     )
     parser.add_argument(
+        "--reset-queue-and-exit",
+        action="store_true",
+        help="clear the durable issue queue + run history and exit (no polling)",
+    )
+    parser.add_argument(
         "--issues",
         type=_parse_issue_numbers,
         help="comma-separated issue numbers to requeue",
@@ -132,6 +153,9 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
     if args.requeue_failed:
         requeue_failed_main(numbers=args.issues, target_stage=args.target_stage)
+        return
+    if args.reset_queue_and_exit:
+        reset_queue_main()
         return
     asyncio.run(async_main(reset_queue=args.reset_queue))
 
