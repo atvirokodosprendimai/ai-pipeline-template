@@ -1,0 +1,26 @@
+pipeline/wgmesh_pipeline/main.py
+  s_b74ea68e6c35f5::t_b10c85c22baec9 157-159
+  s_b74ea68e6c35f5::t_924321c805c623 60-75
+  s_b74ea68e6c35f5::t_87bffbd1b6f5f6 139-142
+.github/workflows/requeue-failed-issues.yml
+  s_b74ea68e6c35f5::t_0e03dd928c58fd 60,75,78,91-98
+  s_b74ea68e6c35f5::t_29e1dd896a6eb4 18-21
+pipeline/tests/test_main.py
+  s_b74ea68e6c35f5::t_170421d5544991 107-128
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "93f16e71372510f37d000e46c1b8a3e78635ddf0",
+  "prompts": {},
+  "sessions": {
+    "s_b74ea68e6c35f5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "401a8475-8ec4-479f-9685-70462be2819a",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
