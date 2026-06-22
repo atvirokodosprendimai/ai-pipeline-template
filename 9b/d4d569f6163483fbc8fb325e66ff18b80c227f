@@ -1,0 +1,47 @@
+pipeline/tests/test_quackback_discovery.py
+  s_b74ea68e6c35f5::t_5d6d3b473f70b6 147-189
+pipeline/wgmesh_pipeline/poller.py
+  s_b74ea68e6c35f5::t_7c41dafec783dd 98
+pipeline/wgmesh_pipeline/github/reconcile.py
+  s_b74ea68e6c35f5::t_ea75ae39763510 194-197,202-220
+pipeline/wgmesh_pipeline/graph/state.py
+  s_b74ea68e6c35f5::t_865e57934e0a04 16
+pipeline/wgmesh_pipeline/state/store.py
+  s_b74ea68e6c35f5::t_5b3421b54b70e2 124,133,135,145-146,159
+  s_b74ea68e6c35f5::t_7419af998baa42 58
+  s_b74ea68e6c35f5::t_2bc60254c5700e 631
+pipeline/tests/test_spec_node.py
+  s_b74ea68e6c35f5::t_81f22262ab98e1 82,87-106
+  s_b74ea68e6c35f5::t_851f580a1b2281 30-33,40
+docs/plans/2026-06-22-005-feat-rich-build-suggestion-briefs-plan.md
+  s_b74ea68e6c35f5::t_280ffad1173942 1-62
+pipeline/wgmesh_pipeline/state/migrations/0004_issue_body.sql
+  s_b74ea68e6c35f5::t_b8a809c7ea83bd 1-11
+pipeline/tests/test_state.py
+  s_b74ea68e6c35f5::t_b50ed515e543f7 64,82,196
+pipeline/wgmesh_pipeline/graph/nodes/spec.py
+  s_b74ea68e6c35f5::t_545ced08433afe 4-5,31-63
+pipeline/recipes/wgmesh-triage-spec.yaml
+  s_b74ea68e6c35f5::t_3c72c714a215db 13-16
+  s_b74ea68e6c35f5::t_5011d528320f13 27-32
+pipeline/tests/test_observation_gather.py
+  s_b74ea68e6c35f5::t_1fed2930ef277d 237-254
+pipeline/wgmesh_pipeline/observation_gather.py
+  s_b74ea68e6c35f5::t_a9e1d63971ec75 313-327,330
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "9bd4d569f6163483fbc8fb325e66ff18b80c227f",
+  "prompts": {},
+  "sessions": {
+    "s_b74ea68e6c35f5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "401a8475-8ec4-479f-9685-70462be2819a",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
