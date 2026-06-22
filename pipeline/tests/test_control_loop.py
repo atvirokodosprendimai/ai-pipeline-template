@@ -208,6 +208,67 @@ def test_each_enabled_planner_fires_at_least_once() -> None:
     assert heal.calls >= 1, "selfheal planner never fired"
 
 
+def test_merge_lane_module_runs_both_repos_in_shadow() -> None:
+    """merge-lane-heal fires for BOTH seed and meta in shadow via the injected
+    planner + client factory (no real HTTP): the planner is called per repo,
+    nothing is executed, and the shadow forge sees no writes."""
+    from wgmesh_pipeline.selfheal import MergeLaneHealRun
+
+    seen_slugs: list[str] = []
+
+    def fake_factory(cfg, slug):
+        seen_slugs.append(slug)
+        return object()  # never touched — the planner is a spy
+
+    ml_spy = Spy(MergeLaneHealRun(actions=(), state={"retry_tracker": {}}))
+    forge = SpyForge()
+    sched = ControlLoopScheduler(
+        config=_config(
+            wgmesh_bot_pat="tok",  # token present → cycle runs (not skipped)
+            meta_repo="atvirokodosprendimai/ai-pipeline-template",
+            merge_lane_heal_interval_seconds=0.01,
+        ),
+        forge=forge,
+        store=SpyStore(),
+        supervisor_planner=Spy(_empty_rank_run()),
+        selfheal_planner=Spy(_empty_selfheal_run()),
+        observation_assessor=lambda inputs: {},
+        strategy_text_reader=lambda: None,
+        merge_lane_planner=ml_spy,
+        merge_lane_client_factory=fake_factory,
+    )
+    asyncio.run(_run_briefly(sched))
+    assert ml_spy.calls >= 2, "merge_lane planner should fire for seed + meta"
+    assert set(seen_slugs) >= {
+        "atvirokodosprendimai/wgmesh",
+        "atvirokodosprendimai/ai-pipeline-template",
+    }
+    assert forge.write_calls == [], "shadow merge_lane must not write to forge"
+
+
+def test_merge_lane_skipped_without_bot_token() -> None:
+    """No bot token → the whole merge-lane cycle is skipped (no client built,
+    planner never called) — keeps token-less environments off the network."""
+    from wgmesh_pipeline.selfheal import MergeLaneHealRun
+
+    built = []
+    ml_spy = Spy(MergeLaneHealRun())
+    sched = ControlLoopScheduler(
+        config=_config(merge_lane_heal_interval_seconds=0.01),  # no wgmesh_bot_pat
+        forge=SpyForge(),
+        store=SpyStore(),
+        supervisor_planner=Spy(_empty_rank_run()),
+        selfheal_planner=Spy(_empty_selfheal_run()),
+        observation_assessor=lambda inputs: {},
+        strategy_text_reader=lambda: None,
+        merge_lane_planner=ml_spy,
+        merge_lane_client_factory=lambda c, s: built.append(s),
+    )
+    asyncio.run(_run_briefly(sched))
+    assert ml_spy.calls == 0, "merge_lane planner must not fire without a token"
+    assert built == [], "no client should be built without a token"
+
+
 def test_shadow_performs_no_forge_writes_and_no_state_save_when_immaterial() -> None:
     # Shadow contract (post-U3): zero FORGE writes always; the box-internal
     # state store MAY be read (load_control_state), but is NOT written when the

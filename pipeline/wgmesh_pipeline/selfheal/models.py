@@ -160,6 +160,18 @@ class StaleBaseHealPlan:
     dry_run: bool = False
 
 
+@dataclass(frozen=True)
+class MergeLaneHealRun:
+    """Box-native merge-lane-heal runner outcome: planned actions (all three
+    passes combined), the new state dict, how many actions were actually
+    executed, and whether this was a shadow/dry run (``live=False``)."""
+
+    actions: tuple[HealAction, ...] = ()
+    state: dict[str, Any] = field(default_factory=dict)
+    executed: int = 0
+    dry_run: bool = True
+
+
 def parse_iso(value: str) -> datetime:
     return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(timezone.utc)
 

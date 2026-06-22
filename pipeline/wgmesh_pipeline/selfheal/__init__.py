@@ -48,11 +48,13 @@ from wgmesh_pipeline.selfheal.models import (
     CheckRearmPlan,
     ConflictHealPlan,
     HealAction,
+    MergeLaneHealRun,
     SelfHealInputs,
     SelfHealRun,
     StaleBaseHealPlan,
     SweepOutcome,
 )
+from wgmesh_pipeline.selfheal.merge_lane import run_merge_lane_heal
 from wgmesh_pipeline.selfheal.rearm import plan_check_rearm
 from wgmesh_pipeline.selfheal.retry_policy import Decision, apply_retry_gate
 from wgmesh_pipeline.selfheal.stale_base import plan_stale_base_heal
@@ -91,6 +93,7 @@ __all__ = [
     "ConflictHealPlan",
     "Decision",
     "HealAction",
+    "MergeLaneHealRun",
     "SelfHealInputs",
     "SelfHealRun",
     "StaleBaseHealPlan",
@@ -107,6 +110,7 @@ __all__ = [
     "plan_check_rearm",
     "plan_conflict_heal",
     "plan_stale_base_heal",
+    "run_merge_lane_heal",
     "run_self_heal",
     "sweep_needs_human",
     "sweep_stale_approved",

@@ -134,6 +134,80 @@ class GitHubClient:
             return None
         return "CONFLICTING" if mergeable is False else "MERGEABLE"
 
+    def compare_behind_by(self, head_branch: str, *, base: str = "main") -> int:
+        """Commits ``head_branch`` is behind ``base`` (GitHub compare
+        ``behind_by``). The stale-base-heal 'stale tree' signal: a branch cut
+        before a since-merged fix is behind main. A deleted branch / 404 /
+        missing field resolves to 0 — not a rebase candidate."""
+        owner = self.config.owner
+        try:
+            resp = self._request(
+                "GET",
+                f"/repos/{owner}/{self.config.repo}/compare/{base}...{head_branch}",
+            )
+        except requests.HTTPError as exc:
+            if getattr(exc.response, "status_code", None) == 404:
+                return 0
+            raise
+        behind = resp.get("behind_by") if isinstance(resp, dict) else None
+        return int(behind) if isinstance(behind, int) else 0
+
+    def pr_has_failing_check(self, number: int) -> bool:
+        """True iff any check on the PR's head commit concluded FAILURE — the
+        stale-base-heal 'broken' signal. Covers both the Checks API
+        (Actions, e.g. build-test) and legacy commit statuses, matching the
+        ``statusCheckRollup`` the retired Actions executor read via its CLI."""
+        head_sha = (self.get_pr(number).get("head") or {}).get("sha")
+        if not head_sha:
+            return False
+        owner = self.config.owner
+        base = f"/repos/{owner}/{self.config.repo}/commits/{head_sha}"
+        runs = self._request("GET", f"{base}/check-runs")
+        check_runs = runs.get("check_runs") or [] if isinstance(runs, dict) else []
+        if any(
+            str(r.get("conclusion") or "").upper() == "FAILURE" for r in check_runs
+        ):
+            return True
+        status = self._request("GET", f"{base}/status")
+        statuses = status.get("statuses") or [] if isinstance(status, dict) else []
+        return any(
+            str(s.get("state") or "").lower() in ("failure", "error")
+            for s in statuses
+        )
+
+    def list_open_pull_requests(
+        self, *, per_page: int = 100, max_prs: int = 200
+    ) -> list[dict[str, Any]]:
+        """All open pull requests: ``[{number, headRefName}]``.
+
+        Paginates up to ``max_prs`` PRs total (sane cap; the box's repos are
+        small). Used by the merge-lane-heal module to build the gather set from
+        which the three planners (conflict/rearm/stale-base) select their
+        candidates. Returns plain dicts so callers can augment them without
+        mutating the API object."""
+        owner = self.config.owner
+        results: list[dict[str, Any]] = []
+        page = 1
+        while len(results) < max_prs:
+            batch = self._request(
+                "GET",
+                f"/repos/{owner}/{self.config.repo}/pulls",
+                params={"state": "open", "per_page": per_page, "page": page},
+            )
+            if not isinstance(batch, list) or not batch:
+                break
+            for item in batch:
+                results.append({
+                    "number": int(item["number"]),
+                    "headRefName": str(item.get("head", {}).get("ref") or ""),
+                })
+                if len(results) >= max_prs:
+                    break
+            if len(batch) < per_page:
+                break
+            page += 1
+        return results
+
     def find_open_pr_number(self, head_branch: str) -> int | None:
         """Open PR number for a head branch, or None. Used to make spec PR
         creation idempotent: a retry after a partial run hits create_pr 422

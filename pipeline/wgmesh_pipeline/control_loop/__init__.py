@@ -27,7 +27,7 @@ import asyncio
 import hashlib
 import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Mapping, Sequence
@@ -36,7 +36,13 @@ from wgmesh_pipeline.config import Config
 from wgmesh_pipeline.control_loop.executor import ExecutionResult, execute_actions
 from wgmesh_pipeline.forge.protocol import Forge
 from wgmesh_pipeline.observation import ObservationPlan, plan_actions
-from wgmesh_pipeline.selfheal import SelfHealInputs, SelfHealRun, run_self_heal
+from wgmesh_pipeline.selfheal import (
+    MergeLaneHealRun,
+    SelfHealInputs,
+    SelfHealRun,
+    run_merge_lane_heal,
+    run_self_heal,
+)
 
 # The gather modules import wgmesh_pipeline.control_loop.executor, so importing
 # them at module top creates a circular import (this package's __init__ would
@@ -74,6 +80,13 @@ SHADOW_REASON = "module not flipped live"
 SUPERVISOR_STATE_KEY = "supervisor-rank-state"
 SELFHEAL_STATE_KEY = "pipeline-health-state"
 STRATEGY_AUDIT_STATE_KEY = "strategy-audit-baseline"
+# Merge-lane-heal persists a separate retry-tracker per repo (the module heals
+# BOTH the seed and the meta repo each cycle), mirroring the retired cron's
+# per-repo state files.
+MERGE_LANE_STATE_KEY_BY_LABEL = {
+    "seed": "merge-lane-heal-state-seed",
+    "meta": "merge-lane-heal-state-meta",
+}
 
 # pipeline-health state keys that change every run regardless of material
 # activity (timestamps/counters). Excluded from the selfheal material
@@ -99,6 +112,20 @@ SelfHealPlanner = Callable[[Forge, SelfHealInputs], SelfHealRun]
 StrategyTextReader = Callable[[], str | None]
 NowProvider = Callable[[], str]
 ActionExecutor = Callable[[Forge, object, Sequence[Any]], list[ExecutionResult]]
+MergeLanePlanner = Callable[..., MergeLaneHealRun]
+# (config, repo_slug) -> a GitHub client for that repo. Injectable so tests
+# drive merge-lane-heal with a fake forge instead of real HTTP.
+MergeLaneClientFactory = Callable[[Config, str], Any]
+
+
+def _default_merge_lane_client(config: Config, repo_slug: str) -> Any:
+    """Build a GitHub client bound to ``repo_slug``. Merge-lane-heal always
+    targets GitHub (PRs live there even when the seed forge is Quackback), so
+    this constructs a GitHubClient directly rather than reusing ``self.forge``.
+    Imported lazily to avoid a control_loop ↔ github.client import cycle."""
+    from wgmesh_pipeline.github.client import GitHubClient
+
+    return GitHubClient(replace(config, target_repo=repo_slug))
 
 
 def _utc_now_iso() -> str:
@@ -179,6 +206,8 @@ class ControlLoopScheduler:
     strategy_http_get: HttpGet | None = None
     now_provider: NowProvider = _utc_now_iso
     action_executor: ActionExecutor = execute_actions
+    merge_lane_planner: MergeLanePlanner = run_merge_lane_heal
+    merge_lane_client_factory: MergeLaneClientFactory = _default_merge_lane_client
     _tasks: list[ModuleTask] = field(default_factory=list, init=False)
 
     def __post_init__(self) -> None:
@@ -200,6 +229,11 @@ class ControlLoopScheduler:
                 "strategy_audit",
                 self.config.strategy_audit_interval_seconds,
                 self._cycle_strategy_audit,
+            ),
+            ModuleTask(
+                "merge_lane",
+                self.config.merge_lane_heal_interval_seconds,
+                self._cycle_merge_lane,
             ),
         ]
         for task in self._tasks:
@@ -241,6 +275,7 @@ class ControlLoopScheduler:
             "selfheal": self.config.selfheal_live,
             "observation": self.config.observation_live,
             "strategy_audit": self.config.strategy_audit_live,
+            "merge_lane": self.config.merge_lane_heal_live,
         }
         try:
             return live_by_module[module_name]
@@ -516,3 +551,58 @@ class ControlLoopScheduler:
             result.persisted,
             result.metrics.paid_fetch_status,
         )
+
+    async def _cycle_merge_lane(self) -> None:
+        """Merge-lane-heal across BOTH repos (seed + meta). PRs always live on
+        GitHub even when the seed forge is Quackback, so this builds a dedicated
+        GitHub client per repo (not ``self.forge``). Shadow plans + logs but
+        executes nothing; live rebases/re-arms via the forge + ``rebase.sh`` and
+        persists the per-repo retry tracker on material activity. One repo
+        raising is caught by ``_run_task`` and never blocks the other."""
+        live = self._module_live("merge_lane")
+        # No bot token → no PR reads/writes possible on either repo. Skip the
+        # whole cycle (also keeps tests, which carry no PAT, off the network).
+        if not self.config.wgmesh_bot_pat:
+            self.log.info(
+                "control_loop: module=merge_lane mode=%s skipped=true "
+                "reason=no-bot-token planned_actions=0 executed=0",
+                LIVE if live else SHADOW,
+            )
+            return
+        now = self.now_provider()
+        for label, repo_slug in (
+            ("seed", self.config.target_repo),
+            ("meta", self.config.meta_repo),
+        ):
+            # Per-repo isolation: one repo's HTTP/rebase failure is logged and
+            # never blocks the other (and never the scheduler — _run_task wraps).
+            try:
+                client = self.merge_lane_client_factory(self.config, repo_slug)
+                state_key = MERGE_LANE_STATE_KEY_BY_LABEL[label]
+                prev_state = self._load_state(state_key) or {}
+                run: MergeLaneHealRun = self.merge_lane_planner(
+                    client, prev_state, now, live=live, repo_label=label
+                )
+            except Exception as exc:  # noqa: BLE001 — loud log, isolate the repo
+                self.log.exception(
+                    "control_loop: module=merge_lane repo=%s cycle failed: %s",
+                    label,
+                    exc,
+                )
+                continue
+            action_kinds = [a.kind for a in run.actions]
+            persisted = False
+            if live and run.actions:  # material = something planned/executed
+                fingerprint = _material_fingerprint(run.state, exclude=frozenset())
+                persisted = self._save_state(state_key, run.state, fingerprint)
+            self.log.info(
+                "control_loop: module=merge_lane repo=%s mode=%s "
+                "planned_actions=%s top_actions=%s executed=%s persisted=%s%s",
+                label,
+                LIVE if live else SHADOW,
+                len(run.actions),
+                action_kinds[:3],
+                run.executed,
+                persisted,
+                "" if live else ' reason="module not flipped live"',
+            )
