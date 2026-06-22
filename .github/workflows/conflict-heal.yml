@@ -1,6 +1,6 @@
 name: Conflict Heal
 
-# Bot-PR merge-lane heal across both repos (meta + seed). Two passes:
+# Bot-PR merge-lane heal across both repos (meta + seed). Three passes:
 #
 #   Pass A (rebase) — a bot PR goes CONFLICTING when main moves under it; such a
 #   PR fires no pull_request workflows, so the judge never runs and it dead-ends.
@@ -13,6 +13,13 @@ name: Conflict Heal
 #   pending, not red). Enable auto-merge + push an empty commit to fire the judge.
 #   Pass B runs AFTER Pass A, so a PR the rebase already re-armed (force-push fires
 #   the judge) is no longer a Pass-B candidate.
+#
+#   Pass C (stale-base rebase) — a MERGEABLE bot PR (no conflict) can still be RED
+#   because its branch predates a since-merged fix to main: the failing check is
+#   already resolved on current main. Rebase such PRs (behind main AND failing —
+#   green/current PRs are never force-pushed) onto main so checks re-run against
+#   the fixed tree; reuses Pass A's rebase.sh. Still red after two rebases ⇒ the
+#   failure is in the PR's own diff ⇒ escalate to a human.
 #
 # Cron offset to 01/07/13/19 so it never overlaps pr-disposition's 0 */6.
 
@@ -120,12 +127,26 @@ jobs:
           fi
           python company/scripts/check-rearm/run.py "${args[@]}"
 
+      - name: Run stale-base-heal (Pass C — rebase MERGEABLE stale-base-broken)
+        env:
+          TARGET_REPO: ${{ matrix.target_repo }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+          STALE_BASE_HEAL_STATE: company/stale-base-heal-state-${{ matrix.repo_label }}.json
+        run: |
+          set -euo pipefail
+          args=()
+          if [ "$DRY_RUN" = "true" ]; then
+            args+=(--dry-run)
+          fi
+          python company/scripts/stale-base-heal/run.py "${args[@]}"
+
       - name: Commit state
         if: ${{ (github.event.inputs.dry_run || 'false') != 'true' }}
         env:
           STATE_FILES: >-
             company/conflict-heal-state-${{ matrix.repo_label }}.json
             company/check-rearm-state-${{ matrix.repo_label }}.json
+            company/stale-base-heal-state-${{ matrix.repo_label }}.json
         run: |
           set -euo pipefail
 
@@ -151,7 +172,7 @@ jobs:
           pr_url=$(gh pr create \
             --repo "${{ github.repository }}" \
             --title "chore(merge-lane-heal): update ${{ matrix.repo_label }} state $today" \
-            --body "Automated conflict-heal + check-rearm retry-tracker update." \
+            --body "Automated conflict-heal + check-rearm + stale-base-heal retry-tracker update." \
             --base main \
             --head "$branch")
           echo "Opened state PR: $pr_url"
