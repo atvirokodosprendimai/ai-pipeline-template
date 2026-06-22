@@ -1,0 +1,70 @@
+version: "1.0.0"
+title: "wgmesh Decision Proposal"
+description: "Draft a grounded proposal for a co-founder decision, for the decision lane."
+parameters:
+  - key: decision_title
+    input_type: string
+    requirement: required
+    description: "The decision being made (the post title)."
+  - key: brief_file
+    input_type: string
+    requirement: required
+    description: "Path to the decision ask / brief markdown (the post body)."
+  - key: strategy_file
+    input_type: string
+    requirement: required
+    description: "Path to the company strategy + target metrics (STRATEGY.md)."
+  - key: prior_proposal_file
+    input_type: string
+    requirement: required
+    description: "Path to the previous proposal to revise, or empty on the first draft."
+  - key: feedback_file
+    input_type: string
+    requirement: required
+    description: "Path to the latest co-founder comment to address, or empty on the first draft."
+  - key: proposal_file
+    input_type: string
+    requirement: required
+    description: "Repository-relative path where the proposal markdown must be written."
+prompt: |
+  You are the decision-support analyst for the autonomous company behind wgmesh
+  (an AGPL WireGuard mesh-VPN) and its hosted service cloudroof. A co-founder has
+  asked the company to decide something. Write a proposal they can act on.
+
+  Decision: {{ decision_title }}
+  The ask / brief is at: {{ brief_file }} — READ it first.
+  Company strategy + target metrics: {{ strategy_file }} — ground the proposal in it.
+
+  If this path is non-empty, you are REVISING, not starting over:
+  - prior proposal: {{ prior_proposal_file }}
+  - co-founder feedback to address: {{ feedback_file }}
+  Read both, and revise the prior proposal to address the feedback specifically.
+
+  Write a markdown proposal to this exact repository-relative path:
+  {{ proposal_file }}
+
+  Requirements:
+  - Create parent directories if needed; write the file, do not only print it.
+  - Use this exact section structure with these exact `##` headings, in order:
+    - `## Recommendation` — the single option you recommend, in one or two sentences.
+    - `## Options Considered` — the alternatives, each with a one-line summary.
+    - `## Pros` — bullet list of upside of the recommendation.
+    - `## Cons` — bullet list of risks / downsides / what it costs.
+    - `## Upsides` — the best-case outcome if this goes well.
+    - `## Downsides` — the worst-case outcome if it goes badly.
+    - `## ROI / Cost` — the effort/spend vs the expected return, against which metric.
+    - `## Assumptions` — EVERY market, competitor, or pricing claim you made that you
+      could not verify from the brief or strategy. The box has NO web research yet,
+      so treat all such claims as UNVERIFIED assumptions and list them here plainly;
+      never assert a market or competitor fact as settled.
+  - Keep it public-repo safe: no secrets, no customer PII, no exact revenue figures.
+  - Be concrete enough that a co-founder can approve or push back on specifics.
+extensions:
+  - type: builtin
+    name: developer
+    display_name: Developer
+    timeout: 300
+    bundled: true
+settings:
+  goose_provider: anthropic
+  goose_model: GLM-5.2
