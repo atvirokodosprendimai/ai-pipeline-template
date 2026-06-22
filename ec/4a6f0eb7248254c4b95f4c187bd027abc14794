@@ -1,0 +1,36 @@
+pipeline/wgmesh_pipeline/selfheal/__init__.py
+  s_139190fe0a9213::t_f44b89823e2876 43,53,58
+  s_139190fe0a9213::t_6926319f2ac2f3 85,96
+  s_139190fe0a9213::t_cff5f42812a117 109
+pipeline/tests/test_stale_base_heal.py
+  s_139190fe0a9213::t_ea2aee1af74fa7 1-142
+company/scripts/stale-base-heal/run.py
+  s_139190fe0a9213::t_528265594042b3 1-283
+pipeline/wgmesh_pipeline/selfheal/models.py
+  s_139190fe0a9213::t_a21367d2d4742a 32-40
+  s_139190fe0a9213::t_6ec3ca9b441f19 150-162
+pipeline/wgmesh_pipeline/selfheal/stale_base.py
+  s_139190fe0a9213::t_ef4d41a5e42fc8 1-111
+.github/workflows/conflict-heal.yml
+  s_139190fe0a9213::t_23acd4e9381828 175
+  s_139190fe0a9213::t_b3a54fe193483d 3
+  s_139190fe0a9213::t_fb2e89af96d106 17-23
+  s_139190fe0a9213::t_e474d3df09e705 130-142
+  s_139190fe0a9213::t_ad566ddebf5b44 149
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "ec4a6f0eb7248254c4b95f4c187bd027abc14794",
+  "prompts": {},
+  "sessions": {
+    "s_139190fe0a9213": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5261b5c8-8e19-4fb2-b868-c1739851bf34",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
