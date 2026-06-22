@@ -18,6 +18,9 @@ on:
       server_name:
         description: 'Hetzner server name'
         default: 'wgmesh-pipeline'
+      service:
+        description: 'Which co-resident instance to reconfigure (wgmesh|cloudroof)'
+        default: 'wgmesh'
       env_set:
         description: 'Comma-separated KEY=VALUE flags (e.g. GRAPH_IMPL=langgraph,PIPELINE_MODE=shadow)'
         required: true
@@ -37,6 +40,22 @@ jobs:
           set -euo pipefail
           : "${DEPLOY_SSH_KEY:?DEPLOY_SSH_KEY secret missing}"
           : "${HCLOUD_TOKEN:?HCLOUD_TOKEN secret missing (org)}"
+
+      - name: Resolve service target (unit + env file)
+        env:
+          SERVICE: ${{ github.event.inputs.service }}
+        run: |
+          set -euo pipefail
+          # Default wgmesh → byte-identical to the pre-parameterization behavior
+          # (unit wgmesh-pipeline, env /etc/wgmesh-pipeline/env). cloudroof is the
+          # 2nd co-resident instance. Any other value fails closed.
+          case "${SERVICE:-wgmesh}" in
+            wgmesh)   UNIT=wgmesh-pipeline;   ENV_FILE=/etc/wgmesh-pipeline/env ;;
+            cloudroof) UNIT=cloudroof-pipeline; ENV_FILE=/etc/cloudroof-pipeline/env ;;
+            *) echo "::error::unknown service '${SERVICE}' (expected wgmesh|cloudroof)"; exit 2 ;;
+          esac
+          echo "UNIT=$UNIT" >> "$GITHUB_ENV"
+          echo "ENV_FILE=$ENV_FILE" >> "$GITHUB_ENV"
 
       - name: Install hcloud CLI
         run: |
@@ -63,12 +82,13 @@ jobs:
           printf '%s\n' "$DEPLOY_SSH_KEY" > "$RUNNER_TEMP/deploy_key"
           SSH_ENV_SET=$(printf '%q' "$ENV_SET")
           # UserKnownHostsFile=/dev/null: provision rotates the host key; the
-          # deploy key is the real gate.
+          # deploy key is the real gate. UNIT + ENV_FILE come from the resolve
+          # step (default wgmesh → unchanged).
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               -o ConnectTimeout=15 -i "$RUNNER_TEMP/deploy_key" root@"$BOX_IP" \
-              "ENV_SET=$SSH_ENV_SET bash -se" <<'REMOTE'
+              "ENV_SET=$SSH_ENV_SET UNIT=$UNIT ENV_FILE=$ENV_FILE bash -se" <<'REMOTE'
           set -euo pipefail
-          ENV_FILE=/etc/wgmesh-pipeline/env
+          : "${UNIT:?}" "${ENV_FILE:?}"
           [ -f "$ENV_FILE" ] || { echo "::error::$ENV_FILE missing — run full provision first"; exit 1; }
 
           IFS=',' read -ra PAIRS <<< "$ENV_SET"
@@ -101,18 +121,18 @@ jobs:
           done
 
           restart_ts=$(date "+%Y-%m-%d %H:%M:%S")
-          systemctl restart wgmesh-pipeline
+          systemctl restart "$UNIT"
           sleep 10
-          if ! systemctl is-active --quiet wgmesh-pipeline; then
+          if ! systemctl is-active --quiet "$UNIT"; then
             echo "::error::service not active after restart"
-            journalctl -u wgmesh-pipeline -n 30 --no-pager
+            journalctl -u "$UNIT" -n 30 --no-pager
             exit 1
           fi
-          if journalctl -u wgmesh-pipeline --since "$restart_ts" --no-pager | grep -q "tick"; then
+          if journalctl -u "$UNIT" --since "$restart_ts" --no-pager | grep -q "tick"; then
             echo "healthy: tick observed after restart"
           else
             echo "::warning::service active but no tick yet — check journal"
-            journalctl -u wgmesh-pipeline -n 30 --no-pager
+            journalctl -u "$UNIT" -n 30 --no-pager
           fi
           REMOTE
 

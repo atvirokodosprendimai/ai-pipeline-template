@@ -40,6 +40,7 @@ BOX_CONFIG_ALLOWLIST = frozenset(
         "POLL_INTERVAL_SECONDS",
         "MAX_FILES",
         "FORGE_KIND",
+        "SURFACE_HOME",
     }
 )
 
@@ -66,6 +67,10 @@ def _read_box_config(path: Path = BOX_CONFIG_PATH) -> dict[str, str]:
 
 VALID_MODES = frozenset({"shadow", "spec-only", "live"})
 VALID_DB_MODES = frozenset({"local", "turso"})
+# Which surface this pipeline instance builds (KTD2). The wgmesh instance is
+# ``product`` (default → byte-unchanged); the cloudroof instance sets ``service``.
+VALID_SURFACE_HOMES = frozenset({"product", "service"})
+DEFAULT_SURFACE_HOME = "product"
 DEFAULT_ANTHROPIC_HOST = "https://api.z.ai/api/anthropic"
 DEFAULT_TARGET_REPO = "atvirokodosprendimai/wgmesh"
 DEFAULT_POLL_INTERVAL_SECONDS = 300
@@ -143,6 +148,9 @@ class Config:
     # Graph backend: 'legacy' (default) or 'langgraph' (U4).
     # Selected via GRAPH_IMPL env var; build_graph dispatches on this value.
     graph_impl: str = "legacy"
+    # Which surface this instance builds (KTD2): 'product' (wgmesh, default) or
+    # 'service' (cloudroof). Drives the surface-gate inversion. SURFACE_HOME env.
+    surface_home: str = DEFAULT_SURFACE_HOME
 
     @property
     def owner(self) -> str:
@@ -201,6 +209,15 @@ def load_config(env: Mapping[str, str] | None = None) -> Config:
         valid = ", ".join(sorted(VALID_CONTROL_LOOP_MODES))
         raise ValueError(
             f"CONTROL_LOOP_MODE must be one of: {valid}; got {control_loop_mode!r}"
+        )
+
+    surface_home = (
+        _get_nonempty(source, "SURFACE_HOME") or DEFAULT_SURFACE_HOME
+    ).lower()
+    if surface_home not in VALID_SURFACE_HOMES:
+        valid = ", ".join(sorted(VALID_SURFACE_HOMES))
+        raise ValueError(
+            f"SURFACE_HOME must be one of: {valid}; got {surface_home!r}"
         )
 
     goose_provider = _get_nonempty(source, "GOOSE_PROVIDER") or DEFAULT_GOOSE_PROVIDER
@@ -275,6 +292,7 @@ def load_config(env: Mapping[str, str] | None = None) -> Config:
         meta_repo=_get_nonempty(source, "META_REPO") or DEFAULT_META_REPO,
         executor=(_get_nonempty(source, "EXECUTOR") or "goose").strip().lower(),
         graph_impl=(_get_nonempty(source, "GRAPH_IMPL") or "legacy").strip().lower(),
+        surface_home=surface_home,
     )
     _log_control_loop_module_modes(cfg)
     return cfg

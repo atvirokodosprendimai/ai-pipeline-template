@@ -1,0 +1,39 @@
+[Unit]
+Description=cloudroof autonomous LangGraph pipeline (service surface → cloudroof-eu)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=wgmesh
+Group=wgmesh
+# Shares the wgmesh code install (one checkout of the pipeline + venv); only the
+# EnvironmentFile differs (TARGET_REPO=cloudroof-eu, SURFACE_HOME=service, own DB
+# + checkout). KTD1: 2nd instance, not a multi-repo refactor.
+WorkingDirectory=/opt/wgmesh-pipeline
+# Unbuffered stdout so journald captures poller logs in real time (Python
+# block-buffers stdout when it is not a tty, hiding logs until exit).
+Environment=PYTHONUNBUFFERED=1
+# Secrets + config live here, root-owned chmod 600 — distinct from the wgmesh
+# instance's /etc/wgmesh-pipeline/env so the two processes never share state.
+EnvironmentFile=/etc/cloudroof-pipeline/env
+ExecStart=/opt/wgmesh-pipeline/.venv/bin/python -m wgmesh_pipeline.main
+# main.py installs SIGTERM/SIGINT handlers and shuts down the poll loop
+# gracefully, so a normal stop drains the in-flight tick.
+KillSignal=SIGTERM
+TimeoutStopSec=120
+Restart=on-failure
+RestartSec=10
+# Hardening: the service holds the cloudroof-scoped bot PAT — keep blast radius small.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+# /opt/cloudroof-checkout is the cloudroof-eu working tree goose writes specs into
+# and spec_pr commits/pushes from. The shared /opt/wgmesh-pipeline holds the venv
+# and this instance's state DB (PIPELINE_DB_PATH=/opt/wgmesh-pipeline/cloudroof-state.db);
+# ProtectSystem=strict makes everything outside ReadWritePaths read-only.
+ReadWritePaths=/opt/wgmesh-pipeline /opt/cloudroof-checkout
+
+[Install]
+WantedBy=multi-user.target
