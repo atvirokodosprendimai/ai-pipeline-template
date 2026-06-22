@@ -100,10 +100,14 @@ jobs:
               -i "$RUNNER_TEMP/deploy_key" root@"$BOX_IP" \
               "SPEC_REF=$SSH_SPEC_REF MODEL=$SSH_MODEL ITERS=$SSH_ITERS bash -se" <<'REMOTE'
           set -euo pipefail
-          # set -a: /etc/wgmesh-pipeline/env is a systemd EnvironmentFile (bare
-          # KEY=VALUE, no `export`). Sourcing without auto-export leaves the vars
-          # unexported, so the python subprocess never sees TARGET_REPO etc.
-          set -a; . /etc/wgmesh-pipeline/env; set +a
+          # /etc/wgmesh-pipeline/env is a systemd EnvironmentFile (bare KEY=VALUE,
+          # values may contain spaces/JSON). Parse without sourcing: `. env`
+          # word-splits an unquoted-space value and runs a token as a command
+          # (see feedback_box_env_not_bash_sourceable). export VAR=VALUE as one
+          # arg sets it (and exports) without word-splitting or execution.
+          while IFS= read -r __envline; do
+            case "$__envline" in ''|'#'*) continue ;; *=*) export "$__envline" ;; esac
+          done < /etc/wgmesh-pipeline/env
           : "${WGMESH_BOT_PAT:?WGMESH_BOT_PAT missing on box}"
 
           temp_dir=$(mktemp -d)
@@ -134,7 +138,10 @@ jobs:
           fi
 
           test -f "$temp_dir/$SPEC_REF"
-          set -a; . /etc/wgmesh-pipeline/env; set +a
+          # re-load env (subshell above) — parse, never source (see above)
+          while IFS= read -r __envline; do
+            case "$__envline" in ''|'#'*) continue ;; *=*) export "$__envline" ;; esac
+          done < /etc/wgmesh-pipeline/env
           export LANGCHAIN_MAX_ITERATIONS="$ITERS"
           cd /opt/wgmesh-pipeline
           PYTHONUNBUFFERED=1 /opt/wgmesh-pipeline/.venv/bin/python \
