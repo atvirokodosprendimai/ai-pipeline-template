@@ -42,6 +42,35 @@ def test_full_env_loads_frozen_config_with_shadow_default() -> None:
         cfg.mode = "live"  # type: ignore[misc]
 
 
+def test_surface_home_defaults_product() -> None:
+    cfg = load_config(
+        {"TARGET_REPO": "atvirokodosprendimai/wgmesh", "DATABASE_MODE": "local"}
+    )
+    assert cfg.surface_home == "product"
+
+
+def test_surface_home_service_for_cloudroof_instance() -> None:
+    cfg = load_config(
+        {
+            "TARGET_REPO": "atvirokodosprendimai/cloudroof-eu",
+            "DATABASE_MODE": "local",
+            "SURFACE_HOME": "service",
+        }
+    )
+    assert cfg.surface_home == "service"
+
+
+def test_surface_home_invalid_rejected() -> None:
+    with pytest.raises(ValueError, match="SURFACE_HOME"):
+        load_config(
+            {
+                "TARGET_REPO": "atvirokodosprendimai/wgmesh",
+                "DATABASE_MODE": "local",
+                "SURFACE_HOME": "gtm",
+            }
+        )
+
+
 @pytest.mark.parametrize(
     ("env_name", "field_name"),
     (

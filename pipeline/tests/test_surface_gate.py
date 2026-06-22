@@ -152,3 +152,62 @@ def test_node_classified_product_persists_and_builds() -> None:
     })
     assert out["surface_verdict"] == "build"
     assert (783, "surface:product") in forge.calls
+
+
+# ---- U3: surface-gate inversion (cloudroof instance, surface_home=service) ----
+
+from dataclasses import dataclass as _dc  # noqa: E402
+
+
+@_dc
+class _Cfg:
+    """Minimal stand-in for Config — only ``surface_home`` is read by the node."""
+    surface_home: str = "product"
+
+
+def test_decide_inverted_service_home_builds_service_blocks_product() -> None:
+    from wgmesh_pipeline.graph.nodes.surface_gate import SurfaceResolution
+    d = lambda res: decide_surface_gate(res, "service")
+    assert d(SurfaceResolution("service", 1.0, "label")) == "build"
+    assert d(SurfaceResolution("service", 0.9, "classified")) == "build"
+    assert d(SurfaceResolution("product", 1.0, "label")) == "block_product"
+    assert d(SurfaceResolution("product", 0.8, "classified")) == "block_product"
+    assert d(SurfaceResolution("unknown", 0.0, "none")) == "block_unknown"
+    # low-confidence home (service) guess fails safe, never builds
+    assert d(SurfaceResolution("service", 0.3, "classified")) == "block_unknown"
+
+
+def test_decide_default_surface_home_is_product_unchanged() -> None:
+    # Explicit guard that the default arg keeps the wgmesh path identical.
+    from wgmesh_pipeline.graph.nodes.surface_gate import SurfaceResolution
+    assert decide_surface_gate(SurfaceResolution("product", 1.0, "label")) == "build"
+    assert decide_surface_gate(SurfaceResolution("service", 1.0, "label")) == "block_service"
+
+
+def test_node_service_home_builds_service_label() -> None:
+    forge = FakeForge()
+    out = run_surface_gate({
+        "issue": _issue(labels=("surface:service",)),
+        "github": forge,
+        "config": _Cfg(surface_home="service"),
+    })
+    assert out["surface_verdict"] == "build"
+    assert surface_gate_blocks(out) is False
+
+
+def test_node_service_home_blocks_product_label() -> None:
+    forge = FakeForge()
+    out = run_surface_gate({
+        "issue": _issue(labels=("surface:product",)),
+        "github": forge,
+        "config": _Cfg(surface_home="service"),
+    })
+    assert out["surface_verdict"] == "block_product"
+    assert surface_gate_blocks(out) is True
+
+
+def test_node_default_config_absent_is_product_home() -> None:
+    # No config in state → product home (default); service still blocked.
+    forge = FakeForge()
+    out = run_surface_gate({"issue": _issue(labels=("surface:service",)), "github": forge})
+    assert out["surface_verdict"] == "block_service"

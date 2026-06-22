@@ -1,13 +1,19 @@
-"""Surface gate — keep service (cloudroof) and unclassified issues out of the
-wgmesh impl pipeline.
+"""Surface gate — build only this instance's *home* surface; park everything else.
 
 Runs on the triage→spec seam (both graph impls). It resolves the issue's surface
 (reading the ``surface:*`` label, else classifying title+body via an injected
-LLM callable), then decides:
+LLM callable), then decides against the instance's ``surface_home`` (``product``
+for the wgmesh instance, ``service`` for the cloudroof instance — KTD2):
 
-  - ``product`` (confident)      → ``build``         (the only path to spec→impl)
-  - ``service``                  → ``block_service`` (park; never built in wgmesh)
-  - unknown / low-confidence     → ``block_unknown`` (fail-safe: park, never build)
+  - home surface (confident)     → ``build``          (the only path to spec→impl)
+  - a known, off-home surface    → ``block_<surface>`` (park; built by the OTHER instance)
+  - unknown / low-confidence     → ``block_unknown``   (fail-safe: park, never build)
+
+The default ``surface_home`` is ``product`` so the wgmesh instance is byte-unchanged:
+``product`` builds, ``service`` → ``block_service``, unknown → ``block_unknown``. The
+cloudroof instance sets ``surface_home=service`` (via ``Config.surface_home`` / the
+``SURFACE_HOME`` env), inverting the gate: ``service`` builds, ``product`` →
+``block_product``.
 
 Blocked issues are parked via labels: a classified surface is persisted, and the
 block path (the graph's existing ``escalate``) adds ``needs-human``. Those labels
@@ -32,6 +38,10 @@ log = logging.getLogger("wgmesh_pipeline.surface_gate")
 # Below this, a classifier verdict is not trusted enough to build on — fail safe
 # to block_unknown rather than spec→impl a shaky guess.
 MIN_CONFIDENCE = 0.5
+
+# Which surface THIS pipeline instance builds. Mirrors ``Config.surface_home``;
+# the literal default keeps this module decoupled from config (no import cycle).
+DEFAULT_SURFACE_HOME = "product"
 
 # (title, body) -> (surface, confidence). Injected so tests and the graph wire a
 # real LLM classifier without this module importing a model client.
@@ -69,13 +79,21 @@ def resolve_issue_surface(
     return SurfaceResolution(surface, float(confidence), "classified")
 
 
-def decide_surface_gate(resolution: SurfaceResolution) -> str:
-    """Map a resolved surface to a gate verdict: ``build`` | ``block_service`` |
-    ``block_unknown``. Policy (confidence gating) lives here, not in resolution."""
-    if resolution.surface == "service":
-        return "block_service"
-    if resolution.surface == "product" and resolution.confidence >= MIN_CONFIDENCE:
+def decide_surface_gate(
+    resolution: SurfaceResolution, surface_home: str = DEFAULT_SURFACE_HOME
+) -> str:
+    """Map a resolved surface to a gate verdict against ``surface_home``:
+    ``build`` | ``block_<surface>`` | ``block_unknown``. Policy (confidence
+    gating) lives here, not in resolution.
+
+    The home surface builds only when confident (a low-confidence classified
+    guess at the home surface fails safe to ``block_unknown``). A confident,
+    known off-home surface is parked under its own ``block_<surface>`` verdict so
+    the OTHER instance can claim it. Everything else (unknown) parks unknown."""
+    if resolution.surface == surface_home and resolution.confidence >= MIN_CONFIDENCE:
         return "build"
+    if resolution.surface in ("product", "service") and resolution.surface != surface_home:
+        return f"block_{resolution.surface}"
     return "block_unknown"
 
 
@@ -88,8 +106,13 @@ def run_surface_gate(state: GraphState) -> GraphState:
     next_state.setdefault("visited", []).append("surface_gate")
     issue = next_state["issue"]
     classifier = next_state.get("surface_classifier")
+    # This instance's home surface (Config.surface_home); default product so the
+    # wgmesh instance — and the existing node tests that pass no config — keep the
+    # original product-builds/service-blocks behavior.
+    cfg = next_state.get("config")
+    surface_home = getattr(cfg, "surface_home", DEFAULT_SURFACE_HOME)
     resolution = resolve_issue_surface(issue, classifier_fn=classifier)
-    verdict = decide_surface_gate(resolution)
+    verdict = decide_surface_gate(resolution, surface_home)
     next_state["surface"] = resolution.surface
     next_state["surface_verdict"] = verdict
 
