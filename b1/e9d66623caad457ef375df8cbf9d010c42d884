@@ -1,0 +1,19 @@
+pipeline/tests/test_langchain_agent_prompts.py
+  s_b74ea68e6c35f5::t_089d62b1dc9b02 24
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "b1e9d66623caad457ef375df8cbf9d010c42d884",
+  "prompts": {},
+  "sessions": {
+    "s_b74ea68e6c35f5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "401a8475-8ec4-479f-9685-70462be2819a",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
