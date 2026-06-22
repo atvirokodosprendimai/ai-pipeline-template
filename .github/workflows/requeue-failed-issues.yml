@@ -15,6 +15,10 @@ on:
       target_stage:
         description: 'actionable target stage'
         default: 'spec_ready'
+      reset_queue:
+        description: 'DANGER: clear the ENTIRE issue queue + run history and exit (drains orphaned rows after a forge cutover). Ignores issues/target_stage.'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -53,6 +57,7 @@ jobs:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           ISSUES: ${{ github.event.inputs.issues }}
           TARGET_STAGE: ${{ github.event.inputs.target_stage }}
+          RESET_QUEUE: ${{ github.event.inputs.reset_queue }}
         run: |
           set -euo pipefail
           if [[ ! "$ISSUES" =~ ^[0-9,]*$ ]]; then
@@ -67,9 +72,10 @@ jobs:
           printf '%s\n' "$DEPLOY_SSH_KEY" > "$RUNNER_TEMP/deploy_key"
           SSH_ISSUES=$(printf '%q' "$ISSUES")
           SSH_TARGET_STAGE=$(printf '%q' "$TARGET_STAGE")
+          SSH_RESET_QUEUE=$(printf '%q' "$RESET_QUEUE")
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               -o ConnectTimeout=15 -i "$RUNNER_TEMP/deploy_key" root@"$BOX_IP" \
-              "ISSUES=$SSH_ISSUES TARGET_STAGE=$SSH_TARGET_STAGE bash -se" <<'REMOTE'
+              "ISSUES=$SSH_ISSUES TARGET_STAGE=$SSH_TARGET_STAGE RESET_QUEUE=$SSH_RESET_QUEUE bash -se" <<'REMOTE'
           set -euo pipefail
           # /etc/wgmesh-pipeline/env is a systemd EnvironmentFile (values may
           # contain spaces/JSON, e.g. STAGE_ROUTING). Parse KEY=VALUE WITHOUT
@@ -82,6 +88,14 @@ jobs:
             esac
           done < /etc/wgmesh-pipeline/env
           cd /opt/wgmesh-pipeline
+          if [ "${RESET_QUEUE}" = "true" ]; then
+            # One-shot store wipe (drain orphaned rows after a forge cutover).
+            # --reset-queue-and-exit clears issues+runs then EXITS — it does NOT
+            # start a second poller (that's what plain --reset-queue would do).
+            echo '===== reset queue (clear issues + runs, no restart) ====='
+            /opt/wgmesh-pipeline/.venv/bin/python -m wgmesh_pipeline.main --reset-queue-and-exit 2>&1
+            exit 0
+          fi
           cmd=(/opt/wgmesh-pipeline/.venv/bin/python -m wgmesh_pipeline.main --requeue-failed)
           if [ -n "${ISSUES}" ]; then
             cmd+=(--issues "$ISSUES")

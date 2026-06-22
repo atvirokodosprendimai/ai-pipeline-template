@@ -104,6 +104,28 @@ def test_main_requeue_failed_runs_one_shot_and_does_not_poll(monkeypatch, capsys
     )
 
 
+def test_main_reset_queue_and_exit_clears_and_does_not_poll(monkeypatch, capsys) -> None:
+    store = Store()
+    cfg = Config(
+        target_repo="atvirokodosprendimai/wgmesh", mode="shadow", database_mode="local"
+    )
+
+    async def fail_async_main(*, reset_queue: bool = False) -> None:
+        raise AssertionError("--reset-queue-and-exit must not enter async_main")
+
+    monkeypatch.setattr(main, "load_config", lambda: cfg)
+    monkeypatch.setattr(main, "open_state_store", lambda config: store)
+    monkeypatch.setattr(main, "async_main", fail_async_main)
+
+    main.main(["--reset-queue-and-exit"])
+
+    assert store.reset_calls == 1
+    assert (
+        "[pipeline] reset_queue_and_exit cleared issues=3 runs=4"
+        in capsys.readouterr().err
+    )
+
+
 def test_main_requeue_failed_passes_issue_filter(monkeypatch) -> None:
     store = Store()
     cfg = Config(
