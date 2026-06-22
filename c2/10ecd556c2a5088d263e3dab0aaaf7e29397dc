@@ -1,0 +1,19 @@
+pipeline/wgmesh_pipeline/github/client.py
+  s_139190fe0a9213::t_42551098685e0a 159
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "c210ecd556c2a5088d263e3dab0aaaf7e29397dc",
+  "prompts": {},
+  "sessions": {
+    "s_139190fe0a9213": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5261b5c8-8e19-4fb2-b868-c1739851bf34",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
