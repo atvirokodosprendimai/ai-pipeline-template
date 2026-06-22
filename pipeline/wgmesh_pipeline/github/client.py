@@ -175,6 +175,39 @@ class GitHubClient:
             for s in statuses
         )
 
+    def list_open_pull_requests(
+        self, *, per_page: int = 100, max_prs: int = 200
+    ) -> list[dict[str, Any]]:
+        """All open pull requests: ``[{number, headRefName}]``.
+
+        Paginates up to ``max_prs`` PRs total (sane cap; the box's repos are
+        small). Used by the merge-lane-heal module to build the gather set from
+        which the three planners (conflict/rearm/stale-base) select their
+        candidates. Returns plain dicts so callers can augment them without
+        mutating the API object."""
+        owner = self.config.owner
+        results: list[dict[str, Any]] = []
+        page = 1
+        while len(results) < max_prs:
+            batch = self._request(
+                "GET",
+                f"/repos/{owner}/{self.config.repo}/pulls",
+                params={"state": "open", "per_page": per_page, "page": page},
+            )
+            if not isinstance(batch, list) or not batch:
+                break
+            for item in batch:
+                results.append({
+                    "number": int(item["number"]),
+                    "headRefName": str(item.get("head", {}).get("ref") or ""),
+                })
+                if len(results) >= max_prs:
+                    break
+            if len(batch) < per_page:
+                break
+            page += 1
+        return results
+
     def find_open_pr_number(self, head_branch: str) -> int | None:
         """Open PR number for a head branch, or None. Used to make spec PR
         creation idempotent: a retry after a partial run hits create_pr 422
