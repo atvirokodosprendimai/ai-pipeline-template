@@ -1,0 +1,33 @@
+pipeline/wgmesh_pipeline/quackback_kpi.py
+  s_b74ea68e6c35f5::t_4489eb5943035e 112-114
+  s_b74ea68e6c35f5::t_1651528a153823 1-111,115-149
+pipeline/tests/test_quackback_forge.py
+  s_b74ea68e6c35f5::t_66cee99da5634a 480-502
+.github/workflows/observation-loop.yml
+  s_b74ea68e6c35f5::t_cd0d6f89a9b200 697,699-706
+  s_b74ea68e6c35f5::t_7b2a173a508832 790,792-797
+pipeline/wgmesh_pipeline/forge/quackback_status.py
+  s_b74ea68e6c35f5::t_d396a4ac6381e0 24-30
+pipeline/tests/test_quackback_kpi.py
+  s_b74ea68e6c35f5::t_dda7f15ff1a1c0 1-78,83-84,90-159
+  s_b74ea68e6c35f5::t_4489eb5943035e 79-82,85-89
+pipeline/wgmesh_pipeline/forge/quackback.py
+  s_b74ea68e6c35f5::t_01cf1b4ffb4820 46
+  s_b74ea68e6c35f5::t_79ee414a0e13fd 276-296
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "73da3acde07c58477bc63a7b34c54a26c4b1e1d8",
+  "prompts": {},
+  "sessions": {
+    "s_b74ea68e6c35f5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "401a8475-8ec4-479f-9685-70462be2819a",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
