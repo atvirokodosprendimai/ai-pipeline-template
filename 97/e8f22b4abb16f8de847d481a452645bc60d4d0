@@ -1,0 +1,21 @@
+pipeline/tests/test_decision_policy.py
+  s_b74ea68e6c35f5::t_dddf580f776011 1-46
+pipeline/wgmesh_pipeline/decision_lane/policy.py
+  s_b74ea68e6c35f5::t_8688f56f46c00c 1-43
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "97e8f22b4abb16f8de847d481a452645bc60d4d0",
+  "prompts": {},
+  "sessions": {
+    "s_b74ea68e6c35f5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "401a8475-8ec4-479f-9685-70462be2819a",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
