@@ -1,0 +1,33 @@
+.github/workflows/update-pipeline-box.yml
+  s_266211d5a327a3::t_99befd3fc33d31 19-21,29-31
+  s_266211d5a327a3::t_cd66c44a04e4c8 50-64
+  s_266211d5a327a3::t_2beefec99e02b3 112,114-115
+.github/workflows/install-cloudroof-instance.yml
+  s_266211d5a327a3::t_0366d118334ca4 1-168
+.github/workflows/set-box-env.yml
+  s_266211d5a327a3::t_60de93e9b1bffe 85-86,89,91
+  s_266211d5a327a3::t_c6129f92df3edb 135
+  s_266211d5a327a3::t_854812ad684716 44-59
+  s_266211d5a327a3::t_9bf8fb97936bb1 21-23
+  s_266211d5a327a3::t_d68357fdb3fde9 124,126,128,131
+pipeline/tests/test_box_workflows.py
+  s_266211d5a327a3::t_7b207be9fdd094 1-118
+pipeline/deploy/cloudroof-pipeline.service
+  s_266211d5a327a3::t_002a6822aa882b 1-39
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "423319439e7936b29ad3e94d2be6fe5a9f227948",
+  "prompts": {},
+  "sessions": {
+    "s_266211d5a327a3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3a89956a-215c-407d-afb0-858ccec3651f",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
