@@ -1,0 +1,33 @@
+pipeline/wgmesh_pipeline/github/client.py
+  s_139190fe0a9213::t_ba4e0adcbe3ad3 178-209
+pipeline/tests/test_github_client_list_open_prs.py
+  s_139190fe0a9213::t_c621813d67e972 1-71
+pipeline/wgmesh_pipeline/selfheal/merge_lane.py
+  s_139190fe0a9213::t_c26b3c83add6f0 1-332
+pipeline/tests/test_merge_lane_heal.py
+  s_139190fe0a9213::t_35a4b7d2221c3a 1-306
+pipeline/wgmesh_pipeline/selfheal/models.py
+  s_139190fe0a9213::t_a2224b1bf7416c 32-37
+  s_139190fe0a9213::t_64cf94b3d58496 147-170
+pipeline/wgmesh_pipeline/selfheal/stale_base.py
+  s_139190fe0a9213::t_c26017c5571fa4 1-114
+pipeline/wgmesh_pipeline/selfheal/__init__.py
+  s_139190fe0a9213::t_a664088180d3bc 43,47,52,55,59
+  s_139190fe0a9213::t_b2137a8e019733 87,91,97,100,113
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "222f92e06de2ba9d886ef24e1de2fb908710ec8e",
+  "prompts": {},
+  "sessions": {
+    "s_139190fe0a9213": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5261b5c8-8e19-4fb2-b868-c1739851bf34",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
