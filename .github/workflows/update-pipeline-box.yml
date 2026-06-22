@@ -16,12 +16,19 @@ on:
       server_name:
         description: 'Hetzner server name'
         default: 'wgmesh-pipeline'
+      service:
+        description: 'Which co-resident instance to restart on latest code (wgmesh|cloudroof)'
+        default: 'wgmesh'
   # Reusable so Auto Deploy on Merge can git-reset the box to a green main.
   workflow_call:
     inputs:
       server_name:
         description: 'Hetzner server name'
         default: 'wgmesh-pipeline'
+        type: string
+      service:
+        description: 'Which co-resident instance to restart (wgmesh|cloudroof)'
+        default: 'wgmesh'
         type: string
 
 permissions:
@@ -39,6 +46,21 @@ jobs:
           set -euo pipefail
           : "${DEPLOY_SSH_KEY:?DEPLOY_SSH_KEY secret missing}"
           : "${HCLOUD_TOKEN:?HCLOUD_TOKEN secret missing (org)}"
+
+      - name: Resolve service unit
+        env:
+          SERVICE: ${{ inputs.service }}
+        run: |
+          set -euo pipefail
+          # Both instances share the /opt/wgmesh-pipeline code install; only the
+          # systemd unit restarted differs. Default wgmesh → unchanged (and the
+          # Auto-Deploy-on-Merge caller passes no service, so it stays wgmesh).
+          case "${SERVICE:-wgmesh}" in
+            wgmesh)   UNIT=wgmesh-pipeline ;;
+            cloudroof) UNIT=cloudroof-pipeline ;;
+            *) echo "::error::unknown service '${SERVICE}' (expected wgmesh|cloudroof)"; exit 2 ;;
+          esac
+          echo "UNIT=$UNIT" >> "$GITHUB_ENV"
 
       - name: Install hcloud CLI
         run: |
@@ -87,10 +109,10 @@ jobs:
              echo \"code: \$OLD -> \$NEW\"
              .venv/bin/pip install -q -e '/opt/wgmesh-pipeline/pipeline[turso,trace]'
              chown -R wgmesh:wgmesh /opt/wgmesh-pipeline
-             systemctl restart wgmesh-pipeline
+             systemctl restart $UNIT
              sleep 8
-             systemctl is-active wgmesh-pipeline
-             journalctl -u wgmesh-pipeline -n 5 --no-pager"
+             systemctl is-active $UNIT
+             journalctl -u $UNIT -n 5 --no-pager"
 
       - name: Report
         run: echo "Box updated in place at $BOX_IP — service restarted on latest main."

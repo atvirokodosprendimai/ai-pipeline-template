@@ -1,0 +1,168 @@
+name: Install Cloudroof Instance
+
+# Stand up the SECOND co-resident pipeline instance (cloudroof-pipeline) on the
+# EXISTING box — NON-DESTRUCTIVE. Unlike "Provision Pipeline Box" (which recreates
+# the server and would kill the wgmesh instance), this only adds the 2nd unit:
+# writes /etc/cloudroof-pipeline/env, clones /opt/cloudroof-checkout, installs +
+# enables cloudroof-pipeline.service. Reuses the wgmesh code install + venv
+# (/opt/wgmesh-pipeline) — KTD1: 2nd instance, not a multi-repo refactor.
+#
+# Prereq: the wgmesh box is already provisioned (Provision Pipeline Box) — this
+# fails loudly if /opt/wgmesh-pipeline/.venv is absent.
+#
+# Auth: DEPLOY_SSH_KEY (box deploy key, same as Update/Set-Env). Starts in shadow.
+#
+# Required secrets:
+#   DEPLOY_SSH_KEY        — box SSH (deploy keypair)
+#   HCLOUD_TOKEN    (org) — resolve box IP
+#   ANTHROPIC_API_KEY     — z.ai/GLM key (→ ZAI_API_KEY); shared with wgmesh
+#   CLOUDROOF_BOT_PAT     — fine-grained PAT scoped to cloudroof-eu (read+write);
+#                           required for spec-only/live, omitted in shadow
+# Optional (shared multi-model routing + observability; absent → single z.ai model):
+#   OPENROUTER_API_KEY / DEEPSEEK_API_KEY / OPENAI_API_KEY / MINIMAX_API_KEY
+#   MODEL_REGISTRY / STAGE_ROUTING
+#   LANGFUSE_HOST / LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY
+#   GITGUARDIAN_API_KEY
+
+on:
+  workflow_dispatch:
+    inputs:
+      server_name:
+        description: 'Hetzner server name (same box as wgmesh)'
+        default: 'wgmesh-pipeline'
+      pipeline_mode:
+        description: 'PIPELINE_MODE (start in shadow)'
+        default: 'shadow'
+      poll_interval:
+        description: 'POLL_INTERVAL_SECONDS'
+        default: '300'
+
+permissions:
+  contents: read
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate secrets
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLOUDROOF_BOT_PAT: ${{ secrets.CLOUDROOF_BOT_PAT }}
+          MODE: ${{ github.event.inputs.pipeline_mode }}
+        run: |
+          set -euo pipefail
+          : "${DEPLOY_SSH_KEY:?DEPLOY_SSH_KEY secret missing}"
+          : "${HCLOUD_TOKEN:?HCLOUD_TOKEN secret missing (org)}"
+          : "${ANTHROPIC_API_KEY:?ANTHROPIC_API_KEY secret missing (the z.ai key)}"
+          # spec-only/live perform real cloudroof-eu writes — require the PAT.
+          if [ "${MODE}" != "shadow" ]; then
+            : "${CLOUDROOF_BOT_PAT:?CLOUDROOF_BOT_PAT required for pipeline_mode=${MODE} (real cloudroof-eu writes)}"
+          fi
+
+      - name: Install hcloud CLI
+        run: |
+          set -euo pipefail
+          curl -fsSL https://github.com/hetznercloud/cli/releases/latest/download/hcloud-linux-amd64.tar.gz \
+            | tar xz hcloud
+          sudo mv hcloud /usr/local/bin/
+
+      - name: Resolve box IP
+        env:
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+        run: |
+          set -euo pipefail
+          IP=$(hcloud server ip "${{ github.event.inputs.server_name }}")
+          echo "BOX_IP=$IP" >> "$GITHUB_ENV"
+
+      - name: Write cloudroof env (over SSH — secrets never touch metadata)
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLOUDROOF_BOT_PAT: ${{ secrets.CLOUDROOF_BOT_PAT }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
+          MODEL_REGISTRY: ${{ secrets.MODEL_REGISTRY }}
+          STAGE_ROUTING: ${{ secrets.STAGE_ROUTING }}
+          LANGFUSE_HOST: ${{ secrets.LANGFUSE_HOST }}
+          LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+          LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+          GITGUARDIAN_API_KEY: ${{ secrets.GITGUARDIAN_API_KEY }}
+          MAX_ESCALATION_ATTEMPTS: ${{ vars.MAX_ESCALATION_ATTEMPTS }}
+          MODE: ${{ github.event.inputs.pipeline_mode }}
+          PINT: ${{ github.event.inputs.poll_interval }}
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$RUNNER_TEMP/deploy_key"
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              -o ConnectTimeout=15 -i "$RUNNER_TEMP/deploy_key" root@"$BOX_IP" \
+            "install -d -m 700 /etc/cloudroof-pipeline; umask 077; cat > /etc/cloudroof-pipeline/env" <<EOF
+          PIPELINE_MODE=$MODE
+          TARGET_REPO=atvirokodosprendimai/cloudroof-eu
+          SURFACE_HOME=service
+          CONTROL_LOOP_ENABLED=true
+          WGMESH_BOT_PAT=$CLOUDROOF_BOT_PAT
+          ZAI_API_KEY=$ANTHROPIC_API_KEY
+          ANTHROPIC_HOST=https://api.z.ai/api/anthropic
+          GOOSE_PROVIDER=anthropic
+          GOOSE_MODEL=glm-4.6
+          OPENROUTER_API_KEY=$OPENROUTER_API_KEY
+          DEEPSEEK_API_KEY=$DEEPSEEK_API_KEY
+          OPENAI_API_KEY=$OPENAI_API_KEY
+          MINIMAX_API_KEY=$MINIMAX_API_KEY
+          MODEL_REGISTRY='$MODEL_REGISTRY'
+          STAGE_ROUTING='$STAGE_ROUTING'
+          MAX_ESCALATION_ATTEMPTS=$MAX_ESCALATION_ATTEMPTS
+          GITGUARDIAN_API_KEY=$GITGUARDIAN_API_KEY
+          WGMESH_CHECKOUT_PATH=/opt/cloudroof-checkout
+          DATABASE_MODE=local
+          PIPELINE_DB_PATH=/opt/wgmesh-pipeline/cloudroof-state.db
+          LANGFUSE_HOST=$LANGFUSE_HOST
+          LANGFUSE_PUBLIC_KEY=$LANGFUSE_PUBLIC_KEY
+          LANGFUSE_SECRET_KEY=$LANGFUSE_SECRET_KEY
+          POLL_INTERVAL_SECONDS=${PINT:-300}
+          MAX_FILES=20
+          EOF
+
+      - name: Install unit + checkout + start (shadow)
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          CLOUDROOF_BOT_PAT: ${{ secrets.CLOUDROOF_BOT_PAT }}
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$RUNNER_TEMP/deploy_key"
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              -o ConnectTimeout=15 -i "$RUNNER_TEMP/deploy_key" root@"$BOX_IP" \
+              "CLOUDROOF_BOT_PAT=$(printf '%q' "$CLOUDROOF_BOT_PAT") bash -se" <<'REMOTE'
+          set -euo pipefail
+          # The 2nd instance reuses the wgmesh code install + venv — require it.
+          [ -x /opt/wgmesh-pipeline/.venv/bin/python ] || {
+            echo "::error::/opt/wgmesh-pipeline/.venv missing — run Provision Pipeline Box (wgmesh) first"; exit 1; }
+          install -m 0644 /opt/wgmesh-pipeline/pipeline/deploy/cloudroof-pipeline.service /etc/systemd/system/
+          # Clone the cloudroof-eu working tree goose writes into (idempotent).
+          if [ ! -d /opt/cloudroof-checkout/.git ]; then
+            if [ -n "${CLOUDROOF_BOT_PAT:-}" ]; then
+              git clone "https://x-access-token:${CLOUDROOF_BOT_PAT}@github.com/atvirokodosprendimai/cloudroof-eu.git" /opt/cloudroof-checkout
+            else
+              git clone https://github.com/atvirokodosprendimai/cloudroof-eu.git /opt/cloudroof-checkout
+            fi
+          fi
+          chown -R wgmesh:wgmesh /opt/cloudroof-checkout
+          # cloudroof-state.db lives in the shared (RW) code dir; ensure ownership.
+          touch /opt/wgmesh-pipeline/cloudroof-state.db
+          chown wgmesh:wgmesh /opt/wgmesh-pipeline/cloudroof-state.db
+          systemctl daemon-reload
+          systemctl enable --now cloudroof-pipeline
+          sleep 5
+          systemctl --no-pager status cloudroof-pipeline | head -n 12
+          journalctl -u cloudroof-pipeline --no-pager | tail -n 20
+          systemctl is-active --quiet cloudroof-pipeline || { echo "::error::cloudroof-pipeline not active"; exit 1; }
+          REMOTE
+
+      - name: Report
+        run: echo "cloudroof-pipeline installed on $BOX_IP — started in '${{ github.event.inputs.pipeline_mode }}' mode (co-resident with wgmesh)."
