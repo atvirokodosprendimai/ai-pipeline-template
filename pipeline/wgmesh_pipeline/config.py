@@ -36,6 +36,11 @@ BOX_CONFIG_ALLOWLIST = frozenset(
         "STRATEGY_AUDIT_LIVE",
         "MERGE_LANE_HEAL_LIVE",
         "MERGE_LANE_HEAL_INTERVAL_SECONDS",
+        "DECISION_LANE_LIVE",
+        "DECISION_LANE_INTERVAL_SECONDS",
+        "DECISION_COFOUNDER_COUNT",
+        "DECISION_MAX_ITERATIONS",
+        "DECISION_BOT_AUTHOR",
         "META_REPO",
         "POLL_INTERVAL_SECONDS",
         "MAX_FILES",
@@ -90,6 +95,7 @@ DEFAULT_OBSERVATION_INTERVAL_SECONDS = 28800
 DEFAULT_STRATEGY_AUDIT_INTERVAL_SECONDS = 86400
 # Merge-lane-heal: 6h, matching the retired conflict-heal.yml cron (01/07/13/19).
 DEFAULT_MERGE_LANE_HEAL_INTERVAL_SECONDS = 21600
+DEFAULT_DECISION_LANE_INTERVAL_SECONDS = 3600  # founder decisions, hourly
 # The meta repo (the pipeline's own repo) — merge-lane-heal heals BOTH repos.
 DEFAULT_META_REPO = "atvirokodosprendimai/ai-pipeline-template"
 
@@ -140,6 +146,14 @@ class Config:
     strategy_audit_live: bool = False
     merge_lane_heal_interval_seconds: int = DEFAULT_MERGE_LANE_HEAL_INTERVAL_SECONDS
     merge_lane_heal_live: bool = False
+    # Decision lane (capability-ladder Phase 1). Shadow until flipped live.
+    decision_lane_live: bool = False
+    decision_lane_interval_seconds: int = DEFAULT_DECISION_LANE_INTERVAL_SECONDS
+    decision_cofounder_count: int = 2
+    decision_max_iterations: int = 5
+    # The bot key's authorName on the board — its own comments are excluded from
+    # the "new co-founder comment" iteration trigger (KTD5).
+    decision_bot_author: str = "autobox-box"
     meta_repo: str = DEFAULT_META_REPO
     # Executor backend: 'goose' (default) or 'langchain' (U2).
     # Selected via EXECUTOR env var; factory in executor.py fails closed on unknown values.
@@ -281,6 +295,16 @@ def load_config(env: Mapping[str, str] | None = None) -> Config:
             DEFAULT_MERGE_LANE_HEAL_INTERVAL_SECONDS,
         ),
         merge_lane_heal_live=_get_bool(source, "MERGE_LANE_HEAL_LIVE", False),
+        decision_lane_live=_get_bool(source, "DECISION_LANE_LIVE", False),
+        decision_lane_interval_seconds=_get_int(
+            source,
+            "DECISION_LANE_INTERVAL_SECONDS",
+            DEFAULT_DECISION_LANE_INTERVAL_SECONDS,
+        ),
+        decision_cofounder_count=_get_int(source, "DECISION_COFOUNDER_COUNT", 2),
+        decision_max_iterations=_get_int(source, "DECISION_MAX_ITERATIONS", 5),
+        decision_bot_author=_get_nonempty(source, "DECISION_BOT_AUTHOR")
+        or "autobox-box",
         meta_repo=_get_nonempty(source, "META_REPO") or DEFAULT_META_REPO,
         executor=(_get_nonempty(source, "EXECUTOR") or "goose").strip().lower(),
         graph_impl=(_get_nonempty(source, "GRAPH_IMPL") or "legacy").strip().lower(),
