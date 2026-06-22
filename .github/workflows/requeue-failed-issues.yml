@@ -72,10 +72,14 @@ jobs:
           printf '%s\n' "$DEPLOY_SSH_KEY" > "$RUNNER_TEMP/deploy_key"
           SSH_ISSUES=$(printf '%q' "$ISSUES")
           SSH_TARGET_STAGE=$(printf '%q' "$TARGET_STAGE")
-          SSH_RESET_QUEUE=$(printf '%q' "$RESET_QUEUE")
+          # Pass the reset flag as DO_RESET, NOT RESET_QUEUE: the box env file
+          # (/etc/wgmesh-pipeline/env) already carries RESET_QUEUE=0 (written by
+          # provision), and the env-parse loop below re-exports it — clobbering
+          # any RESET_QUEUE we set here. A distinct name dodges the collision.
+          SSH_DO_RESET=$(printf '%q' "$RESET_QUEUE")
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               -o ConnectTimeout=15 -i "$RUNNER_TEMP/deploy_key" root@"$BOX_IP" \
-              "ISSUES=$SSH_ISSUES TARGET_STAGE=$SSH_TARGET_STAGE RESET_QUEUE=$SSH_RESET_QUEUE bash -se" <<'REMOTE'
+              "ISSUES=$SSH_ISSUES TARGET_STAGE=$SSH_TARGET_STAGE DO_RESET=$SSH_DO_RESET bash -se" <<'REMOTE'
           set -euo pipefail
           # /etc/wgmesh-pipeline/env is a systemd EnvironmentFile (values may
           # contain spaces/JSON, e.g. STAGE_ROUTING). Parse KEY=VALUE WITHOUT
@@ -88,7 +92,7 @@ jobs:
             esac
           done < /etc/wgmesh-pipeline/env
           cd /opt/wgmesh-pipeline
-          if [ "${RESET_QUEUE}" = "true" ]; then
+          if [ "${DO_RESET}" = "true" ]; then
             # One-shot store wipe (drain orphaned rows after a forge cutover).
             # --reset-queue-and-exit clears issues+runs then EXITS — it does NOT
             # start a second poller (that's what plain --reset-queue would do).
