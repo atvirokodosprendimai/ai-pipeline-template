@@ -144,6 +144,49 @@ def test_happy_one_accepted_post_queued_once(store: StateStore) -> None:
     assert branch.rsplit("-", 1)[1] == str(n)
 
 
+def test_reconcile_carries_post_body_as_brief(store: StateStore) -> None:
+    # The PM brief in the post body must reach the builder (not title-only).
+    brief = "## Problem\nTrial drop-off.\n## Acceptance Criteria\n- lead form\n"
+    post = {
+        "id": "post_01",
+        "title": "Add SSO",
+        "updatedAt": "2026-06-21T00:00:00Z",
+        "content": brief,
+    }
+    reconcile_quackback(FakeQuackbackForge([post]), store)
+
+    record = store.list_issues()[0]
+    assert record.body == brief
+
+
+def test_reconcile_drops_body_that_fails_sanitise(
+    store: StateStore, monkeypatch
+) -> None:
+    # A body that fails the sanitise wall degrades to empty (build from title),
+    # never leaks into a public spec — the issue is still queued.
+    monkeypatch.setattr(
+        "wgmesh_pipeline.graph.nodes.review.run_sanitise", lambda _t: False
+    )
+    post = {
+        "id": "post_01",
+        "title": "Add SSO",
+        "updatedAt": "2026-06-21T00:00:00Z",
+        "content": "leaks a secret",
+    }
+    result = reconcile_quackback(FakeQuackbackForge([post]), store)
+
+    assert result.queued == 1  # still queued (title is safe)
+    assert store.list_issues()[0].body == ""  # unsafe brief dropped
+
+
+def test_migration_0004_adds_issue_body_column(store: StateStore) -> None:
+    cols = {
+        str(r["name"])
+        for r in store._conn.execute("PRAGMA table_info(issues)").fetchall()
+    }
+    assert "body" in cols
+
+
 def test_idempotent_same_post_twice_one_row_second_queued_zero(
     store: StateStore,
 ) -> None:

@@ -27,12 +27,17 @@ class FakeRunner:
             "## Acceptance Criteria\n- Passes.\n\n"
             "## Out of scope\n- Nothing else.\n"
         )
+        # Capture the brief file's content WHILE it exists — spec_node unlinks
+        # it in a finally, so it's gone by the time the test asserts.
+        brief_path = params.get("issue_brief_file") or ""
+        brief_content = Path(brief_path).read_text() if brief_path else ""
         self.calls.append(
             {
                 "recipe": recipe,
                 "workdir": workdir,
                 "params": params,
                 "expected_output": expected_output,
+                "brief_content": brief_content,
             }
         )
         return GooseResult(ok=True, output_path=output, duration_seconds=0.01, raw_log="ok")
@@ -74,8 +79,31 @@ def test_spec_node_resolves_recipe_path_and_passes_issue_params(tmp_path: Path) 
     assert call["params"] == {
         "issue_number": "18",
         "issue_title": "Add managed ingress",
+        "issue_brief_file": "",  # no body in state → empty path → title fallback
         "spec_file": "specs/issue-18-spec.md",
     }
+
+
+def test_spec_node_hands_the_brief_to_the_recipe_as_a_file(tmp_path: Path) -> None:
+    # The PM brief (issue_body) must reach the builder as a file path (it is
+    # multi-line, so it can't be an inline recipe param), and the file must
+    # carry the brief verbatim.
+    runner = FakeRunner(calls=[])
+    brief = "## Problem\nTrial drop-off.\n## ROI / Impact\n+5% conversion.\n"
+    spec_node(
+        {
+            "issue": GitHubIssue(number=42, title="Onboarding fix", labels=(), state="open"),
+            "issue_body": brief,
+            "repo_path": tmp_path,
+            "goose_runner": runner,
+            "config": Config(target_repo="atvirokodosprendimai/wgmesh"),
+        }
+    )
+
+    call = runner.calls[0]
+    assert call["params"]["issue_brief_file"]  # non-empty path
+    assert call["params"]["issue_brief_file"].endswith(".md")
+    assert call["brief_content"] == brief
 
 
 def test_spec_node_puts_spec_content_in_state_for_judge(tmp_path: Path) -> None:

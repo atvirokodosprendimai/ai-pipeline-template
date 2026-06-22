@@ -1,0 +1,11 @@
+-- +migrate Up
+-- Carry the Build Suggestion brief (post body) through to the builder.
+--
+-- The box used to build from the issue TITLE alone — reconcile carried title
+-- only and the spec recipe took title only. A Quackback Build Suggestion now
+-- carries a PM-grade brief (Problem / Pros / Cons / ROI / Acceptance) in its
+-- body; this column threads that brief to the spec agent so it builds from the
+-- brief, not the title. The body is sanitised at ingest (reconcile_quackback),
+-- so the KTD10 PII concern is handled by the wall, not by dropping the body.
+-- Nullable + default '': old rows and the github fallback path stay title-only.
+ALTER TABLE issues ADD COLUMN body TEXT DEFAULT '';

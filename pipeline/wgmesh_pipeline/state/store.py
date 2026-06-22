@@ -55,6 +55,7 @@ class IssueRecord:
     impl_pr: int | None
     last_error: str | None
     updated_at: datetime
+    body: str = ""
 
 
 class StateStore:
@@ -120,6 +121,7 @@ class StateStore:
         impl_pr: int | None = None,
         last_error: str | None = None,
         updated_at: datetime | None = None,
+        body: str | None = None,
     ) -> IssueRecord:
         if stage not in ALLOWED_TRANSITIONS:
             raise ValueError(f"unknown issue stage: {stage}")
@@ -128,9 +130,9 @@ class StateStore:
             """
             INSERT INTO issues (
               number, title, classification, stage, status, risk_tier,
-              attempts, spec_pr, impl_pr, last_error, updated_at
+              attempts, spec_pr, impl_pr, last_error, updated_at, body
             )
-            VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)
             ON CONFLICT(number) DO UPDATE SET
               title=excluded.title,
               classification=COALESCE(excluded.classification, issues.classification),
@@ -140,7 +142,8 @@ class StateStore:
               spec_pr=COALESCE(excluded.spec_pr, issues.spec_pr),
               impl_pr=COALESCE(excluded.impl_pr, issues.impl_pr),
               last_error=excluded.last_error,
-              updated_at=excluded.updated_at
+              updated_at=excluded.updated_at,
+              body=COALESCE(excluded.body, issues.body)
             """,
             (
                 number,
@@ -153,6 +156,7 @@ class StateStore:
                 impl_pr,
                 last_error,
                 _iso(now),
+                body,
             ),
         )
         self._conn.commit()
@@ -624,6 +628,7 @@ def _issue(row: sqlite3.Row) -> IssueRecord:
         impl_pr=row["impl_pr"],
         last_error=row["last_error"],
         updated_at=_parse(str(row["updated_at"])),
+        body=str(row["body"]) if ("body" in row.keys() and row["body"] is not None) else "",
     )
 
 
