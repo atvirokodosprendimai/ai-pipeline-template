@@ -61,7 +61,7 @@ def test_injected_connection_adapter_roundtrip() -> None:
     assert len(db.list_runs()) == 1
     # migrations tracked through the adapter
     versions = [r["version"] for r in db._conn.execute("SELECT version FROM schema_migrations").fetchall()]
-    assert versions == ["0001", "0002", "0003", "0004"]
+    assert versions == ["0001", "0002", "0003", "0004", "0005"]
 
 
 def test_reset_queue_clears_issues_and_runs_idempotently(tmp_path) -> None:
@@ -79,7 +79,7 @@ def test_reset_queue_clears_issues_and_runs_idempotently(tmp_path) -> None:
     assert db.list_issues() == []
     assert db.list_runs() == []
     versions = [r["version"] for r in db._conn.execute("SELECT version FROM schema_migrations").fetchall()]
-    assert versions == ["0001", "0002", "0003", "0004"]
+    assert versions == ["0001", "0002", "0003", "0004", "0005"]
 
 
 def test_requeue_failed_all_preserves_linkage_and_clears_attempts(tmp_path) -> None:
@@ -193,7 +193,7 @@ def test_migrations_apply_idempotently(tmp_path) -> None:
     assert db.get_issue(1).stage == "queued"
     # schema_migrations records the initial migration exactly once
     versions = [r["version"] for r in db._conn.execute("SELECT version FROM schema_migrations").fetchall()]
-    assert versions == ["0001", "0002", "0003", "0004"]
+    assert versions == ["0001", "0002", "0003", "0004", "0005"]
 
 
 def test_sqlite_connection_uses_wal_and_busy_timeout(tmp_path) -> None:

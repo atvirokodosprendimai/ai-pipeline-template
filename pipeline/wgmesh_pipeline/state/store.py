@@ -504,6 +504,49 @@ class StateStore:
         ).fetchone()
         return None if row is None else str(row["quackback_post_id"])
 
+    # ----------------------------------------------------- decision lane (U4)
+
+    def get_decision_state(self, post_id: str) -> dict[str, Any] | None:
+        """Iteration state for a decision post: ``{last_comment_id, iterations}``
+        or ``None`` if the lane has never drafted a proposal for it."""
+        row = self._conn.execute(
+            "SELECT last_comment_id, iterations FROM decision_posts WHERE post_id = ?",
+            (post_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        return {
+            "last_comment_id": row["last_comment_id"],
+            "iterations": int(row["iterations"]),
+        }
+
+    def record_decision_proposal(
+        self, post_id: str, *, last_comment_id: str | None
+    ) -> int:
+        """Mark a proposal drafted for ``post_id`` in response to ``last_comment_id``
+        (None on the first draft), bumping the iteration counter. Returns the new
+        iteration count — the caller enforces the max-iteration loop guard."""
+        row = self._conn.execute(
+            "SELECT iterations FROM decision_posts WHERE post_id = ?",
+            (post_id,),
+        ).fetchone()
+        if row is None:
+            self._conn.execute(
+                "INSERT INTO decision_posts(post_id, last_comment_id, iterations, updated_at) "
+                "VALUES (?, ?, 1, ?)",
+                (post_id, last_comment_id, _iso(_now())),
+            )
+            self._conn.commit()
+            return 1
+        iterations = int(row["iterations"]) + 1
+        self._conn.execute(
+            "UPDATE decision_posts SET last_comment_id = ?, iterations = ?, updated_at = ? "
+            "WHERE post_id = ?",
+            (last_comment_id, iterations, _iso(_now()), post_id),
+        )
+        self._conn.commit()
+        return iterations
+
 
 class _MappingCursor:
     """Wraps a libsql cursor so fetchone/fetchall return name-accessible dict
