@@ -40,6 +40,7 @@ from wgmesh_pipeline.selfheal.models import (
     ESCALATE_COOLDOWN_HOURS,
     HEAL_KIND_CHECK_REARM,
     HEAL_KIND_CONFLICT_REBASE,
+    HEAL_KIND_STALE_BASE_REBASE,
     IDLE_DISPATCH_COOLDOWN_SECONDS,
     MAX_RETRIES_BEFORE_ESCALATE,
     REARM_RECHECK_COOLDOWN_HOURS,
@@ -49,10 +50,12 @@ from wgmesh_pipeline.selfheal.models import (
     HealAction,
     SelfHealInputs,
     SelfHealRun,
+    StaleBaseHealPlan,
     SweepOutcome,
 )
 from wgmesh_pipeline.selfheal.rearm import plan_check_rearm
 from wgmesh_pipeline.selfheal.retry_policy import Decision, apply_retry_gate
+from wgmesh_pipeline.selfheal.stale_base import plan_stale_base_heal
 from wgmesh_pipeline.selfheal.runner import needs_human_from_forge, run_self_heal
 from wgmesh_pipeline.selfheal.signals import (
     assert_state_mutation,
@@ -79,6 +82,7 @@ __all__ = [
     "ESCALATE_COOLDOWN_HOURS",
     "HEAL_KIND_CHECK_REARM",
     "HEAL_KIND_CONFLICT_REBASE",
+    "HEAL_KIND_STALE_BASE_REBASE",
     "IDLE_DISPATCH_COOLDOWN_SECONDS",
     "MAX_RETRIES_BEFORE_ESCALATE",
     "REARM_RECHECK_COOLDOWN_HOURS",
@@ -89,6 +93,7 @@ __all__ = [
     "HealAction",
     "SelfHealInputs",
     "SelfHealRun",
+    "StaleBaseHealPlan",
     "SweepOutcome",
     "apply_retry_gate",
     "assert_state_mutation",
@@ -101,6 +106,7 @@ __all__ = [
     "needs_human_from_forge",
     "plan_check_rearm",
     "plan_conflict_heal",
+    "plan_stale_base_heal",
     "run_self_heal",
     "sweep_needs_human",
     "sweep_stale_approved",

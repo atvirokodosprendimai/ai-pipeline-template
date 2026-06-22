@@ -29,6 +29,15 @@ HEAL_KIND_CONFLICT_REBASE = "conflict_rebase"
 # conflict value (a PR that can't be armed in 2 tries needs a human).
 HEAL_KIND_CHECK_REARM = "check_rearm"
 REARM_RECHECK_COOLDOWN_HOURS = 6
+# Stale-base-heal: a MERGEABLE bot PR (no conflict) can still be RED because its
+# branch was cut before a since-merged fix to main — its tree is stale and the
+# failing check is already resolved on current main. conflict-heal only rebases
+# CONFLICTING PRs, so these stay frozen. We rebase them onto main so checks
+# re-run against the fixed tree. Only ever touch a PR that is behind main AND has
+# a failing check (a green-or-current PR needs no force-push — thrash guard). If
+# it still fails after the shared retry cap, the failure is in the PR's own diff,
+# not a stale base → escalate. Cooldown reuses the conflict value.
+HEAL_KIND_STALE_BASE_REBASE = "stale_base_rebase"
 IDLE_DISPATCH_COOLDOWN_SECONDS = 6 * 60 * 60
 CHECK_INTERVAL_HOURS = 0.5
 ACTIVE_PIPELINE_LABELS = (
@@ -132,6 +141,19 @@ class CheckRearmPlan:
     ``escalate`` actions plus the retry tracker the executor persists. Like the
     conflict planner, it does NOT record the re-arm attempt — the executor
     reports the outcome and the next cycle's tracker reflects it."""
+
+    actions: tuple[HealAction, ...] = ()
+    tracker: dict[str, Any] = field(default_factory=dict)
+    dry_run: bool = False
+
+
+@dataclass(frozen=True)
+class StaleBaseHealPlan:
+    """Result of the pure stale-base-heal planner: the planned
+    ``stale_base_rebase`` / ``escalate`` actions plus the retry tracker the
+    executor persists. Like the conflict planner, it does NOT increment a rebase
+    attempt — the executor reports the outcome and the next cycle's tracker
+    reflects it (R5: clean rebase resets, failure increments)."""
 
     actions: tuple[HealAction, ...] = ()
     tracker: dict[str, Any] = field(default_factory=dict)
