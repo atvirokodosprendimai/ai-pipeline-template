@@ -279,3 +279,81 @@ def test_create_tag_malformed_payload_raises() -> None:
 
     with pytest.raises(QuackbackError, match="missing 'data' object"):
         client.create_tag("growth")
+
+
+# ------------------------------------------------------- decision lane reads (U1/U2)
+
+
+def test_list_comments_returns_thread_with_author_fields() -> None:
+    body = json.dumps(
+        {
+            "data": [
+                {
+                    "id": "c1",
+                    "principalId": "prin_founder",
+                    "authorName": "marty",
+                    "isTeamMember": True,
+                    "content": "lower the tier",
+                    "createdAt": "2026-06-22T10:00:00Z",
+                }
+            ]
+        }
+    )
+    client, http = _client(
+        [("GET", "/posts/post_01/comments", HttpResponse(200, body))]
+    )
+
+    comments = client.list_comments("post_01")
+
+    assert len(comments) == 1
+    assert comments[0]["authorName"] == "marty"
+    assert comments[0]["isTeamMember"] is True
+    assert http.calls[0]["method"] == "GET"
+
+
+def test_list_comments_empty_thread_is_empty_list() -> None:
+    client, _ = _client(
+        [("GET", "/posts/post_01/comments", HttpResponse(200, json.dumps({"data": []})))]
+    )
+
+    assert client.list_comments("post_01") == []
+
+
+def test_list_comments_malformed_payload_raises() -> None:
+    # 200 but no 'data' array — must fail closed, never read as "no feedback".
+    client, _ = _client(
+        [("GET", "/posts/post_01/comments", HttpResponse(200, json.dumps({"ok": 1})))]
+    )
+
+    with pytest.raises(QuackbackError, match="missing 'data' array"):
+        client.list_comments("post_01")
+
+
+def test_list_comments_api_error_raises() -> None:
+    client, _ = _client(
+        [("GET", "/posts/post_01/comments", HttpResponse(503, "down"))]
+    )
+
+    with pytest.raises(QuackbackError):
+        client.list_comments("post_01")
+
+
+def test_get_vote_count_reads_vote_count_off_post() -> None:
+    body = json.dumps({"data": {"id": "post_01", "title": "t", "voteCount": 3}})
+    client, _ = _client([("GET", "/posts/post_01", HttpResponse(200, body))])
+
+    assert client.get_vote_count("post_01") == 3
+
+
+def test_get_vote_count_missing_field_is_zero() -> None:
+    body = json.dumps({"data": {"id": "post_01", "title": "t"}})
+    client, _ = _client([("GET", "/posts/post_01", HttpResponse(200, body))])
+
+    assert client.get_vote_count("post_01") == 0
+
+
+def test_get_vote_count_api_error_raises() -> None:
+    client, _ = _client([("GET", "/posts/post_01", HttpResponse(500, "boom"))])
+
+    with pytest.raises(QuackbackError):
+        client.get_vote_count("post_01")
