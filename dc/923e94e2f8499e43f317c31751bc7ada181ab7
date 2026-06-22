@@ -1,0 +1,23 @@
+docs/plans/2026-06-22-001-merge-lane-heal-to-box-plan.md
+  s_139190fe0a9213::t_ebcd81de62ae6a 1-67
+pipeline/wgmesh_pipeline/github/client.py
+  s_139190fe0a9213::t_6960a5f60e6651 137-177
+pipeline/tests/test_github_client_merge_lane_accessors.py
+  s_139190fe0a9213::t_8717ae4acfade7 1-105
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "dc923e94e2f8499e43f317c31751bc7ada181ab7",
+  "prompts": {},
+  "sessions": {
+    "s_139190fe0a9213": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5261b5c8-8e19-4fb2-b868-c1739851bf34",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
