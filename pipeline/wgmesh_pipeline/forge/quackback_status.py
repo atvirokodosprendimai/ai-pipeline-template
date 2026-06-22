@@ -21,6 +21,13 @@ BOX_SETTABLE_STATUSES: frozenset[str] = frozenset(
 # status are the box's work queue.
 ACCEPTED_FOR_BUILD = "Accepted for Build"
 
+# The founder-attention backlog (cutover U3 KPI): posts still awaiting a human
+# decision. The age of the OLDEST post in these statuses is the queue-health
+# signal that replaces the GitHub open-issue-age KPI once issues live on the
+# Quackback board — a rising oldest-undecided age is the silent-stall canary
+# (no founder vote → nothing builds), the explicit mitigation for KTD3.
+UNDECIDED_STATUSES: frozenset[str] = frozenset({"Open for Vote", "Needs Refinement"})
+
 # The lane the box owns end-to-end: a post that has been accepted and is being
 # driven to ship moves through these statuses (the accept marker + the three
 # box-settable milestones). A post in this lane is the box's to mirror; a post

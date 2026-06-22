@@ -43,7 +43,7 @@ from wgmesh_pipeline.forge.quackback_status import (
     BOX_SETTABLE_STATUSES,
     is_box_settable,
 )
-from wgmesh_pipeline.github.client import GitHubClient
+from wgmesh_pipeline.github.client import DryRunResult, GitHubClient
 
 log = logging.getLogger("wgmesh_pipeline.forge.quackback")
 
@@ -273,7 +273,27 @@ class QuackbackForge:
         return self._gh.close_pr(number, comment)
 
     def dispatch_workflow(self, workflow: str, inputs: dict[str, Any]) -> Any:
-        return self._gh.dispatch_workflow(workflow, inputs)
+        """HOST SEAM (cutover U1): under the Quackback decision layer the box's
+        own ``_cycle_observation`` is the sole Build-Suggestion creator, so
+        firing the GitHub Actions ``observation-loop`` (whose creation steps are
+        muted post-cutover) would be a no-op at best and a double-create race at
+        worst. Mirror the Gitea seam: no-op-and-warn, return a ``DryRunResult``
+        marker (no HTTP, never touches ``_gh``) so an idle signal can't re-arm a
+        creation-disabled workflow."""
+        log.warning(
+            "dispatch_workflow(%r) skipped under forge_kind=quackback — the box "
+            "observation loop is the successor creator (cutover U1 host seam)",
+            workflow,
+        )
+        return DryRunResult(
+            dry_run=True,
+            operation="dispatch_workflow",
+            payload={
+                "unsupported_host": "quackback",
+                "workflow": workflow,
+                "inputs": dict(inputs),
+            },
+        )
 
     # Labels are a GitHub PR concern here → _gh (the conformance split routes
     # them to the code backend, not the decision board).
