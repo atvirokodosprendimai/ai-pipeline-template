@@ -40,6 +40,9 @@ BOX_CONFIG_ALLOWLIST = frozenset(
         "POLL_INTERVAL_SECONDS",
         "MAX_FILES",
         "FORGE_KIND",
+        # Quackback Build Suggestions board id — non-secret, lets the cutover
+        # set it via box-config or set-box-env (the URL/token stay secrets).
+        "QUACKBACK_BOARD_ID",
     }
 )
 
@@ -109,6 +112,7 @@ class Config:
     gitea_url: str | None = None
     quackback_url: str | None = None
     quackback_token: str | None = None
+    quackback_board_id: str | None = None
     database_mode: str = "local"
     database_path: str = "pipeline/state.db"
     turso_url: str | None = None
@@ -189,9 +193,13 @@ def load_config(env: Mapping[str, str] | None = None) -> Config:
     forge_kind = _get_nonempty(source, "FORGE_KIND") or "github"
     quackback_url = _get_nonempty(source, "QUACKBACK_URL")
     quackback_token = _get_nonempty(source, "QUACKBACK_TOKEN")
-    if forge_kind == "quackback" and not (quackback_url and quackback_token):
+    quackback_board_id = _get_nonempty(source, "QUACKBACK_BOARD_ID")
+    if forge_kind == "quackback" and not (
+        quackback_url and quackback_token and quackback_board_id
+    ):
         raise ValueError(
-            "forge_kind=quackback requires QUACKBACK_URL and QUACKBACK_TOKEN"
+            "forge_kind=quackback requires QUACKBACK_URL, QUACKBACK_TOKEN, "
+            "and QUACKBACK_BOARD_ID"
         )
 
     control_loop_mode = (
@@ -224,6 +232,7 @@ def load_config(env: Mapping[str, str] | None = None) -> Config:
         gitea_url=_get_nonempty(source, "GITEA_URL"),
         quackback_url=quackback_url,
         quackback_token=quackback_token,
+        quackback_board_id=quackback_board_id,
         poll_interval_seconds=_get_int(
             source, "POLL_INTERVAL_SECONDS", DEFAULT_POLL_INTERVAL_SECONDS
         ),

@@ -362,10 +362,12 @@ def test_quackback_forge_with_creds_loads_successfully() -> None:
             "FORGE_KIND": "quackback",
             "QUACKBACK_URL": "https://quackback.example.com",
             "QUACKBACK_TOKEN": "secret-token",
+            "QUACKBACK_BOARD_ID": "board_01abc",
         }
     )
     assert cfg.quackback_url == "https://quackback.example.com"
     assert cfg.quackback_token == "secret-token"
+    assert cfg.quackback_board_id == "board_01abc"
 
 
 def test_quackback_forge_missing_token_raises_value_error() -> None:
@@ -375,9 +377,34 @@ def test_quackback_forge_missing_token_raises_value_error() -> None:
                 **_MINIMAL_ENV,
                 "FORGE_KIND": "quackback",
                 "QUACKBACK_URL": "https://quackback.example.com",
+                "QUACKBACK_BOARD_ID": "board_01abc",
                 # QUACKBACK_TOKEN intentionally absent
             }
         )
+
+
+def test_quackback_forge_missing_board_id_raises_value_error() -> None:
+    # The cutover (U2) needs the board id at config time — a misconfigured box
+    # must fail loudly, not fall back to github or KeyError at first create.
+    with pytest.raises(ValueError, match="QUACKBACK_BOARD_ID"):
+        load_config(
+            {
+                **_MINIMAL_ENV,
+                "FORGE_KIND": "quackback",
+                "QUACKBACK_URL": "https://quackback.example.com",
+                "QUACKBACK_TOKEN": "secret-token",
+                # QUACKBACK_BOARD_ID intentionally absent
+            }
+        )
+
+
+def test_quackback_board_id_passes_through_box_config_allowlist(tmp_path: Path) -> None:
+    from wgmesh_pipeline.config import _read_box_config
+
+    path = tmp_path / "box-config.json"
+    path.write_text(json.dumps({"QUACKBACK_BOARD_ID": "board_01xyz"}), encoding="utf-8")
+    allowed = _read_box_config(path)
+    assert allowed.get("QUACKBACK_BOARD_ID") == "board_01xyz"
 
 
 def test_github_forge_without_quackback_vars_is_fine() -> None:

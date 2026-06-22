@@ -72,7 +72,14 @@ class QuackbackForge:
         # false-matches a constructor argument.
         self._gh = gh_client if gh_client is not None else GitHubClient(config)
         self._qb = qb_client if qb_client is not None else QuackbackClient(config)
-        self._board_id = board_id or os.environ.get(BOARD_ID_ENV)
+        # Prefer the explicit arg, then Config (promoted in the cutover U2), then
+        # the env var (back-compat). load_config fail-closes when forge_kind is
+        # quackback and the board id is unset, so this is non-None in production.
+        self._board_id = (
+            board_id
+            or getattr(config, "quackback_board_id", None)
+            or os.environ.get(BOARD_ID_ENV)
+        )
         # Store-backed fallback resolver for ids not in the in-memory _id_map.
         # Posts ingested via the U4 store mapping (reconcile_quackback) never
         # touched _id_map, so set_status/comment/get_issue would KeyError on them
