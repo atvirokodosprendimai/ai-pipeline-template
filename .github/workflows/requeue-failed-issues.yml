@@ -71,9 +71,16 @@ jobs:
               -o ConnectTimeout=15 -i "$RUNNER_TEMP/deploy_key" root@"$BOX_IP" \
               "ISSUES=$SSH_ISSUES TARGET_STAGE=$SSH_TARGET_STAGE bash -se" <<'REMOTE'
           set -euo pipefail
-          set -a
-          . /etc/wgmesh-pipeline/env
-          set +a
+          # /etc/wgmesh-pipeline/env is a systemd EnvironmentFile (values may
+          # contain spaces/JSON, e.g. STAGE_ROUTING). Parse KEY=VALUE WITHOUT
+          # sourcing — `. env` word-splits an unquoted-space value and runs a
+          # token as a command (see feedback_box_env_not_bash_sourceable).
+          while IFS= read -r __envline; do
+            case "$__envline" in
+              ''|'#'*) continue ;;
+              *=*) export "$__envline" ;;
+            esac
+          done < /etc/wgmesh-pipeline/env
           cd /opt/wgmesh-pipeline
           cmd=(/opt/wgmesh-pipeline/.venv/bin/python -m wgmesh_pipeline.main --requeue-failed)
           if [ -n "${ISSUES}" ]; then

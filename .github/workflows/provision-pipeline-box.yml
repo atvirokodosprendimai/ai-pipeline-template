@@ -233,9 +233,13 @@ jobs:
           REPO_URL="https://github.com/${{ github.repository }}.git"
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i "$RUNNER_TEMP/box_key" root@"$BOX_IP" \
             "set -euo pipefail
-             set -a
-             . /etc/wgmesh-pipeline/env
-             set +a
+             # systemd EnvironmentFile — parse KEY=VALUE, never source: a value
+             # with spaces/JSON would word-split and run as a command under \`.\`
+             # (see feedback_box_env_not_bash_sourceable). \$ escaped so the loop
+             # var resolves on the box, not the runner.
+             while IFS= read -r __envline; do
+               case \"\$__envline\" in ''|'#'*) continue ;; *=*) export \"\$__envline\" ;; esac
+             done < /etc/wgmesh-pipeline/env
              git clone --depth 1 '$REPO_URL' /opt/wgmesh-pipeline || (cd /opt/wgmesh-pipeline && git pull)
              if [ '${{ github.event.inputs.database_mode }}' = 'turso' ]; then EXTRA='[turso,trace]'; else EXTRA='[trace]'; fi
              python3 -m venv /opt/wgmesh-pipeline/.venv
