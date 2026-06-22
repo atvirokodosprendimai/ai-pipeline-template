@@ -1,0 +1,32 @@
+pipeline/wgmesh_pipeline/graph/nodes/surface_gate.py
+  s_266211d5a327a3::t_6880f303b6c125 42-45
+  s_266211d5a327a3::t_1275c2efd898e8 1,5-6,8-16
+  s_266211d5a327a3::t_1b2e6f32193b95 82-93,95-96
+  s_266211d5a327a3::t_80f388f4e40022 109-113,115
+pipeline/wgmesh_pipeline/config.py
+  s_266211d5a327a3::t_30f8b39f3cf7f6 214-222
+  s_266211d5a327a3::t_29b13748c56a2a 295
+  s_266211d5a327a3::t_db556465245996 43
+  s_266211d5a327a3::t_d0f0ac3309fb9c 151-153
+  s_266211d5a327a3::t_27dd3a41de775c 70-73
+pipeline/tests/test_config.py
+  s_266211d5a327a3::t_de612d27d7bb53 45-73
+pipeline/tests/test_surface_gate.py
+  s_266211d5a327a3::t_6b6ee378d3d441 155-213
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "1315147ee6d8c901497d0e2c8f8379439ee12570",
+  "prompts": {},
+  "sessions": {
+    "s_266211d5a327a3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3a89956a-215c-407d-afb0-858ccec3651f",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
