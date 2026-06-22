@@ -1,0 +1,24 @@
+.github/workflows/provision-pipeline-box.yml
+  s_139190fe0a9213::t_82686096ca98a3 236-242
+.github/workflows/requeue-failed-issues.yml
+  s_139190fe0a9213::t_c9431af8d8bc18 74-83
+.github/workflows/nongoose-shadow.yml
+  s_139190fe0a9213::t_e76a591725f37a 141-144
+  s_139190fe0a9213::t_26e60a4ea71cde 103-110
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "611343e78a60ff34271fbe2d0a735d07fcd8a698",
+  "prompts": {},
+  "sessions": {
+    "s_139190fe0a9213": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5261b5c8-8e19-4fb2-b868-c1739851bf34",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
