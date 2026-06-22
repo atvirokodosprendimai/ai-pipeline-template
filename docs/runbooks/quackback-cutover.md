@@ -184,3 +184,24 @@ GitHub backlog was drained at cutover, reseed it. No code revert required.
 - ✅ Ingest filter = `?status=<slug>` (the `?statusId=` param is ignored — see §2).
 - Still open: Postgres base version in `docker/postgres/Dockerfile` before pinning upgrades
   (not blocking — the stack runs on the built image).
+
+---
+
+## 6. Internal roadmap (configured 2026-06-22)
+
+The internal roadmap is a view of board posts grouped by status where the status carries
+`showOnRoadmap = true`. The box already drives posts through statuses (`_mirror_quackback`),
+so the roadmap auto-populates — the only config is the per-status flag.
+
+**Decision (`docs/brainstorms/2026-06-22-quackback-roadmap-changelog-requirements.md`):** show
+only the **box lane** — Accepted for Build, Building, Ready for Review, Shipped. Backlog
+(Open for Vote, Needs Refinement), terminal-negative (Rejected, Cancelled), and the 6 unused
+Quackback default statuses (open, under_review, planned, in_progress, complete, closed) are
+**off**.
+
+**API (VERIFIED 2026-06-22):** `PATCH /api/v1/statuses/{id}` `{"showOnRoadmap": <bool>}` → 200.
+Applied with the `qb_` bot key — only the four box-lane statuses are `true`. To change the
+roadmap, flip the flag on the relevant status id (`GET /api/v1/statuses` for ids).
+
+> The changelog half of that brainstorm (daily roll-up → Quackback changelog, retire the
+> Unsend email) is NOT built — it needs the create-changelog endpoint VERIFIED first.
