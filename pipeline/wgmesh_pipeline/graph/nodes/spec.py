@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import logging
+import os
+import tempfile
 from pathlib import Path
 
 from wgmesh_pipeline.config import DEFAULT_RECIPES_DIR
@@ -26,18 +28,39 @@ def spec_node(state: GraphState) -> GraphState:
     config = next_state.get("config")
     recipes_dir = Path(getattr(config, "recipes_dir", DEFAULT_RECIPES_DIR))
     recipe_path = recipes_dir / "wgmesh-triage-spec.yaml"
-    result = runner.run_recipe(
-        recipe=recipe_path,
-        workdir=repo_path,
-        params={
-            "issue_number": str(issue.number),
-            "issue_title": issue.title,
-            "spec_file": str(spec_rel),
-        },
-        expected_output=spec_rel,
-        stage="spec",
-        session_id=f"issue-{issue.number}",
-    )
+    # The brief (PM body) is multi-line, so it can NOT be inlined as a recipe
+    # param — goose substitutes params into the YAML before parsing and a
+    # multi-line value breaks the `prompt: |` scalar. Hand it over as a FILE
+    # path (the same convention as spec_file / open_board_file); empty body →
+    # empty path → the recipe falls back to the title.
+    brief = str(next_state.get("issue_body", "") or "")
+    brief_file = ""
+    if brief.strip():
+        fd, brief_file = tempfile.mkstemp(
+            prefix=f"issue-{issue.number}-brief-", suffix=".md"
+        )
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(brief)
+    try:
+        result = runner.run_recipe(
+            recipe=recipe_path,
+            workdir=repo_path,
+            params={
+                "issue_number": str(issue.number),
+                "issue_title": issue.title,
+                "issue_brief_file": brief_file,
+                "spec_file": str(spec_rel),
+            },
+            expected_output=spec_rel,
+            stage="spec",
+            session_id=f"issue-{issue.number}",
+        )
+    finally:
+        if brief_file:
+            try:
+                os.unlink(brief_file)
+            except OSError:
+                pass
     if not result.ok:
         # Surface goose's actual output so a write-tool/model/recipe failure is
         # diagnosable from the journal instead of just "empty output guard".

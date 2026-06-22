@@ -191,9 +191,33 @@ def reconcile_quackback(client: object, store: StateStore) -> ReconcileResult:
         number, fresh = store.map_quackback_post(post_id, marker)
         seen += 1
         if fresh:
-            store.upsert_issue(number, title, stage="queued", status="open")
+            store.upsert_issue(
+                number, title, stage="queued", status="open",
+                body=_safe_brief(post, number),
+            )
             queued += 1
     return ReconcileResult(seen=seen, queued=queued, escalated=0, merged=0)
+
+
+def _safe_brief(post: dict, number: int) -> str:
+    """The post body, sanitised, for the builder to spec from (KTD10 handled by
+    the wall, not by dropping). A body that fails the sanitise wall degrades to
+    empty — the issue still builds from its title — rather than leaking PII into
+    a public spec/PR. The title is already sanitised at create time."""
+    content = str(post.get("content") or "")
+    if not content:
+        return ""
+    # Local import: keep the control-loop graph out of module-load import order.
+    from wgmesh_pipeline.graph.nodes.review import run_sanitise
+
+    if run_sanitise(content):
+        return content
+    log.warning(
+        "quackback ingest #%s: post body failed the sanitise wall — "
+        "building from title only (brief dropped)",
+        number,
+    )
+    return ""
 
 
 def _current_stage(store: StateStore, number: int) -> str | None:

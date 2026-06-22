@@ -234,6 +234,24 @@ def test_assessment_recipe_templates_params_as_single_line_paths() -> None:
     # paid-customer growth work, not housekeeping.
     assert "PAID CUSTOMERS" in recipe
     assert "lead-capture form" in recipe  # pre-wires the nurture/Mautic handoff
+
+
+def test_assessment_recipe_requires_pm_grade_body_sections() -> None:
+    # The post body becomes the builder's brief (cutover follow-on), so the
+    # assess loop must emit a structured PM-grade feature description, not a
+    # one-liner. Assert the prompt demands each section by its exact heading.
+    from wgmesh_pipeline.observation_gather import _assessment_recipe
+
+    recipe = _assessment_recipe()
+    for heading in (
+        "## Problem",
+        "## Proposed Solution",
+        "## Pros",
+        "## Cons",
+        "## ROI / Impact",
+        "## Acceptance Criteria",
+    ):
+        assert heading in recipe, f"assess prompt must require body section {heading!r}"
     # Templating a param must not add lines (single-line path values only).
     templated = (
         recipe.replace("{{ open_board_file }}", "/tmp/board.md")

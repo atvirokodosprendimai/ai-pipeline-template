@@ -13,6 +13,7 @@ Decision = Literal["merge", "escalate"]
 
 class GraphState(TypedDict, total=False):
     issue: GitHubIssue
+    issue_body: str
     classification: Classification
     classification_override: Classification
     spec_path: str

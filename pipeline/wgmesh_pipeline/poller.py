@@ -95,6 +95,7 @@ class Poller:
         state = {
             **self.scratch.get(issue.number, {}),
             "issue": graph_issue,
+            "issue_body": issue.body,
             "github": self.client,
             "config": self.config,
             "repo_path": Path(self.config.repo_path),

@@ -310,9 +310,24 @@ prompt: |
   issues. Leave issues_to_close / prs_to_close empty unless an item is clearly
   obsolete and safe to close.
 
+  The `body` of every issues_to_create item is the BRIEF the build agent specs
+  from — write it like a product manager's feature description, not a one-liner.
+  Use this exact markdown structure with these exact `##` headings, in order:
+    - `## Problem` — the user/business problem and why it matters now.
+    - `## Proposed Solution` — the concrete thing to build, specifically enough
+      for a coding agent to start.
+    - `## Pros` — bullet list of upside.
+    - `## Cons` — bullet list of risks / downsides / what it costs.
+    - `## ROI / Impact` — the effort vs the expected metric lift (which funnel
+      number it moves, roughly how much, against what effort).
+    - `## Acceptance Criteria` — bullet list of what "done" is + the metric it
+      should move. (For a landing/signup/trial task, this MUST include a
+      lead-capture form and an analytics snippet, per above.)
+  Keep the body public-repo safe: no secrets, no customer PII, no exact revenue.
+
   Write ONLY strict JSON to this exact path: {{ assessment_file }}
   Four keys, each an array:
-  - issues_to_create: objects with title, body, labels
+  - issues_to_create: objects with title, body (the PM brief above), labels
   - issues_to_close: objects with number, reason
   - needs_human: objects with request, urgency, reason
   - prs_to_close: objects with repo, number, reason
