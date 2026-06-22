@@ -235,6 +235,11 @@ class ControlLoopScheduler:
                 self.config.merge_lane_heal_interval_seconds,
                 self._cycle_merge_lane,
             ),
+            ModuleTask(
+                "decision",
+                self.config.decision_lane_interval_seconds,
+                self._cycle_decision,
+            ),
         ]
         for task in self._tasks:
             self.log.info(
@@ -276,6 +281,7 @@ class ControlLoopScheduler:
             "observation": self.config.observation_live,
             "strategy_audit": self.config.strategy_audit_live,
             "merge_lane": self.config.merge_lane_heal_live,
+            "decision": self.config.decision_lane_live,
         }
         try:
             return live_by_module[module_name]
@@ -606,3 +612,44 @@ class ControlLoopScheduler:
                 persisted,
                 "" if live else ' reason="module not flipped live"',
             )
+
+    async def _cycle_decision(self) -> None:
+        """Decision-lane cycle (capability-ladder Phase 1). Quackback-only — the
+        lane reads/writes board posts, which GitHubForge has no analogue for, so
+        it no-ops on the github forge. Shadow plans + logs; live runs the consent
+        loop through the sanitise-walled forge."""
+        if not hasattr(self.forge, "list_decision_asks"):
+            self.log.info(
+                "control_loop: module=decision mode=%s skipped "
+                '(forge has no decision lane — forge_kind != quackback)',
+                self._module_mode("decision"),
+            )
+            return
+        from wgmesh_pipeline.decision_lane import run_decision_cycle
+        from wgmesh_pipeline.decision_lane.proposal_runner import build_proposal_fn
+
+        live = self._module_live("decision")
+        # The proposal recipe runner is built lazily; in shadow it is never called.
+        proposal_fn = (
+            build_proposal_fn(self.config) if live else (lambda post, latest: "")
+        )
+        result = run_decision_cycle(
+            self.forge,
+            self.store,
+            proposal_fn,
+            bot_author=self.config.decision_bot_author,
+            cofounder_count=self.config.decision_cofounder_count,
+            max_iterations=self.config.decision_max_iterations,
+            live=live,
+        )
+        kinds: dict[str, int] = {}
+        for action in result.planned:
+            kinds[action.kind] = kinds.get(action.kind, 0) + 1
+        self.log.info(
+            "control_loop: module=decision mode=%s seen=%s planned=%s executed=%s%s",
+            self._module_mode("decision"),
+            result.seen,
+            kinds,
+            result.executed,
+            "" if live else ' reason="module not flipped live"',
+        )

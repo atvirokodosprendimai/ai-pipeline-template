@@ -53,6 +53,10 @@ BUILD_SUGGESTION_TAGS: tuple[str, ...] = ("agent-suggestion", "build-candidate")
 # (not Config) to keep the U1 Config surface untouched — this is a U2 concern.
 BOARD_ID_ENV = "QUACKBACK_BOARD_ID"
 
+# The decision-lane trigger: a founder moves a post here to ask the box to draft
+# a proposal. Slug (not name) — the list filter is by status slug (VERIFIED).
+NEEDS_REFINEMENT_SLUG = "needs_refinement"
+
 
 class QuackbackForge:
     """Composition adapter: ``_qb`` for posts, ``_gh`` for PRs (KTD1)."""
@@ -162,6 +166,50 @@ class QuackbackForge:
         if status_id in (None, ""):
             return None
         return self._status_name_for(str(status_id))
+
+    # ------------------------------------------------- decision lane (U6)
+
+    def list_decision_asks(self) -> list[dict[str, Any]]:
+        """Raw posts the founders flagged for the box to work — the lane trigger.
+
+        A founder moves a decision post to ``Needs Refinement`` (= "box, draft a
+        proposal here"). The box only READS that status (slug-filtered list); it
+        never sets it (KTD9)."""
+        page = self._qb.list_posts(status_slug=NEEDS_REFINEMENT_SLUG)
+        return list(page.get("data", []))
+
+    def list_post_comments(self, post_id: str) -> list[dict[str, Any]]:
+        """The discussion thread for a decision post (raw, post-id keyed)."""
+        return self._qb.list_comments(post_id)
+
+    def post_vote_count(self, post_id: str) -> int:
+        """The decision post's approve-vote count (the threshold gate input)."""
+        return self._qb.get_vote_count(post_id)
+
+    def post_proposal_comment(self, post_id: str, body: str) -> Any:
+        """Post a proposal (or a revision) as a comment on the discussion post —
+        sanitise-walled (KTD10). A comment is the only verified write to an
+        existing post, so the proposal thread lives in comments."""
+        self._gh._sanitise_write("decision_proposal", {"body": body})
+        return self._qb.comment(post_id, body)
+
+    def open_final_proposal(self, title: str, body: str) -> dict[str, Any]:
+        """Create the clean final proposal post (the decision record) on
+        agreement — sanitise-walled. A plain create (no build-suggestion tags /
+        dedup), distinct from ``create_issue``."""
+        if not self._board_id:
+            raise RuntimeError("open_final_proposal requires a board id")
+        self._gh._sanitise_write("final_proposal", {"title": title, "body": body})
+        return self._qb.create_post(self._board_id, title, body)
+
+    def mark_superseded(self, post_id: str, final_ref: str) -> Any:
+        """Retire the discussion post with a 'superseded' comment pointing at the
+        final proposal — keeps the deliberation thread (KTD6). The box may not set
+        ``Cancelled`` (KTD9), and tag-on-existing-post is unverified, so a comment
+        marker is the verified retirement."""
+        return self._qb.comment(
+            post_id, f"SUPERSEDED — decided. Final proposal: {final_ref}"
+        )
 
     def list_needs_triage(self) -> list[ForgeIssue]:
         """HOST SEAM: GitHub needs-triage labels have no Quackback analogue —

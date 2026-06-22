@@ -174,6 +174,36 @@ class QuackbackClient:
             payload={"content": content},
         )
 
+    def list_comments(self, post_id: str) -> list[dict[str, Any]]:
+        """Read a post's comment thread (VERIFIED ``GET /posts/{id}/comments``).
+
+        Each comment carries ``id`` / ``principalId`` / ``authorName`` /
+        ``isTeamMember`` / ``content`` / ``createdAt`` — enough to distinguish a
+        co-founder comment from the box's own. Fail-closed-loud: a read error must
+        never silently read as "no new feedback" (the decision lane re-drafts on
+        new comments, so a swallowed error would freeze iteration)."""
+        body = self._call(
+            "GET", f"/posts/{urllib.parse.quote(str(post_id))}/comments"
+        )
+        data = body.get("data")
+        if not isinstance(data, list):
+            raise QuackbackError(
+                "Quackback /posts/{id}/comments response missing 'data' array"
+            )
+        return data
+
+    def get_vote_count(self, post_id: str) -> int:
+        """The post's approve-vote count, read off the post payload.
+
+        There is no voter sub-resource (``GET /posts/{id}/votes`` → 404), so this
+        is a count only; that the voters are co-founders rests on the private-board
+        assumption (the decision-lane threshold gate)."""
+        post = self.get_post(post_id)
+        try:
+            return int(post.get("voteCount") or 0)
+        except (TypeError, ValueError):
+            return 0
+
     def delete_post(self, post_id: str) -> None:
         # 204 No Content — no body to shape-check.
         self._call(

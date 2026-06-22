@@ -479,6 +479,58 @@ def test_post_url_none_when_unresolvable() -> None:
     assert forge.post_url(999) is None
 
 
+# ------------------------------------------------- U6: decision-lane methods
+
+
+def test_list_decision_asks_filters_needs_refinement_slug() -> None:
+    forge, gh, qb = _forge()
+    qb.board_posts = []  # list_posts(status_slug=...) returns [] in the fake
+
+    forge.list_decision_asks()
+
+    # the read went to _qb with the Needs-Refinement slug, not _gh
+    assert ("list_posts", ("needs_refinement", None, None)) in qb.calls
+    assert gh.calls == []
+
+
+def test_post_proposal_comment_runs_sanitise_then_comments() -> None:
+    forge, gh, qb = _forge()
+
+    forge.post_proposal_comment("post_01", "## Recommendation\nDo X")
+
+    assert ("decision_proposal", {"body": "## Recommendation\nDo X"}) in gh.sanitised
+    assert ("comment", ("post_01", "## Recommendation\nDo X")) in qb.calls
+
+
+def test_post_proposal_comment_blocked_by_sanitise_failure() -> None:
+    gh = FakeGH(sanitiser=lambda _t: False)
+    forge, _, qb = _forge(gh=gh)
+
+    with pytest.raises(Exception):
+        forge.post_proposal_comment("post_01", "leaks a secret")
+    assert "comment" not in [c[0] for c in qb.calls]  # never reached the board
+
+
+def test_open_final_proposal_sanitises_and_creates_plain_post() -> None:
+    forge, gh, qb = _forge()
+
+    forge.open_final_proposal("Pricing decided", "## Recommendation\n€9/mo")
+
+    assert ("final_proposal", {"title": "Pricing decided", "body": "## Recommendation\n€9/mo"}) in gh.sanitised
+    ops = [c[0] for c in qb.calls]
+    assert ops.count("create_post") == 1
+
+
+def test_mark_superseded_comments_marker_never_sets_status() -> None:
+    forge, gh, qb = _forge()
+
+    forge.mark_superseded("post_01", "https://qb/posts/post_final")
+
+    comments = [c for c in qb.calls if c[0] == "comment"]
+    assert comments and "SUPERSEDED" in comments[0][1][1]
+    assert "set_post_status" not in [c[0] for c in qb.calls]  # KTD9
+
+
 # ------------------------------------------------- U1: dispatch host seam
 
 
