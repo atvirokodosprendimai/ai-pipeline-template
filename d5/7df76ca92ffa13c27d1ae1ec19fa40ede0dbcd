@@ -1,0 +1,21 @@
+pipeline/tests/test_decision_recipe.py
+  s_b74ea68e6c35f5::t_aaae7e720c8327 1-73
+pipeline/recipes/wgmesh-decision-proposal.yaml
+  s_b74ea68e6c35f5::t_38c355d3c372b9 1-70
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "d57df76ca92ffa13c27d1ae1ec19fa40ede0dbcd",
+  "prompts": {},
+  "sessions": {
+    "s_b74ea68e6c35f5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "401a8475-8ec4-479f-9685-70462be2819a",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
