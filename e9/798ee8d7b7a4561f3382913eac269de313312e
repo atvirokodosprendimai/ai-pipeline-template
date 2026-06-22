@@ -1,0 +1,19 @@
+docs/runbooks/cloudroof-funnel-cutover.md
+  s_266211d5a327a3::t_f83c71a4ec352e 1-116
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "e9798ee8d7b7a4561f3382913eac269de313312e",
+  "prompts": {},
+  "sessions": {
+    "s_266211d5a327a3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3a89956a-215c-407d-afb0-858ccec3651f",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
