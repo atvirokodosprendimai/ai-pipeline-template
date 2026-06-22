@@ -1,0 +1,27 @@
+pipeline/wgmesh_pipeline/state/migrations/0005_decision_lane.sql
+  s_b74ea68e6c35f5::t_0501b0731c92e3 1-15
+pipeline/tests/test_state.py
+  s_b74ea68e6c35f5::t_b8e080cecf2e85 64,82,196
+pipeline/wgmesh_pipeline/decision_lane/comments.py
+  s_b74ea68e6c35f5::t_7b67c5d4861546 1-41
+pipeline/wgmesh_pipeline/state/store.py
+  s_b74ea68e6c35f5::t_eddaebbbf10827 507-549
+pipeline/tests/test_decision_comments.py
+  s_b74ea68e6c35f5::t_7d63e7195ab5e8 1-69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "ed1a20b11145518663b0d046c8d6376d1cb4062d",
+  "prompts": {},
+  "sessions": {
+    "s_b74ea68e6c35f5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "401a8475-8ec4-479f-9685-70462be2819a",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
