@@ -1,0 +1,21 @@
+pipeline/tests/test_quackback_client.py
+  s_b74ea68e6c35f5::t_97ba38ae72567d 282-359
+pipeline/wgmesh_pipeline/forge/quackback_client.py
+  s_b74ea68e6c35f5::t_43cef37aa19cd9 177-206
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "7645dfe23200ef9ba57b4091ea74d204e016431b",
+  "prompts": {},
+  "sessions": {
+    "s_b74ea68e6c35f5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "401a8475-8ec4-479f-9685-70462be2819a",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
