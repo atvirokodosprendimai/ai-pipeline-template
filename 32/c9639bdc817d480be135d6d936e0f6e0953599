@@ -1,0 +1,23 @@
+pipeline/wgmesh_pipeline/decision_lane/__init__.py
+  s_b74ea68e6c35f5::t_ae96f7ca6f3bfe 1-157
+pipeline/tests/test_decision_lane.py
+  s_b74ea68e6c35f5::t_1a961834f3ecab 1-161
+pipeline/wgmesh_pipeline/forge/quackback.py
+  s_b74ea68e6c35f5::t_169ef1c3af7e9d 181-188
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "32c9639bdc817d480be135d6d936e0f6e0953599",
+  "prompts": {},
+  "sessions": {
+    "s_b74ea68e6c35f5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "401a8475-8ec4-479f-9685-70462be2819a",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
