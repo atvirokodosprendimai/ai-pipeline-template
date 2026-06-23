@@ -61,7 +61,7 @@ def test_injected_connection_adapter_roundtrip() -> None:
     assert len(db.list_runs()) == 1
     # migrations tracked through the adapter
     versions = [r["version"] for r in db._conn.execute("SELECT version FROM schema_migrations").fetchall()]
-    assert versions == ["0001", "0002", "0003", "0004", "0005"]
+    assert versions == ["0001", "0002", "0003", "0004", "0005", "0006"]
 
 
 def test_reset_queue_clears_issues_and_runs_idempotently(tmp_path) -> None:
@@ -79,7 +79,7 @@ def test_reset_queue_clears_issues_and_runs_idempotently(tmp_path) -> None:
     assert db.list_issues() == []
     assert db.list_runs() == []
     versions = [r["version"] for r in db._conn.execute("SELECT version FROM schema_migrations").fetchall()]
-    assert versions == ["0001", "0002", "0003", "0004", "0005"]
+    assert versions == ["0001", "0002", "0003", "0004", "0005", "0006"]
 
 
 def test_requeue_failed_all_preserves_linkage_and_clears_attempts(tmp_path) -> None:
@@ -193,7 +193,7 @@ def test_migrations_apply_idempotently(tmp_path) -> None:
     assert db.get_issue(1).stage == "queued"
     # schema_migrations records the initial migration exactly once
     versions = [r["version"] for r in db._conn.execute("SELECT version FROM schema_migrations").fetchall()]
-    assert versions == ["0001", "0002", "0003", "0004", "0005"]
+    assert versions == ["0001", "0002", "0003", "0004", "0005", "0006"]
 
 
 def test_sqlite_connection_uses_wal_and_busy_timeout(tmp_path) -> None:
@@ -351,3 +351,33 @@ def test_control_state_empty_fingerprint_always_writes(tmp_path) -> None:
     assert db.save_control_state("k", {"a": 1}, fingerprint="") is True
     assert db.save_control_state("k", {"a": 2}, fingerprint="") is True
     assert db.load_control_state("k") == {"a": 2}
+
+
+def test_post_embedding_cache_round_trip(tmp_path) -> None:
+    store = StateStore(tmp_path / "state.db")
+    assert store.get_post_embedding("post_1", "embedding-3") is None
+
+    store.put_post_embedding("post_1", "embedding-3", [0.1, 0.2, 0.3])
+    assert store.get_post_embedding("post_1", "embedding-3") == [0.1, 0.2, 0.3]
+
+
+def test_post_embedding_model_change_is_a_miss(tmp_path) -> None:
+    store = StateStore(tmp_path / "state.db")
+    store.put_post_embedding("post_1", "embedding-3", [1.0, 2.0])
+    # a different model must not return the stale vector
+    assert store.get_post_embedding("post_1", "embedding-9") is None
+
+
+def test_post_embedding_upsert_overwrites(tmp_path) -> None:
+    store = StateStore(tmp_path / "state.db")
+    store.put_post_embedding("post_1", "embedding-3", [1.0])
+    store.put_post_embedding("post_1", "embedding-3", [9.0])
+    assert store.get_post_embedding("post_1", "embedding-3") == [9.0]
+
+
+def test_migration_0006_adds_post_embeddings_table(tmp_path) -> None:
+    store = StateStore(tmp_path / "state.db")
+    row = store._conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='post_embeddings'"
+    ).fetchone()
+    assert row is not None
