@@ -43,6 +43,7 @@ from wgmesh_pipeline.forge.quackback_status import (
     BOX_SETTABLE_STATUSES,
     is_box_settable,
 )
+from wgmesh_pipeline.forge.embeddings import EmbeddingError
 from wgmesh_pipeline.github.client import DryRunResult, GitHubClient
 
 log = logging.getLogger("wgmesh_pipeline.forge.quackback")
@@ -96,6 +97,8 @@ class QuackbackForge:
         self._status_id_cache: dict[str, str] = {}
         # name→tagId cache (tags are board-stable; resolved create-if-missing).
         self._tag_id_cache: dict[str, str] = {}
+        # Optional semantic deduper (U4); when None the forge dedups by exact title.
+        self._deduper: Any = None
 
     # ------------------------------------------------------- post → _qb (issues)
 
@@ -123,7 +126,7 @@ class QuackbackForge:
         self._gh._sanitise_write("create_issue", {"title": title, "body": body})
 
         # 2. Cross-status dedup against existing board posts.
-        existing = self._find_duplicate_post(title)
+        existing = self._find_duplicate_post(title, body)
         if existing is not None:
             existing_id = str(existing.get("id") or "")
             if existing_id:
@@ -355,6 +358,11 @@ class QuackbackForge:
 
     # --------------------------------------------------------------- plumbing
 
+    def bind_deduper(self, deduper: Any) -> None:
+        """Bind the semantic deduper after construction (U4). When bound,
+        ``create_issue`` dedups by embedding cosine; unbound → exact-title."""
+        self._deduper = deduper
+
     def bind_resolver(self, resolver: Callable[[int], str | None]) -> None:
         """Bind the store-backed post-id resolver after construction (U6).
 
@@ -417,31 +425,47 @@ class QuackbackForge:
     # board cannot make every Build Suggestion an unbounded scan.
     _DEDUP_MAX_POSTS = 500
 
-    def _find_duplicate_post(self, title: str) -> dict[str, Any] | None:
-        """Return an existing board post whose title matches ``title`` after
-        normalization (case/space/punctuation-insensitive), else None.
+    def _find_duplicate_post(
+        self, title: str, body: str = ""
+    ) -> dict[str, Any] | None:
+        """Return an existing board post that duplicates ``title``/``body``, else None.
 
         Lists posts with NO status filter so a duplicate is caught regardless of
-        where it already sits in the funnel (the cross-status guarantee). Paged
-        up to ``_DEDUP_MAX_POSTS`` via the cursor; an API error propagates
-        (fail-closed) rather than silently skipping dedup."""
+        where it already sits in the funnel (the cross-status guarantee). Paged up
+        to ``_DEDUP_MAX_POSTS``. When a semantic deduper is bound (U4), match by
+        embedding cosine over title+body; on an embeddings failure, degrade to the
+        exact normalized-title match (a weaker backstop, never "no dedup"). An API
+        error on the listing itself propagates (fail-closed)."""
+        candidates = self._gather_board_posts()
+        if self._deduper is not None:
+            try:
+                match = self._deduper.find_duplicate(f"{title}\n{body}".strip(), candidates)
+                return dict(match) if match is not None else None
+            except EmbeddingError:
+                log.warning(
+                    "decision dedup: embeddings failed — degrading to exact-title match"
+                )
         target = _normalize_title(title)
         if not target:
             return None
-        seen = 0
+        for post in candidates:
+            if _normalize_title(str(post.get("title", ""))) == target:
+                return post
+        return None
+
+    def _gather_board_posts(self) -> list[dict[str, Any]]:
+        """All board posts (cross-status), paged up to ``_DEDUP_MAX_POSTS``."""
+        out: list[dict[str, Any]] = []
         cursor: str | None = None
-        while seen < self._DEDUP_MAX_POSTS:
+        while len(out) < self._DEDUP_MAX_POSTS:
             page = self._qb.list_posts(cursor=cursor, limit=100)
             posts = page.get("data", [])
-            for post in posts:
-                seen += 1
-                if _normalize_title(str(post.get("title", ""))) == target:
-                    return post
+            out.extend(posts)
             pagination = (page.get("meta") or {}).get("pagination") or {}
             cursor = pagination.get("cursor")
             if not pagination.get("hasMore") or not cursor or not posts:
                 break
-        return None
+        return out
 
     def _resolve_tag_ids(self, names: tuple[str, ...]) -> list[str]:
         """Map tag names → ids, creating any that don't yet exist.

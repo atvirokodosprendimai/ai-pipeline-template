@@ -521,6 +521,42 @@ def test_open_final_proposal_sanitises_and_creates_plain_post() -> None:
     assert ops.count("create_post") == 1
 
 
+def test_create_issue_uses_bound_semantic_deduper() -> None:
+    forge, gh, qb = _forge()
+    qb.board_posts = [{"id": "post_existing", "title": "Lead capture form"}]
+
+    class _Deduper:
+        def find_duplicate(self, candidate_text, posts):
+            return {"id": "post_existing", "title": "Lead capture form"}
+
+    forge.bind_deduper(_Deduper())
+    forge.create_issue(title="Add email lead-capture", body="b")
+
+    # matched semantically → comment on existing, no new create_post
+    ops = [c[0] for c in qb.calls]
+    assert "comment" in ops
+    assert ops.count("create_post") == 0
+
+
+def test_create_issue_degrades_to_exact_title_when_embeddings_fail() -> None:
+    from wgmesh_pipeline.forge.embeddings import EmbeddingError
+
+    forge, gh, qb = _forge()
+    qb.board_posts = [{"id": "post_x", "title": "Add SSO"}]
+
+    class _BoomDeduper:
+        def find_duplicate(self, candidate_text, posts):
+            raise EmbeddingError("down")
+
+    forge.bind_deduper(_BoomDeduper())
+    # exact-title match still catches an identical title (degrade path)
+    forge.create_issue(title="Add SSO", body="b")
+
+    ops = [c[0] for c in qb.calls]
+    assert "comment" in ops  # degrade found the exact-title dup
+    assert ops.count("create_post") == 0
+
+
 def test_mark_superseded_comments_marker_never_sets_status() -> None:
     forge, gh, qb = _forge()
 
