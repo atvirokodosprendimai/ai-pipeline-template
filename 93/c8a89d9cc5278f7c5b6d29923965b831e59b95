@@ -1,0 +1,21 @@
+pipeline/tests/test_proposal_runner.py
+  s_8756b8d374182e::t_a559f0a5bcea08 12-59,61-82,84-99
+  s_8756b8d374182e::t_660305d18133c5 60,83
+  s_8756b8d374182e::t_c1c57f8f402b3d 1-11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.11",
+  "base_commit_sha": "93c8a89d9cc5278f7c5b6d29923965b831e59b95",
+  "prompts": {},
+  "sessions": {
+    "s_8756b8d374182e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e4da3fd9-1e61-452c-a33b-71ff8a3e2833",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
