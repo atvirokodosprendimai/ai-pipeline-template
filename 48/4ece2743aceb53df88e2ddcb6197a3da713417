@@ -1,0 +1,24 @@
+pipeline/recipes/wgmesh-decision-proposal.yaml
+  s_b74ea68e6c35f5::t_46e0409d434029 62-63
+pipeline/wgmesh_pipeline/forge/quackback.py
+  s_b74ea68e6c35f5::t_1abd066f9838c6 220-225,227
+  s_b74ea68e6c35f5::t_ed0169c3cf7d91 66-77
+pipeline/tests/test_quackback_forge.py
+  s_b74ea68e6c35f5::t_17cb8c0c17b698 515-536
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "484ece2743aceb53df88e2ddcb6197a3da713417",
+  "prompts": {},
+  "sessions": {
+    "s_b74ea68e6c35f5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "401a8475-8ec4-479f-9685-70462be2819a",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
