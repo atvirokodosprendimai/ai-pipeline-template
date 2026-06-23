@@ -512,6 +512,28 @@ def test_post_proposal_comment_blocked_by_sanitise_failure() -> None:
     assert "comment" not in [c[0] for c in qb.calls]  # never reached the board
 
 
+def test_post_proposal_comment_truncates_over_the_limit() -> None:
+    from wgmesh_pipeline.forge.quackback import COMMENT_MAX_CHARS
+
+    forge, _, qb = _forge()
+    big = "x" * (COMMENT_MAX_CHARS + 2000)
+
+    forge.post_proposal_comment("post_01", big)
+
+    posted = next(c[1][1] for c in qb.calls if c[0] == "comment")
+    assert len(posted) <= COMMENT_MAX_CHARS
+    assert posted.endswith("[proposal truncated to fit the comment limit]")
+
+
+def test_post_proposal_comment_under_limit_unchanged() -> None:
+    forge, _, qb = _forge()
+
+    forge.post_proposal_comment("post_01", "short proposal")
+
+    posted = next(c[1][1] for c in qb.calls if c[0] == "comment")
+    assert posted == "short proposal"
+
+
 def test_open_final_proposal_sanitises_and_creates_plain_post() -> None:
     forge, gh, qb = _forge()
 
