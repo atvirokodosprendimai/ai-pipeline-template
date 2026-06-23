@@ -1,0 +1,27 @@
+pipeline/tests/test_embeddings.py
+  s_b74ea68e6c35f5::t_dde51c991fac92 1-81
+pipeline/wgmesh_pipeline/forge/embeddings.py
+  s_b74ea68e6c35f5::t_cb9d9c0e20f1c4 1-96
+pipeline/wgmesh_pipeline/config.py
+  s_b74ea68e6c35f5::t_aac75319de8de6 418-427
+  s_b74ea68e6c35f5::t_b3e0417b8685fc 103-107
+  s_b74ea68e6c35f5::t_f151f1d7ac2ac6 322-329
+  s_b74ea68e6c35f5::t_c1ece1484c7ade 44-47
+  s_b74ea68e6c35f5::t_fab8cb1d0539e6 166-170
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "4bb12a4a665419fb17a9aeea3accb65b2e4c816a",
+  "prompts": {},
+  "sessions": {
+    "s_b74ea68e6c35f5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "401a8475-8ec4-479f-9685-70462be2819a",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
