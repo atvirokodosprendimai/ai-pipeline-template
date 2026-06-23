@@ -1,0 +1,21 @@
+docs/brainstorms/2026-06-23-dedup-hardening-semantic-requirements.md
+  s_b74ea68e6c35f5::t_de5ac5fd6b238f 1-103
+docs/plans/2026-06-23-001-fix-dedup-hardening-semantic-plan.md
+  s_b74ea68e6c35f5::t_635a0a54fc3907 1-204
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "214919ce95583a5c60b5ec26ab96bd8057fd4099",
+  "prompts": {},
+  "sessions": {
+    "s_b74ea68e6c35f5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "401a8475-8ec4-479f-9685-70462be2819a",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
