@@ -247,6 +247,36 @@ class ControlLoopScheduler:
                 task.name,
                 LIVE if self._module_live(task.name) else SHADOW,
             )
+        self._bind_semantic_deduper()
+
+    def _bind_semantic_deduper(self) -> None:
+        """Wire the semantic deduper onto the forge when enabled (U4). Best-effort:
+        a missing key / unbindable forge logs and leaves the forge on exact-title."""
+        if not getattr(self.config, "dedup_semantic_enabled", False):
+            return
+        binder = getattr(self.forge, "bind_deduper", None)
+        if not callable(binder):
+            return
+        try:
+            from wgmesh_pipeline.forge.dedup import SemanticDeduper
+            from wgmesh_pipeline.forge.embeddings import EmbeddingsClient
+
+            deduper = SemanticDeduper(
+                EmbeddingsClient(self.config),
+                self.store,
+                model=self.config.embeddings_model,
+                threshold=self.config.dedup_similarity_threshold,
+            )
+            binder(deduper)
+            self.log.info(
+                "control_loop: semantic dedup enabled (model=%s threshold=%s)",
+                self.config.embeddings_model,
+                self.config.dedup_similarity_threshold,
+            )
+        except Exception as exc:  # noqa: BLE001 — never let dedup wiring kill startup
+            self.log.warning(
+                "control_loop: semantic dedup not bound (%s) — using exact-title", exc
+            )
 
     @property
     def tasks(self) -> tuple[ModuleTask, ...]:
