@@ -63,6 +63,18 @@ NEEDS_REFINEMENT_SLUG = "needs_refinement"
 # new posts enter the voting flow (U6).
 OPEN_FOR_VOTE_STATUS = "Open for Vote"
 
+# Quackback rejects a comment body over this length (HTTP 400 BAD_REQUEST).
+COMMENT_MAX_CHARS = 5000
+_TRUNCATION_MARKER = "\n\n…[proposal truncated to fit the comment limit]"
+
+
+def _fit_comment(body: str) -> str:
+    """Trim ``body`` to the Quackback comment limit, with a marker if cut."""
+    if len(body) <= COMMENT_MAX_CHARS:
+        return body
+    keep = COMMENT_MAX_CHARS - len(_TRUNCATION_MARKER)
+    return body[:keep] + _TRUNCATION_MARKER
+
 
 class QuackbackForge:
     """Composition adapter: ``_qb`` for posts, ``_gh`` for PRs (KTD1)."""
@@ -205,9 +217,14 @@ class QuackbackForge:
     def post_proposal_comment(self, post_id: str, body: str) -> Any:
         """Post a proposal (or a revision) as a comment on the discussion post —
         sanitise-walled (KTD10). A comment is the only verified write to an
-        existing post, so the proposal thread lives in comments."""
+        existing post, so the proposal thread lives in comments.
+
+        Quackback rejects comments over ``COMMENT_MAX_CHARS`` (HTTP 400), so a
+        long proposal is truncated with a marker before posting — the sanitise
+        wall runs on the FULL body first (a leak in the dropped tail still
+        blocks). The recipe is also instructed to stay under the limit."""
         self._gh._sanitise_write("decision_proposal", {"body": body})
-        return self._qb.comment(post_id, body)
+        return self._qb.comment(post_id, _fit_comment(body))
 
     def open_final_proposal(self, title: str, body: str) -> dict[str, Any]:
         """Create the clean final proposal post (the decision record) on

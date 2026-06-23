@@ -59,6 +59,8 @@ prompt: |
       never assert a market or competitor fact as settled.
   - Keep it public-repo safe: no secrets, no customer PII, no exact revenue figures.
   - Be concrete enough that a co-founder can approve or push back on specifics.
+  - Keep the WHOLE proposal under 4500 characters — it is posted as a single
+    comment with a hard 5000-character limit. Be concise; cut filler, not substance.
 extensions:
   - type: builtin
     name: developer
