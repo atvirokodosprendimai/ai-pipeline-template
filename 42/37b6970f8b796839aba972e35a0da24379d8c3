@@ -1,0 +1,21 @@
+pipeline/tests/test_similarity.py
+  s_b74ea68e6c35f5::t_f148f9b96dc342 1-36
+pipeline/wgmesh_pipeline/forge/similarity.py
+  s_b74ea68e6c35f5::t_ca5b358100b5a5 1-32
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "4237b6970f8b796839aba972e35a0da24379d8c3",
+  "prompts": {},
+  "sessions": {
+    "s_b74ea68e6c35f5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "401a8475-8ec4-479f-9685-70462be2819a",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
