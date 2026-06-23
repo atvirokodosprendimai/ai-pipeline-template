@@ -1,0 +1,23 @@
+pipeline/tests/test_state.py
+  s_b74ea68e6c35f5::t_d4fe48f38414a2 64,82,196,354-383
+pipeline/wgmesh_pipeline/state/store.py
+  s_b74ea68e6c35f5::t_e1636e5c0ed92f 523-551
+pipeline/wgmesh_pipeline/state/migrations/0006_post_embeddings.sql
+  s_b74ea68e6c35f5::t_3a36170fd460f8 1-15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "d17239d2e295253bb740eca67d0516037e81b414",
+  "prompts": {},
+  "sessions": {
+    "s_b74ea68e6c35f5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "401a8475-8ec4-479f-9685-70462be2819a",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
