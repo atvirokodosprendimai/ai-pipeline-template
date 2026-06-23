@@ -48,6 +48,8 @@ BOX_CONFIG_ALLOWLIST = frozenset(
         "META_REPO",
         "POLL_INTERVAL_SECONDS",
         "MAX_FILES",
+        "EXECUTOR",
+        "LLM_REQUEST_TIMEOUT_SECONDS",
         "FORGE_KIND",
         # Quackback Build Suggestions board id — non-secret, lets the cutover
         # set it via box-config or set-box-env (the URL/token stay secrets).
@@ -100,6 +102,10 @@ DEFAULT_STRATEGY_AUDIT_INTERVAL_SECONDS = 86400
 # Merge-lane-heal: 6h, matching the retired conflict-heal.yml cron (01/07/13/19).
 DEFAULT_MERGE_LANE_HEAL_INTERVAL_SECONDS = 21600
 DEFAULT_DECISION_LANE_INTERVAL_SECONDS = 3600  # founder decisions, hourly
+# LLM client request timeout. The provider (GLM-5.2 on z.ai) is known to run long
+# on coding-agent calls; 60s cancelled mid-request → "Request timed out". 600s
+# matches Anthropic's long-request window + the replay harness.
+DEFAULT_LLM_REQUEST_TIMEOUT_SECONDS = 600
 # Semantic dedup (z.ai embeddings). OFF until the endpoint/model/dim is VERIFIED
 # against the live z.ai account; until then the forge dedup keeps exact-title.
 DEFAULT_EMBEDDINGS_MODEL = "embedding-3"
@@ -171,6 +177,7 @@ class Config:
     meta_repo: str = DEFAULT_META_REPO
     # Executor backend: 'goose' (default) or 'langchain' (U2).
     # Selected via EXECUTOR env var; factory in executor.py fails closed on unknown values.
+    llm_request_timeout_seconds: int = DEFAULT_LLM_REQUEST_TIMEOUT_SECONDS
     executor: str = "goose"
     # Graph backend: 'legacy' (default) or 'langgraph' (U4).
     # Selected via GRAPH_IMPL env var; build_graph dispatches on this value.
@@ -329,6 +336,9 @@ def load_config(env: Mapping[str, str] | None = None) -> Config:
         or DEFAULT_EMBEDDINGS_BASE_URL,
         meta_repo=_get_nonempty(source, "META_REPO") or DEFAULT_META_REPO,
         executor=(_get_nonempty(source, "EXECUTOR") or "goose").strip().lower(),
+        llm_request_timeout_seconds=_get_int(
+            source, "LLM_REQUEST_TIMEOUT_SECONDS", DEFAULT_LLM_REQUEST_TIMEOUT_SECONDS
+        ),
         graph_impl=(_get_nonempty(source, "GRAPH_IMPL") or "legacy").strip().lower(),
     )
     _log_control_loop_module_modes(cfg)

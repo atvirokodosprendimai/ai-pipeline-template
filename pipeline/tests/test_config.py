@@ -415,3 +415,13 @@ def test_github_forge_without_quackback_vars_is_fine() -> None:
         }
     )
     assert cfg.quackback_url is None
+
+
+def test_llm_request_timeout_default_and_override() -> None:
+    from wgmesh_pipeline.config import Config, load_config
+
+    assert Config(target_repo="o/r").llm_request_timeout_seconds == 600
+    cfg = load_config(
+        {"TARGET_REPO": "o/r", "DATABASE_MODE": "local", "LLM_REQUEST_TIMEOUT_SECONDS": "900"}
+    )
+    assert cfg.llm_request_timeout_seconds == 900
