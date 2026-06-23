@@ -280,7 +280,9 @@ def _default_client_factory(profile: ModelProfile, config: Config) -> Any:
         model=profile.model,
         base_url=profile.host or getattr(config, "anthropic_host", None),
         api_key=credential_for(profile, _credential_env(config)),
-        timeout=60,
+        # The provider runs long on coding-agent calls; a 60s cap cancelled
+        # mid-request → "Request timed out". Config-driven, default 600s.
+        timeout=getattr(config, "llm_request_timeout_seconds", 600),
         max_retries=2,
     )
 
