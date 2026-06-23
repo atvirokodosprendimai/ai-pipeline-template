@@ -422,6 +422,55 @@ def test_llm_request_timeout_default_and_override() -> None:
 
     assert Config(target_repo="o/r").llm_request_timeout_seconds == 600
     cfg = load_config(
-        {"TARGET_REPO": "o/r", "DATABASE_MODE": "local", "LLM_REQUEST_TIMEOUT_SECONDS": "900"}
+        {
+            "TARGET_REPO": "o/r",
+            "DATABASE_MODE": "local",
+            "LLM_REQUEST_TIMEOUT_SECONDS": "900",
+        }
     )
     assert cfg.llm_request_timeout_seconds == 900
+
+
+# ---------------------------------------------------------------------------
+# Per-surface executor overrides (U1) — OBSERVATION_EXECUTOR / DECISION_EXECUTOR
+# each fall back to the global EXECUTOR (then to "goose") when unset.
+# ---------------------------------------------------------------------------
+
+_PER_SURFACE_BASE = {
+    "TARGET_REPO": "o/r",
+    "DATABASE_MODE": "local",
+    "WGMESH_BOT_PAT": "token",
+    "ZAI_API_KEY": "zai",
+}
+
+
+def test_per_surface_executors_default_to_goose() -> None:
+    cfg = load_config(dict(_PER_SURFACE_BASE))
+    assert cfg.executor == "goose"
+    assert cfg.observation_executor == "goose"
+    assert cfg.decision_executor == "goose"
+
+
+def test_per_surface_executors_fall_back_to_global_executor() -> None:
+    cfg = load_config({**_PER_SURFACE_BASE, "EXECUTOR": "langchain"})
+    assert cfg.observation_executor == "langchain"
+    assert cfg.decision_executor == "langchain"
+
+
+def test_per_surface_executor_overrides_global() -> None:
+    cfg = load_config(
+        {
+            **_PER_SURFACE_BASE,
+            "EXECUTOR": "langchain",
+            "OBSERVATION_EXECUTOR": "goose",
+        }
+    )
+    # observation pinned to goose despite the global being langchain;
+    # decision still inherits the global.
+    assert cfg.observation_executor == "goose"
+    assert cfg.decision_executor == "langchain"
+
+
+def test_per_surface_executor_normalised_lower_strip() -> None:
+    cfg = load_config({**_PER_SURFACE_BASE, "DECISION_EXECUTOR": "LangChain "})
+    assert cfg.decision_executor == "langchain"

@@ -17,8 +17,8 @@ from typing import Any, Callable, Mapping, Protocol, Sequence
 
 from wgmesh_pipeline.config import Config
 from wgmesh_pipeline.control_loop.executor import ExecutionResult, execute_actions
+from wgmesh_pipeline.executor import build_executor
 from wgmesh_pipeline.forge.protocol import Forge
-from wgmesh_pipeline.goose.runner import GooseRunner
 from wgmesh_pipeline.observation import ObservationInputs, ObservationPlan, plan_actions
 
 log = logging.getLogger("wgmesh_pipeline.observation_gather")
@@ -180,7 +180,9 @@ class GooseObservationAssessor:
             # Feed the company goal/strategy (single-line path) so the LLM
             # proposes goal-advancing work, not housekeeping the stale board.
             strategy_file = self.repo_root / "STRATEGY.md"
-            result = GooseRunner(self.config).run_recipe(
+            result = build_executor(
+                self.config, executor_name=self.config.observation_executor
+            ).run_recipe(
                 recipe=recipe,
                 workdir=self.repo_root,
                 params={
