@@ -58,6 +58,11 @@ BOARD_ID_ENV = "QUACKBACK_BOARD_ID"
 # a proposal. Slug (not name) — the list filter is by status slug (VERIFIED).
 NEEDS_REFINEMENT_SLUG = "needs_refinement"
 
+# The board's intended entry status for new Build Suggestions. create_post with
+# no status lands in the Quackback system default ("Open"); set this explicitly so
+# new posts enter the voting flow (U6).
+OPEN_FOR_VOTE_STATUS = "Open for Vote"
+
 
 class QuackbackForge:
     """Composition adapter: ``_qb`` for posts, ``_gh`` for PRs (KTD1)."""
@@ -134,9 +139,17 @@ class QuackbackForge:
                 self._number_for(existing_id)
                 return existing
 
-        # 3. Resolve tags and create the tagged Build Suggestion.
+        # 3. Resolve tags + the Open-for-Vote status (U6) and create the post.
+        #    create_post with no status lands in the Quackback system default
+        #    ("Open"), NOT the board's intended entry status — so set it explicitly.
         tag_ids = self._resolve_tag_ids(BUILD_SUGGESTION_TAGS + tuple(labels))
-        post = self._qb.create_post(self._board_id, title, body, tag_ids=tag_ids)
+        try:
+            status_id: str | None = self._status_id_for(OPEN_FOR_VOTE_STATUS)
+        except RuntimeError:
+            status_id = None  # status absent → fall back to board default, don't crash
+        post = self._qb.create_post(
+            self._board_id, title, body, status_id=status_id, tag_ids=tag_ids
+        )
         post_id = str(post.get("id") or "")
         if not post_id:
             raise RuntimeError("Quackback create_post returned a post without an id")
