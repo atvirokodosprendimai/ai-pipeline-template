@@ -1,0 +1,19 @@
+docs/roadmaps/2026-06-23-lang-triad-roadmap.md
+  s_b74ea68e6c35f5::t_c75db21d271c22 1-112
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "f4b9061e015f1a585cafb83d07fce1d411a79c0f",
+  "prompts": {},
+  "sessions": {
+    "s_b74ea68e6c35f5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "401a8475-8ec4-479f-9685-70462be2819a",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
