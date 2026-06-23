@@ -1,0 +1,19 @@
+pipeline/tests/test_config.py
+  s_8756b8d374182e::t_63e91da7a7724e 425-429,432-476
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.11",
+  "base_commit_sha": "df8d00b2b689d0248bb9fb81716f05338ee7c9bc",
+  "prompts": {},
+  "sessions": {
+    "s_8756b8d374182e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e4da3fd9-1e61-452c-a33b-71ff8a3e2833",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
