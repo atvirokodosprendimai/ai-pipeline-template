@@ -75,6 +75,7 @@ class FakeQB:
     def list_statuses(self) -> list[dict[str, Any]]:
         self.calls.append(("list_statuses", ()))
         return [
+            {"id": "status_ofv", "name": "Open for Vote", "slug": "open-for-vote"},
             {
                 "id": "status_afb",
                 "name": "Accepted for Build",
@@ -323,8 +324,8 @@ def test_create_issue_tags_post_with_build_suggestion_and_label_tags() -> None:
     board_id, title, _content, status_id, tag_ids = create[1]
     assert board_id == "board_1"
     assert title == "Add SSO login"
-    # Default status: no statusId — the board's default ("Open for Vote").
-    assert status_id is None
+    # U6: set Open for Vote explicitly (the system default "Open" was the bug).
+    assert status_id == "status_ofv"
     # The two pre-existing Build-Suggestion tags plus the growth label tag.
     assert set(tag_ids) == {"tag_sugg", "tag_cand", "tag_growth"}
 
@@ -519,6 +520,54 @@ def test_open_final_proposal_sanitises_and_creates_plain_post() -> None:
     assert ("final_proposal", {"title": "Pricing decided", "body": "## Recommendation\n€9/mo"}) in gh.sanitised
     ops = [c[0] for c in qb.calls]
     assert ops.count("create_post") == 1
+
+
+def test_create_issue_sets_open_for_vote_status() -> None:
+    # U6: new Build Suggestions enter the voting flow, not the stray 'Open' default.
+    forge, gh, qb = _forge()
+
+    forge.create_issue(title="New idea", body="b")
+
+    create = next(c for c in qb.calls if c[0] == "create_post")
+    # FakeQB.create_post records (board_id, title, content, status_id, tag_ids)
+    status_id = create[1][3]
+    assert status_id == "status_ofv"
+
+
+def test_create_issue_uses_bound_semantic_deduper() -> None:
+    forge, gh, qb = _forge()
+    qb.board_posts = [{"id": "post_existing", "title": "Lead capture form"}]
+
+    class _Deduper:
+        def find_duplicate(self, candidate_text, posts):
+            return {"id": "post_existing", "title": "Lead capture form"}
+
+    forge.bind_deduper(_Deduper())
+    forge.create_issue(title="Add email lead-capture", body="b")
+
+    # matched semantically → comment on existing, no new create_post
+    ops = [c[0] for c in qb.calls]
+    assert "comment" in ops
+    assert ops.count("create_post") == 0
+
+
+def test_create_issue_degrades_to_exact_title_when_embeddings_fail() -> None:
+    from wgmesh_pipeline.forge.embeddings import EmbeddingError
+
+    forge, gh, qb = _forge()
+    qb.board_posts = [{"id": "post_x", "title": "Add SSO"}]
+
+    class _BoomDeduper:
+        def find_duplicate(self, candidate_text, posts):
+            raise EmbeddingError("down")
+
+    forge.bind_deduper(_BoomDeduper())
+    # exact-title match still catches an identical title (degrade path)
+    forge.create_issue(title="Add SSO", body="b")
+
+    ops = [c[0] for c in qb.calls]
+    assert "comment" in ops  # degrade found the exact-title dup
+    assert ops.count("create_post") == 0
 
 
 def test_mark_superseded_comments_marker_never_sets_status() -> None:

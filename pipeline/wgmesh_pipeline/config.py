@@ -41,6 +41,10 @@ BOX_CONFIG_ALLOWLIST = frozenset(
         "DECISION_COFOUNDER_COUNT",
         "DECISION_MAX_ITERATIONS",
         "DECISION_BOT_AUTHOR",
+        "DEDUP_SEMANTIC_ENABLED",
+        "DEDUP_SIMILARITY_THRESHOLD",
+        "EMBEDDINGS_MODEL",
+        "EMBEDDINGS_BASE_URL",
         "META_REPO",
         "POLL_INTERVAL_SECONDS",
         "MAX_FILES",
@@ -96,6 +100,11 @@ DEFAULT_STRATEGY_AUDIT_INTERVAL_SECONDS = 86400
 # Merge-lane-heal: 6h, matching the retired conflict-heal.yml cron (01/07/13/19).
 DEFAULT_MERGE_LANE_HEAL_INTERVAL_SECONDS = 21600
 DEFAULT_DECISION_LANE_INTERVAL_SECONDS = 3600  # founder decisions, hourly
+# Semantic dedup (z.ai embeddings). OFF until the endpoint/model/dim is VERIFIED
+# against the live z.ai account; until then the forge dedup keeps exact-title.
+DEFAULT_EMBEDDINGS_MODEL = "embedding-3"
+DEFAULT_EMBEDDINGS_BASE_URL = "https://api.z.ai/api/paas/v4"
+DEFAULT_DEDUP_SIMILARITY_THRESHOLD = 0.85
 # The meta repo (the pipeline's own repo) — merge-lane-heal heals BOTH repos.
 DEFAULT_META_REPO = "atvirokodosprendimai/ai-pipeline-template"
 
@@ -154,6 +163,11 @@ class Config:
     # The bot key's authorName on the board — its own comments are excluded from
     # the "new co-founder comment" iteration trigger (KTD5).
     decision_bot_author: str = "autobox-box"
+    # Semantic dedup (z.ai embeddings); see DEFAULT_* notes above.
+    dedup_semantic_enabled: bool = False
+    dedup_similarity_threshold: float = DEFAULT_DEDUP_SIMILARITY_THRESHOLD
+    embeddings_model: str = DEFAULT_EMBEDDINGS_MODEL
+    embeddings_base_url: str = DEFAULT_EMBEDDINGS_BASE_URL
     meta_repo: str = DEFAULT_META_REPO
     # Executor backend: 'goose' (default) or 'langchain' (U2).
     # Selected via EXECUTOR env var; factory in executor.py fails closed on unknown values.
@@ -305,6 +319,14 @@ def load_config(env: Mapping[str, str] | None = None) -> Config:
         decision_max_iterations=_get_int(source, "DECISION_MAX_ITERATIONS", 5),
         decision_bot_author=_get_nonempty(source, "DECISION_BOT_AUTHOR")
         or "autobox-box",
+        dedup_semantic_enabled=_get_bool(source, "DEDUP_SEMANTIC_ENABLED", False),
+        dedup_similarity_threshold=_get_float(
+            source, "DEDUP_SIMILARITY_THRESHOLD", DEFAULT_DEDUP_SIMILARITY_THRESHOLD
+        ),
+        embeddings_model=_get_nonempty(source, "EMBEDDINGS_MODEL")
+        or DEFAULT_EMBEDDINGS_MODEL,
+        embeddings_base_url=_get_nonempty(source, "EMBEDDINGS_BASE_URL")
+        or DEFAULT_EMBEDDINGS_BASE_URL,
         meta_repo=_get_nonempty(source, "META_REPO") or DEFAULT_META_REPO,
         executor=(_get_nonempty(source, "EXECUTOR") or "goose").strip().lower(),
         graph_impl=(_get_nonempty(source, "GRAPH_IMPL") or "legacy").strip().lower(),
@@ -391,6 +413,16 @@ def _get_nonempty(env: Mapping[str, str], name: str) -> str | None:
         return None
     value = value.strip()
     return value or None
+
+
+def _get_float(env: Mapping[str, str], name: str, default: float) -> float:
+    raw = _get_nonempty(env, name)
+    if raw is None:
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        return default
 
 
 def _get_int(env: Mapping[str, str], name: str, default: int) -> int:

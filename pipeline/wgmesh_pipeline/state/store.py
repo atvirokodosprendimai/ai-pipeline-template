@@ -520,6 +520,35 @@ class StateStore:
             "iterations": int(row["iterations"]),
         }
 
+    # ----------------------------------------------- embedding cache (U2)
+
+    def get_post_embedding(self, post_id: str, model: str) -> list[float] | None:
+        """The cached embedding for ``post_id`` under ``model``, or None on a
+        miss (unknown post, or a stale vector from a different model)."""
+        row = self._conn.execute(
+            "SELECT vector FROM post_embeddings WHERE post_id = ? AND model = ?",
+            (post_id, model),
+        ).fetchone()
+        if row is None:
+            return None
+        try:
+            return [float(x) for x in json.loads(row["vector"])]
+        except (ValueError, TypeError):
+            return None  # corrupt cache row degrades to a miss, re-embed
+
+    def put_post_embedding(
+        self, post_id: str, model: str, vector: list[float]
+    ) -> None:
+        """Cache ``vector`` for ``post_id`` under ``model`` (upsert)."""
+        self._conn.execute(
+            "INSERT INTO post_embeddings(post_id, model, vector, updated_at) "
+            "VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(post_id) DO UPDATE SET "
+            "model=excluded.model, vector=excluded.vector, updated_at=excluded.updated_at",
+            (post_id, model, json.dumps(list(vector)), _iso(_now())),
+        )
+        self._conn.commit()
+
     def record_decision_proposal(
         self, post_id: str, *, last_comment_id: str | None
     ) -> int:
