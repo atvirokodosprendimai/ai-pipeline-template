@@ -1,0 +1,35 @@
+pipeline/tests/test_learnings.py
+  s_eea9284b2e8077::t_5d3df9a42889c7 151-188
+  s_eea9284b2e8077::t_6cb59a5f0b569a 3
+  s_eea9284b2e8077::t_e9d0a5d56cf2fb 8
+pipeline/wgmesh_pipeline/graph/nodes/spec.py
+  s_eea9284b2e8077::t_c6153f202cbc66 10
+  s_eea9284b2e8077::t_d26a59029de46d 45-52,61,69-74
+pipeline/recipes/wgmesh-triage-spec.yaml
+  s_eea9284b2e8077::t_399222529ccbd5 37-41
+  s_eea9284b2e8077::t_d471d4a489e7c5 17-20
+pipeline/wgmesh_pipeline/learnings.py
+  s_eea9284b2e8077::t_a9892c59f496bd 117-157
+  s_eea9284b2e8077::t_65a3b15b54b65a 14-15,17,23
+pipeline/tests/test_spec_node.py
+  s_eea9284b2e8077::t_822ff28a064d7e 83
+pipeline/tests/test_spec_node_learnings.py
+  s_eea9284b2e8077::t_8d078c18af2ee7 90-92
+  s_eea9284b2e8077::t_b6cd581a4aa152 1-89,93-123
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.11",
+  "base_commit_sha": "5223b1fb270a92c94cdbf0ea2ec4931a344b3c6b",
+  "prompts": {},
+  "sessions": {
+    "s_eea9284b2e8077": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3563df33-6276-49d3-963b-2a7749cefa7c",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
