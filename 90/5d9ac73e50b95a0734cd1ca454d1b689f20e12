@@ -1,0 +1,21 @@
+pipeline/wgmesh_pipeline/learnings.py
+  s_eea9284b2e8077::t_2860452791ecf1 1-161
+pipeline/tests/test_learnings.py
+  s_eea9284b2e8077::t_eb01ecd5122a87 1-151
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.11",
+  "base_commit_sha": "905d9ac73e50b95a0734cd1ca454d1b689f20e12",
+  "prompts": {},
+  "sessions": {
+    "s_eea9284b2e8077": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3563df33-6276-49d3-963b-2a7749cefa7c",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
