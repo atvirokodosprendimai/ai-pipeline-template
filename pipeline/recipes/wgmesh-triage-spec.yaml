@@ -14,6 +14,10 @@ parameters:
     input_type: string
     requirement: required
     description: "Path to the PM brief markdown for this issue, or empty if none."
+  - key: learnings_file
+    input_type: string
+    requirement: required
+    description: "Path to a markdown file of known pitfalls from past runs, or empty if none."
   - key: spec_file
     input_type: string
     requirement: required
@@ -29,6 +33,11 @@ prompt: |
   (Problem / Proposed Solution / Pros / Cons / ROI / Acceptance Criteria) and is
   the authoritative source for what to build; the title is only a summary. If the
   path is empty, build the spec from the title and the repository alone.
+
+  A file of known pitfalls from past runs may be at this path: {{ learnings_file }}
+  If that path is non-empty, READ it and avoid repeating those documented mistakes.
+  It is advisory context, not the spec — never copy it into the spec output, and if
+  the path is empty, simply proceed without it.
 
   Write a markdown implementation spec to this exact repository-relative path:
   {{ spec_file }}

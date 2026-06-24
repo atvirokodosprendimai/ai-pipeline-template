@@ -7,6 +7,7 @@ from pathlib import Path
 
 from wgmesh_pipeline.config import DEFAULT_RECIPES_DIR
 from wgmesh_pipeline.graph.state import GraphState
+from wgmesh_pipeline.learnings import write_learnings_file
 
 log = logging.getLogger("wgmesh_pipeline.spec")
 
@@ -41,6 +42,14 @@ def spec_node(state: GraphState) -> GraphState:
         )
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
             handle.write(brief)
+    # Inject the most relevant past learnings as advisory "known pitfalls" so the
+    # agent stops re-hitting documented failure modes. Keyed on the issue
+    # title + body. Same file-path convention as the brief (multi-line content,
+    # passed as a path). Always pass the param (empty path on no-match) because
+    # the recipe declares it required; fail-open inside write_learnings_file.
+    learnings_file = write_learnings_file(
+        f"{issue.title}\n{brief}", prefix=f"issue-{issue.number}-learnings-"
+    )
     try:
         result = runner.run_recipe(
             recipe=recipe_path,
@@ -49,6 +58,7 @@ def spec_node(state: GraphState) -> GraphState:
                 "issue_number": str(issue.number),
                 "issue_title": issue.title,
                 "issue_brief_file": brief_file,
+                "learnings_file": learnings_file,
                 "spec_file": str(spec_rel),
             },
             expected_output=spec_rel,
@@ -56,11 +66,12 @@ def spec_node(state: GraphState) -> GraphState:
             session_id=f"issue-{issue.number}",
         )
     finally:
-        if brief_file:
-            try:
-                os.unlink(brief_file)
-            except OSError:
-                pass
+        for tmp in (brief_file, learnings_file):
+            if tmp:
+                try:
+                    os.unlink(tmp)
+                except OSError:
+                    pass
     if not result.ok:
         # Surface goose's actual output so a write-tool/model/recipe failure is
         # diagnosable from the journal instead of just "empty output guard".

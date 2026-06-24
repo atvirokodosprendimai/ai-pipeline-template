@@ -1,8 +1,14 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
-from wgmesh_pipeline.learnings import _BLOCK_HEADER, select_learnings
+from wgmesh_pipeline import learnings as learnings_mod
+from wgmesh_pipeline.learnings import (
+    _BLOCK_HEADER,
+    select_learnings,
+    write_learnings_file,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -140,6 +146,44 @@ def test_recursive_glob_finds_subdir_only_files(tmp_path: Path) -> None:
     )
     blob = select_learnings("widget nested", root=tmp_path)
     assert "Nested subdir learning" in blob
+
+
+def test_write_learnings_file_returns_path_with_content(tmp_path: Path) -> None:
+    _write(
+        tmp_path,
+        "logic-errors/good.md",
+        title="Widget good learning",
+        tags=["widget"],
+        date="2026-06-01",
+        body="## Problem\nok",
+    )
+    path = write_learnings_file("widget", root=tmp_path)
+    try:
+        assert path
+        content = Path(path).read_text(encoding="utf-8")
+        assert "Widget good learning" in content
+    finally:
+        if path:
+            os.unlink(path)
+
+
+def test_write_learnings_file_empty_on_no_match(tmp_path: Path) -> None:
+    (tmp_path / "docs" / "solutions").mkdir(parents=True)
+    assert write_learnings_file("anything", root=tmp_path) == ""
+
+
+def test_write_learnings_file_failopen_on_selector_error(monkeypatch, tmp_path: Path) -> None:
+    def boom(*_args, **_kwargs):
+        raise RuntimeError("selector exploded")
+
+    monkeypatch.setattr(learnings_mod, "select_learnings", boom)
+    assert write_learnings_file("widget", root=tmp_path) == ""
+
+
+def test_default_corpus_root_holds_solutions() -> None:
+    from wgmesh_pipeline.learnings import default_corpus_root
+
+    assert (default_corpus_root() / "docs" / "solutions").is_dir()
 
 
 def test_default_budget_constants() -> None:

@@ -11,11 +11,16 @@ skipped, never raised, so injecting learnings can never break a build run.
 
 from __future__ import annotations
 
+import logging
+import os
 import re
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
+
+log = logging.getLogger("wgmesh_pipeline.learnings")
 
 _SOLUTIONS_REL = ("docs", "solutions")
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
@@ -107,6 +112,47 @@ def _compact_body(body: str) -> str:
 
 def _block(entry: _Entry) -> str:
     return f"{_BLOCK_HEADER} {entry.title}\n\n{_compact_body(entry.body)}\n"
+
+
+def default_corpus_root() -> Path:
+    """Repo root holding ``docs/solutions/`` — this pipeline's own checkout, not
+    the target repo the agent edits. Derived from this module's location."""
+    return Path(__file__).resolve().parents[2]
+
+
+def write_learnings_file(
+    query: str,
+    *,
+    root: str | Path | None = None,
+    prefix: str = "learnings-",
+    max_items: int = 3,
+    max_chars: int = 4000,
+) -> str:
+    """Select learnings for ``query`` and write them to a temp file.
+
+    Returns the temp file path, or "" when there are no relevant learnings — so
+    callers ALWAYS pass the (required) recipe param, empty on no-match. Fail-open:
+    any selector/IO error logs and returns "" rather than raising. The caller owns
+    cleanup (unlink in a ``finally``).
+    """
+    corpus_root = Path(root) if root is not None else default_corpus_root()
+    try:
+        blob = select_learnings(
+            query, root=corpus_root, max_items=max_items, max_chars=max_chars
+        )
+    except Exception:  # noqa: BLE001 — fail-open; learnings must never break a run
+        log.warning("learnings selection failed; proceeding without", exc_info=True)
+        return ""
+    if not blob.strip():
+        return ""
+    try:
+        fd, path = tempfile.mkstemp(prefix=prefix, suffix=".md")
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(blob)
+    except OSError:
+        log.warning("learnings temp-file write failed; proceeding without", exc_info=True)
+        return ""
+    return path
 
 
 def select_learnings(
