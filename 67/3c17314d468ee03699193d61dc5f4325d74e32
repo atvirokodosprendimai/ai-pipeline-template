@@ -1,0 +1,21 @@
+pipeline/deploy/deploy.sh
+  s_3a57c8f81f9307::t_81129addaa9346 49-62
+.github/workflows/update-pipeline-box.yml
+  s_3a57c8f81f9307::t_0d1e7cb04e2945 90-103
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.13",
+  "base_commit_sha": "673c17314d468ee03699193d61dc5f4325d74e32",
+  "prompts": {},
+  "sessions": {
+    "s_3a57c8f81f9307": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d3a29bba-4017-4509-91db-46b1c74bc670",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
