@@ -1,0 +1,44 @@
+pipeline/tests/test_github_client.py
+  s_3a57c8f81f9307::t_5bc58089671a32 289,291,293,303-307
+  s_3a57c8f81f9307::t_10cd60256929f9 258,260,262,276-280
+.github/workflows/provision-pipeline-box.yml
+  s_3a57c8f81f9307::t_70eb1d2b88ef9d 268-271
+  s_3a57c8f81f9307::t_d1ecb5456abec4 142-148
+  s_3a57c8f81f9307::t_3cd0994dba08b0 261-265
+  s_3a57c8f81f9307::t_1bd1588dfab688 119-122
+pipeline/tests/test_langchain_agent_tools.py
+  s_3a57c8f81f9307::t_2a3db715571fec 36-59,61,73-77,89-99
+  s_3a57c8f81f9307::t_d189e7871f50a0 3-4,7
+  s_3a57c8f81f9307::t_fc1207a3872078 60,62-72,78-88
+pipeline/wgmesh_pipeline/github/client.py
+  s_3a57c8f81f9307::t_4ffc0cb7dc4713 523-527,529-548
+  s_3a57c8f81f9307::t_4ce136c96084f6 4-5,7-8,11
+  s_3a57c8f81f9307::t_6cf0eaa23cc36b 31-34,40-72
+pipeline/wgmesh_pipeline/langchain_agent/tools.py
+  s_3a57c8f81f9307::t_80d5ff1fa02880 112-125,130-146
+  s_3a57c8f81f9307::t_acfe1405678993 16-21,23,26-29,40,49-65
+  s_3a57c8f81f9307::t_b70bdab3183b59 126-129
+  s_3a57c8f81f9307::t_c9f90a35a75abe 3,5,14-15,22,24-25,30-39,41-48
+pipeline/deploy/hetzner-provision.sh
+  s_3a57c8f81f9307::t_ba2d5f3e8080be 24-26,31-35
+pipeline/deploy/run-container.sh
+  s_3a57c8f81f9307::t_c618bd713fe89a 20
+pipeline/deploy/deploy.sh
+  s_3a57c8f81f9307::t_bbe621bdc18283 45-48
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.13",
+  "base_commit_sha": "2e5d764da9f9faa6256b31ab91cad300b170f530",
+  "prompts": {},
+  "sessions": {
+    "s_3a57c8f81f9307": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d3a29bba-4017-4509-91db-46b1c74bc670",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
