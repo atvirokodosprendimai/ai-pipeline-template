@@ -42,6 +42,10 @@ install -m 0644 "$APP_DIR/pipeline/deploy/wgmesh-pipeline.service" \
   /etc/systemd/system/${SERVICE}.service
 id wgmesh >/dev/null 2>&1 || useradd --system --home "$APP_DIR" --shell /usr/sbin/nologin wgmesh
 chown -R wgmesh:wgmesh "$APP_DIR"
+# Writable, persistent cache for the bubblewrap-sandboxed run_bash tool
+# (GOMODCACHE/GOCACHE/GOPATH/pip live here; the host root is read-only inside
+# the sandbox). Created after useradd so wgmesh owns it.
+install -d -m 0700 -o wgmesh -g wgmesh /var/cache/wgmesh-agent
 systemctl daemon-reload
 systemctl enable "$SERVICE"
 systemctl restart "$SERVICE"

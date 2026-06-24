@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import logging
 import os
+import shutil
 import subprocess
 from pathlib import Path
 from typing import Callable
@@ -8,6 +10,59 @@ from typing import Callable
 from wgmesh_pipeline.goose.runner import _is_safe_var
 
 ToolDispatch = dict[str, Callable[..., str]]
+
+log = logging.getLogger("wgmesh_pipeline.langchain_agent.tools")
+
+# Writable, persistent cache dir bound INTO the sandbox. `--ro-bind / /` makes
+# the host read-only, but Go/pip caches live outside the workspace (GOMODCACHE,
+# GOCACHE, pip, HOME/go) — without a writable bind the build/test gate can't
+# populate them. This dir is re-bound writable and the toolchains are pointed at
+# subdirs of it (see run_bash). Provisioned 0700-owned by the run user.
+AGENT_CACHE_DIR = os.environ.get("WGMESH_AGENT_CACHE", "/var/cache/wgmesh-agent")
+
+
+def bwrap_argv(root: str | Path, command: str) -> list[str]:
+    """Build the bubblewrap argv that confines an LLM-driven `run_bash` command
+    to the workspace `root` plus the writable agent cache dir. The host
+    filesystem is read-only bound, then the workspace and AGENT_CACHE_DIR are
+    re-bound writable ON TOP (the --bind entries MUST come after --ro-bind / /
+    so they win). Network is intentionally NOT unshared — the build/test gate
+    needs `go mod` / `pip` egress. PID/UTS/IPC are unshared and the sandbox dies
+    with the parent so a timed-out push can't leave orphans."""
+    root = str(root)
+    return [
+        "bwrap",
+        "--ro-bind", "/", "/",
+        "--dev", "/dev",
+        "--proc", "/proc",
+        "--tmpfs", "/tmp",
+        "--bind", root, root,
+        "--bind", AGENT_CACHE_DIR, AGENT_CACHE_DIR,
+        "--chdir", root,
+        "--unshare-pid",
+        "--unshare-uts",
+        "--unshare-ipc",
+        "--die-with-parent",
+        "--",
+        "/bin/bash", "-lc", command,
+    ]
+
+
+def _sandbox_cache_env(base_env: dict[str, str]) -> dict[str, str]:
+    """Point Go/pip/XDG/HOME at subdirs of AGENT_CACHE_DIR so the toolchains
+    write into the one writable bind inside the sandbox. Go/pip create the
+    subdirs themselves since the parent bind is writable. Keeps GOFLAGS
+    (-modcacherw) from _safe_subprocess_env intact."""
+    cache = AGENT_CACHE_DIR
+    return {
+        **base_env,
+        "GOMODCACHE": f"{cache}/gomod",
+        "GOCACHE": f"{cache}/gocache",
+        "GOPATH": f"{cache}/go",
+        "PIP_CACHE_DIR": f"{cache}/pip",
+        "XDG_CACHE_HOME": f"{cache}/xdg",
+        "HOME": f"{cache}/home",
+    }
 
 
 def _safe_subprocess_env() -> dict[str, str]:
@@ -54,17 +109,41 @@ def build_tools(workdir: str | Path) -> tuple[list[object], ToolDispatch]:
         return f"edited {resolved.relative_to(root)}"
 
     def run_bash(command: str) -> str:
-        completed = subprocess.run(
-            command,
-            cwd=root,
-            shell=True,
-            text=True,
-            errors="replace",
-            capture_output=True,
-            check=False,
-            timeout=120,
-            env=safe_env,
-        )
+        # OS-sandbox via bubblewrap when present so the command (which untrusted
+        # GitHub issue text can reach via prompt injection) cannot write outside
+        # the workspace. Falls back to the bare shell with a loud warning where
+        # bwrap is unavailable (dev/test) so the pipeline still runs — prod has
+        # bubblewrap installed by provisioning.
+        if shutil.which("bwrap"):
+            completed = subprocess.run(
+                bwrap_argv(root, command),
+                cwd=root,
+                text=True,
+                errors="replace",
+                capture_output=True,
+                check=False,
+                timeout=120,
+                # Point Go/pip caches at the writable AGENT_CACHE_DIR bind; the
+                # read-only host root would otherwise make the ambient caches
+                # unwritable inside the sandbox.
+                env=_sandbox_cache_env(safe_env),
+            )
+        else:
+            log.warning(
+                "bwrap not found on PATH — running run_bash WITHOUT an OS "
+                "sandbox; the command can write outside the workspace"
+            )
+            completed = subprocess.run(
+                command,
+                cwd=root,
+                shell=True,
+                text=True,
+                errors="replace",
+                capture_output=True,
+                check=False,
+                timeout=120,
+                env=safe_env,
+            )
         return (
             f"exit={completed.returncode}\n"
             f"stdout:\n{completed.stdout}\n"

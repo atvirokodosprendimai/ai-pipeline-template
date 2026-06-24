@@ -116,7 +116,10 @@ jobs:
           cat > "$RUNNER_TEMP/cloud-init.yml" <<'CLOUD'
           #cloud-config
           package_update: true
-          packages: [git, python3, python3-venv, python3-pip, curl, jq]
+          # bubblewrap: OS sandbox for the agent's run_bash tool (see
+          # langchain_agent/tools.py). iptables-persistent: survive-reboot
+          # egress rule blocking cloud metadata (169.254.169.254).
+          packages: [git, python3, python3-venv, python3-pip, curl, jq, bubblewrap, iptables-persistent]
           runcmd:
             # Install Goose SYSTEM-WIDE (/usr/local/bin, on PATH for the wgmesh
             # service user) — the default ~/.local/bin lands in root's home and
@@ -136,6 +139,13 @@ jobs:
             - ln -sf /usr/local/go/bin/go /usr/local/bin/go
             - rm -f /tmp/go.tgz
             - install -d -m 700 /etc/wgmesh-pipeline
+            # Block egress to the cloud metadata endpoint (SSRF / prompt-injection
+            # exfil hardening). Hetzner serves metadata at 169.254.169.254; the
+            # IPv6 link-local equivalent is fd00:ec2::254. Persisted via
+            # iptables-persistent so the rules survive reboot.
+            - iptables -I OUTPUT -d 169.254.169.254 -j REJECT
+            - ip6tables -I OUTPUT -d fd00:ec2::254 -j REJECT
+            - netfilter-persistent save
             - touch /etc/wgmesh-pipeline/.cloud-init-done
           CLOUD
           # Reuse an existing server with this name? Delete first for a clean stand-up.
@@ -248,13 +258,17 @@ jobs:
              install -m 0644 /opt/wgmesh-pipeline/pipeline/deploy/wgmesh-pipeline.service /etc/systemd/system/
              id wgmesh >/dev/null 2>&1 || useradd --system --home /opt/wgmesh-pipeline --shell /usr/sbin/nologin wgmesh
              rm -rf /opt/wgmesh-checkout
-             if [ -n \"\$WGMESH_BOT_PAT\" ]; then
-               git clone \"https://x-access-token:\$WGMESH_BOT_PAT@github.com/atvirokodosprendimai/wgmesh.git\" /opt/wgmesh-checkout
-             else
-               git clone https://github.com/atvirokodosprendimai/wgmesh.git /opt/wgmesh-checkout
-             fi
+             # Always clone TOKENLESS: wgmesh is public, so an unauthenticated
+             # clone works and the PAT never lands in .git/config (where the
+             # sandboxed run_bash agent could 'cat' it). Push auth is injected
+             # transiently at push time via GIT_ASKPASS (see github/client.py).
+             git clone https://github.com/atvirokodosprendimai/wgmesh.git /opt/wgmesh-checkout
              chown -R wgmesh:wgmesh /opt/wgmesh-pipeline
              chown -R wgmesh:wgmesh /opt/wgmesh-checkout
+             # Writable, persistent cache for the bubblewrap-sandboxed run_bash
+             # tool (GOMODCACHE/GOCACHE/GOPATH/pip live here; the host root is
+             # read-only inside the sandbox). Created here because wgmesh now exists.
+             install -d -m 0700 -o wgmesh -g wgmesh /var/cache/wgmesh-agent
              systemctl daemon-reload
              systemctl enable --now wgmesh-pipeline
              sleep 5

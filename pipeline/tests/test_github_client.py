@@ -255,9 +255,11 @@ def test_spec_only_allows_spec_branch_push_and_label_swap(
         replace(cfg, mode="spec-only"), session=session, sanitiser=lambda text: True
     )
     pushes: list[tuple[list[str], str]] = []
+    push_envs: list[dict[str, str] | None] = []
 
-    def fake_run(command, *, cwd, check, text, capture_output, timeout):
+    def fake_run(command, *, cwd, check, text, capture_output, timeout, env=None):
         pushes.append((command, cwd))
+        push_envs.append(env)
         return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
 
     monkeypatch.setattr("wgmesh_pipeline.github.client.subprocess.run", fake_run)
@@ -271,6 +273,11 @@ def test_spec_only_allows_spec_branch_push_and_label_swap(
     assert pushes == [
         (["git", "push", "--force", "origin", "bot/spec-17"], str(tmp_path))
     ]
+    # PAT never appears in argv (no leak via `ps`); auth flows through GIT_ASKPASS.
+    assert "pat" not in pushes[0][0]
+    assert push_envs[0] is not None
+    assert push_envs[0]["GIT_ASKPASS"]
+    assert push_envs[0]["GIT_TERMINAL_PROMPT"] == "0"
     assert [call["method"] for call in session.calls] == ["DELETE", "POST"]
 
 
@@ -279,9 +286,11 @@ def test_live_impl_branch_push_is_force_updated(
 ) -> None:
     client = GitHubClient(replace(cfg, mode="live"), sanitiser=lambda text: True)
     pushes: list[tuple[list[str], str]] = []
+    push_envs: list[dict[str, str] | None] = []
 
-    def fake_run(command, *, cwd, check, text, capture_output, timeout):
+    def fake_run(command, *, cwd, check, text, capture_output, timeout, env=None):
         pushes.append((command, cwd))
+        push_envs.append(env)
         return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
 
     monkeypatch.setattr("wgmesh_pipeline.github.client.subprocess.run", fake_run)
@@ -291,6 +300,11 @@ def test_live_impl_branch_push_is_force_updated(
     assert pushes == [
         (["git", "push", "--force", "origin", "bot/impl-17"], str(tmp_path))
     ]
+    # PAT never appears in argv (no leak via `ps`); auth flows through GIT_ASKPASS.
+    assert "pat" not in pushes[0][0]
+    assert push_envs[0] is not None
+    assert push_envs[0]["GIT_ASKPASS"]
+    assert push_envs[0]["GIT_TERMINAL_PROMPT"] == "0"
 
 
 def _issue_payload(number: int, *, pull_request: bool = False) -> dict[str, Any]:

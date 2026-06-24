@@ -17,5 +17,6 @@ exec docker run --rm \
   --env-file "$STATE_DIR/env" \
   -v /opt/wgmesh-checkout:/opt/wgmesh-checkout \
   -v /var/cache/go-mod:/go/pkg/mod \
+  -v /var/cache/wgmesh-agent:/var/cache/wgmesh-agent \
   --name wgmesh-pipeline \
   "$IMAGE_REF"
