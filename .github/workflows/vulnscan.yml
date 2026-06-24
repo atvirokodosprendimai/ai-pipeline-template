@@ -1,0 +1,25 @@
+name: Vulnerability Scan
+
+# Agent-native vuln scan via the shared reusable workflow
+# (atvirokodosprendimai/vulnscan-action). LLM keys come from org-level secrets.
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  scan:
+    # Fork PRs don't receive org secrets, so the scan would fail — only run for
+    # same-repo PRs and manual dispatch.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    uses: atvirokodosprendimai/vulnscan-action/.github/workflows/vulnscan.yml@v1
+    permissions:
+      contents: read
+      security-events: write
+    with:
+      fail_on: HIGH
+    secrets:
+      ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
+      FEATHERLESS_API_KEY: ${{ secrets.FEATHERLESS_API_KEY }}
+      DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
