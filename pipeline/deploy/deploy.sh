@@ -46,6 +46,20 @@ chown -R wgmesh:wgmesh "$APP_DIR"
 # (GOMODCACHE/GOCACHE/GOPATH/pip live here; the host root is read-only inside
 # the sandbox). Created after useradd so wgmesh owns it.
 install -d -m 0700 -o wgmesh -g wgmesh /var/cache/wgmesh-agent
+
+# Security hardening (idempotent): bubblewrap sandbox for run_bash, metadata
+# egress block, and de-tokenize the wgmesh workspace remote. Mirrors the
+# cloud-init provision so updating an existing box converges to the full fix.
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -qq && apt-get install -y bubblewrap iptables-persistent
+iptables -C OUTPUT -d 169.254.169.254 -j REJECT 2>/dev/null || iptables -I OUTPUT -d 169.254.169.254 -j REJECT
+ip6tables -C OUTPUT -d fd00:ec2::254 -j REJECT 2>/dev/null || ip6tables -I OUTPUT -d fd00:ec2::254 -j REJECT
+netfilter-persistent save
+if [ -d /opt/wgmesh-checkout/.git ]; then
+  git config --global --add safe.directory /opt/wgmesh-checkout || true
+  git -C /opt/wgmesh-checkout remote set-url origin https://github.com/atvirokodosprendimai/wgmesh.git
+fi
+
 systemctl daemon-reload
 systemctl enable "$SERVICE"
 systemctl restart "$SERVICE"

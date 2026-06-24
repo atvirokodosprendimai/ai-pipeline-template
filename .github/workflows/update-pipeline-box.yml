@@ -87,6 +87,20 @@ jobs:
              echo \"code: \$OLD -> \$NEW\"
              .venv/bin/pip install -q -e '/opt/wgmesh-pipeline/pipeline[turso,trace]'
              chown -R wgmesh:wgmesh /opt/wgmesh-pipeline
+             # Security hardening (idempotent) — in-place deploys don't re-run
+             # cloud-init, so apply the sandbox/firewall/de-tokenization here too,
+             # otherwise the run_bash CWE-78 fix ships inert (no bwrap = fallback,
+             # no firewall, PAT still in the checkout's .git/config).
+             export DEBIAN_FRONTEND=noninteractive
+             apt-get update -qq && apt-get install -y bubblewrap iptables-persistent
+             install -d -m 0700 -o wgmesh -g wgmesh /var/cache/wgmesh-agent
+             iptables -C OUTPUT -d 169.254.169.254 -j REJECT 2>/dev/null || iptables -I OUTPUT -d 169.254.169.254 -j REJECT
+             ip6tables -C OUTPUT -d fd00:ec2::254 -j REJECT 2>/dev/null || ip6tables -I OUTPUT -d fd00:ec2::254 -j REJECT
+             netfilter-persistent save
+             # Drop the PAT from the existing workspace remote (was cloned with a
+             # token before this change); set-url is cheaper than a re-clone.
+             git config --global --add safe.directory /opt/wgmesh-checkout || true
+             [ -d /opt/wgmesh-checkout/.git ] && git -C /opt/wgmesh-checkout remote set-url origin https://github.com/atvirokodosprendimai/wgmesh.git || true
              systemctl restart wgmesh-pipeline
              sleep 8
              systemctl is-active wgmesh-pipeline
