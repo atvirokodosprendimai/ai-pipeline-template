@@ -145,12 +145,20 @@ def write_learnings_file(
         return ""
     if not blob.strip():
         return ""
+    path = ""
     try:
         fd, path = tempfile.mkstemp(prefix=prefix, suffix=".md")
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
             handle.write(blob)
     except OSError:
         log.warning("learnings temp-file write failed; proceeding without", exc_info=True)
+        # mkstemp may have created the file before the write failed (ENOSPC);
+        # unlink it so a partial temp file is not orphaned.
+        if path:
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
         return ""
     return path
 
@@ -200,8 +208,10 @@ def select_learnings(
             if len(candidate) > max_chars:
                 break
         elif len(block) > max_chars:
-            # single oversized highest-ranked entry: cut at a line boundary
-            head = block[:max_chars].rsplit("\n", 1)[0] or block[:max_chars]
+            # single oversized highest-ranked entry: cut at a line boundary,
+            # reserving room for the marker so the total stays within max_chars.
+            budget = max(0, max_chars - len(_PARTIAL_MARKER))
+            head = block[:budget].rsplit("\n", 1)[0] or block[:budget]
             return head + _PARTIAL_MARKER
         result = candidate
     return result

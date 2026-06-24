@@ -80,11 +80,29 @@ def test_max_chars_truncates_at_boundary_with_marker(tmp_path: Path) -> None:
         date="2026-06-01",
         body=f"## Problem\n{long_body}",
     )
-    blob = select_learnings("widget", root=tmp_path, max_chars=120)
+    blob = select_learnings("widget", root=tmp_path, max_chars=400)
     assert blob  # still returns the head of the highest-ranked entry
     assert "partial" in blob.lower()
     # never cut mid-line: the body portion ends on a line boundary
     assert "about widgetsline" not in blob
+    # marker is reserved within budget — total stays within max_chars
+    assert len(blob) <= 400
+
+
+def test_max_chars_bound_holds_with_no_newline_in_head(tmp_path: Path) -> None:
+    # a long single-line body: the head slice contains no newline to cut on,
+    # exercising the `or block[:budget]` fallback — total must still be bounded
+    _write(
+        tmp_path,
+        "logic-errors/oneline.md",
+        title="Widget oneline learning",
+        tags=["widget"],
+        date="2026-06-01",
+        body="x" * 5000,
+    )
+    blob = select_learnings("widget", root=tmp_path, max_chars=1000)
+    assert blob
+    assert len(blob) <= 1000
 
 
 def test_malformed_file_skipped_others_ranked(tmp_path: Path) -> None:
@@ -170,6 +188,34 @@ def test_write_learnings_file_returns_path_with_content(tmp_path: Path) -> None:
 def test_write_learnings_file_empty_on_no_match(tmp_path: Path) -> None:
     (tmp_path / "docs" / "solutions").mkdir(parents=True)
     assert write_learnings_file("anything", root=tmp_path) == ""
+
+
+def test_write_learnings_file_no_orphan_on_write_failure(monkeypatch, tmp_path: Path) -> None:
+    _write(
+        tmp_path,
+        "logic-errors/good.md",
+        title="Widget good learning",
+        tags=["widget"],
+        date="2026-06-01",
+        body="## Problem\nok",
+    )
+    created: list[str] = []
+    real_mkstemp = learnings_mod.tempfile.mkstemp
+
+    def tracking_mkstemp(*args, **kwargs):
+        fd, path = real_mkstemp(*args, **kwargs)
+        created.append(path)
+        return fd, path
+
+    def boom(*_args, **_kwargs):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(learnings_mod.tempfile, "mkstemp", tracking_mkstemp)
+    monkeypatch.setattr(learnings_mod.os, "fdopen", boom)
+
+    assert write_learnings_file("widget", root=tmp_path) == ""
+    assert created  # mkstemp ran and created a file
+    assert not Path(created[0]).exists()  # orphan cleaned up despite write failure
 
 
 def test_write_learnings_file_failopen_on_selector_error(monkeypatch, tmp_path: Path) -> None:
