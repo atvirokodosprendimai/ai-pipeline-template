@@ -683,6 +683,9 @@ def test_quackback_issue_method_hits_qb_caller() -> None:
             # before the single POST that creates the tagged Build Suggestion.
             ("GET", "/api/v1/posts", HttpResponse(200, _json.dumps({"data": []}))),
             ("GET", "/api/v1/tags", HttpResponse(200, _json.dumps({"data": []}))),
+            # create_issue resolves the board entry status (Open for Vote) and
+            # falls back gracefully when absent — empty list exercises that path.
+            ("GET", "/api/v1/statuses", HttpResponse(200, _json.dumps({"data": []}))),
             (
                 "POST",
                 "/api/v1/tags",
@@ -733,6 +736,9 @@ def test_quackback_set_status_accepted_for_build_raises_locally() -> None:
         qb_routes=[
             ("GET", "/api/v1/posts", HttpResponse(200, _json.dumps({"data": []}))),
             ("GET", "/api/v1/tags", HttpResponse(200, _json.dumps({"data": []}))),
+            # create_issue resolves the board entry status (Open for Vote) and
+            # falls back gracefully when absent — empty list exercises that path.
+            ("GET", "/api/v1/statuses", HttpResponse(200, _json.dumps({"data": []}))),
             (
                 "POST",
                 "/api/v1/tags",
