@@ -1,0 +1,27 @@
+pipeline/tests/test_gtm_safety.py
+  s_eea9284b2e8077::t_6d318962eb89a6 81-82
+  s_eea9284b2e8077::t_bd0a15a0a850c5 1-80,83-86
+pipeline/wgmesh_pipeline/gtm_lane/job_spec.py
+  s_eea9284b2e8077::t_6c3d0ac3f8ca68 12-26
+pipeline/wgmesh_pipeline/gtm_lane/executor.py
+  s_eea9284b2e8077::t_dd6ea6b9f4651b 21,29
+  s_eea9284b2e8077::t_849c13baa8c30d 49,51-56,59-66
+pipeline/wgmesh_pipeline/gtm_lane/safety.py
+  s_eea9284b2e8077::t_6a81ac26ec1000 1-72
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.2",
+  "base_commit_sha": "35ced0a759f64c609cb1c08c92676e74a9d50b08",
+  "prompts": {},
+  "sessions": {
+    "s_eea9284b2e8077": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3563df33-6276-49d3-963b-2a7749cefa7c",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
