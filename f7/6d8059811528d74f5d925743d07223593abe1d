@@ -1,0 +1,25 @@
+pipeline/wgmesh_pipeline/gtm_lane/telemetry.py
+  s_eea9284b2e8077::t_9f07c541627ccd 1-50
+docs/solutions/integration-issues/public-repo-third-party-pii.md
+  s_eea9284b2e8077::t_7f0b1957965f76 1-38
+docs/solutions/integration-issues/cloudflare-urllib-user-agent-block.md
+  s_eea9284b2e8077::t_228a45e57273fd 1-35
+pipeline/tests/test_gtm_telemetry.py
+  s_eea9284b2e8077::t_db8d55d133b30e 1-32
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.2",
+  "base_commit_sha": "f76d8059811528d74f5d925743d07223593abe1d",
+  "prompts": {},
+  "sessions": {
+    "s_eea9284b2e8077": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3563df33-6276-49d3-963b-2a7749cefa7c",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
