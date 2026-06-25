@@ -1,0 +1,25 @@
+pipeline/tests/test_gtm_provider.py
+  s_eea9284b2e8077::t_4dd2ec4cb0d24a 1-58
+pipeline/wgmesh_pipeline/gtm_lane/__init__.py
+  s_eea9284b2e8077::t_881843da091437 1-6
+pipeline/wgmesh_pipeline/gtm_lane/provider.py
+  s_eea9284b2e8077::t_0bb7f4a8de8a46 1-69
+pipeline/wgmesh_pipeline/gtm_lane/fake_provider.py
+  s_eea9284b2e8077::t_353a468c2e8182 1-38
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.13",
+  "base_commit_sha": "11e59ca25e3e3083828b0a5593798eb62b85ca6e",
+  "prompts": {},
+  "sessions": {
+    "s_eea9284b2e8077": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3563df33-6276-49d3-963b-2a7749cefa7c",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
