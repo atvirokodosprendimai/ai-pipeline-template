@@ -1,0 +1,104 @@
+pipeline/tests/test_learnings.py
+  s_eea9284b2e8077::t_204e8dd71deba1 1-241
+pipeline/wgmesh_pipeline/gtm_lane/telemetry.py
+  s_eea9284b2e8077::t_9f07c541627ccd 1-50
+pipeline/wgmesh_pipeline/gtm_lane/budget.py
+  s_eea9284b2e8077::t_1148d3a3e7bcde 40,50-52,54-55,61,64-67,69-76
+  s_eea9284b2e8077::t_f8f161b39ec9eb 1-39,41-49,53,56-60,62-63,68
+pipeline/tests/test_gtm_telemetry.py
+  s_eea9284b2e8077::t_db8d55d133b30e 1-32
+docs/gtm/mom-test-stargazers.md
+  s_eea9284b2e8077::t_65ccec175ed579 1-47
+pipeline/tests/test_gtm_grounding.py
+  s_eea9284b2e8077::t_1889483ac9dbed 1-37
+pipeline/tests/test_gtm_budget.py
+  s_eea9284b2e8077::t_abcf64b5565044 1-54,74-106,146-153
+  s_eea9284b2e8077::t_90f778dbb57b4f 55-73
+  s_eea9284b2e8077::t_27c3e302cd15a5 107-145
+pipeline/wgmesh_pipeline/gtm_lane/provider.py
+  s_eea9284b2e8077::t_0ce5f2241b8b6b 43-51,54-55
+  s_eea9284b2e8077::t_0bb7f4a8de8a46 1-42,52-53,56-77
+pipeline/tests/test_gtm_executor.py
+  s_eea9284b2e8077::t_efca0e2e971f95 1-93
+docs/solutions/gtm-playbook/mom-test-discovery.md
+  s_eea9284b2e8077::t_ece3a86e15289c 1-29
+pipeline/recipes/wgmesh-gtm-job-draft.yaml
+  s_eea9284b2e8077::t_5ecb983d9cf705 1-65
+docs/pulse-reports/2026-06-24_07-08.md
+  s_eea9284b2e8077::t_629240d552b17c 1-53
+pipeline/tests/test_gtm_verify.py
+  s_eea9284b2e8077::t_df6b1111e586ec 1-106
+pipeline/wgmesh_pipeline/gtm_lane/verify.py
+  s_eea9284b2e8077::t_7c440b1d76e5fe 1-75,79-82
+  s_eea9284b2e8077::t_f9c460d8253c0b 76-78
+pipeline/wgmesh_pipeline/gtm_lane/executor.py
+  s_eea9284b2e8077::t_caa14325da2cc6 1-20,24-30,33-45,52-57,61,68-69,88-89,103-107,124-126,130-134
+  s_eea9284b2e8077::t_8709d17d07e30a 31-32
+  s_eea9284b2e8077::t_48d093b63280fa 60,62-64,66-67,90-91
+  s_eea9284b2e8077::t_849c13baa8c30d 58,65,70-77
+  s_eea9284b2e8077::t_ccf535e3c8f886 23
+  s_eea9284b2e8077::t_352dba7a10ea61 78-83,85-87
+  s_eea9284b2e8077::t_dd6ea6b9f4651b 22
+  s_eea9284b2e8077::t_a457308be84100 108-123,127-129
+  s_eea9284b2e8077::t_fbf87aef4ac536 59
+  s_eea9284b2e8077::t_6647e01dc22b47 21
+  s_eea9284b2e8077::t_d3f69250d4284d 84,92-102
+  s_eea9284b2e8077::t_419ee234b60722 46-51
+docs/solutions/integration-issues/cloudflare-urllib-user-agent-block.md
+  s_eea9284b2e8077::t_228a45e57273fd 1-35
+pipeline/tests/test_gtm_provider.py
+  s_eea9284b2e8077::t_4dd2ec4cb0d24a 1-58
+docs/gtm/provider-feasibility.md
+  s_eea9284b2e8077::t_639ce359dd9c85 1-94
+pipeline/wgmesh_pipeline/learnings.py
+  s_eea9284b2e8077::t_204e8dd71deba1 1-217
+pipeline/wgmesh_pipeline/gtm_lane/lane.py
+  s_eea9284b2e8077::t_fcad50a787969f 1-52
+docs/gtm/cloudroof-positioning.md
+  s_eea9284b2e8077::t_1591b5cd7e4d53 1-46
+docs/solutions/gtm-playbook/obviously-awesome-positioning.md
+  s_eea9284b2e8077::t_1e86dafba3b493 1-28
+pipeline/wgmesh_pipeline/gtm_lane/__init__.py
+  s_eea9284b2e8077::t_881843da091437 1-6
+pipeline/tests/test_gtm_safety.py
+  s_eea9284b2e8077::t_bd0a15a0a850c5 1-80,83-86
+  s_eea9284b2e8077::t_6d318962eb89a6 81-82
+  s_eea9284b2e8077::t_aff4bd3c5190ee 87-89
+pipeline/tests/test_gtm_lane.py
+  s_eea9284b2e8077::t_96b673da6e55ef 1-63
+pipeline/wgmesh_pipeline/gtm_lane/safety.py
+  s_eea9284b2e8077::t_6a81ac26ec1000 1-72
+docs/solutions/integration-issues/public-repo-third-party-pii.md
+  s_eea9284b2e8077::t_7f0b1957965f76 1-38
+pipeline/wgmesh_pipeline/gtm_lane/draft.py
+  s_eea9284b2e8077::t_b24a609fb431f3 1-19,21-38,47-55,57-67,74-75
+  s_eea9284b2e8077::t_8dcfb1d5eb7c7b 20
+  s_eea9284b2e8077::t_596b5e97d0c6a4 39-46,56,68-73
+docs/plans/2026-06-25-001-feat-gtm-rent-a-human-executor-plan.md
+  s_eea9284b2e8077::t_1257418f6f8b3b 1-512
+docs/solutions/gtm-playbook/core-four-warm-outreach.md
+  s_eea9284b2e8077::t_002894c95b023e 1-28
+pipeline/wgmesh_pipeline/gtm_lane/fake_provider.py
+  s_eea9284b2e8077::t_353a468c2e8182 1-38
+pipeline/wgmesh_pipeline/gtm_lane/job_spec.py
+  s_eea9284b2e8077::t_6c3d0ac3f8ca68 12-26
+  s_eea9284b2e8077::t_d6ebe065a466d6 1-11,27-64
+docs/brainstorms/2026-06-24-gtm-rent-a-human-executor-requirements.md
+  s_eea9284b2e8077::t_9cb4e4a767050a 1-267
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.2",
+  "base_commit_sha": "a348756e06373cdba9f902cbaa958f4f61b80dec",
+  "prompts": {},
+  "sessions": {
+    "s_eea9284b2e8077": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3563df33-6276-49d3-963b-2a7749cefa7c",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
