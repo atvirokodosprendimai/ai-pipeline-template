@@ -1,0 +1,33 @@
+pipeline/wgmesh_pipeline/gtm_lane/lane.py
+  s_eea9284b2e8077::t_fcad50a787969f 1-52
+pipeline/wgmesh_pipeline/gtm_lane/executor.py
+  s_eea9284b2e8077::t_d3f69250d4284d 84,92-102
+  s_eea9284b2e8077::t_a457308be84100 108-123,127-129
+pipeline/tests/test_gtm_budget.py
+  s_eea9284b2e8077::t_90f778dbb57b4f 55-73
+  s_eea9284b2e8077::t_27c3e302cd15a5 107-145
+pipeline/wgmesh_pipeline/gtm_lane/provider.py
+  s_eea9284b2e8077::t_0ce5f2241b8b6b 43-51,54-55
+pipeline/tests/test_gtm_lane.py
+  s_eea9284b2e8077::t_96b673da6e55ef 1-63
+pipeline/wgmesh_pipeline/gtm_lane/budget.py
+  s_eea9284b2e8077::t_1148d3a3e7bcde 40,50-52,54-55,61,64-67,69-76
+pipeline/wgmesh_pipeline/gtm_lane/verify.py
+  s_eea9284b2e8077::t_f9c460d8253c0b 76-78
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.2",
+  "base_commit_sha": "1d09c3926d7ff39aed4dece082de0f1f5d0c7be8",
+  "prompts": {},
+  "sessions": {
+    "s_eea9284b2e8077": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3563df33-6276-49d3-963b-2a7749cefa7c",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
