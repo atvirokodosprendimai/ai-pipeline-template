@@ -1,0 +1,21 @@
+docs/gtm/cloudroof-positioning.md
+  s_eea9284b2e8077::t_1591b5cd7e4d53 1-46
+docs/gtm/mom-test-stargazers.md
+  s_eea9284b2e8077::t_65ccec175ed579 1-47
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.2",
+  "base_commit_sha": "c2dd6b25b7c01cf18110f0e99759abe09b064065",
+  "prompts": {},
+  "sessions": {
+    "s_eea9284b2e8077": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3563df33-6276-49d3-963b-2a7749cefa7c",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
