@@ -1,0 +1,23 @@
+docs/plans/2026-06-25-001-feat-gtm-rent-a-human-executor-plan.md
+  s_eea9284b2e8077::t_1257418f6f8b3b 1-512
+docs/pulse-reports/2026-06-24_07-08.md
+  s_eea9284b2e8077::t_629240d552b17c 1-53
+docs/gtm/provider-feasibility.md
+  s_eea9284b2e8077::t_639ce359dd9c85 1-94
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.13",
+  "base_commit_sha": "3e5a99d163921e6977af4e8f78b579d8fbe1e767",
+  "prompts": {},
+  "sessions": {
+    "s_eea9284b2e8077": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3563df33-6276-49d3-963b-2a7749cefa7c",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
