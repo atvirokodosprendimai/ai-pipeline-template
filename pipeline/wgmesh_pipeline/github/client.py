@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import logging
+import os
+import stat
 import subprocess
+import tempfile
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Iterator
 
 import requests
 
@@ -24,9 +28,48 @@ HTTP_TIMEOUT_SECONDS = 30
 SANITISE_TIMEOUT_SECONDS = 120
 OPEN_ISSUES_PAGE_SIZE = 100
 OPEN_ISSUES_MAX_PAGES = 50
+# Env var the askpass helper reads the bot PAT from at push time. Kept out of
+# the workspace git remote (which is cloned tokenless) so `cat .git/config`
+# can't leak it.
+PAT_ENV_VAR = "WGMESH_BOT_PAT"
 Sanitiser = Callable[[str], bool]
 
 log = logging.getLogger("wgmesh_pipeline.github.client")
+
+
+@contextmanager
+def _git_askpass(pat: str) -> Iterator[dict[str, str]]:
+    """Yield a ``git push`` env that authenticates via a transient GIT_ASKPASS
+    helper: the PAT is never written to the remote URL, never passed in argv
+    (so it stays out of `ps`), and only persists on disk inside a 0700 temp dir
+    for the duration of the push. The helper echoes ``x-access-token`` for the
+    Username prompt and the PAT (read from its OWN env, inherited from this
+    process) for the Password prompt."""
+    tmpdir = tempfile.mkdtemp(prefix="wgmesh-askpass-")
+    helper = Path(tmpdir) / "askpass.sh"
+    # The PAT is NOT embedded in the script body — it is read from $WGMESH_BOT_PAT
+    # at invocation, so it never touches disk via this file.
+    helper.write_text(
+        '#!/bin/sh\n'
+        'case "$1" in\n'
+        '  *[Uu]sername*) printf "x-access-token" ;;\n'
+        f'  *[Pp]assword*) printf "%s" "${PAT_ENV_VAR}" ;;\n'
+        'esac\n',
+        encoding="utf-8",
+    )
+    helper.chmod(stat.S_IRWXU)  # 0700
+    try:
+        os.chmod(tmpdir, stat.S_IRWXU)
+        env = {
+            **os.environ,
+            PAT_ENV_VAR: pat,
+            "GIT_ASKPASS": str(helper),
+            "GIT_TERMINAL_PROMPT": "0",
+        }
+        yield env
+    finally:
+        helper.unlink(missing_ok=True)
+        Path(tmpdir).rmdir()
 
 
 class SanitiseError(RuntimeError):
@@ -477,15 +520,32 @@ class GitHubClient:
         push_cmd = ["git", "push", "origin", branch]
         if is_force_updated_bot_branch:
             push_cmd.insert(2, "--force")
+        # The workspace remote is tokenless (the PAT is no longer in .git/config),
+        # so authenticate via a transient GIT_ASKPASS helper. Absent a PAT
+        # (shadow/dev, which short-circuit above and never reach here), push
+        # without it.
+        pat = self.config.wgmesh_bot_pat
         try:
-            completed = subprocess.run(
-                push_cmd,
-                cwd=clone_path,
-                check=False,
-                text=True,
-                capture_output=True,
-                timeout=GIT_TIMEOUT_SECONDS,
-            )
+            if pat:
+                with _git_askpass(pat) as push_env:
+                    completed = subprocess.run(
+                        push_cmd,
+                        cwd=clone_path,
+                        check=False,
+                        text=True,
+                        capture_output=True,
+                        timeout=GIT_TIMEOUT_SECONDS,
+                        env=push_env,
+                    )
+            else:
+                completed = subprocess.run(
+                    push_cmd,
+                    cwd=clone_path,
+                    check=False,
+                    text=True,
+                    capture_output=True,
+                    timeout=GIT_TIMEOUT_SECONDS,
+                )
         except subprocess.TimeoutExpired:
             raise RuntimeError(f"git push timed out after {GIT_TIMEOUT_SECONDS}s")
         if completed.returncode != 0:
