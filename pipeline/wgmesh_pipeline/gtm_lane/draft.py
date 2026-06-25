@@ -3,7 +3,8 @@
 Mirrors ``decision_lane/proposal_runner.build_proposal_fn``: multi-line content
 (the brief, the GTM playbook) is handed to the recipe as temp-file paths, never
 inline params. Returns a ``draft_fn(item) -> JobSpec`` the executor calls. The
-``learnings_file`` param is wired empty until U7 vendors the GTM corpus.
+``learnings_file`` param is grounded via the shipped ``write_learnings_file``
+seam over the vendored GTM corpus in ``docs/solutions/gtm-playbook/`` (U7).
 """
 
 from __future__ import annotations
