@@ -1,0 +1,19 @@
+pipeline/wgmesh_pipeline/gtm_lane/draft.py
+  s_0b2aef34520b5a::t_9a05e49e581c14 6-7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.2",
+  "base_commit_sha": "9c886137c8235aaefa579c6328aec5fe154bba10",
+  "prompts": {},
+  "sessions": {
+    "s_0b2aef34520b5a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "da6a1478-c2c1-416e-9ff9-a43a3371e8bc",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
