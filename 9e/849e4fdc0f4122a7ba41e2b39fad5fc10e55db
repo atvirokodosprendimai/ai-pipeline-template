@@ -1,0 +1,26 @@
+pipeline/wgmesh_pipeline/gtm_lane/budget.py
+  s_eea9284b2e8077::t_f8f161b39ec9eb 1-59
+pipeline/wgmesh_pipeline/gtm_lane/executor.py
+  s_eea9284b2e8077::t_fbf87aef4ac536 59
+  s_eea9284b2e8077::t_8709d17d07e30a 31-32
+  s_eea9284b2e8077::t_6647e01dc22b47 21
+  s_eea9284b2e8077::t_352dba7a10ea61 78-86
+pipeline/tests/test_gtm_budget.py
+  s_eea9284b2e8077::t_abcf64b5565044 1-95
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.2",
+  "base_commit_sha": "9e849e4fdc0f4122a7ba41e2b39fad5fc10e55db",
+  "prompts": {},
+  "sessions": {
+    "s_eea9284b2e8077": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3563df33-6276-49d3-963b-2a7749cefa7c",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
