@@ -1,0 +1,105 @@
+name: Configure Langfuse SMTP
+
+# Wire transactional email (Mailgun EU) into the self-hosted Langfuse box by
+# upserting EMAIL_FROM_ADDRESS + SMTP_CONNECTION_URL into /opt/langfuse/.env and
+# recreating the web+worker containers — WITHOUT a server recreate (preserves
+# clickhouse/postgres trace data and the box IP). In-place, idempotent, rerunnable.
+#
+# Values come from SECRETS (not inputs): the SMTP URL contains '@' and '%' which
+# the flag-charset workflows reject, and secrets keep them out of logs.
+#
+# Auth: DEPLOY_SSH_KEY (same deploy keypair as the pipeline-box workflows; its
+# pubkey must already be in the box's authorized_keys).
+#
+# Required secrets: DEPLOY_SSH_KEY, HCLOUD_TOKEN (org),
+#   LANGFUSE_SMTP_CONNECTION_URL (e.g. smtp://user%40mg.dom:PASS@smtp.eu.mailgun.org:587),
+#   LANGFUSE_EMAIL_FROM (e.g. no-reply@mg.dom).
+
+on:
+  workflow_dispatch:
+    inputs:
+      server_name:
+        description: 'Hetzner server name'
+        default: 'langfuse'
+
+permissions:
+  contents: read
+
+jobs:
+  configure-smtp:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate secrets
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+          SMTP_URL: ${{ secrets.LANGFUSE_SMTP_CONNECTION_URL }}
+          EMAIL_FROM: ${{ secrets.LANGFUSE_EMAIL_FROM }}
+        run: |
+          set -euo pipefail
+          : "${DEPLOY_SSH_KEY:?DEPLOY_SSH_KEY secret missing}"
+          : "${HCLOUD_TOKEN:?HCLOUD_TOKEN secret missing (org)}"
+          : "${SMTP_URL:?LANGFUSE_SMTP_CONNECTION_URL secret missing}"
+          : "${EMAIL_FROM:?LANGFUSE_EMAIL_FROM secret missing}"
+
+      - name: Install hcloud CLI
+        run: |
+          set -euo pipefail
+          curl -fsSL https://github.com/hetznercloud/cli/releases/latest/download/hcloud-linux-amd64.tar.gz \
+            | tar xz hcloud
+          sudo mv hcloud /usr/local/bin/
+
+      - name: Resolve box IP
+        env:
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+        run: |
+          set -euo pipefail
+          IP=$(hcloud server ip "${{ github.event.inputs.server_name }}")
+          echo "BOX_IP=$IP" >> "$GITHUB_ENV"
+
+      - name: Upsert SMTP env + recreate web/worker
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SMTP_URL: ${{ secrets.LANGFUSE_SMTP_CONNECTION_URL }}
+          EMAIL_FROM: ${{ secrets.LANGFUSE_EMAIL_FROM }}
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$RUNNER_TEMP/deploy_key"
+          SSH_SMTP=$(printf '%q' "$SMTP_URL")
+          SSH_FROM=$(printf '%q' "$EMAIL_FROM")
+          # UserKnownHostsFile=/dev/null: provision rotates the host key; the
+          # deploy key is the real gate.
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              -o ConnectTimeout=15 -i "$RUNNER_TEMP/deploy_key" root@"$BOX_IP" \
+              "SMTP_URL=$SSH_SMTP EMAIL_FROM=$SSH_FROM bash -se" <<'REMOTE'
+          set -euo pipefail
+          cd /opt/langfuse
+          [ -f .env ] || { echo "::error::/opt/langfuse/.env missing — run full provision first"; exit 1; }
+          upsert() {
+            grep -v "^$1=" .env > .env.tmp 2>/dev/null || true
+            printf '%s=%s\n' "$1" "$2" >> .env.tmp
+            mv .env.tmp .env
+          }
+          upsert EMAIL_FROM_ADDRESS "$EMAIL_FROM"
+          upsert SMTP_CONNECTION_URL "$SMTP_URL"
+          chmod 600 .env
+          docker compose --env-file .env up -d langfuse-web langfuse-worker
+          code=""
+          for i in $(seq 1 20); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/public/health || true)
+            [ "$code" = "200" ] && break
+            sleep 6
+          done
+          echo "health=$code"
+          # Confirm injection WITHOUT printing values (SMTP_CONNECTION_URL holds a password).
+          docker compose exec -T langfuse-web sh -c 'test -n "$EMAIL_FROM_ADDRESS"' \
+            && echo "EMAIL_FROM_ADDRESS present in web container" \
+            || { echo "::error::EMAIL_FROM_ADDRESS not in container"; exit 1; }
+          docker compose exec -T langfuse-web sh -c 'test -n "$SMTP_CONNECTION_URL"' \
+            && echo "SMTP_CONNECTION_URL present in web container" \
+            || { echo "::error::SMTP_CONNECTION_URL not in container"; exit 1; }
+          REMOTE
+
+      - name: Report
+        run: echo "Langfuse SMTP configured on $BOX_IP (web+worker recreated, data preserved)."
