@@ -94,15 +94,18 @@ jobs:
           LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
           LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
           LANGFUSE_ADMIN_PASSWORD: ${{ secrets.LANGFUSE_ADMIN_PASSWORD }}
+          LANGFUSE_SMTP_CONNECTION_URL: ${{ secrets.LANGFUSE_SMTP_CONNECTION_URL }}
+          LANGFUSE_EMAIL_FROM: ${{ secrets.LANGFUSE_EMAIL_FROM }}
         run: |
           set -euo pipefail
           # Generate infra secrets ONCE on the box (idempotent: keep an existing
           # .env so SALT/ENCRYPTION_KEY stay stable across redeploys). Admin
           # password is the known LANGFUSE_ADMIN_PASSWORD secret so login works.
           ssh -o StrictHostKeyChecking=no -i "$RUNNER_TEMP/k" root@"$BOX_IP" bash -s -- \
-            "$BOX_IP" "$LANGFUSE_PUBLIC_KEY" "$LANGFUSE_SECRET_KEY" "$LANGFUSE_ADMIN_PASSWORD" <<'REMOTE'
+            "$BOX_IP" "$LANGFUSE_PUBLIC_KEY" "$LANGFUSE_SECRET_KEY" "$LANGFUSE_ADMIN_PASSWORD" \
+            "$LANGFUSE_SMTP_CONNECTION_URL" "$LANGFUSE_EMAIL_FROM" <<'REMOTE'
           set -euo pipefail
-          IP="$1"; LF_PUB="$2"; LF_SEC="$3"; ADMINPW="$4"
+          IP="$1"; LF_PUB="$2"; LF_SEC="$3"; ADMINPW="$4"; SMTP_URL="${5:-}"; EMAIL_FROM="${6:-}"
           cd /opt/langfuse
           # Fetch the compose from a RELEASE TAG, not main: main can change
           # service shape between provisions with zero signal.
@@ -145,9 +148,22 @@ jobs:
           LANGFUSE_INIT_USER_EMAIL=admin@wgmesh.local
           LANGFUSE_INIT_USER_NAME=admin
           LANGFUSE_INIT_USER_PASSWORD=$ADMINPW
+          EMAIL_FROM_ADDRESS=$EMAIL_FROM
+          SMTP_CONNECTION_URL=$SMTP_URL
           TELEMETRY_ENABLED=false
           EOF
             echo "ADMIN_PASSWORD=$ADMINPW" > .admin
+          fi
+          # Idempotently ensure SMTP keys present even on an existing .env (so a
+          # re-provision against a surviving box wires email; allows rotation).
+          if [ -n "${SMTP_URL:-}" ]; then
+            upsert_env() {
+              grep -v "^$1=" .env > .env.tmp 2>/dev/null || true
+              printf '%s=%s\n' "$1" "$2" >> .env.tmp
+              mv .env.tmp .env
+            }
+            upsert_env EMAIL_FROM_ADDRESS "$EMAIL_FROM"
+            upsert_env SMTP_CONNECTION_URL "$SMTP_URL"
           fi
           # postgres password also needs to reach the postgres + clickhouse services:
           set -a; . ./.env; set +a
