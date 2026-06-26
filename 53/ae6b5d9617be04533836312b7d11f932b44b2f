@@ -1,0 +1,24 @@
+.github/workflows/configure-langfuse-smtp.yml
+  s_47332a9728626d::t_144b60c079cdf6 1-105
+.github/workflows/provision-langfuse.yml
+  s_47332a9728626d::t_1e9f38983cb50f 151-152
+  s_47332a9728626d::t_3c22d2e6b8314b 97-98
+  s_47332a9728626d::t_2aefd633d47c45 157-167
+  s_47332a9728626d::t_6a564ad758cdab 105-106,108
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.2",
+  "base_commit_sha": "53ae6b5d9617be04533836312b7d11f932b44b2f",
+  "prompts": {},
+  "sessions": {
+    "s_47332a9728626d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6a344e51-0869-4e88-859d-f9f30615fcf5",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
