@@ -11,3 +11,4 @@ infrastructure/terraform/**/backend.hcl
 
 # Compound Engineering local config
 .compound-engineering/*.local.yaml
+.gstack/
