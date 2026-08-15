@@ -99,7 +99,7 @@ Product works but target audience doesn't know about it.
 
 ### Stage 3: Reachable
 People can find it but can't pay.
-- **Exit when**: managed-service billing live (cloudroof.eu signup + invoice for company-operated hosting), customer can sign up and get invoiced. Billing attaches to the managed layer only — never to gating a component (PROD-3).
+- **Exit when**: support billing live on Open Collective (opencollective.com/it-uoga/projects/cloudroof) — Collective/project live with tiers, first recurring contribution collected. Billing attaches to the managed layer only — never to gating a component (PROD-3).
 
 ### Stage 4: Pipeline
 People can pay but nobody has.
@@ -284,7 +284,7 @@ You will be given:
    - Infrastructure: health check results from configured endpoints
    - Contributions: recent git authors, AI agent activity, dependency info
    - Costs: current category-level spend (from secrets, aggregated — no raw credentials)
-   - Revenue: live Polar.sh data — active subscriber count, MRR (cents), recent orders for the managed service (cloudroof.eu). Use these to track funnel progression and determine if Stage 3 (Reachable: managed-service billing live) exit criteria are met.
+   - Revenue: live Open Collective data (public GraphQL, no token) — active monthly contributor count, MRR (cents), recent orders for the cloudroof project (opencollective.com/it-uoga/projects/cloudroof). Use these to track funnel progression and determine if Stage 3 (Reachable: support billing live) exit criteria are met. Polar.sh is retired — ignore any Polar-shaped data in old records.
 4. **Recent assessment history** (last 3-5 assessments for continuity)
 
 ## Assessment writing style
