@@ -1,0 +1,20 @@
+.claude/hooks/check-gstack.sh
+  h_f6687c1f6f3520 1-20
+.claude/settings.json
+  h_f6687c1f6f3520 1-15
+.gitignore
+  h_f6687c1f6f3520 14-16
+CLAUDE.md
+  h_f6687c1f6f3520 15-38
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "4e763644ed513e17066edadf9bf8b86add52d4f7",
+  "prompts": {},
+  "humans": {
+    "h_f6687c1f6f3520": {
+      "author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
