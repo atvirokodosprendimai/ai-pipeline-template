@@ -11,3 +11,6 @@ infrastructure/terraform/**/backend.hcl
 
 # Compound Engineering local config
 .compound-engineering/*.local.yaml
+
+# Claude Code per-developer overrides (never commit)
+.claude/settings.local.json
