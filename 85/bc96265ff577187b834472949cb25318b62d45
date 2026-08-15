@@ -1,0 +1,19 @@
+.gitignore
+  s_b2625fe85d884c::t_63e3aebdf21c22 14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "85bc96265ff577187b834472949cb25318b62d45",
+  "prompts": {},
+  "sessions": {
+    "s_b2625fe85d884c": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a003f1-cdda-70c9-9f4d-23a56ff8247a",
+        "model": "glm-5.3"
+      },
+      "human_author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
