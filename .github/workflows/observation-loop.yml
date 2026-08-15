@@ -181,28 +181,57 @@ jobs:
             echo "No idle policy available." > /tmp/idle_policy.txt
           fi
 
-      - name: Collect Polar revenue signals
-        env:
-          POLAR_TOKEN: ${{ secrets.POLAR_TOKEN }}
+      - name: Collect Open Collective revenue signals
         run: |
-          # Poll Polar.sh API for subscription/revenue data.
+          # Poll Open Collective's public GraphQL API for contribution data.
           #
-          # Filters subscriptions to the seeded-product cohort (cloudroof tiers).
-          # Earlier versions queried all subs in the org, which mixed in
-          # unrelated products. The downstream assessment LLM then attributed
-          # those org-level subs to the seeded product — wrong stage signal.
-          # Background:
-          #   docs/solutions/integration-issues/polar-checkout-404s-from-stale-config-2026-05-08.md
-          # contains the discovery of these product UUIDs and the slug fix.
+          # Replaces the Polar.sh collector (Polar stopped serving this org,
+          # 2026-08-15). The cloudroof OC project IS the seed cohort — no
+          # product-attribution filtering needed (that was the Polar-era bug:
+          # org-level subs from unrelated products were misattributed).
+          # API notes (verified 2026-08-15):
+          #   - Endpoint: POST https://api.opencollective.com/graphql
+          #   - Public data needs NO token. graphql.* subdomains are dead.
+          #   - Project fields need `... on Project`; tiers give slug/amount;
+          #     orders give status/frequency/tier for contributor math.
           # Schema-stability note: ALL paths (success + degraded) emit the
           # same field set including `note`; cents are integer, EUR fields
           # are NOT precomputed (LLM divides cents by 100 to render).
-          NOTE_TEXT="SEED cohort = cloudroof tier products only. Use seed_product_* for stage progression. ALL-org may include unrelated products in the same Polar organization; do NOT attribute those to the seeded product."
-          if [ -z "$POLAR_TOKEN" ]; then
-            echo '::warning::POLAR_TOKEN not configured — revenue signals unavailable'
+          # Field names intentionally match the Polar-era shape so the
+          # merge step and LLM prompt keep working.
+          NOTE_TEXT="OC project cloudroof (opencollective.com/it-uoga/projects/cloudroof) = the seeded-product cohort exactly. Support-style contributions: recurring monthly tiers count toward stage progression."
+          OC_API="https://api.opencollective.com/graphql"
+
+          query='query {
+            account(slug: "cloudroof") {
+              ... on Project {
+                name
+                tiers { totalCount nodes { slug name amount { value currency } interval } }
+                orders(limit: 100) {
+                  totalCount
+                  nodes {
+                    id
+                    amount { value currency }
+                    status
+                    frequency
+                    createdAt
+                    tier { slug }
+                  }
+                }
+              }
+            }
+          }'
+
+          resp=$(curl -sf --max-time 30 \
+            -H 'Content-Type: application/json' \
+            -d "{\"query\": $(echo "$query" | jq -Rs .)}" \
+            "$OC_API" 2>/dev/null || echo '{"data":{"account":null}}')
+
+          if [ "$(echo "$resp" | jq -r '.data.account // null')" = "null" ]; then
+            echo '::warning::OC project cloudroof unreachable — revenue signals degraded'
             jq -n --arg note "$NOTE_TEXT" '{
-              source: "polar",
-              error: "POLAR_TOKEN not configured",
+              source: "opencollective",
+              error: "project unreachable",
               note: $note,
               seed_product_subscribers: 0,
               seed_product_mrr_cents: 0,
@@ -210,117 +239,46 @@ jobs:
               all_org_subscribers: 0,
               all_org_mrr_cents: 0,
               recent_orders: []
-            }' > /tmp/polar.json
+            }' > /tmp/revenue.json
             exit 0
           fi
 
-          POLAR_ORG="it-uoga-mb"
-          API="https://api.polar.sh"
+          # Active monthly contributors = the stage-progression signal.
+          # (OC "orders" with status ACTIVE + frequency MONTHLY; one order
+          # node per recurring subscription.)
+          orders_json=$(echo "$resp" | jq -c '.data.account.orders.nodes')
 
-          # Cloudroof seeded-product cohort UUIDs. Source-of-truth doc is
-          # in this repo at docs/solutions/integration-issues/polar-checkout-404s-from-stale-config-2026-05-08.md
-          # which documents how these were discovered. If new tiers are added,
-          # add the UUID below and to that doc.
-          # Founding $5/mo, Edge Node $20/mo, Mesh Operator $100/mo.
-          SEED_PRODUCT_IDS=(
-            "3f5d75de-936b-49d8-a21b-4b79d9fd22c1"
-            "1927e637-4cfd-4c94-8bee-c5518803bc89"
-            "eb20683e-55ea-4354-9d8c-070e55a4eff5"
-          )
+          seed_subs_total=$(echo "$orders_json" | jq '[.[] | select(.status == "ACTIVE" and .frequency == "MONTHLY")] | length')
+          seed_mrr_cents=$(echo "$orders_json" | jq '[.[] | select(.status == "ACTIVE" and .frequency == "MONTHLY") | .amount.value * 100] | add // 0 | floor')
 
-          org_data=$(curl -sf \
-            -H "Authorization: Bearer $POLAR_TOKEN" \
-            -H "Accept: application/json" \
-            "$API/v1/organizations/?slug=$POLAR_ORG" 2>/dev/null || echo '{"items":[]}')
+          per_product_json=$(echo "$orders_json" | jq '
+            [ .[] | select(.status == "ACTIVE" and .frequency == "MONTHLY")
+            | .tier.slug // "custom" ]
+            | group_by(.)
+            | map({product_id: .[0], active_subscribers: length,
+                   mrr_cents: 0})')
 
-          org_id=$(echo "$org_data" | jq -r '.items[0].id // empty')
-          if [ -z "$org_id" ]; then
-            echo '::warning::Could not resolve Polar organization ID'
-            jq -n --arg note "$NOTE_TEXT" '{
-              source: "polar",
-              error: "org not found",
-              note: $note,
-              seed_product_subscribers: 0,
-              seed_product_mrr_cents: 0,
-              seed_per_product: [],
-              all_org_subscribers: 0,
-              all_org_mrr_cents: 0,
-              recent_orders: []
-            }' > /tmp/polar.json
-            exit 0
-          fi
+          # Per-tier MRR: join order amounts by tier slug.
+          per_product_json=$(echo "$orders_json" | jq '
+            [ .[] | select(.status == "ACTIVE" and .frequency == "MONTHLY")
+            | {tier: (.tier.slug // "custom"), cents: ((.amount.value * 100) | floor)} ]
+            | group_by(.tier)
+            | map({product_id: .[0].tier, active_subscribers: length,
+                   mrr_cents: (map(.cents) | add // 0)})')
 
-          # Helper: paginate Polar /v1/subscriptions across all pages and
-          # aggregate count + summed amount (in cents). Polar pagination
-          # uses `page` (1-indexed) + `limit` query params and returns a
-          # `pagination.total_count` + `pagination.max_page` envelope.
-          # Stops early if a page returns no items (defensive).
-          # Args:
-          #   $1 = base subscriptions URL (organization_id and any product_id
-          #        already in querystring; pagination params appended here)
-          # Sets via stdout: "<count> <mrr_cents>" (space-separated).
-          polar_paginate_subs() {
-            local base_url="$1"
-            local page=1
-            local limit=100
-            local total_count=0
-            local total_mrr=0
-            local seen=0
-            local max_pages=50  # hard cap to prevent runaway loops on bad responses
-            while [ "$page" -le "$max_pages" ]; do
-              local resp
-              resp=$(curl -sf \
-                -H "Authorization: Bearer $POLAR_TOKEN" \
-                -H "Accept: application/json" \
-                "${base_url}&page=${page}&limit=${limit}" 2>/dev/null \
-                || echo '{"items":[]}')
-              local pcount pmrr
-              pcount=$(echo "$resp" | jq '.items | length')
-              pmrr=$(echo "$resp" | jq '[.items[].amount // 0] | add // 0')
-              total_count=$((total_count + pcount))
-              total_mrr=$((total_mrr + pmrr))
-              seen=$((seen + pcount))
-              # Stop if this page returned fewer than `limit` items — done.
-              if [ "$pcount" -lt "$limit" ]; then
-                break
-              fi
-              page=$((page + 1))
-            done
-            printf '%d %d\n' "$total_count" "$total_mrr"
-          }
+          # Recent orders mapped to the Polar-era shape (product_id = tier slug).
+          recent_orders=$(echo "$orders_json" | jq '[.[:10][] | {
+            id: .id,
+            amount_cents: ((.amount.value * 100) | floor),
+            status: .status,
+            created_at: .createdAt,
+            product_id: (.tier.slug // "custom")
+          }]')
 
-          # 1. Org-level subs (used for context only — must NOT be attributed
-          # to the seeded product without product_id check). Paginated.
-          read -r all_sub_count all_mrr_cents < <(
-            polar_paginate_subs "$API/v1/subscriptions/?organization_id=$org_id&active=true"
-          )
-
-          # 2. Seed-product cohort: per-product, sum across cloudroof tiers only.
-          # Canonical "is the seeded product getting paid customers?" signal.
-          # Each product paginated independently.
-          seed_subs_total=0
-          seed_mrr_cents=0
-          seed_per_product=()
-          for pid in "${SEED_PRODUCT_IDS[@]}"; do
-            local_count=0
-            local_mrr=0
-            read -r local_count local_mrr < <(
-              polar_paginate_subs "$API/v1/subscriptions/?organization_id=$org_id&product_id=$pid&active=true"
-            )
-            seed_subs_total=$((seed_subs_total + local_count))
-            seed_mrr_cents=$((seed_mrr_cents + local_mrr))
-            seed_per_product+=("$(jq -n --arg id "$pid" --argjson c "$local_count" --argjson m "$local_mrr" '{product_id: $id, active_subscribers: $c, mrr_cents: $m}')")
-          done
-
-          # Recent orders. Org-level; downstream LLM must NOT attribute to
-          # seed cohort without checking product_id on each order.
-          orders=$(curl -sf \
-            -H "Authorization: Bearer $POLAR_TOKEN" \
-            -H "Accept: application/json" \
-            "$API/v1/orders/?organization_id=$org_id&limit=10" 2>/dev/null \
-            || echo '{"items":[]}')
-
-          recent_orders=$(echo "$orders" | jq '[.items[] | {id: .id, amount_cents: .amount, status: .status, created_at: .created_at, product_id: .product_id}]')
+          # On OC, the project IS the org's seed surface — mirror seed to
+          # all_org so downstream context fields stay populated.
+          all_subs="$seed_subs_total"
+          all_mrr_cents="$seed_mrr_cents"
 
           # Logging: aggregate phrasing only. Public-repo workflow logs are
           # publicly visible and company/system-prompt.md forbids exact
@@ -330,22 +288,20 @@ jobs:
           elif [ "$seed_subs_total" -le 50 ]; then seed_bucket="growing"
           else seed_bucket="scale"
           fi
-          echo "Polar SEED-cohort (cloudroof) status=${seed_bucket}"
-          echo "Polar ALL-org subs sampled (CONTEXT ONLY — includes unrelated products); exact figures in /tmp/polar.json (workflow-internal)"
-
-          per_product_json=$(printf '%s\n' "${seed_per_product[@]}" | jq -s '.')
+          echo "OC cloudroof status=${seed_bucket}"
+          echo "OC tiers live: $(echo "$resp" | jq -r '.data.account.tiers.totalCount') — exact figures in /tmp/revenue.json (workflow-internal)"
 
           jq -n \
             --arg note "$NOTE_TEXT" \
             --argjson seed_subs "$seed_subs_total" \
             --argjson seed_mrr_c "$seed_mrr_cents" \
-            --argjson all_subs "$all_sub_count" \
+            --argjson all_subs "$all_subs" \
             --argjson all_mrr_c "$all_mrr_cents" \
             --argjson per_product "$per_product_json" \
             --argjson orders "$recent_orders" \
             --arg collected_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
             '{
-              source: "polar",
+              source: "opencollective",
               collected_at: $collected_at,
               note: $note,
               seed_product_subscribers: $seed_subs,
@@ -354,7 +310,7 @@ jobs:
               all_org_subscribers: $all_subs,
               all_org_mrr_cents: $all_mrr_c,
               recent_orders: $orders
-            }' > /tmp/polar.json
+            }' > /tmp/revenue.json
 
       - name: Merge state snapshot (revenue bucketized for LLM)
         run: |
@@ -370,7 +326,7 @@ jobs:
           #   emerging    : 1–5 subs
           #   growing     : 6–50 subs
           #   scale       : 51+ subs
-          # Workflow-internal /tmp/polar.json retains raw cents for audit
+          # Workflow-internal /tmp/revenue.json retains raw cents for audit
           # (workflow logs are public BUT polar.json itself is not artifact-
           # uploaded; only the bucketized snapshot is shown to the LLM).
           jq -n \
@@ -379,7 +335,7 @@ jobs:
             --slurpfile contributions /tmp/contributions.json \
             --slurpfile loop_state company/loop-state.json \
             --slurpfile costs company/costs.json \
-            --slurpfile polar /tmp/polar.json \
+            --slurpfile polar /tmp/revenue.json \
             --slurpfile pipeline_health company/pipeline-health-state.json \
             '
             def bucket(n):
