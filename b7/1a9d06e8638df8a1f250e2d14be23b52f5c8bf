@@ -1,0 +1,16 @@
+.github/workflows/observation-loop.yml
+  h_f6687c1f6f3520 184,186,188-196,200-223,225-228,230-231,233-234,242,246-281,291-292,298,304,313,329,338
+company/system-prompt.md
+  h_f6687c1f6f3520 102,287
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "b71a9d06e8638df8a1f250e2d14be23b52f5c8bf",
+  "prompts": {},
+  "humans": {
+    "h_f6687c1f6f3520": {
+      "author": "Marty <saint@ghost.lt>"
+    }
+  }
+}
