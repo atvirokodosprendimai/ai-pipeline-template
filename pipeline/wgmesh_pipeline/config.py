@@ -179,6 +179,12 @@ class Config:
     # Selected via EXECUTOR env var; factory in executor.py fails closed on unknown values.
     llm_request_timeout_seconds: int = DEFAULT_LLM_REQUEST_TIMEOUT_SECONDS
     executor: str = "goose"
+    # Per-surface executor overrides (U1): the observation-assess and
+    # decision-proposal surfaces select their backend independently, each
+    # defaulting to `executor` (then "goose"). Lets each surface flip to
+    # langchain on its own via OBSERVATION_EXECUTOR / DECISION_EXECUTOR.
+    observation_executor: str = "goose"
+    decision_executor: str = "goose"
     # Graph backend: 'legacy' (default) or 'langgraph' (U4).
     # Selected via GRAPH_IMPL env var; build_graph dispatches on this value.
     graph_impl: str = "legacy"
@@ -336,6 +342,20 @@ def load_config(env: Mapping[str, str] | None = None) -> Config:
         or DEFAULT_EMBEDDINGS_BASE_URL,
         meta_repo=_get_nonempty(source, "META_REPO") or DEFAULT_META_REPO,
         executor=(_get_nonempty(source, "EXECUTOR") or "goose").strip().lower(),
+        observation_executor=(
+            _get_nonempty(source, "OBSERVATION_EXECUTOR")
+            or _get_nonempty(source, "EXECUTOR")
+            or "goose"
+        )
+        .strip()
+        .lower(),
+        decision_executor=(
+            _get_nonempty(source, "DECISION_EXECUTOR")
+            or _get_nonempty(source, "EXECUTOR")
+            or "goose"
+        )
+        .strip()
+        .lower(),
         llm_request_timeout_seconds=_get_int(
             source, "LLM_REQUEST_TIMEOUT_SECONDS", DEFAULT_LLM_REQUEST_TIMEOUT_SECONDS
         ),

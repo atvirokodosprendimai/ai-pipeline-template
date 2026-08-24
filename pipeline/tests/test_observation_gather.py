@@ -200,13 +200,15 @@ def test_goose_assessor_surfaces_raw_log_on_failure(
         error = "goose exited 1"
 
     class _FakeRunner:
-        def __init__(self, config: Config) -> None:
-            self.config = config
-
         def run_recipe(self, **kwargs: Any) -> _FailResult:
             return _FailResult()
 
-    monkeypatch.setattr(og, "GooseRunner", _FakeRunner)
+    # The assessor now selects its backend via build_executor honoring the
+    # per-surface observation_executor (U1); patch the factory to inject the
+    # failing fake regardless of the resolved backend name.
+    monkeypatch.setattr(
+        og, "build_executor", lambda config, *, executor_name=None: _FakeRunner()
+    )
     assessor = og.GooseObservationAssessor(
         config=Config(target_repo="atvirokodosprendimai/wgmesh"),
         repo_root=Path("."),

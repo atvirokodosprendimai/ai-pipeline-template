@@ -1,0 +1,65 @@
+version: "1.0.0"
+title: "wgmesh GTM Job Draft"
+description: "Turn an approved low-risk GTM decision into a structured job spec for a rented human."
+parameters:
+  - key: item_title
+    input_type: string
+    requirement: required
+    description: "Title of the approved surface:service decision item."
+  - key: brief_file
+    input_type: string
+    requirement: required
+    description: "Path to the decision brief markdown, or empty."
+  - key: strategy_file
+    input_type: string
+    requirement: required
+    description: "Path to STRATEGY.md for company grounding."
+  - key: learnings_file
+    input_type: string
+    requirement: required
+    description: "Path to a GTM playbook (known-good angles/pitfalls) file, or empty if none."
+  - key: job_spec_file
+    input_type: string
+    requirement: required
+    description: "Repository-relative path where the JSON job spec must be written."
+prompt: |
+  You are drafting a work order for a RENTED HUMAN worker (a microtask/VA service),
+  not an engineer. Turn the approved GTM decision into a small, concrete, low-risk
+  job a stranger can complete and prove.
+
+  Decision: {{ item_title }}
+  A decision brief may be at: {{ brief_file }} — if non-empty, READ it first.
+  Company strategy grounding: {{ strategy_file }}.
+
+  A file of known GTM playbook guidance (proven angles / documented pitfalls) may be
+  at: {{ learnings_file }}. If non-empty, READ it and shape the job to follow it;
+  it is advisory context, never copy it into the job spec. If empty, proceed without it.
+
+  Write a JSON job spec to this exact repository-relative path: {{ job_spec_file }}
+  with these keys:
+    - "id": a short stable id derived from the decision
+    - "task": one clear instruction a non-expert can follow start to finish
+    - "acceptance_criteria": a list of concrete, checkable conditions the returned
+      work must satisfy (counts, fields, format) so completion can be verified
+    - "safety_bounds": a list of hard limits (e.g. "no PII collected", "no outbound
+      contact", "public sources only")
+    - "job_class": one of: lead_research, list_building, manual_signup, content_qa,
+      competitor_recon, data_entry
+    - "payload": an object with any inputs the worker needs
+
+  Rules:
+  - Create parent directories if needed; write the file, do not only print it.
+  - Keep it a LOW-RISK job. Never draft outbound contact as the company, posting,
+    or anything touching customer PII or exact revenue.
+  - Acceptance criteria must be verifiable from the returned artifact alone.
+
+extensions:
+  - type: builtin
+    name: developer
+    display_name: Developer
+    timeout: 300
+    bundled: true
+
+settings:
+  goose_provider: anthropic
+  goose_model: GLM-5.2
