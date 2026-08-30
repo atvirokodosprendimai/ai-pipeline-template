@@ -1,3 +1,24 @@
 {
-  "retry_tracker": {}
+  "retry_tracker": {
+    "pr-731": {
+      "action": "conflict_rebase",
+      "last_retry": "2026-06-22T06:26:57Z",
+      "retries": 1
+    },
+    "pr-740": {
+      "action": "conflict_rebase",
+      "last_retry": "2026-06-22T06:26:57Z",
+      "retries": 1
+    },
+    "pr-744": {
+      "action": "conflict_rebase",
+      "last_retry": "2026-06-22T06:26:57Z",
+      "retries": 1
+    },
+    "pr-755": {
+      "action": "conflict_rebase",
+      "last_retry": "2026-06-22T06:26:57Z",
+      "retries": 1
+    }
+  }
 }
