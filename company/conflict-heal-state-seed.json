@@ -1,3 +1,14 @@
 {
-  "retry_tracker": {}
+  "retry_tracker": {
+    "pr-731": {
+      "action": "conflict_rebase",
+      "last_retry": "2026-06-21T20:23:04Z",
+      "retries": 1
+    },
+    "pr-740": {
+      "action": "conflict_rebase",
+      "last_retry": "2026-06-21T20:23:04Z",
+      "retries": 1
+    }
+  }
 }
