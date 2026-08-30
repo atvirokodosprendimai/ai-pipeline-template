@@ -1,3 +1,70 @@
 {
-  "retry_tracker": {}
+  "retry_tracker": {
+    "pr-731": {
+      "action": "check_rearm",
+      "cooldown_until": "2026-06-22T00:15:34Z",
+      "last_retry": "2026-06-21T18:15:34Z",
+      "retries": 1
+    },
+    "pr-738": {
+      "action": "check_rearm",
+      "cooldown_until": "2026-06-22T00:15:34Z",
+      "last_retry": "2026-06-21T18:15:34Z",
+      "retries": 1
+    },
+    "pr-740": {
+      "action": "check_rearm",
+      "cooldown_until": "2026-06-22T00:15:34Z",
+      "last_retry": "2026-06-21T18:15:34Z",
+      "retries": 1
+    },
+    "pr-742": {
+      "action": "check_rearm",
+      "cooldown_until": "2026-06-22T00:15:34Z",
+      "last_retry": "2026-06-21T18:15:34Z",
+      "retries": 1
+    },
+    "pr-751": {
+      "action": "check_rearm",
+      "cooldown_until": "2026-06-22T00:15:34Z",
+      "last_retry": "2026-06-21T18:15:34Z",
+      "retries": 1
+    },
+    "pr-757": {
+      "action": "check_rearm",
+      "cooldown_until": "2026-06-22T00:15:34Z",
+      "last_retry": "2026-06-21T18:15:34Z",
+      "retries": 1
+    },
+    "pr-761": {
+      "action": "check_rearm",
+      "cooldown_until": "2026-06-22T00:15:34Z",
+      "last_retry": "2026-06-21T18:15:34Z",
+      "retries": 1
+    },
+    "pr-782": {
+      "action": "check_rearm",
+      "cooldown_until": "2026-06-22T00:15:34Z",
+      "last_retry": "2026-06-21T18:15:34Z",
+      "retries": 1
+    },
+    "pr-785": {
+      "action": "check_rearm",
+      "cooldown_until": "2026-06-22T00:15:34Z",
+      "last_retry": "2026-06-21T18:15:34Z",
+      "retries": 1
+    },
+    "pr-788": {
+      "action": "check_rearm",
+      "cooldown_until": "2026-06-22T00:15:34Z",
+      "last_retry": "2026-06-21T18:15:34Z",
+      "retries": 1
+    },
+    "pr-793": {
+      "action": "check_rearm",
+      "cooldown_until": "2026-06-22T00:15:34Z",
+      "last_retry": "2026-06-21T18:15:34Z",
+      "retries": 1
+    }
+  }
 }
