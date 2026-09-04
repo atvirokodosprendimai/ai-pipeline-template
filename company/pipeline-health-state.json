@@ -1,8 +1,8 @@
 {
-  "last_check": "2026-06-22T10:21:12Z",
+  "last_check": "2026-09-04T06:28:23Z",
   "check_interval_hours": 0.5,
-  "checks_run": 920,
-  "issues_healed_total": 47,
+  "checks_run": 921,
+  "issues_healed_total": 53,
   "consecutive_no_mutation_runs": 0,
   "retry_tracker": {
     "651": {
@@ -100,32 +100,62 @@
       "retries": 1,
       "last_retry": "2026-06-21T19:00:39Z",
       "action": "retrigger_copilot"
+    },
+    "836": {
+      "retries": 1,
+      "last_retry": "2026-09-04T06:27:49Z",
+      "action": "retrigger_triage"
+    },
+    "835": {
+      "retries": 1,
+      "last_retry": "2026-09-04T06:27:56Z",
+      "action": "retrigger_triage"
+    },
+    "834": {
+      "retries": 1,
+      "last_retry": "2026-09-04T06:28:01Z",
+      "action": "retrigger_triage"
+    },
+    "833": {
+      "retries": 1,
+      "last_retry": "2026-09-04T06:28:07Z",
+      "action": "retrigger_triage"
+    },
+    "830": {
+      "retries": 1,
+      "last_retry": "2026-09-04T06:28:13Z",
+      "action": "retrigger_triage"
+    },
+    "827": {
+      "retries": 1,
+      "last_retry": "2026-09-04T06:28:18Z",
+      "action": "retrigger_triage"
     }
   },
   "funnel_signals": {
     "dogfood": true,
     "presence": true,
     "endpoint_details": "chimney:ok,cloudroof:ok,coroot:ok,tvcentras:ok",
-    "checked_at": "2026-06-22T10:21:11Z"
+    "checked_at": "2026-09-04T06:28:22Z"
   },
   "idle_signal": {
     "idle": false,
-    "open_prs": 12,
-    "active_pipeline_issues": 5,
-    "checked_at": "2026-06-22T10:21:11Z",
+    "open_prs": 5,
+    "active_pipeline_issues": 6,
+    "checked_at": "2026-09-04T06:28:22Z",
     "last_dispatch_at": "2026-06-16T08:26:33Z"
   },
   "last_run_summary": {
-    "stale_triage_found": 0,
-    "stale_copilot_found": 3,
+    "stale_triage_found": 6,
+    "stale_copilot_found": 0,
     "stale_approved_found": 0,
     "needs_human_closed": 0,
-    "actions_taken": 0,
+    "actions_taken": 6,
     "errors": 0
   },
-  "last_mutation_asserted_at": "2026-06-22T10:21:12Z",
+  "last_mutation_asserted_at": "2026-09-04T06:28:23Z",
   "last_mutation_assertion": {
     "status": "passed",
-    "checked_at": "2026-06-22T10:21:12Z"
+    "checked_at": "2026-09-04T06:28:23Z"
   }
 }
