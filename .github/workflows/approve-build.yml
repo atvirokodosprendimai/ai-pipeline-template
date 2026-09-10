@@ -47,6 +47,17 @@ jobs:
 
             // Update the original issue
             if (issueNumber) {
+              // Plan-004 accept-gate: the poller reads founder approval by
+              // ISSUE number, so the approved-for-build label must also land
+              // on the issue (not just the spec PR) or the gate blocks every
+              // approved build.
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                labels: ['approved-for-build']
+              });
+
               // Remove copilot-triaging label
               try {
                 await github.rest.issues.removeLabel({

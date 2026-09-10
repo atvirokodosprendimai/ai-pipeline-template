@@ -34,6 +34,7 @@ BOX_CONFIG_ALLOWLIST = frozenset(
         "SELFHEAL_LIVE",
         "OBSERVATION_LIVE",
         "STRATEGY_AUDIT_LIVE",
+        "ACCEPT_GATE_LIVE",
         "MERGE_LANE_HEAL_LIVE",
         "MERGE_LANE_HEAL_INTERVAL_SECONDS",
         "DECISION_LANE_LIVE",
@@ -159,6 +160,7 @@ class Config:
     selfheal_live: bool = False
     observation_live: bool = False
     strategy_audit_live: bool = False
+    accept_gate_live: bool = False
     merge_lane_heal_interval_seconds: int = DEFAULT_MERGE_LANE_HEAL_INTERVAL_SECONDS
     merge_lane_heal_live: bool = False
     # Decision lane (capability-ladder Phase 1). Shadow until flipped live.
@@ -310,6 +312,7 @@ def load_config(env: Mapping[str, str] | None = None) -> Config:
         selfheal_live=_get_bool(source, "SELFHEAL_LIVE", False),
         observation_live=_get_bool(source, "OBSERVATION_LIVE", False),
         strategy_audit_live=_get_bool(source, "STRATEGY_AUDIT_LIVE", False),
+        accept_gate_live=_get_bool(source, "ACCEPT_GATE_LIVE", False),
         merge_lane_heal_interval_seconds=_get_int(
             source,
             "MERGE_LANE_HEAL_INTERVAL_SECONDS",

@@ -9,5 +9,6 @@
   "SUPERVISOR_LIVE": "false",
   "SELFHEAL_LIVE": "false",
   "OBSERVATION_LIVE": "true",
-  "STRATEGY_AUDIT_LIVE": "false"
+  "STRATEGY_AUDIT_LIVE": "false",
+  "ACCEPT_GATE_LIVE": "false"
 }
