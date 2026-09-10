@@ -21,9 +21,12 @@ seed products** — revenue flows from an unrelated product line.
 
 ## The decisive context: the pipeline is off ON PURPOSE
 
-Observable today: **45 of 62 workflows are `disabled_manually`**, including the whole merge and
-build lane (*Heartbeat PR Auto-Merge*, *Bot PR Review and Merge*, *Supervisor Rank*, *Spec Merged
-— Trigger Build*, *Copilot Issue Triage*, *Conflict Heal*, *PR Disposition*); the producers
+Observable today: **42 of 59 workflows are `disabled_manually`** (17 remain `active`), including
+the whole merge and build lane (*Heartbeat PR Auto-Merge*, *Bot PR Review and Merge*, *Supervisor
+Rank*, *Spec Merged — Trigger Build*, *Copilot Issue Triage*, *Conflict Heal*, *PR Disposition*)
+and — separately — **`CI`, `Pipeline CI` and `Release` themselves**. No pull request in this repo
+can run an automated check today, so "all checks passing" is not a signal available here and no PR
+can satisfy a checks-based branch protection rule. The producers
 (*Observation Loop*, *Pipeline Health*) are still `active` and report `success` daily; **455 pull
 requests are open** (363 `pipeline-health/`, 74 `loop/`, 4 `conflict-heal/`, 3 `audit/`, 11
 other); and `company/loop-state.json` has not changed since **2026-06-22**.
@@ -41,7 +44,9 @@ shadow-proven."* Project memory recorded the same conclusion on 2026-08-29: the 
 > merge path" is prescribing the original harm.
 
 The producers keep running and keep opening PRs that cannot merge. That backlog is **collateral**,
-not backlog — it is the kill switch working.
+not backlog — it is the kill switch working. With `CI` disabled as well, nothing will ever
+distinguish a good one from a bad one while it sits there, which is an argument for a disposition
+decision (D3) rather than for waiting.
 
 ## Where plan-004 actually stands (verified 2026-09-10)
 
