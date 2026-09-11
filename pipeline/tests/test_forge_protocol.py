@@ -37,3 +37,16 @@ def test_gitea_forge_satisfies_get_pr_mergeable() -> None:
     from wgmesh_pipeline.forge.gitea import GiteaForge
 
     assert hasattr(GiteaForge, "get_pr_mergeable")
+
+def test_forge_protocol_declares_get_decision_status() -> None:
+    """Plan-004 KTD2: the accept-gate reads approval through the protocol, so
+    every forge exposes the same decision-status surface."""
+    assert hasattr(Forge, "get_decision_status")
+
+
+def test_github_client_and_gitea_satisfy_get_decision_status() -> None:
+    from wgmesh_pipeline.forge.gitea import GiteaForge
+
+    assert hasattr(GitHubClient, "get_decision_status")
+    assert hasattr(GiteaForge, "get_decision_status")
+

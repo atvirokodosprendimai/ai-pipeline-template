@@ -570,3 +570,157 @@ def test_awaiting_merge_stays_while_pr_open(tmp_path, cfg: Config) -> None:
 
     assert store.get_issue(6).stage == "awaiting_merge"  # no transition, no phantom
     assert client.labels == []
+
+
+class _GateClient(GitHubClient):
+    """GitHub-shaped forge with a programmable decision-status read (plan-004 U2).
+
+    Mirrors test_quackback_drift's fake-status-read setup so the poller gate
+    drives the REAL decision-status accessor path instead of a stub field.
+    ``decision_status`` may be a fixed string or a zero-arg callable (a read
+    error is simulated by a callable that raises).
+    """
+
+    def __init__(self, cfg, decision_status="approved"):
+        super().__init__(cfg)
+        self._decision_status = decision_status
+        self.labels: list[tuple[int, str]] = []
+        self.status_reads: list[int] = []
+
+    def list_open_issues(self):
+        return []
+
+    def get_decision_status(self, number: int) -> str:
+        self.status_reads.append(number)
+        if callable(self._decision_status):
+            return self._decision_status()
+        return self._decision_status
+
+    def add_label(self, number: int, label: str, **kwargs):
+        self.labels.append((number, label))
+        return {"ok": True}
+
+
+def _gate_cfg(cfg: Config, **overrides) -> Config:
+    base = dict(
+        target_repo=cfg.target_repo,
+        mode="live",
+        max_files=cfg.max_files,
+        wgmesh_bot_pat="pat",
+    )
+    base.update(overrides)
+    return Config(**base)
+
+
+def test_accept_gate_blocks_unapproved_issue_in_live(tmp_path, cfg: Config) -> None:
+    """Plan-004 R1/R4: an unapproved Issue at triaged must NOT be specced —
+    it parks + escalates (needs-human), loud and traced, never a silent skip."""
+    live = _gate_cfg(cfg, accept_gate_live=True)
+    store = StateStore(tmp_path / "state.db")
+    store.upsert_issue(7, "Not approved yet", stage="triaged")
+    client = _GateClient(live, decision_status="not_approved")
+    graph = Graph()
+    p = Poller(config=live, store=store, client=client, graph=graph)
+
+    result = asyncio.run(p.tick())
+
+    issue = store.get_issue(7)
+    assert result is not None
+    assert result.stage == "escalated"
+    assert issue.stage == "escalated"
+    assert graph.calls == []  # spec never called
+    assert client.labels == [(7, "needs-human")]
+    assert client.status_reads == [7]
+
+
+def test_accept_gate_approved_issue_specs_in_live(tmp_path, cfg: Config) -> None:
+    """Plan-004 R3: explicit founder approval (approved label) lets the issue
+    advance triaged -> specced. The bite: same stage, opposite decision,
+    opposite outcome vs the unapproved test above."""
+    live = _gate_cfg(cfg, accept_gate_live=True)
+    store = StateStore(tmp_path / "state.db")
+    store.upsert_issue(8, "Approved", stage="triaged")
+    client = _GateClient(live, decision_status="approved")
+    graph = Graph()
+    p = Poller(config=live, store=store, client=client, graph=graph)
+
+    result = asyncio.run(p.tick())
+
+    assert result is not None
+    assert result.stage == "specced"
+    assert graph.calls == ["spec"]
+    assert client.labels == []
+
+
+def test_accept_gate_read_error_blocks_fail_closed(tmp_path, cfg: Config) -> None:
+    """Plan-004 R2: an unreadable decision read must never build — the gate
+    defaults to deny and escalates, exactly like an unapproved read."""
+    live = _gate_cfg(cfg, accept_gate_live=True)
+    store = StateStore(tmp_path / "state.db")
+    store.upsert_issue(9, "Forge down", stage="triaged")
+
+    def boom():
+        raise RuntimeError("forge down")
+
+    client = _GateClient(live, decision_status=boom)
+    graph = Graph()
+    p = Poller(config=live, store=store, client=client, graph=graph)
+
+    result = asyncio.run(p.tick())
+
+    assert result is not None
+    assert result.stage == "escalated"
+    assert graph.calls == []
+    assert client.labels == [(9, "needs-human")]
+
+
+def test_accept_gate_shadow_logs_would_block_without_changing_flow(
+    tmp_path, cfg: Config, caplog
+) -> None:
+    """Plan-004 U7 shadow window: with ACCEPT_GATE_LIVE=false the gate OBSERVES
+    (logs would_block) and the existing flow is unchanged — the issue still
+    specs, so the shadow evidence accumulates before the staged re-enable."""
+    shadow = _gate_cfg(cfg, mode="shadow", accept_gate_live=False)
+    store = StateStore(tmp_path / "state.db")
+    store.upsert_issue(10, "Unapproved in shadow", stage="triaged")
+    client = _GateClient(shadow, decision_status="not_approved")
+    graph = Graph()
+    p = Poller(config=shadow, store=store, client=client, graph=graph)
+
+    with caplog.at_level("WARNING"):
+        result = asyncio.run(p.tick())
+
+    assert result is not None
+    assert result.stage == "specced"  # flow unchanged in shadow
+    assert graph.calls == ["spec"]
+    assert client.labels == []
+    assert "would_block" in caplog.text
+
+
+def test_accept_gate_approved_then_unapproved_flips_build_to_block(
+    tmp_path, cfg: Config
+) -> None:
+    """Plan-004 U2 bite check: the SAME issue number builds while approved and
+    blocks once the founder's decision flips to unapproved (decision-sensitive,
+    not sticky)."""
+    live = _gate_cfg(cfg, accept_gate_live=True)
+    store = StateStore(tmp_path / "state.db")
+    store.upsert_issue(11, "Flip", stage="triaged")
+    client = _GateClient(live, decision_status="approved")
+    graph = Graph()
+    p = Poller(config=live, store=store, client=client, graph=graph)
+
+    first = asyncio.run(p.tick())
+    assert first is not None and first.stage == "specced"
+    assert graph.calls == ["spec"]
+
+    # Founder's decision flips; the issue is re-parked at triaged (re-queued).
+    client._decision_status = "not_approved"
+    store.upsert_issue(11, "Flip", stage="triaged")
+
+    second = asyncio.run(p.tick())
+
+    assert second is not None and second.stage == "escalated"
+    assert graph.calls == ["spec"]  # no second spec
+    assert client.labels == [(11, "needs-human")]
+

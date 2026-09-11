@@ -17,6 +17,15 @@ from dataclasses import dataclass
 from typing import Any, Protocol, runtime_checkable
 
 
+# Plan-004 accept-gate vocabulary (host-neutral): the positive founder-approval
+# signal is the approved-for-build label ON THE ISSUE. The normalized decision
+# status lets the poller's gate compare one token across forges (KTD2); the
+# Quackback side carries its own token (quackback_status.ACCEPTED_FOR_BUILD).
+APPROVED_FOR_BUILD_LABEL = "approved-for-build"
+DECISION_APPROVED = "approved"
+DECISION_NOT_APPROVED = "not_approved"
+
+
 @dataclass(frozen=True)
 class ForgeIssue:
     number: int
@@ -33,6 +42,15 @@ class Forge(Protocol):
     def list_open_issues(self) -> list[ForgeIssue]: ...
 
     def get_issue(self, number: int) -> ForgeIssue | None: ...
+
+    def get_decision_status(self, number: int) -> str | None:
+        """Normalized founder-approval read for the accept-gate (plan-004).
+
+        Returns DECISION_APPROVED on explicit approval; anything else
+        (DECISION_NOT_APPROVED, None, or a raised error surfaced to the
+        caller) denies the build. Deterministic label/status read — never
+        an LLM judgement.
+        """
 
     def get_pr(self, number: int) -> dict[str, Any]: ...
 

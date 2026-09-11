@@ -49,6 +49,7 @@ def test_full_env_loads_frozen_config_with_shadow_default() -> None:
         ("SELFHEAL_LIVE", "selfheal_live"),
         ("OBSERVATION_LIVE", "observation_live"),
         ("STRATEGY_AUDIT_LIVE", "strategy_audit_live"),
+        ("ACCEPT_GATE_LIVE", "accept_gate_live"),
     ),
 )
 def test_per_module_live_flags_parse_from_env(env_name: str, field_name: str) -> None:
@@ -70,6 +71,7 @@ def test_per_module_live_flags_parse_from_env(env_name: str, field_name: str) ->
         ("SELFHEAL_LIVE", "selfheal_live"),
         ("OBSERVATION_LIVE", "observation_live"),
         ("STRATEGY_AUDIT_LIVE", "strategy_audit_live"),
+        ("ACCEPT_GATE_LIVE", "accept_gate_live"),
     ),
 )
 def test_per_module_live_flags_parse_from_box_config(
@@ -98,6 +100,7 @@ def test_per_module_live_flags_parse_from_box_config(
         "SELFHEAL_LIVE",
         "OBSERVATION_LIVE",
         "STRATEGY_AUDIT_LIVE",
+        "ACCEPT_GATE_LIVE",
     ),
 )
 def test_per_module_live_flags_reject_invalid_values(env_name: str) -> None:

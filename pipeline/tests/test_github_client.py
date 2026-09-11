@@ -470,3 +470,61 @@ def test_get_pr_mergeable_null_not_yet_computed(cfg: Config) -> None:
     session = Session(Response({"mergeable": None, "mergeable_state": "unknown"}))
 
     assert GitHubClient(cfg, session=session).get_pr_mergeable(7) is None
+
+
+def test_get_decision_status_approved_when_label_present(cfg: Config) -> None:
+    """Plan-004 U1 happy path: the ISSUE carries approved-for-build -> approved."""
+    session = Session(
+        Response(
+            {
+                "number": 1,
+                "title": "Build me",
+                "state": "open",
+                "labels": [{"name": "approved-for-build"}, {"name": "needs-triage"}],
+            }
+        )
+    )
+
+    status = GitHubClient(cfg, session=session).get_decision_status(1)
+
+    assert status == "approved"
+    assert session.calls[0]["method"] == "GET"
+    assert "issues/1" in session.calls[0]["url"]
+
+
+def test_get_decision_status_not_approved_when_no_labels(cfg: Config) -> None:
+    """Plan-004 U1 edge: an issue with no labels reads not_approved (not error)."""
+    session = Session(Response({"number": 2, "title": "T", "state": "open", "labels": []}))
+
+    assert GitHubClient(cfg, session=session).get_decision_status(2) == "not_approved"
+
+
+def test_get_decision_status_not_approved_for_other_labels(cfg: Config) -> None:
+    """Plan-004 U1 edge: other labels without approved-for-build -> not_approved."""
+    session = Session(
+        Response(
+            {
+                "number": 3,
+                "title": "T",
+                "state": "open",
+                "labels": [{"name": "needs-triage"}, {"name": "bug"}],
+            }
+        )
+    )
+
+    assert GitHubClient(cfg, session=session).get_decision_status(3) == "not_approved"
+
+
+def test_get_decision_status_missing_issue_is_not_approved(cfg: Config) -> None:
+    """Plan-004 R2 fail-closed: a missing issue reads not_approved, never error."""
+    session = Session(ErrorResponse(404, "Not Found"))
+
+    assert GitHubClient(cfg, session=session).get_decision_status(404) == "not_approved"
+
+
+def test_get_decision_status_surfaces_non_404_errors(cfg: Config) -> None:
+    """Plan-004 U1: a genuine API failure surfaces to the caller (which denies)."""
+    session = Session(ErrorResponse(500, "boom"))
+
+    with pytest.raises(requests.HTTPError):
+        GitHubClient(cfg, session=session).get_decision_status(5)

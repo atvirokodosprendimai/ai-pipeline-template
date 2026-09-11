@@ -7,7 +7,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from wgmesh_pipeline.config import Config
-from wgmesh_pipeline.forge.protocol import Forge, ForgeIssue as GitHubIssue
+from wgmesh_pipeline.forge.protocol import (
+    DECISION_APPROVED,
+    Forge,
+    ForgeIssue as GitHubIssue,
+)
 from wgmesh_pipeline.forge.quackback_status import is_active_lane, status_for_stage
 from wgmesh_pipeline.github.reconcile import reconcile_issues, reconcile_quackback
 from wgmesh_pipeline.graph.nodes.gate import apply_gate_side_effects, gate_node
@@ -129,6 +133,15 @@ class Poller:
             return advanced
 
         if issue.stage == "triaged":
+            # Plan-004 accept-gate (KTD1): the spec chokepoint. No Issue
+            # advances triaged -> specced without explicit founder approval;
+            # a denial parks + escalates (needs-human), loud and traced —
+            # never a silent skip (R1/R4).
+            if not self._accept_gate_decision(issue.number):
+                self.client.add_label(issue.number, "needs-human")
+                advanced = self.store.transition(issue.number, "triaged", "escalated")
+                score_run(self.scratch.get(issue.number, {}), outcome="escalated")
+                return advanced
             self.scratch[issue.number] = dict(self.graph.spec(state))
             return self.store.transition(issue.number, "triaged", "specced")
 
@@ -268,6 +281,53 @@ class Poller:
             return issue
 
         raise ValueError(f"stage is not actionable: {issue.stage}")
+
+    def _accept_gate_allows(self, number: int) -> bool:
+        """Deterministic founder-approval read for the accept-gate (plan-004 KTD2).
+
+        Approval must be PRESENT — the inverse of the Langfuse fail-open
+        trap; any other state (missing label, unapproved status, unresolvable
+        read) denies. Never an LLM judgement.
+
+        Quackback: the post must be in the box's active lane. The ingest
+        filter already admitted only Accepted-for-Build posts and the mirror
+        flips the post to Building at first claim, so lane membership is the
+        correct entry evidence at this stage — a strict == ACCEPTED_FOR_BUILD
+        compare (plan-004's literal wording) would false-deny every post
+        already claimed.
+        GitHub: the issue must carry the approved-for-build label.
+        """
+        status = self.client.get_decision_status(number)
+        if getattr(self.config, "forge_kind", "github") == "quackback":
+            return is_active_lane(status)
+        return status == DECISION_APPROVED
+
+    def _accept_gate_decision(self, number: int) -> bool:
+        """Plan-004 U2 gate: True lets the issue advance to spec, False blocks.
+
+        Fail-closed: a read error (API down, malformed response) denies
+        exactly like an unapproved read — an unreadable decision must never
+        build (R2). With ACCEPT_GATE_LIVE=false the gate runs in shadow: the
+        decision is logged as would_block and the existing flow proceeds,
+        accumulating the shadow evidence the staged re-enable (U7/U8) is
+        gated on.
+        """
+        try:
+            allowed = self._accept_gate_allows(number)
+        except Exception as exc:
+            log.warning(
+                "accept-gate: decision read for #%s failed, denying: %s", number, exc
+            )
+            allowed = False
+        if allowed:
+            return True
+        if self.config.accept_gate_live:
+            log.warning("accept-gate: BLOCK #%s — no founder approval, escalating", number)
+            return False
+        log.warning(
+            "accept-gate shadow: would_block #%s (ACCEPT_GATE_LIVE=false)", number
+        )
+        return True
 
     def _mirror_quackback(self, number: int, stage: str) -> bool:
         """Mirror the box's execution milestone to the Quackback post + guard drift.

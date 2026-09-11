@@ -13,7 +13,12 @@ from typing import Any, Callable, Iterator
 import requests
 
 from wgmesh_pipeline.config import Config
-from wgmesh_pipeline.forge.protocol import ForgeIssue
+from wgmesh_pipeline.forge.protocol import (
+    APPROVED_FOR_BUILD_LABEL,
+    DECISION_APPROVED,
+    DECISION_NOT_APPROVED,
+    ForgeIssue,
+)
 
 API_ROOT = "https://api.github.com"
 SANITISE_SCRIPT = (
@@ -160,6 +165,23 @@ class GitHubClient:
         if "pull_request" in item:
             return None
         return _parse_issue(item)
+
+    def get_decision_status(self, number: int) -> str:
+        """Plan-004 U1: normalized founder-approval read (approved /
+        not_approved) from the approved-for-build label on the ISSUE.
+
+        Deterministic and read-only — the box must never author approval.
+        A missing issue reads not_approved (fail-closed); a non-404 API
+        error surfaces so the caller can deny.
+        """
+        issue = self.get_issue(number)
+        if issue is None:
+            return DECISION_NOT_APPROVED
+        return (
+            DECISION_APPROVED
+            if APPROVED_FOR_BUILD_LABEL in issue.labels
+            else DECISION_NOT_APPROVED
+        )
 
     def get_pr(self, number: int) -> dict[str, Any]:
         return self._request(
