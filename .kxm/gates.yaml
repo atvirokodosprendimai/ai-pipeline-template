@@ -1,0 +1,8 @@
+schema: kxm.gate-registry.v1
+gates:
+  test:
+    kind: command
+    argv:
+      - npm
+      - test
+    timeoutMs: 3600000

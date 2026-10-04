@@ -1,0 +1,5 @@
+schema: kxm.repository.v1
+projectId: prj_19e8dd9aa8824bf1812c2fb17035dcbb
+repositoryId: control
+description: Authoritative project configuration and repository content.
+defaultAccess: write

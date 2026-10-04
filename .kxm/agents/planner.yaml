@@ -1,0 +1,12 @@
+schema: kxm.agent.v1
+purpose: Coordinate the pinned workflow and emit schema-validated commands.
+tools:
+  preset: coordinator
+defaultRepositoryAccess: read
+repositories:
+  control: read
+network: provider-only
+resultSchema: kxm.assignment-result.v1
+role: planner
+aliases:
+  - coordinator

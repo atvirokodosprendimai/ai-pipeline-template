@@ -1,0 +1,15 @@
+schema: kxm.project.v1
+id: prj_19e8dd9aa8824bf1812c2fb17035dcbb
+name: ai-pipeline-template
+defaultWorkflow: default
+defaultExecutor: local
+defaultHarness: pi
+repositories:
+  - id: control
+    role: control
+    required: true
+    pathHint: .
+workspace:
+  dirtySnapshot:
+    untracked: ask
+    dirtySubmodules: fail

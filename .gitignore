@@ -12,3 +12,14 @@ infrastructure/terraform/**/backend.hcl
 # Compound Engineering local config
 .compound-engineering/*.local.yaml
 .gstack/
+# Local Pi runtime state
+.atl/
+
+# KXM runtime state (kxm init writes no ignore rules; docs/reference/config-reference.md)
+.kxm/logs/*
+.kxm/state/*
+.kxm/tasks/
+.kxm/run/
+.kxm/backups/
+.kxm/assets/generated/
+.kxm-init-transaction/

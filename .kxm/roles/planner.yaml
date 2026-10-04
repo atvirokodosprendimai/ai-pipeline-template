@@ -1,0 +1,8 @@
+schema: kxm.role.v2
+id: planner
+purpose: planner
+permission: read-only
+description: Plans the change before implementation.
+roster:
+  - route: claude-fable
+    effort: medium

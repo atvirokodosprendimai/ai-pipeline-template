@@ -1,0 +1,12 @@
+schema: kxm.agent.v1
+purpose: Implement the approved change within the declared repository scope.
+tools:
+  preset: workspace-writer
+defaultRepositoryAccess: none
+repositories:
+  control: write
+network: provider-only
+resultSchema: kxm.assignment-result.v1
+role: writer
+aliases:
+  - implementer

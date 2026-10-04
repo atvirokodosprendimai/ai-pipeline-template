@@ -1,0 +1,71 @@
+schema: kxm.workflow.v1
+description: Plan, implement, and verify a local change.
+coordinator: planner
+limits:
+  maxTransitions: 8
+  maxRunDurationMs: 14400000
+steps:
+  - id: plan
+    kind: agent
+    agent: planner
+    maxAttempts: 2
+    repositories:
+      control: read
+    requiredEvidence:
+      - key: plan
+        kind: artifact
+    timeoutMs: 1200000
+    on:
+      passed: writer
+      blocked:
+        target: $terminal
+        terminalStatus: failed
+  - id: writer
+    kind: agent
+    agent: writer
+    maxAttempts: 3
+    repositories:
+      control: write
+    assignments:
+      allowedAgents:
+        - writer
+      minimum: 1
+      target: 1
+      maximum: 1
+      maxParallel: 1
+      maxAttemptsPerAssignment: 2
+      maxWriteRepositories: 1
+    requiredEvidence:
+      - key: implementation-diff
+        kind: artifact
+    timeoutMs: 3600000
+    on:
+      passed: verify
+      failed:
+        target: $terminal
+        terminalStatus: failed
+      blocked:
+        target: $terminal
+        terminalStatus: failed
+    aliases:
+      - implement
+  - id: verify
+    kind: gate
+    gate: test
+    maxAttempts: 3
+    repositories:
+      control: write
+    requiredEvidence:
+      - key: local-gates
+        kind: gate
+    timeoutMs: 3600000
+    on:
+      passed:
+        target: $terminal
+        terminalStatus: completed
+      implementation-failure:
+        target: writer
+        maxTransitions: 3
+      failed:
+        target: $terminal
+        terminalStatus: failed
