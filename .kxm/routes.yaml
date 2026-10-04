@@ -1,0 +1,7 @@
+schema: kxm.routes.v2
+updatedAt: 2026-10-03T21:27:21.975Z
+admitted:
+  - anthropic/fable
+  - xai/grok-4.6
+  - openai/gpt-5.6-sol
+disabled: []

@@ -1,0 +1,10 @@
+schema: kxm.model.v2
+id: grok-grok-4-6
+aliases:
+  - grok-default
+harness: grok
+model: grok-4.6
+vendor: xai
+status: admitted
+permissions:
+  - edit

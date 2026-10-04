@@ -1,0 +1,51 @@
+schema: kxm.template-provenance.v1
+templateId: builtin-minimal
+templateRevision: sha256:98069836eaae4753875beb10d4fe2468acc6da9b6c8767cf7fd572fcaf46ccae
+inputs:
+  projectId: prj_19e8dd9aa8824bf1812c2fb17035dcbb
+  projectName: ai-pipeline-template
+files:
+  - path: .kxm/agents/planner.yaml
+    sha256: sha256:ed4209b1079b64abbfebe44e5ceefecb72d824607076b41bf2efa42dc1797ebd
+    authoritySha256: sha256:c5eef6418a548363f5af4bbace1afdd48dac28a00a7e7dc1138c51824d53d547
+    bytes: 287
+  - path: .kxm/agents/writer.yaml
+    sha256: sha256:d0bd2852afc00312b62fd936239ef819fdc7ec1db1b43fa8c5f4d3529409151e
+    authoritySha256: sha256:37261d2b3a47018b7865b1e9e193b4a50f2096ca938ff224a629d35d5313a4cc
+    bytes: 293
+  - path: .kxm/gates.yaml
+    sha256: sha256:e1de32f0b849ee7a0c38c61809ad25e14adc8005dc14a2ebd43f5c52c1bdea47
+    authoritySha256: sha256:13ee1368d9f48614f41fc3fd6b51233196ead9a08cdcbc3c207c9e3c4b6046ff
+    bytes: 120
+  - path: .kxm/models/claude-fable.yaml
+    sha256: sha256:33ed68f2a1109b9fa32fc9dd54957ba8025593afb0962521a467eb4ea5c51de5
+    authoritySha256: sha256:99148f2e96b55c264e8cea01a1fabbd023e77bbb38ceb431226dd5c6fcbfaa1c
+    bytes: 156
+  - path: .kxm/models/grok-grok-4-6.yaml
+    sha256: sha256:22ae027587583f4e9682256cd22be6c6e7bb7b58351b4578dd89cc6b4b79696e
+    authoritySha256: sha256:656ae07f41897480605f2a1e1852457be33aca0e510499fd7f749caf745c8852
+    bytes: 146
+  - path: .kxm/project.yaml
+    sha256: sha256:5dc41f99e36caa8ef8694660a423966264516881a472921173e2da3245464b86
+    authoritySha256: sha256:76abe6df3871722d1671e93038ab3e189d34629f79d140995e91f2541a4b13bb
+    bytes: 314
+  - path: .kxm/repo/repo.yaml
+    sha256: sha256:3a4337b1887a900c7f6abd18c559a592f03d76065da1afa68abbaf41c9dea93d
+    authoritySha256: sha256:50732113e76236900733a24c4acaf1d86dea089cb2cfefc5a0f7f89c46435150
+    bytes: 190
+  - path: .kxm/roles/planner.yaml
+    sha256: sha256:9114373469bcc3263f6d648bda9069894e7ea9ace2c71fb87146a4569c320e89
+    authoritySha256: sha256:89c6e2f53ac9071e1c4d2f8c62f455a6962ea8196bd27db5edc139ccb38407bc
+    bytes: 175
+  - path: .kxm/roles/writer.yaml
+    sha256: sha256:036a5b0429efc96e23dc3b812726d0bbbbb7be83b0f922d5752f5f5080fe2e76
+    authoritySha256: sha256:d8e3a26f80f8ff9118b992689da458d4831eb59a3f777b7779818504c8c3aab1
+    bytes: 159
+  - path: .kxm/routes.yaml
+    sha256: sha256:2b93498b1eba5539b464ea6dbebd5d2406fb52e70c0d7fbec3ce68d7febd086a
+    authoritySha256: sha256:4e5e4f2e5098e7db1e08b696c373e212042e2b8e9d7e7974f598885724cadec1
+    bytes: 118
+  - path: .kxm/workflows/default.yaml
+    sha256: sha256:ff6297a29ccbb816ce8b016c1c2843bc39b8341969f9388dd533af66575de362
+    authoritySha256: sha256:d00474c349cc6225cccf421a880e99c8e0ad773e29c35272fb5ce81f15840afc
+    bytes: 1483

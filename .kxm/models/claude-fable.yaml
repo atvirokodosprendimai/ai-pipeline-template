@@ -1,0 +1,10 @@
+schema: kxm.model.v2
+id: claude-fable
+aliases:
+  - fable-default
+harness: claude
+model: fable
+vendor: anthropic
+status: admitted
+permissions:
+  - read-only

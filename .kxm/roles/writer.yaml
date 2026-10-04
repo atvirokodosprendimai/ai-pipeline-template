@@ -1,0 +1,8 @@
+schema: kxm.role.v2
+id: writer
+purpose: writer
+permission: edit
+description: Primary implementation agent.
+roster:
+  - route: grok-grok-4-6
+    effort: medium
