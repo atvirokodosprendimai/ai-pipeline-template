@@ -80,6 +80,7 @@ def test_spec_node_resolves_recipe_path_and_passes_issue_params(tmp_path: Path) 
         "issue_number": "18",
         "issue_title": "Add managed ingress",
         "issue_brief_file": "",  # no body in state → empty path → title fallback
+        "learnings_file": "",  # title matches no learning → empty path (always passed)
         "spec_file": "specs/issue-18-spec.md",
     }
 

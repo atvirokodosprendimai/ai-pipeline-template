@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 from typing import Any
@@ -9,6 +10,7 @@ from requests import HTTPError
 from wgmesh_pipeline.config import DEFAULT_RECIPES_DIR
 from wgmesh_pipeline.graph.state import GraphState
 from wgmesh_pipeline.graph.nodes.spec_pr import GIT_AUTHOR_EMAIL, GIT_AUTHOR_NAME, _git
+from wgmesh_pipeline.learnings import write_learnings_file
 
 
 def implement_node(state: GraphState) -> GraphState:
@@ -37,20 +39,39 @@ def implement_node(state: GraphState) -> GraphState:
         # implement attempt.
         config = next_state.get("config")
         recipes_dir = Path(getattr(config, "recipes_dir", DEFAULT_RECIPES_DIR))
-        result = runner.run_recipe(
-            recipe=recipes_dir / "wgmesh-implementation.yaml",
-            workdir=repo_path,
-            # diff_file mirrors expected_output: the recipe instructs goose to
-            # write the unified diff there, the runner verifies it appeared.
-            params={
-                "spec_file": str(spec_rel if real_path else next_state["spec_path"]),
-                "diff_file": str(diff_rel),
-            },
-            expected_output=diff_rel,
-            stage="implement",
-            tier=tier,
-            session_id=f"issue-{issue.number}",
+        # Inject relevant past learnings as advisory "known pitfalls" (mirrors
+        # spec_node). Key the selector on the SPEC text — implement-stage pitfalls
+        # (build/test/diff-emit, "don't reference non-established types") match the
+        # spec, not the issue title alone. The spec content is not a GraphState
+        # channel, so read it from disk: the materialized copy on the real path,
+        # state["spec_path"] otherwise. Fall back to the title-only query if the
+        # read fails. Always pass the (required) param, empty path on no-match.
+        spec_text = _read_spec_text(repo_path, next_state, spec_rel, real_path)
+        learnings_file = write_learnings_file(
+            f"{issue.title}\n{spec_text}", prefix=f"issue-{issue.number}-learnings-"
         )
+        try:
+            result = runner.run_recipe(
+                recipe=recipes_dir / "wgmesh-implementation.yaml",
+                workdir=repo_path,
+                # diff_file mirrors expected_output: the recipe instructs goose to
+                # write the unified diff there, the runner verifies it appeared.
+                params={
+                    "spec_file": str(spec_rel if real_path else next_state["spec_path"]),
+                    "learnings_file": learnings_file,
+                    "diff_file": str(diff_rel),
+                },
+                expected_output=diff_rel,
+                stage="implement",
+                tier=tier,
+                session_id=f"issue-{issue.number}",
+            )
+        finally:
+            if learnings_file:
+                try:
+                    os.unlink(learnings_file)
+                except OSError:
+                    pass
         if not result.ok:
             raise RuntimeError(result.error or "goose implementation failed")
         if result.model_key is not None:
@@ -125,6 +146,30 @@ def _normalise_diff_path(path: str) -> str | None:
     if path.startswith("a/") or path.startswith("b/"):
         return path[2:]
     return path
+
+
+def _read_spec_text(repo_path: Path, state: dict, spec_rel: Path, real_path: bool) -> str:
+    """Best-effort read of the spec text to key the learnings selector on.
+
+    Real path: the materialized copy at ``repo_path/spec_rel`` (written by
+    ``_materialize_spec``, which runs first). Otherwise ``state["spec_path"]``
+    (tried as-is and relative to ``repo_path``). Returns "" on any failure — the
+    caller then falls back to an issue-title-only query.
+    """
+    candidates: list[Path] = []
+    if real_path:
+        candidates.append(repo_path / spec_rel)
+    spec_path = state.get("spec_path")
+    if spec_path:
+        candidates.append(Path(spec_path))
+        candidates.append(repo_path / str(spec_path))
+    for candidate in candidates:
+        try:
+            if candidate.is_file():
+                return candidate.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+    return ""
 
 
 def _materialize_spec(repo_path: Path, state: dict, spec_rel: Path) -> None:
