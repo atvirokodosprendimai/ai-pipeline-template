@@ -89,3 +89,36 @@ def test_goose_runner_satisfies_executor_protocol() -> None:
     assert isinstance(runner, Executor)
     # Also verify the method is present as a double-check.
     assert callable(getattr(runner, "run_recipe", None))
+
+
+# ---------------------------------------------------------------------------
+# Per-surface executor_name override (U1) — lets a caller pick a backend
+# independent of the global config.executor.
+# ---------------------------------------------------------------------------
+
+
+def test_executor_name_override_selects_langchain() -> None:
+    """An explicit executor_name override wins over config.executor (which is goose)."""
+    cfg = _cfg()  # global executor == "goose"
+    result = build_executor(cfg, executor_name="langchain")
+    assert isinstance(result, LangchainAgentRunner)
+
+
+def test_executor_name_override_selects_goose_against_langchain_global() -> None:
+    """executor_name='goose' runs Goose even when the global is langchain (independent gating)."""
+    cfg = _cfg(EXECUTOR="langchain")
+    result = build_executor(cfg, executor_name="goose")
+    assert isinstance(result, GooseRunner)
+
+
+def test_executor_name_override_none_falls_back_to_config() -> None:
+    """executor_name=None preserves the original config.executor behaviour."""
+    cfg = _cfg(EXECUTOR="langchain")
+    assert isinstance(build_executor(cfg, executor_name=None), LangchainAgentRunner)
+
+
+def test_executor_name_override_unknown_raises() -> None:
+    """An unknown override value fails closed, same as config.executor."""
+    cfg = _cfg()
+    with pytest.raises(ValueError, match="unknown executor"):
+        build_executor(cfg, executor_name="bogus")

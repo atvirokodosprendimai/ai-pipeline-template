@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from wgmesh_pipeline.config import DEFAULT_RECIPES_DIR, Config
-from wgmesh_pipeline.goose.runner import GooseRunner
+from wgmesh_pipeline.executor import build_executor
 
 log = logging.getLogger("wgmesh_pipeline.decision_lane.proposal")
 
@@ -26,7 +26,7 @@ def build_proposal_fn(
 ) -> Callable[[dict[str, Any], dict[str, Any] | None], str]:
     """Return a ``proposal_fn(post, latest_comment) -> markdown`` backed by the
     Goose recipe. The returned text is the proposal to post as a comment."""
-    runner = GooseRunner(config)
+    runner = build_executor(config, executor_name=config.decision_executor)
     recipes_dir = Path(getattr(config, "recipes_dir", DEFAULT_RECIPES_DIR))
     recipe = recipes_dir / "wgmesh-decision-proposal.yaml"
     strategy = str(Path(config.repo_path) / "STRATEGY.md")

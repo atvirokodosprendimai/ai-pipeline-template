@@ -40,6 +40,7 @@ def build_executor(
     config: object,
     *,
     runner: SubprocessRunner | None = None,
+    executor_name: str | None = None,
 ) -> Executor:
     """Return an ``Executor`` selected by ``config.executor``.
 
@@ -48,8 +49,14 @@ def build_executor(
     * anything else  → raises :exc:`ValueError` (fail-closed)
 
     ``runner`` is forwarded to ``GooseRunner.__init__`` for test injection.
+
+    ``executor_name`` is an optional per-surface override (U1): when given it
+    selects the backend directly, independent of ``config.executor`` — letting
+    the observation and decision surfaces flip independently of the global flag.
+    When ``None`` the global ``config.executor`` is used (unchanged behaviour).
     """
-    executor_name: str = getattr(config, "executor", "goose")
+    if executor_name is None:
+        executor_name = getattr(config, "executor", "goose")
     if executor_name == "goose":
         return GooseRunner(config, runner=runner)  # type: ignore[arg-type]
     if executor_name == "langchain":
