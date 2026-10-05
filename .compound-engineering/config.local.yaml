@@ -63,15 +63,19 @@ pulse_lookback_default: 24h
 #                           action. The unprocessed-defect count at 48h granularity —
 #                           tighter than pr_dwell_violations (7d, PRs only) and also
 #                           covers issues. Target 0.
-#   mixpost_daily_posts  = Mixpost API — GET ${MIXPOST_BASE}/api/${MIXPOST_WORKSPACE}/posts,
-#                          count posts bucketed by calendar day. Source already wired in
-#                          .github/workflows/wgmesh-social-drip.yml (secrets MIXPOST_API_TOKEN
-#                          + MIXPOST_WORKSPACE, var MIXPOST_BASE default
-#                          https://mixpost.infrawei.com/mixpost). Counts ALL posts created
-#                          per day (pulse_mixpost_count: all) — drafts included — so a
-#                          zero-post day means the drip produced nothing that day.
-pulse_metric_sources: paid_customers=chimney-html,autonomous_ship_rate=seed-repo-pr-data,lead_time_hours=seed-repo-pr-data,spec_coverage=seed-repo-pr-data,self_heal_rate=company/pipeline-health-state.json,active_stuck_issues=seed-repo-issues,cycle_time_to_revenue=polar,supervisor_rank_state=company/supervisor-rank-state.json,pr_processing_rate=meta-repo-pr-data,pr_dwell_violations=meta-repo-pr-data,aged_open_items=both-repos-issues-and-prs,mixpost_daily_posts=mixpost
-pulse_pending_metrics: cycle_time_to_revenue,spec_coverage
+#   mixpost_weekly_posts = Mixpost posts (count: all, drafts incl) bucketed by ISO week.
+#                          Source = .github/workflows/wgmesh-social-drip.yml (WEEKLY, cron
+#                          Thu 15:00; secrets MIXPOST_API_TOKEN + MIXPOST_WORKSPACE, var
+#                          MIXPOST_BASE default https://mixpost.infrawei.com/mixpost,
+#                          GET ${MIXPOST_BASE}/api/${MIXPOST_WORKSPACE}/posts). EXISTS.
+#   mixpost_daily_posts  = Mixpost posts bucketed by calendar day. Source = a DAILY @wgmesh
+#                          Mixpost drip that does NOT YET EXIST (only the weekly drip is built).
+#                          PENDING until that workflow ships (issue filed) — `no data` /
+#                          structural breach until then.
+pulse_metric_sources: paid_customers=chimney-html,autonomous_ship_rate=seed-repo-pr-data,lead_time_hours=seed-repo-pr-data,spec_coverage=seed-repo-pr-data,self_heal_rate=company/pipeline-health-state.json,active_stuck_issues=seed-repo-issues,cycle_time_to_revenue=polar,supervisor_rank_state=company/supervisor-rank-state.json,pr_processing_rate=meta-repo-pr-data,pr_dwell_violations=meta-repo-pr-data,aged_open_items=both-repos-issues-and-prs,mixpost_weekly_posts=mixpost,mixpost_daily_posts=mixpost
+# mixpost_daily_posts pending = its producer (a daily Mixpost drip) is not built yet.
+# mixpost_weekly_posts is NOT pending — the weekly drip exists.
+pulse_pending_metrics: cycle_time_to_revenue,spec_coverage,mixpost_daily_posts
 # --- PR-processing KPI (added 2026-06-05) ---
 # Intent: open PRs must be ACTED ON per the goal, never bulk-closed to clear backlog.
 # Every disposition needs a goal-aligned reason. Dwelling = defect, not idle.
@@ -91,23 +95,27 @@ pulse_open_age_sla_hours: 48
 pulse_open_age_target: 0
 pulse_open_age_scope: meta-repo,seed-repo
 
-# --- Social posting cadence KPI (added 2026-06-21) ---
-# The social poster (Mixpost) must publish AT LEAST ONE post per day. A window
-# is clean only when every calendar day in it has >=1 published post; any
-# zero-post day is a tracked breach — silent outreach is a defect, not idle.
-# SCOPE = service (cloudroof/wgmesh GTM cadence, per the product-vs-service
-# split). Source = the EXISTING Mixpost integration in
-# .github/workflows/wgmesh-social-drip.yml: GET
-# ${MIXPOST_BASE}/api/${MIXPOST_WORKSPACE}/posts (Bearer MIXPOST_API_TOKEN),
-# bucket by day, assert each day >= pulse_mixpost_min_posts_per_day.
-# COUNT basis = ALL posts created that day (drafts included). Measures that the
-# drip RAN and produced a post each day, not that anything was published. The
-# drip creates drafts ("schedule": false), so `all` credits each drafted post;
-# a zero-post day means the drip itself didn't run / produced nothing.
+# --- Mixpost social posting cadence KPI (added 2026-06-21) ---
+# TWO intended Mixpost @wgmesh drips, each its own cadence assertion (a window
+# is clean only when both are met). COUNT basis = ALL posts (drafts included):
+# the drip creates drafts ("schedule": false), so `all` credits each drafted
+# post — the assertion is that the drip RAN and produced a post, not that it
+# published. Source = Mixpost API GET ${MIXPOST_BASE}/api/${MIXPOST_WORKSPACE}/posts
+# (Bearer MIXPOST_API_TOKEN); cadence is also observable via each drip's run
+# history. SCOPE = service (GTM). NOTE: the DAILY email digest
+# (daily-release-notes.yml, Unsend) is a SEPARATE concern — NOT counted here.
+#
+#   WEEKLY — wgmesh-social-drip.yml (cron Thu 15:00). EXISTS. Assert >=1 Mixpost
+#            post per ISO week.
+#   DAILY  — a daily @wgmesh Mixpost drip that is NOT YET BUILT (only the weekly
+#            drip exists). Assert >=1 Mixpost post per calendar day. Renders
+#            `no data` (mixpost_daily_posts is pending) and is a structural
+#            breach until the daily drip ships — issue filed to build it.
 pulse_mixpost_kpi: enabled
-pulse_mixpost_min_posts_per_day: 1
+pulse_mixpost_count: all                 # all | scheduled | published
 pulse_mixpost_scope: service
-pulse_mixpost_count: all   # all | scheduled | published
+pulse_mixpost_weekly_min_posts: 1        # source: wgmesh-social-drip.yml (exists)
+pulse_mixpost_daily_min_posts: 1         # source: daily drip — NOT built yet (pending)
 
 # --- Action-success KPI (added 2026-06-06) ---
 # Andon/jidoka: EVERY autonomous action the pipeline attempts must succeed.
