@@ -1,8 +1,8 @@
 {
-  "funnel_stage": 3,
-  "stage_name": "Reachable",
+  "funnel_stage": 2,
+  "stage_name": "Presence",
   "stage_entered": "2026-03-18T08:53:41Z",
-  "last_run": "2026-06-22T13:26:45Z",
-  "run_count": 284,
+  "last_run": "2026-08-30T13:40:47Z",
+  "run_count": 285,
   "history": []
 }
