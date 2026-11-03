@@ -18,7 +18,7 @@ jobs:
       SYNTHESIS_BRANCH: compound/synthesis-${{ github.run_id }}
     steps:
       - name: Checkout default branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.event.repository.default_branch }}
           token: ${{ secrets.PUSH_TOKEN }}

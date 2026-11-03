@@ -47,7 +47,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout PR head
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           # Explicit head SHA (not the synthetic merge ref). On
           # `pull_request` events the default checkout is the merge of

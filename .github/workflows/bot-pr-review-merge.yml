@@ -37,13 +37,13 @@ jobs:
     steps:
       - name: Generate GitHub App token
         id: app-token
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ vars.APP_ID }}
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
 
       - name: Checkout main (script lives on main, not PR branch)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: main
 
