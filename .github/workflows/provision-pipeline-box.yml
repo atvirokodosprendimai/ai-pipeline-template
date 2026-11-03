@@ -57,7 +57,7 @@ jobs:
       NAME: ${{ github.event.inputs.server_name }}
     steps:
       - name: Checkout (repo URL used by deploy on the box)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Validate required secrets
         run: |

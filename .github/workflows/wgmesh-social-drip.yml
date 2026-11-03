@@ -34,7 +34,7 @@ jobs:
       DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
       SINCE_HOURS: ${{ github.event.inputs.since_hours || '168' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
