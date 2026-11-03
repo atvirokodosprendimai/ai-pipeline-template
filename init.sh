@@ -67,7 +67,7 @@ get_provider_preset() {
 get_observer_preset() {
   local provider="$1" field="$2"
   case "${provider}:${field}" in
-    openrouter:model)  echo "anthropic/claude-sonnet-4" ;;
+    openrouter:model)  echo "anthropic/claude-sonnet-5" ;;
     openrouter:key)    echo "OPENROUTER_API_KEY" ;;
     openrouter:url)    echo "https://openrouter.ai/api/v1/chat/completions" ;;
     openai:model)      echo "gpt-4o" ;;
