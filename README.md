@@ -161,7 +161,7 @@ docs/
 
 | Provider | Default Model | Secret Name |
 |----------|--------------|-------------|
-| OpenRouter | `anthropic/claude-sonnet-4` | `OPENROUTER_API_KEY` |
+| OpenRouter | `anthropic/claude-sonnet-5` | `OPENROUTER_API_KEY` |
 | OpenAI | `gpt-4o` | `OPENAI_API_KEY` |
 
 ## Customization

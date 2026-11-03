@@ -116,7 +116,7 @@ jq -n \
   --argjson pr "$pr_summary" \
   --arg risk "$risk_tier" \
   '{
-    model: "anthropic/claude-sonnet-4",
+    model: "anthropic/claude-sonnet-5",
     max_tokens: 1024,
     messages: [
       {role: "system", content: $system},

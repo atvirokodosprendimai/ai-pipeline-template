@@ -376,11 +376,13 @@ jobs:
       # ── Assess ─────────────────────────────────────────────────
 
       - name: Call LLM (or generate stub)
+        id: llm
         env:
           OBSERVER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: |
           if [ -z "$OBSERVER_API_KEY" ]; then
             echo "::warning::Observer API key not set — generating stub assessment."
+            echo "stub=true" >> "$GITHUB_OUTPUT"
             today=$(date -u '+%Y-%m-%d')
             cat > /tmp/assessment.json <<STUBEOF
           {
@@ -447,7 +449,7 @@ jobs:
               --rawfile system company/system-prompt.md \
               --rawfile user /tmp/user_message.txt \
               '{
-                model: "anthropic/claude-sonnet-4",
+                model: "anthropic/claude-sonnet-5",
                 max_tokens: 4096,
                 messages: [{role: "system", content: $system}, {role: "user", content: $user}]
               }' > /tmp/request.json
@@ -469,6 +471,7 @@ jobs:
             else
               api_error=$(jq -r '.error.message // "unknown error"' /tmp/llm_response.json 2>/dev/null || echo "HTTP $http_code")
               echo "::warning::Observer LLM returned HTTP $http_code: $api_error — falling back to stub."
+              echo "stub=true" >> "$GITHUB_OUTPUT"
               today=$(date -u '+%Y-%m-%d')
               jq -n --arg ts "${today}T08:00:00Z" --arg err "$api_error" '{
                 timestamp: $ts, funnel_stage: 0, stage_name: "Foundation",
@@ -519,12 +522,16 @@ jobs:
 
       # ── Act ────────────────────────────────────────────────────
 
+      # A stub assessment is not a real one: it must not overwrite funnel stage,
+      # run count or history (see the fail step at the end of the job).
       - name: Save assessment to loop history
+        if: steps.llm.outputs.stub != 'true'
         run: |
           today=$(date -u '+%Y%m%d')
           cp /tmp/assessment.md "company/loop-history/${today}-assessment.md"
 
       - name: Update loop state
+        if: steps.llm.outputs.stub != 'true'
         run: |
           today=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
           stage=$(jq -r '.funnel_stage // 0' /tmp/assessment.json)
@@ -540,6 +547,7 @@ jobs:
           mv /tmp/new-state.json company/loop-state.json
 
       - name: Append assessment to MentisDB
+        if: steps.llm.outputs.stub != 'true'
         continue-on-error: true
         timeout-minutes: 1
         env:
@@ -837,3 +845,12 @@ jobs:
             sleep 2
             gh issue edit "$number" --repo "$TARGET_REPO" --add-label "needs-triage" 2>/dev/null || true
           done
+
+      # Green must mean state was assessed: surface a stub fallback as a failed
+      # run instead of a "daily assessment" PR. The needs-human issue above is
+      # still created.
+      - name: Fail run when LLM assessment unavailable
+        if: steps.llm.outputs.stub == 'true'
+        run: |
+          echo "::error::Observer LLM assessment unavailable (stub fallback) — loop state and history were not updated."
+          exit 1

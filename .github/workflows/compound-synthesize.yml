@@ -96,7 +96,7 @@ jobs:
             --rawfile system /tmp/system_prompt.txt \
             --rawfile user /tmp/user_message.txt \
             '{
-              model: "anthropic/claude-sonnet-4",
+              model: "anthropic/claude-sonnet-5",
               max_tokens: 4096,
               messages: [{role: "system", content: $system}, {role: "user", content: $user}]
             }' > /tmp/request.json
